@@ -1,0 +1,6 @@
+Anything Plays v22 release candidate
+- Shuffle zone moves with all other active zones
+- Fixed saturated overlay opacity; 75–100 now changes tint strength
+- Approved blue-eyed betta icon, Windows ICO, Linux PNG, macOS ICNS build source
+- Existing symmetrical layout, manual zone drawing and scrollbar navigation retained
+- Windows 1.5.0, Linux 1.5.0

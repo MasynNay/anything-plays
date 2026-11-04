@@ -1,0 +1,28 @@
+# Python environments and caches
+.venv/
+.build-venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Platform build output
+build/
+dist/
+release/
+*.egg-info/
+
+# Platform and editor files
+.DS_Store
+__MACOSX/
+._*
+.vscode/
+.idea/
+
+# Game content and downloaded native cores
+*.gba
+*.gb
+*.gbc
+*.zip
+cores/*
+!cores/.gitkeep
