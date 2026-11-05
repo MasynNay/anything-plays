@@ -1,98 +1,120 @@
+<div align="center">
+
 # Anything Plays
 
-**If it moves, it plays.** Camera-controlled Game Boy Advance gameplay for Windows, macOS, and Linux.
+### If it moves, it plays.
 
-**Version:** 1.5.0 · **Interface:** Tkinter · **Tracking:** OpenCV · **Emulation:** mGBA libretro core
+**Turn real-world movement into Game Boy Advance controls with a webcam.**
 
-Anything Plays tracks a chosen color in a webcam feed, converts movement through configurable screen zones into GBA controls, and displays the game alongside the camera preview. Manual keyboard controls are also available.
+[**Download v1.5.0**](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0) · [Report an issue](https://github.com/MasynNay/anything-plays/issues) · [Release notes](RELEASE_NOTES.md)
+
+![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows) ![macOS](https://img.shields.io/badge/macOS-Intel%20%26%20Apple%20Silicon-555555?logo=apple) ![Linux](https://img.shields.io/badge/Linux-Debian%2FUbuntu-FCC624?logo=linux&logoColor=black) ![Version](https://img.shields.io/badge/version-1.5.0-blue)
+
+</div>
+
+## What is Anything Plays?
+
+Anything Plays is a desktop application that uses **OpenCV computer vision** to track a selected color in a camera feed. When the tracked object enters a configurable control zone, the app translates that movement into Game Boy Advance button presses using the **mGBA libretro core**.
+
+A fish swimming in a tank, a moving toy, or any other suitably trackable object could become the controller. The app also includes manual controls, so you can explore it without a camera-controlled setup.
+
+> **No fish required.** Anything Plays is designed around the movement of a trackable object, not a specific animal or device.
+
+## Download and install
+
+**You do not need to install Python to use the packaged releases.**
+
+| Platform | Download | Getting started |
+| --- | --- | --- |
+| Windows (x64) | [Windows installer](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0) | Download `AnythingPlaysSetup-1.5.0.exe`, run the installer, then launch Anything Plays. |
+| macOS (Apple Silicon) | [macOS DMG](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0) | Download the ARM64 DMG, open it, and install the app. |
+| macOS (Intel) | [macOS DMG](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0) | Download the Intel/x86_64 DMG, open it, and install the app. |
+| Debian/Ubuntu Linux | [Linux package](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0) | Download the `.deb` package and install it with your package manager. |
+
+Find the files under **Assets** on the [v1.5.0 release page](https://github.com/MasynNay/anything-plays/releases/tag/v1.5.0).
+
+**Important:** The builds are not commercially code-signed or notarized. Windows SmartScreen or macOS Gatekeeper may warn about an unrecognized developer. Only proceed if you trust the downloaded software. The release's `SHA256SUMS.txt` can be used to verify download integrity.
+
+**Game files are not included.** Supply your own legally obtained, compatible GBA ROMs. No ROMs or BIOS files are distributed with this project.
+
+## How it works
+
+1. **Choose a camera** and view the live preview, or use manual controls to explore the app.
+2. **Select a color** on the object you want to track.
+3. **Arrange control zones** for directions and GBA buttons.
+4. **Load a compatible GBA ROM** and start the embedded emulator.
+5. **Move the object** through the camera's zones to trigger game inputs.
+
+Tracking quality depends on lighting, color contrast, camera placement, and object movement.
 
 ## Features
 
-- Webcam discovery and selection with live preview and color sampling.
-- Configurable tracking tolerance, minimum object area, button hold, cooldown, and mirroring.
-- Editable control zones for directional buttons, A, B, Start, Select, and Shuffle.
-- Symmetric 3 × 3 preset, randomized zone positions, optional Shuffle overlay, and manual zone drawing.
-- Zone labels, opacity, high-contrast/outline/minimal styles, and optional local or HTTPS PNG artwork.
-- ROM shelf browsing, embedded GBA display, manual input, and JSON profile save/load.
-- Independently scrollable interface panes.
+- **Camera tracking:** Camera selection, live preview, color sampling, tracking tolerance, minimum object area, and mirroring.
+- **Custom controls:** Editable zones for directional inputs, A, B, Start, Select, and Shuffle.
+- **Flexible layouts:** Symmetric 3 × 3 preset, randomized zone positions, manual zone drawing, and Shuffle overlay.
+- **Visual customization:** Zone labels, opacity, high-contrast/outline/minimal styles, and optional PNG artwork.
+- **Built-in GBA gameplay:** Embedded mGBA libretro emulation and ROM shelf browsing.
+- **Profiles and manual input:** Save/load JSON configurations and use keyboard controls.
+- **Cross-platform packaging:** Automated release builds for Windows, macOS Intel, macOS Apple Silicon, and Debian/Ubuntu Linux.
+
+## Project status
+
+**v1.5.0 is the first public release.** The GitHub Actions source checks and platform builds passed, and the Windows installer was downloaded and launched successfully. The macOS and Linux release packages have not yet been independently verified from a clean download.
+
+A recorded gameplay demonstration may be added in a future update.
+
+## Technology
+
+| Component | Technology |
+| --- | --- |
+| Desktop UI | Python + Tkinter |
+| Camera and object tracking | OpenCV |
+| Game emulation | mGBA libretro core |
+| Native packaging | PyInstaller, Inno Setup, DMG and DEB build scripts |
+| Automated builds | GitHub Actions |
 
 ## Run from source
 
-Requires Python 3.10+ with Tkinter, a supported webcam (optional for manual play), and a native mGBA **libretro** core compatible with your operating system and CPU architecture.
+For developers who prefer to run the Python application directly:
+
+**Requirements:** Python 3.10+, Tkinter, and a compatible native mGBA libretro core. A camera is optional for manual play.
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m pip install -r requirements.txt
 python app.py
 ```
 
-On Linux, install your distribution's `python3-tk` package if Tkinter is unavailable. On macOS, use a Python distribution with Tk 8.6 or newer.
+On Linux, install your distribution's `python3-tk` package if necessary. On macOS, use a Python distribution with Tk 8.6 or newer.
 
-The app searches for a compatible core in `cores/`, packaged application directories, and standard RetroArch core locations. You can also choose a core in the interface. To download a core for your build host, run `python fetch_mgba_core.py`. This uses Libretro nightly builds and requires internet access. **No ROMs or BIOS files are supplied.** Use only game content you are authorized to use.
+The app searches for a compatible core in `cores/`, packaged application directories, and standard RetroArch core locations. You can also select a core in the interface. Run `python fetch_mgba_core.py` to fetch a native core for your build host; this requires internet access and uses Libretro nightly builds.
 
-## Download and release
+## Build and test
 
-Published installers appear under the repository **Releases** tab after a `v1.5.0` tag build succeeds. GitHub Actions builds Windows setup, macOS Intel and Apple Silicon DMGs, and an Ubuntu/Debian package; it also generates SHA256 checksums. The automated builds are defined in `.github/workflows/release.yml`. See `RELEASE_NOTES.md` for release text. These are unsigned or ad hoc signed builds, not notarized commercial installers.
-
-## Build installers
-
-Build on the **target operating system**, not by cross-compiling. All build scripts download the native core first.
-
-| Platform | Command | Expected output |
-| --- | --- | --- |
-| Windows x64 | `build_windows.bat` | `release/AnythingPlaysSetup-1.5.0.exe` (with Inno Setup 6); otherwise portable `dist/AnythingPlays/` |
-| macOS arm64 / x86_64 | `chmod +x build_macos_dmg.sh && ./build_macos_dmg.sh` | `release/AnythingPlays.dmg` |
-| Debian/Ubuntu Linux | `chmod +x build_linux_deb.sh && ./build_linux_deb.sh` | `.deb` under `release/` |
-
-`build_macos_linux.sh` dispatches to the appropriate Unix build script. The included `AnythingPlays.spec` is retained for existing PyInstaller workflows; the platform scripts use their own PyInstaller arguments.
-
-**macOS distribution:** The DMG script applies an ad hoc signature and sets the camera privacy usage description. Public distribution requires appropriate Developer ID signing and notarization. Verify Finder and Applications launches on a clean Mac.
-
-**Windows distribution:** Install Python and Inno Setup 6 to produce the installer. Test installation, uninstall, and camera access on a clean Windows system.
-
-**Linux distribution:** Install `python3-venv`, `python3-tk`, and `dpkg-dev` before running the Debian build script.
-
-## Settings and profiles
-
-The application intentionally retains the historical preferences path: `~/.config/fish-plays-pokemon-studio/preferences.json`. **Do not rename this directory** during upgrades: changing it would break existing ROM directory preferences. Saved JSON profiles remain compatible, including migration defaults for older profiles missing Select or Shuffle zones.
-
-## Repository layout
-
-```text
-app.py                 Tkinter interface, camera tracking, settings, profiles
-cameras.py             Cross-platform camera discovery
-gba_emulator.py        ctypes libretro bridge and emulator worker
-fetch_mgba_core.py     Download and validate native mGBA core
-assets/                Application artwork and icons
-cores/                 Placeholder for locally downloaded cores (not tracked)
-tests/                 Source-level regression checks
-build_*.sh / .bat      Native packaging workflows
-installer.iss          Windows Inno Setup configuration
-AnythingPlays.spec     Existing PyInstaller specification
-requirements.txt       Runtime Python dependencies
-```
-
-## Publishing v1.5.0
-
-Create an empty GitHub repository, upload/commit this source tree to `main`, then run:
+Build packages on their target operating system. See `build_windows.bat`, `build_macos_dmg.sh`, and `build_linux_deb.sh` for platform-specific build procedures. The GitHub Actions workflows in `.github/workflows/` automate source checks and tagged release builds.
 
 ```bash
-git tag v1.5.0
-git push origin main
-git push origin v1.5.0
+python -m unittest discover -s tests -v
+python -m compileall -q app.py cameras.py gba_emulator.py fetch_mgba_core.py
 ```
 
-The tag starts the multi-OS build workflow. When every job passes, GitHub publishes the installers and checksums as a release. The workflow cannot be executed until the repository is pushed to GitHub. Check the **Actions** tab for any host-specific build failures.
+These checks do not replace hands-on testing of camera permissions, ROM loading, tracking, controls, profiles, and installers.
 
-## Testing and release checklist
+## Configuration compatibility
 
-Run `python -m unittest discover -s tests -v` and `python -m compileall -q app.py cameras.py gba_emulator.py fetch_mgba_core.py` for source-level checks. These do **not** replace native runtime validation. Before tagging a release, test camera permissions, detection, manual controls, profile round-trips, ROM loading, zone shuffling, and installer launches on Windows, macOS, and Linux.
+To preserve existing user settings, Anything Plays retains the historical preferences path:
 
-## Distribution notes
+`~/.config/fish-plays-pokemon-studio/preferences.json`
 
-- No ROMs, BIOS files, build outputs, or platform-specific core binaries are included in this source repository.
-- The build fetcher downloads Libretro nightly binaries. For repeatable public releases, pin and verify a tested binary and check relevant redistribution licenses.
-- The artwork in `assets/` is preserved from the supplied project; confirm you have redistribution rights before publishing publicly.
-- **License:** No license has been granted in this repository. Add a license only after the copyright holder chooses one.
-- **Verification:** The project owner reports native testing on Windows, macOS, and Linux. GitHub-hosted release builds remain unverified until the tag workflow completes.
+Existing JSON profiles remain compatible, including defaults for older profiles missing Select or Shuffle zones.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and [SECURITY.md](SECURITY.md) for responsible vulnerability reporting. For bugs and feature requests, [open an issue](https://github.com/MasynNay/anything-plays/issues).
+
+## Licensing and third-party components
+
+**No license is currently granted for this repository's original source code.** Please do not assume it is open-source licensed until the project owner adds a `LICENSE` file. Third-party libraries, native emulator cores, and artwork may have their own licenses and redistribution requirements. Confirm redistribution rights before reusing bundled assets or distributing modified packages.
+
+Anything Plays is an independent project and is not affiliated with or endorsed by Nintendo, Pokémon, or the mGBA project.
