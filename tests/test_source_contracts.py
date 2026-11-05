@@ -18,8 +18,8 @@ class SourceContracts(unittest.TestCase):
 
     def test_profile_migration_preserved(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn("cfg['zones'].setdefault('Select'", source)
-        self.assertIn("cfg['zones'].setdefault('Shuffle'", source)
+        self.assertIn("normalize(self.system_key.get(), cfg, DEFAULT)", source)
+        self.assertIn("ProfileStore", source)
 
     def test_platform_build_scripts_retained(self):
         for filename in ("build_windows.bat", "build_macos_dmg.sh", "build_linux_deb.sh", "build_macos_linux.sh", "installer.iss", "AnythingPlays.spec"):

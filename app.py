@@ -15,6 +15,8 @@ import numpy as np
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 from cameras import discover
 from gba_emulator import Emulator, BUTTONS
+from systems import SYSTEMS, DEFAULT_SYSTEM
+from system_profiles import ProfileStore, BUTTONS_BY_SYSTEM, normalize, default_for, enabled_zones, fit_to_grid, DISABLED_MAPPING
 
 DEFAULT = {
     'rgb': [255, 0, 0], 'tolerance': 20, 'min_area': 120,
@@ -54,6 +56,7 @@ class App:
         self.camera_scanning = False
         self.pick_mode = False
         self.drag_start = None
+        self.custom_draw_enabled = tk.BooleanVar(value=False)
         self.camera_photo = None
         self.game_photo = None
         self.manual_active = False
@@ -62,7 +65,14 @@ class App:
         self.armed = False
         self.emu = Emulator()
         self.preferences_path = Path.home() / '.config' / 'fish-plays-pokemon-studio' / 'preferences.json'  # Preserve existing settings on upgrade
-        self.rom_directory = self.read_rom_directory()
+        self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
+        self.theme_name = tk.StringVar(value=self.read_theme_preference())
+        self.apply_theme(self.theme_name.get())
+        self.system_key = tk.StringVar(value=self.read_selected_system())
+        self.rom_directories = self.read_rom_directories()
+        self.rom_directory = self.rom_directories.get(self.system_key.get(), '')
+        self.emu.system = self.system_key.get()
+        self.emu.core_path = self.emu.find_system_core()
         self.library_window = None
         self.shelf_drag = None
         self.shelf_momentum_job = None
@@ -75,7 +85,7 @@ class App:
         self.current_rom = None
         self.status = tk.StringVar(value='Searching for cameras…')
         self.action = tk.StringVar(value='PREVIEW ONLY — no keyboard events are sent')
-        self.game_status = tk.StringVar(value='Load your own .gba game ROM')
+        self.game_status = tk.StringVar(value='Load your own game ROM')
         self.camera_name = tk.StringVar()
         self.zone_name = tk.StringVar(value='Up')
         self.color_text = tk.StringVar()
@@ -86,8 +96,11 @@ class App:
         self.shuffle_enabled = tk.BooleanVar(value=True)
         self.zone_image_path = tk.StringVar(value='')
         self._zone_art = None
+        self.cfg = self.profile_store.get(self.system_key.get())
         self.build()
         self.refresh_settings()
+        self.refresh_system_buttons()
+        self._active_profile_system = self.system_key.get()
         root.bind('<Control-Alt-F11>', lambda _: self.toggle())
         root.bind('<Control-Alt-F12>', lambda _: self.stop_controls())
         root.bind('<Escape>', lambda _: self.stop_controls())
@@ -135,10 +148,108 @@ class App:
         self.root.option_add('*TCombobox*Listbox.background', '#152f50')
         self.root.option_add('*TCombobox*Listbox.foreground', '#f4f8ff')
 
+    THEMES = {
+        # Original themes: unchanged for existing saved preferences.
+        'Dark': ('#081425', '#10243e', '#e0ebff', '#5aa9ff', '#23456f', '#152f50'),
+        'Light': ('#e9eef5', '#ffffff', '#17283d', '#195baf', '#d5e2f2', '#f2f6fc'),
+        'Midnight': ('#090b16', '#161b2e', '#e6e9ff', '#a59bff', '#343459', '#222840'),
+        'Retro': ('#18271d', '#253b2c', '#e5f2c9', '#b9ed75', '#446043', '#304b35'),
+        # New dark variations.
+        'Charcoal': ('#111315', '#1c2024', '#edf0f2', '#86c5d8', '#323b42', '#252c31'),
+        'Slate': ('#151b25', '#222c39', '#edf3fb', '#93b7ed', '#384b60', '#2d394a'),
+        'Ocean Dark': ('#071b25', '#102d3b', '#e6f7fa', '#55c9d9', '#205063', '#183b4b'),
+        'Forest Dark': ('#101d18', '#1c3027', '#ecf5eb', '#90d6a1', '#345744', '#294337'),
+        'Plum Dark': ('#211725', '#32253b', '#f8edf9', '#d4a0e8', '#554064', '#412e4d'),
+        'Graphite': ('#141414', '#242424', '#f3f3f3', '#f0b86b', '#414141', '#303030'),
+        # New light variations.
+        'Soft White': ('#f3f5f7', '#ffffff', '#243142', '#487cae', '#dfe7ef', '#f8fafc'),
+        'Warm Cream': ('#f2eadc', '#fffaf0', '#45392b', '#aa713c', '#e9d8bd', '#f8eedc'),
+        'Ocean Light': ('#e0f1f4', '#f7fdff', '#193c4a', '#167d98', '#c5e5ec', '#e8f6fa'),
+        'Sage Light': ('#e6efe6', '#f8fcf6', '#294438', '#4c8b68', '#d0e4d1', '#edf6ec'),
+        'Lavender Light': ('#eee9f8', '#fcfaff', '#3b3151', '#8660b7', '#dfd3f1', '#f4effc'),
+        'Rose Light': ('#f8eaf0', '#fffafd', '#523342', '#b36c8d', '#f0d6e1', '#fff0f5'),
+    }
+
+    def read_theme_preference(self):
+        try:
+            data = json.loads(self.preferences_path.read_text(encoding='utf-8'))
+            value = data.get('theme', 'Dark')
+            return value if value in self.THEMES else 'Dark'
+        except (OSError, ValueError, TypeError):
+            return 'Dark'
+
+    def select_theme(self, *_):
+        theme = self.theme_name.get()
+        if theme not in self.THEMES:
+            return
+        self.apply_theme(theme)
+        try:
+            self.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+            data = {}
+            if self.preferences_path.exists():
+                data = json.loads(self.preferences_path.read_text(encoding='utf-8'))
+                if not isinstance(data, dict):
+                    data = {}
+            data['theme'] = theme
+            self.preferences_path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        except (OSError, ValueError, TypeError):
+            self.status.set('Theme applied, but could not save preference.')
+
+    def apply_theme(self, name):
+        outer, surface, text, accent, button, field = self.THEMES.get(name, self.THEMES['Dark'])
+        self.root.configure(bg=outer)
+        style = ttk.Style(self.root)
+        style.theme_use('clam')
+        style.configure('.', background=surface, foreground=text, font=('DejaVu Sans', 10))
+        style.configure('TFrame', background=surface)
+        style.configure('TLabel', background=surface, foreground=text)
+        style.configure('Title.TLabel', background=surface, foreground=text, font=('DejaVu Sans', 22, 'bold'))
+        style.configure('Subtitle.TLabel', background=surface, foreground=text)
+        style.configure('TLabelframe', background=surface, bordercolor=accent, relief='solid')
+        style.configure('TLabelframe.Label', background=surface, foreground=accent, font=('DejaVu Sans', 11, 'bold'))
+        for key, padding, font_size in [('TButton', (12, 9), 10), ('Compact.TButton', (7, 6), 9)]:
+            style.configure(key, background=button, foreground=text, borderwidth=0, padding=padding,
+                            font=('DejaVu Sans', font_size, 'bold'))
+            style.map(key, background=[('active', accent)], foreground=[('disabled', text)])
+        style.configure('Accent.TButton', background=accent, foreground=text)
+        style.map('Accent.TButton', background=[('active', button)])
+        style.configure('Danger.TButton', background='#a34d62', foreground='#ffffff')
+        style.map('Danger.TButton', background=[('active', '#bd6275')])
+        style.configure('TCombobox', fieldbackground=field, background=button, foreground=text, arrowcolor=text, padding=6)
+        style.map('TCombobox', fieldbackground=[('readonly', field)], foreground=[('readonly', text)])
+        style.configure('TSpinbox', fieldbackground=field, background=button, foreground=text)
+        style.configure('TCheckbutton', background=surface, foreground=text)
+        style.map('TCheckbutton', background=[('active', surface)])
+        style.configure('TPanedwindow', background=outer)
+        style.configure('Vertical.TScrollbar', background=button, troughcolor=surface, arrowcolor=text)
+        self.root.option_add('*TCombobox*Listbox.background', field)
+        self.root.option_add('*TCombobox*Listbox.foreground', text)
+        for attr in ('library_canvas',):
+            canvas = getattr(self, attr, None)
+            if canvas is not None:
+                canvas.configure(bg=surface)
+        # Transparent cartridge corners should match the newly selected theme.
+        grid = getattr(self, 'library_grid', None)
+        if grid is not None:
+            for tile in grid.winfo_children():
+                for widget in tile.winfo_children():
+                    if getattr(widget, 'is_cartridge_tile', False):
+                        widget.configure(bg=surface)
+        for attr in ('canvas', 'game_canvas'):
+            canvas = getattr(self, attr, None)
+            if canvas is not None:
+                canvas.configure(bg=outer)
+
     def build(self):
         main = ttk.Frame(self.root, padding=18)
         main.pack(fill='both', expand=True)
         ttk.Label(main, text='Anything Plays', style='Title.TLabel').pack(anchor='w')
+        theme_row = ttk.Frame(main)
+        theme_row.pack(anchor='e', pady=(0, 5))
+        ttk.Label(theme_row, text='Theme:').pack(side='left', padx=(0, 6))
+        ttk.Combobox(theme_row, textvariable=self.theme_name, state='readonly',
+                     values=list(self.THEMES), width=17).pack(side='left')
+        self.theme_name.trace_add('write', self.select_theme)
         ttk.Label(main, text='A little world where movement becomes play  •  Camera tracking  •  Game Boy Advance', style='Subtitle.TLabel').pack(anchor='w', pady=(2, 16))
         body = ttk.Panedwindow(main, orient='horizontal')
         body.pack(fill='both', expand=True)
@@ -182,9 +293,26 @@ class App:
 
         game = ttk.LabelFrame(right, text='02   GAME  ·  Your play space', padding=10)
         game.pack(fill='x', padx=(14, 0), pady=(0, 10))
-        ttk.Button(game, text='ROM folder / Rescan', command=self.choose_or_rescan_library, style='Accent.TButton').pack(fill='x')
-        ttk.Button(game, text='Open GBA ROM (.gba)', command=self.load_rom).pack(fill='x', pady=(5, 0))
-        ttk.Button(game, text='Select mGBA core', command=self.choose_core).pack(fill='x', pady=(5, 0))
+        system_row = ttk.Frame(game)
+        system_row.pack(fill='x', pady=(0, 6))
+        ttk.Label(system_row, text='Choose emulator:').pack(side='left', padx=(0, 6))
+        self.system_combo = ttk.Combobox(system_row, textvariable=self.system_key, state='readonly',
+                                         values=list(SYSTEMS), width=12)
+        self.system_combo.pack(side='left')
+        self.system_combo.bind('<<ComboboxSelected>>', self.switch_system)
+        self.system_description = ttk.Label(system_row, text=SYSTEMS[self.system_key.get()].title)
+        self.system_description.pack(side='left', padx=8)
+        # Separate, permanently visible actions. Rescan must never replace Browse.
+        rom_actions = ttk.Frame(game)
+        rom_actions.pack(fill='x', pady=(0, 5))
+        rom_actions.columnconfigure(0, weight=1)
+        rom_actions.columnconfigure(1, weight=1)
+        ttk.Button(rom_actions, text='Browse ROM Folder', command=self.set_rom_directory,
+                   style='Accent.TButton').grid(row=0, column=0, sticky='ew', padx=(0, 4))
+        ttk.Button(rom_actions, text='Refresh ROM Library', command=self.populate_inline_library).grid(
+            row=0, column=1, sticky='ew', padx=(4, 0))
+        ttk.Button(game, text='Open game ROM', command=self.load_rom).pack(fill='x', pady=(5, 0))
+        # Emulator cores are bundled; no manual core selection required.
         self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)
         self.game_canvas.configure(takefocus=1, highlightthickness=2, highlightbackground='#23456f', highlightcolor='#5aa9ff')
@@ -229,7 +357,7 @@ class App:
         ttk.Label(self.playing_row, textvariable=self.manual_label, wraplength=345).pack(side='left', fill='x', expand=True)
         ttk.Button(self.playing_row, text='Unload ROM', command=self.unload_rom, style='Danger.TButton').pack(side='right', padx=(8, 0))
         ttk.Label(self.playing_info, textvariable=self.game_status, wraplength=470).pack(anchor='w', pady=(4, 0))
-        ttk.Label(game, text='Embedded GBA · No system-wide keyboard injection', wraplength=470).pack(anchor='w', pady=5)
+        ttk.Label(game, text='Embedded libretro · No system-wide keyboard injection', wraplength=470).pack(anchor='w', pady=5)
         self.populate_inline_library()
 
         fish = ttk.LabelFrame(right, text='3  Object tracking and control zones', padding=10)
@@ -259,9 +387,13 @@ class App:
         # affect the camera preview only, not emulator input detection.
         appearance = ttk.LabelFrame(fish, text='Zone appearance', padding=7)
         appearance.pack(fill='x', pady=(8, 5))
-        ttk.Label(appearance, text='Label size').pack(anchor='w')
-        ttk.Scale(appearance, from_=24, to=112, variable=self.zone_font_size,
-                  orient='horizontal').pack(fill='x')
+        ttk.Label(appearance, text='Label size (8–160 px)').pack(anchor='w')
+        font_row = ttk.Frame(appearance)
+        font_row.pack(fill='x')
+        ttk.Scale(font_row, from_=8, to=160, variable=self.zone_font_size,
+                  orient='horizontal').pack(side='left', fill='x', expand=True)
+        ttk.Spinbox(font_row, from_=8, to=160, increment=1, width=5,
+                    textvariable=self.zone_font_size).pack(side='right', padx=(8, 0))
         ttk.Label(appearance, text='Overlay tint strength (75 subtle → 100 bold)').pack(anchor='w')
         ttk.Scale(appearance, from_=75, to=100, variable=self.zone_opacity,
                   orient='horizontal').pack(fill='x')
@@ -284,20 +416,29 @@ class App:
                         variable=self.shuffle_enabled).pack(side='left')
         ttk.Button(shuffle_row, text='Shuffle now', command=self.shuffle_zones,
                    style='Compact.TButton').pack(side='right')
-        ttk.Button(fish, text='Make symmetrical 3 × 3 grid', command=self.make_symmetric_grid,
+        ttk.Button(fish, text='Fit buttons to grid', command=self.make_symmetric_grid,
                    style='Accent.TButton').pack(fill='x', pady=(7, 3))
-        ttk.Label(fish, text='Evenly divides the camera into 9 zones. You can still drag any zone to customize it.',
+        ttk.Label(fish, text='Equal-size grid cells for this console. Custom drawing is optional.',
                   wraplength=420).pack(anchor='w')
         ttk.Checkbutton(fish, text='Mirror camera', variable=self.mirror).pack(anchor='w')
-        ttk.Label(fish, text='Zone to redraw (drag on camera preview):').pack(anchor='w', pady=(7, 0))
-        ttk.Combobox(fish, textvariable=self.zone_name, values=list(ACTIVE_BUTTONS) + ['Shuffle'], state='readonly').pack(fill='x')
+        ttk.Checkbutton(fish, text='Enable custom zone drawing', variable=self.custom_draw_enabled,
+                        command=self.toggle_custom_draw).pack(anchor='w', pady=(7, 0))
+        ttk.Label(fish, text='Zone to redraw (only when custom drawing is enabled):').pack(anchor='w')
+        self.zone_combo = ttk.Combobox(fish, textvariable=self.zone_name, values=list(ACTIVE_BUTTONS) + ['Shuffle'], state='readonly')
+        self.zone_combo.pack(fill='x')
         mapping = ttk.Frame(fish)
         mapping.pack(fill='x', pady=5)
         for i, name in enumerate(ACTIVE_BUTTONS):
-            ttk.Label(mapping, text=name).grid(row=i // 2, column=(i % 2) * 2, sticky='w', padx=(0, 4), pady=2)
+            label = ttk.Label(mapping, text=name)
+            label.grid(row=i // 2, column=(i % 2) * 2, sticky='w', padx=(0, 4), pady=2)
+            if not hasattr(self, 'mapping_widgets'):
+                self.mapping_widgets = {}
             var = tk.StringVar()
             self.mapping_vars[name] = var
-            ttk.Combobox(mapping, textvariable=var, values=list(ACTIVE_BUTTONS), state='readonly', width=9).grid(row=i // 2, column=(i % 2) * 2 + 1, sticky='w', padx=(0, 12))
+            combo = ttk.Combobox(mapping, textvariable=var, values=[DISABLED_MAPPING, *ACTIVE_BUTTONS], state='readonly', width=9)
+            combo.grid(row=i // 2, column=(i % 2) * 2 + 1, sticky='w', padx=(0, 12))
+            self.mapping_widgets[name] = (label, combo)
+            combo.bind('<<ComboboxSelected>>', lambda _event, n=name: self.update_button_mapping(n))
 
         controls = ttk.LabelFrame(right, text='4  Safe controls', padding=10)
         controls.pack(fill='x', padx=(12, 0), pady=(0, 8))
@@ -436,25 +577,26 @@ class App:
         self.status.set('Camera stopped')
 
     def choose_core(self):
-        path = filedialog.askopenfilename(title='Select mGBA libretro core', filetypes=[('Native libraries', '*.so *.dll *.dylib'), ('All files', '*')])
+        path = filedialog.askopenfilename(title='Select libretro core for ' + SYSTEMS[self.system_key.get()].title, filetypes=[('Native libraries', '*.so *.dll *.dylib'), ('All files', '*')])
         if path:
             self.stop_controls()
             self.emu.stop()
             self.emu.core_path = path
-            self.game_status.set('mGBA core selected: ' + Path(path).name)
+            self.save_preferences(core_path=path)
+            self.game_status.set('Core selected: ' + Path(path).name)
 
     KEYMAP = {'Up':'Up', 'Down':'Down', 'Left':'Left', 'Right':'Right',
-              'z':'A', 'x':'B', 'Return':'Start', 'KP_Enter':'Start'}
+              'z':'A', 'x':'B', 'a':'Y', 's':'X', 'q':'L', 'w':'R', 'Return':'Start', 'KP_Enter':'Start'}
 
     def activate_manual(self, event=None):
         self.manual_active = True
         self.game_canvas.focus_set()
-        self.manual_label.set('MANUAL PLAY ACTIVE · Arrows = D-pad · Z = A · X = B · Enter = Start · Click outside to release')
+        self.manual_label.set('MANUAL PLAY ACTIVE · Arrows D-pad · Z/X A/B · A/S Y/X · Q/W L/R · Enter Start')
 
     def deactivate_manual(self, event=None):
         self.manual_active = False
         self.emu.release_manual()
-        self.manual_label.set('Click the game screen to play manually · Arrows = D-pad · Z = A · X = B · Enter = Start')
+        self.manual_label.set('Click game screen · Arrows D-pad · Z/X A/B · A/S Y/X · Q/W L/R · Enter Start')
 
     def deactivate_on_outside_click(self, event):
         if event.widget is not self.game_canvas and self.manual_active:
@@ -472,66 +614,260 @@ class App:
             self.emu.set_manual(button, False)
             return 'break'
 
-    def read_rom_directory(self):
+    def read_preferences(self):
         try:
             data = json.loads(self.preferences_path.read_text(encoding='utf-8'))
-            return str(data.get('rom_directory', ''))
+            return data if isinstance(data, dict) else {}
         except (OSError, ValueError, TypeError):
-            return ''
+            return {}
+
+    def read_selected_system(self):
+        key = self.read_preferences().get('system', DEFAULT_SYSTEM)
+        return key if key in SYSTEMS else DEFAULT_SYSTEM
+
+    def read_rom_directories(self):
+        prefs = self.read_preferences()
+        directories = prefs.get('rom_directories', {})
+        directories = directories if isinstance(directories, dict) else {}
+        directories.setdefault('gba', str(prefs.get('rom_directory', '')))
+        return {key: str(value) for key, value in directories.items() if key in SYSTEMS and isinstance(value, str)}
+
+    def read_core_paths(self):
+        paths = self.read_preferences().get('core_paths', {})
+        return paths if isinstance(paths, dict) else {}
+
+    def save_preferences(self, core_path=None):
+        prefs = self.read_preferences()
+        prefs['theme'] = self.theme_name.get()
+        prefs['system'] = self.system_key.get()
+        prefs['rom_directories'] = dict(self.rom_directories)
+        prefs['rom_directory'] = self.rom_directories.get('gba', '')  # legacy compatibility
+        if core_path:
+            paths = prefs.get('core_paths', {})
+            paths = paths if isinstance(paths, dict) else {}
+            paths[self.system_key.get()] = core_path
+            prefs['core_paths'] = paths
+        try:
+            self.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+            self.preferences_path.write_text(json.dumps(prefs, indent=2), encoding='utf-8')
+        except OSError as exc:
+            messagebox.showwarning('Preferences', f'Could not save preferences: {exc}')
+
+    def update_button_mapping(self, name):
+        self.cfg.setdefault('mapping', {})[name] = self.mapping_vars[name].get()
+        self.profile_store.put(self.system_key.get(), self.cfg)
+        self.status.set(f'{name} mapping updated. Use Fit buttons to grid to rearrange enabled zones.')
+
+    def refresh_system_buttons(self):
+        names = BUTTONS_BY_SYSTEM[self.system_key.get()]
+        self.zone_combo.configure(values=[*names, 'Shuffle'])
+        if self.zone_name.get() not in (*names, 'Shuffle'):
+            self.zone_name.set(names[0])
+        for name, (label, combo) in self.mapping_widgets.items():
+            if name in names:
+                label.grid()
+                combo.grid()
+                combo.configure(values=[DISABLED_MAPPING, *names])
+            else:
+                label.grid_remove()
+                combo.grid_remove()
+
+    def persist_system_profile(self):
+        self.read_settings()
+        self.profile_store.put(self.system_key.get(), self.cfg)
+
+    def switch_system(self, event=None):
+        key = self.system_key.get()
+        if key not in SYSTEMS:
+            return
+        self.stop_controls()
+        # The combobox has already changed, so save the previous system explicitly.
+        previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
+        try:
+            self.read_settings()
+            self.profile_store.put(previous, self.cfg)
+        except (ValueError, tk.TclError, OSError):
+            pass
+        self.cfg = self.profile_store.get(key)
+        self.refresh_settings()
+        self.refresh_system_buttons()
+        self._active_profile_system = key
+        self.emu.stop()
+        self.emu.system = key
+        self.emu.core_path = self.emu.find_system_core()
+        self.rom_directory = self.rom_directories.get(key, '')
+        self.system_description.configure(text=SYSTEMS[key].title)
+        self.current_rom = None
+        self.game_canvas.delete('all')
+        self.game_status.set('Load your own ' + SYSTEMS[key].title + ' ROM')
+        self.show_library()
+        self.populate_inline_library()
+        self.save_preferences()
+
+    def read_rom_directory(self):
+        return self.read_rom_directories().get('gba', '')
 
     def set_rom_directory(self):
-        directory = filedialog.askdirectory(title='Choose your GBA ROM folder', initialdir=self.rom_directory or str(Path.home()))
+        initial = self.rom_directory
+        if not initial or not Path(initial).is_dir():
+            initial = str(Path.home())
+        directory = filedialog.askdirectory(
+            parent=self.root,
+            title='Choose your ' + SYSTEMS[self.system_key.get()].title + ' ROM folder',
+            initialdir=initial)
         if not directory:
             return
         self.rom_directory = directory
-        try:
-            self.preferences_path.parent.mkdir(parents=True, exist_ok=True)
-            self.preferences_path.write_text(json.dumps({'rom_directory': directory}, indent=2), encoding='utf-8')
-        except OSError as exc:
-            messagebox.showwarning('ROM library', f'Folder selected, but preference could not be saved: {exc}')
+        self.rom_directories[self.system_key.get()] = directory
+        self.save_preferences()
         self.populate_inline_library()
 
     def scan_roms(self):
         directory = Path(self.rom_directory)
         if not self.rom_directory or not directory.is_dir():
             return []
+        extensions = SYSTEMS[self.system_key.get()].extensions
+        # ROM collections commonly contain one folder per game and nested hacks.
+        # Bound traversal and never follow directory symlinks, so an accidentally
+        # selected large folder cannot trigger an unlimited recursive walk.
+        import os
+        found = []
+        visited = 0
         try:
-            return sorted((p for p in directory.rglob('*') if p.is_file() and p.suffix.lower() == '.gba'),
-                          key=lambda p: (p.stem.casefold(), str(p).casefold()))
+            for root, dirs, files in os.walk(directory, followlinks=False):
+                visited += 1
+                if visited > 2500 or len(found) >= 2000:
+                    break
+                dirs[:] = sorted(d for d in dirs if not d.startswith('.') and
+                                 not (Path(root) / d).is_symlink())
+                for name in files:
+                    path = Path(root) / name
+                    if path.suffix.lower() in extensions and path.is_file():
+                        found.append(path)
+                        if len(found) >= 2000:
+                            break
         except OSError:
-            return []
+            pass
+        return sorted(found, key=lambda p: (p.stem.casefold(), str(p).casefold()))
 
     @staticmethod
-    def cartridge_image(filename):
-        # Draw a landscape GBA cartridge with a filename label, no copyrighted cover art.
+    def cartridge_image(filename, system='gba', artwork_path=None):
+        """Draw console-specific cartridges on a genuinely transparent canvas.
+
+        All artwork is generated locally; no game cover art or network requests.
+        The alpha channel remains transparent outside the plastic shell so tiles
+        blend into every dark and light theme without a rectangular halo.
+        """
         w, h = 300, 226
         image = Image.new('RGBA', (w, h), (0, 0, 0, 0))
         d = ImageDraw.Draw(image)
-        d.rounded_rectangle((10, 14, 290, 212), radius=17, fill='#333a46', outline='#657080', width=3)
-        d.rounded_rectangle((10, 14, 290, 46), radius=13, fill='#4b5563', outline='#737d8a', width=2)
-        d.rectangle((22, 40, 278, 48), fill='#333a46')
-        d.text((150, 30), 'GAME BOY ADVANCE', anchor='mm', fill='#b5c0ce', font=App.cartridge_font(13, bold=True))
-        d.rounded_rectangle((39, 61, 261, 184), radius=9, fill='#10243e', outline='#8c98a8', width=3)
-        d.rounded_rectangle((46, 68, 254, 177), radius=5, fill='#1e5182')
-        d.polygon([(46, 68), (254, 68), (254, 89), (46, 141)], fill='#2e699d')
-        d.text((150, 95), 'GBA  •  GAME LIBRARY', anchor='mm', fill='#d8e9ff', font=App.cartridge_font(11, bold=True))
-        font = App.cartridge_font(18, bold=True)
-        title = filename
-        # Fit filename onto up to three centered lines; keep the real filename visible in the tile caption.
-        lines, current = [], ''
-        for word in title.replace('_', ' ').split():
-            test = f'{current} {word}'.strip()
-            if d.textbbox((0, 0), test, font=font)[2] > 188 and current:
-                lines.append(current); current = word
+        system = system if system in ('gb', 'gbc', 'gba', 'snes') else 'gba'
+        if system == 'gb':
+            # Original Game Boy: tall, light gray cartridge with a corner notch.
+            shell = [(80, 8), (219, 8), (229, 18), (229, 209), (72, 209), (72, 17)]
+            d.polygon(shell, fill='#b8bcc0')
+            d.line(shell + [shell[0]], fill='#656c72', width=4, joint='curve')
+            d.rounded_rectangle((83, 22, 216, 43), radius=5, fill='#979da2')
+            d.text((150, 33), 'GAME BOY', anchor='mm', fill='#333b44', font=App.cartridge_font(13, True))
+            d.rounded_rectangle((87, 55, 213, 179), radius=5, fill='#f3f0e8', outline='#656c72', width=3)
+            d.rectangle((87, 55, 213, 79), fill='#6d7380')
+            d.text((150, 68), 'ANYTHING PLAYS', anchor='mm', fill='#ffffff', font=App.cartridge_font(10, True))
+            label_box = (95, 85, 205, 170)
+            ink = '#24344a'
+            d.line((103, 196, 197, 196), fill='#84898e', width=3)
+        elif system == 'gbc':
+            # Color cartridge: translucent-purple style with tall silhouette.
+            shell = [(79, 9), (220, 9), (230, 19), (230, 209), (70, 209), (70, 18)]
+            d.polygon(shell, fill='#6c5b9b')
+            d.line(shell + [shell[0]], fill='#40375e', width=4, joint='curve')
+            d.rounded_rectangle((82, 23, 217, 45), radius=6, fill='#8574b4')
+            d.text((150, 34), 'GAME BOY COLOR', anchor='mm', fill='#f4edff', font=App.cartridge_font(11, True))
+            d.rounded_rectangle((86, 56, 214, 180), radius=6, fill='#ece7fb', outline='#40375e', width=3)
+            d.rectangle((86, 56, 214, 80), fill='#4c75b5')
+            d.text((150, 68), 'ANYTHING PLAYS', anchor='mm', fill='#ffffff', font=App.cartridge_font(10, True))
+            label_box = (95, 86, 205, 171)
+            ink = '#352c55'
+            d.line((103, 197, 197, 197), fill='#9c8ec0', width=3)
+        elif system == 'snes':
+            # North American SNES cartridge: broad rectangular shell, softly
+            # rounded upper shoulders, distinctive recessed label and side grips.
+            # Draw at high resolution so downscaled tiles retain crisp edges.
+            shell = [(37, 18), (263, 18), (275, 24), (282, 39),
+                     (282, 196), (274, 206), (26, 206), (18, 196),
+                     (18, 39), (25, 24)]
+            d.polygon(shell, fill='#c9c8d0')
+            d.line(shell + [shell[0]], fill='#696975', width=4, joint='curve')
+            # Molded top ridge and stepped shoulder detail.
+            d.rounded_rectangle((37, 24, 263, 48), radius=7, fill='#d9d8df', outline='#9b9aa6', width=2)
+            d.line((28, 50, 272, 50), fill='#a2a1ad', width=3)
+            # Vertical molded grip rails on the left and right.
+            d.rounded_rectangle((25, 61, 44, 181), radius=6, fill='#b0afb9', outline='#8a8995', width=2)
+            d.rounded_rectangle((256, 61, 275, 181), radius=6, fill='#b0afb9', outline='#8a8995', width=2)
+            for x in (31, 37, 263, 269):
+                d.line((x, 76, x, 167), fill='#d0cfd7' if x in (31, 263) else '#92919d', width=2)
+            # A large rectangular paper label with a thin inset frame.
+            d.rounded_rectangle((51, 57, 249, 175), radius=5, fill='#777581', outline='#5f5e6b', width=3)
+            d.rounded_rectangle((56, 62, 244, 170), radius=3, fill='#f1eff0', outline='#d7d4d9', width=2)
+            d.rectangle((58, 64, 242, 87), fill='#353b59')
+            d.text((150, 75), 'SUPER NINTENDO', anchor='mm', fill='#ffffff', font=App.cartridge_font(12, True))
+            d.rectangle((58, 88, 242, 92), fill='#8176ae')
+            label_box = (65, 98, 235, 161)
+            ink = '#27273b'
+            # Bottom molded seam and central locking notch.
+            d.line((45, 187, 255, 187), fill='#9695a0', width=3)
+            d.rounded_rectangle((123, 194, 177, 205), radius=3, fill='#aaa9b4', outline='#777683', width=2)
+        else:
+            # Compact Game Boy Advance cartridge, with alpha outside the shell.
+            d.rounded_rectangle((10, 14, 290, 212), radius=17, fill='#333a46', outline='#657080', width=3)
+            d.rounded_rectangle((10, 14, 290, 46), radius=13, fill='#4b5563', outline='#737d8a', width=2)
+            d.rectangle((22, 40, 278, 48), fill='#333a46')
+            d.text((150, 30), 'GAME BOY ADVANCE', anchor='mm', fill='#d5dce7', font=App.cartridge_font(13, True))
+            d.rounded_rectangle((39, 61, 261, 184), radius=9, fill='#10243e', outline='#8c98a8', width=3)
+            d.rounded_rectangle((46, 68, 254, 177), radius=5, fill='#1e5182')
+            d.polygon([(46, 68), (254, 68), (254, 89), (46, 141)], fill='#2e699d')
+            d.text((150, 95), 'ANYTHING PLAYS', anchor='mm', fill='#d8e9ff', font=App.cartridge_font(11, True))
+            label_box = (54, 113, 246, 169)
+            ink = '#ffffff'
+            d.line((112, 200, 188, 200), fill='#1a202b', width=4)
+
+        # Optional game-specific artwork: place cover.png, cover.jpg, or an image
+        # with the same filename stem alongside the ROM. No network required.
+        if artwork_path is not None:
+            try:
+                with Image.open(artwork_path) as source:
+                    cover = source.convert('RGB')
+                box_w = label_box[2] - label_box[0]
+                box_h = label_box[3] - label_box[1]
+                from PIL import ImageOps
+                cover = ImageOps.fit(cover, (box_w, box_h), method=Image.Resampling.LANCZOS)
+                image.paste(cover, (label_box[0], label_box[1]))
+                return image
+            except (OSError, ValueError):
+                pass
+        max_width = label_box[2] - label_box[0] - 6
+        max_lines = 3 if system in ('gb', 'gbc') else 2
+        font_size = 14 if system in ('gb', 'gbc') else 16
+        font = App.cartridge_font(font_size, bold=True)
+        words = filename.replace('_', ' ').split()
+        lines = []
+        current = ''
+        for word in words:
+            candidate = f'{current} {word}'.strip()
+            if current and d.textbbox((0, 0), candidate, font=font)[2] > max_width:
+                lines.append(current)
+                current = word
             else:
-                current = test
-        if current: lines.append(current)
-        lines = lines[:3]
-        for i, line in enumerate(lines):
-            while d.textbbox((0, 0), line, font=font)[2] > 192 and len(line) > 2:
+                current = candidate
+        if current:
+            lines.append(current)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines - 1] + [' '.join(lines[max_lines - 1:])]
+        line_height = font_size + 4
+        top = (label_box[1] + label_box[3] - line_height * len(lines)) // 2 + line_height // 2
+        for index, line in enumerate(lines):
+            while len(line) > 2 and d.textbbox((0, 0), line, font=font)[2] > max_width:
                 line = line[:-2] + '…'
-            d.text((150, 121 + i * 19), line, anchor='mm', fill='#ffffff', font=font)
-        d.line((112, 200, 188, 200), fill='#1a202b', width=4)
+            d.text((150, top + index * line_height), line, anchor='mm', fill=ink, font=font)
         return image
 
     @staticmethod
@@ -688,15 +1024,19 @@ class App:
         else:
             self.library_summary.set(f'ROM LIBRARY · {len(games)} game(s) · Drag or use Previous / Next')
         if not games:
-            ttk.Label(self.library_grid, text='No GBA games yet. Choose a folder to browse cartridges.').pack(padx=8, pady=40)
+            ttk.Label(self.library_grid, text='No compatible games yet. Choose a folder to browse cartridges.').pack(padx=8, pady=40)
         for rom in games:
             tile = ttk.Frame(self.library_grid, padding=(5, 0))
             tile.pack(side='left', anchor='n')
-            art = self.cartridge_image(rom.stem).resize((176, 133), Image.Resampling.LANCZOS)
+            art_path = next((candidate for stem in (rom.stem, 'cover', 'folder')
+                             for ext in ('.png', '.jpg', '.jpeg', '.webp')
+                             if (candidate := rom.parent / (stem + ext)).is_file()), None)
+            art = self.cartridge_image(rom.stem, self.system_key.get(), art_path).resize((176, 133), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(art)
             self.library_images.append(photo)
-            cartridge = tk.Label(tile, image=photo, bg='#10243e',
+            cartridge = tk.Label(tile, image=photo, bg=self.THEMES.get(self.theme_name.get(), self.THEMES['Dark'])[1],
                                  cursor='hand2', bd=0, highlightthickness=0)
+            cartridge.is_cartridge_tile = True
             cartridge.pack()
             caption = ttk.Label(tile, text=rom.stem, width=24, anchor='center', cursor='hand2')
             caption.pack()
@@ -737,7 +1077,8 @@ class App:
             messagebox.showerror('ROM', f'Could not start game: {exc}')
 
     def load_rom(self):
-        path = filedialog.askopenfilename(filetypes=[('Game Boy Advance ROMs', '*.gba')])
+        system = SYSTEMS[self.system_key.get()]
+        path = filedialog.askopenfilename(filetypes=[(system.title + ' ROMs', ' '.join('*' + ext for ext in system.extensions))])
         if not path:
             return
         self.start_rom(path)
@@ -800,11 +1141,11 @@ class App:
             self.refresh_color()
             self.pick_mode = False
             self.status.set('Target color selected. Adjust tolerance if needed.')
-        else:
+        elif self.custom_draw_enabled.get():
             self.drag_start = point
 
     def on_release(self, event):
-        if self.drag_start is None:
+        if not self.custom_draw_enabled.get() or self.drag_start is None:
             return
         end, start = self.xy(event), self.drag_start
         self.drag_start = None
@@ -822,12 +1163,13 @@ class App:
         self.hold_frames.set(self.cfg['hold_frames'])
         self.cooldown.set(self.cfg['cooldown_ms'])
         self.mirror.set(self.cfg['mirror'])
+        self.cfg = normalize(self.system_key.get(), self.cfg, DEFAULT)
         for name, var in self.mapping_vars.items():
             var.set(self.cfg.get('mapping', {}).get(name, name))
-        self.zone_font_size.set(max(24, min(112, self.cfg.get('zone_font_size', 44))))
+        self.zone_font_size.set(max(8, min(160, self.cfg.get('zone_font_size', 44))))
         self.zone_opacity.set(max(75, min(100, self.cfg.get('zone_opacity', 85))))
         self.zone_style.set(self.cfg.get('zone_style', 'Outline'))
-        self.cfg['zones'].setdefault('Shuffle', DEFAULT['zones']['Shuffle'][:])
+        self.cfg = normalize(self.system_key.get(), self.cfg, DEFAULT)
         self.shuffle_enabled.set(self.cfg.get('shuffle_enabled', True))
         self.zone_image_path.set(self.cfg.get('zone_image', ''))
         self.load_zone_art(silent=True)
@@ -839,7 +1181,7 @@ class App:
         self.cfg['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
         self.cfg['cooldown_ms'] = max(50, int(self.cooldown.get()))
         self.cfg['mirror'] = self.mirror.get()
-        self.cfg['zone_font_size'] = max(24, min(112, int(self.zone_font_size.get())))
+        self.cfg['zone_font_size'] = max(8, min(160, int(self.zone_font_size.get())))
         self.cfg['zone_opacity'] = max(75, min(100, int(self.zone_opacity.get())))
         self.cfg['zone_style'] = self.zone_style.get()
         self.cfg['shuffle_enabled'] = bool(self.shuffle_enabled.get())
@@ -854,7 +1196,7 @@ class App:
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
             return
         if not self.emu.running:
-            messagebox.showinfo('Emulator required', 'Open a Game Boy Advance ROM first. No system-wide keyboard fallback is available.')
+            messagebox.showinfo('Emulator required', 'Open a compatible ROM first. No system-wide keyboard fallback is available.')
             return
         try:
             self.read_settings()
@@ -956,21 +1298,25 @@ class App:
         """The checkbox controls whether the tracked Shuffle zone is active/visible."""
         self._shuffle_latched = False
 
+    def toggle_custom_draw(self):
+        self.drag_start = None
+        self.status.set('Custom zone drawing enabled: drag on the camera preview.'
+                        if self.custom_draw_enabled.get()
+                        else 'Custom drawing disabled. Symmetrical zones remain active.')
+
     def make_symmetric_grid(self):
-        """Lay out eight GBA controls and Shuffle in a uniform 3 by 3 grid."""
-        order = ('Left', 'Up', 'Right', 'A', 'Start', 'B', 'Down', 'Select', 'Shuffle')
-        self.cfg['zones'] = {
-            name: [col / 3, row / 3, (col + 1) / 3, (row + 1) / 3]
-            for index, name in enumerate(order)
-            for row, col in [(index // 3, index % 3)]
-        }
+        """Reset only the active console's controls to an even grid."""
+        self.read_settings()
+        fit_to_grid(self.cfg, self.system_key.get())
         self._shuffle_latched = False
-        self.status.set('Symmetrical 3 × 3 grid applied. Drag to customize any zone.')
+        self.profile_store.put(self.system_key.get(), self.cfg)
+        self.status.set('Enabled buttons fitted to an even grid for this console.')
 
     def shuffle_zones(self):
         """Shuffle every visible control, including the camera-triggered Shuffle zone."""
         names = [name for name in self.cfg['zones']
-                 if name != 'Shuffle' or self.shuffle_enabled.get()]
+                 if (name != 'Shuffle' or self.shuffle_enabled.get())
+                 and (name == 'Shuffle' or self.mapping_vars[name].get() != DISABLED_MAPPING)]
         positions = [self.cfg['zones'][name][:] for name in names]
         if len(positions) < 2:
             return
@@ -994,7 +1340,7 @@ class App:
         # The previous opacity*1.5 calculation exceeded 255 and saturated.
         # Map the user-facing 75–100 range to visibly distinct alpha levels.
         tint_alpha = round(25 + (opacity - 75) / 25 * 170)
-        size = max(24, min(112, int(self.zone_font_size.get())))
+        size = max(8, min(160, int(self.zone_font_size.get())))
         font = None
         for font_name in ('/System/Library/Fonts/Supplemental/Arial Bold.ttf',
                           '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
@@ -1008,6 +1354,8 @@ class App:
             font = ImageFont.load_default()
         for name, (x1, y1, x2, y2) in self.cfg['zones'].items():
             if name == 'Shuffle' and not self.shuffle_enabled.get():
+                continue
+            if name != 'Shuffle' and self.mapping_vars.get(name) is not None and self.mapping_vars[name].get() == DISABLED_MAPPING:
                 continue
             box = (int(x1 * width), int(y1 * height), int(x2 * width), int(y2 * height))
             if box[2] <= box[0] or box[3] <= box[1]:
@@ -1079,6 +1427,8 @@ class App:
             for name, (x1, y1, x2, y2) in self.cfg['zones'].items():
                 if name == 'Shuffle' and not self.shuffle_enabled.get():
                     continue
+                if name != 'Shuffle' and self.mapping_vars[name].get() == DISABLED_MAPPING:
+                    continue
                 if x1 <= center[0] / w <= x2 and y1 <= center[1] / h <= y2:
                     active = name
                     break
@@ -1092,9 +1442,10 @@ class App:
                 self.action.set('Object activated Shuffle — controls rearranged')
         elif active and self.armed and time.monotonic() - self.last_action >= max(.05, int(self.cooldown.get()) / 1000):
             button = self.mapping_vars[active].get()
-            self.emu.press(button, self.hold_frames.get())
-            self.last_action = time.monotonic()
-            self.action.set(f'Object zone: {active} → game button: {button} (isolated)')
+            if button != DISABLED_MAPPING:
+                self.emu.press(button, self.hold_frames.get())
+                self.last_action = time.monotonic()
+                self.action.set(f'Object zone: {active} → game button: {button} (isolated)')
         geom = self.geometry()
         if geom:
             x, y, dw, dh, _, _ = geom
@@ -1125,6 +1476,7 @@ class App:
         path = filedialog.asksaveasfilename(defaultextension='.json', filetypes=[('JSON profile', '*.json')])
         if path:
             Path(path).write_text(json.dumps(self.cfg, indent=2), encoding='utf-8')
+            self.profile_store.put(self.system_key.get(), self.cfg)
 
     def load_profile(self):
         path = filedialog.askopenfilename(filetypes=[('JSON profile', '*.json')])
@@ -1132,25 +1484,26 @@ class App:
             return
         try:
             cfg = json.loads(Path(path).read_text(encoding='utf-8'))
-            if not set(ACTIVE_BUTTONS).difference({'Select'}).issubset(cfg['zones']) or not set(ACTIVE_BUTTONS).difference({'Select'}).issubset(cfg['mapping']):
-                raise ValueError('Missing control zones or mappings')
-            cfg['zones'].setdefault('Select', DEFAULT['zones']['Select'][:])
-            cfg['zones'].setdefault('Shuffle', DEFAULT['zones']['Shuffle'][:])
-            cfg['mapping'].setdefault('Select', 'Select')
+            if not isinstance(cfg, dict) or not isinstance(cfg.get('zones'), dict):
+                raise ValueError('Invalid profile: missing zones')
             self.stop_controls()
-            cfg['zones'] = {k: cfg['zones'][k] for k in (*ACTIVE_BUTTONS, 'Shuffle')}
-            cfg['mapping'] = {k: cfg['mapping'][k] for k in ACTIVE_BUTTONS}
-            self.cfg = cfg
+            self.cfg = normalize(self.system_key.get(), cfg, DEFAULT)
+            self.profile_store.put(self.system_key.get(), self.cfg)
             self.refresh_settings()
         except Exception as exc:
             messagebox.showerror('Profile', str(exc))
 
     def reset_profile(self):
         self.stop_controls()
-        self.cfg = json.loads(json.dumps(DEFAULT))
+        self.cfg = default_for(self.system_key.get(), DEFAULT)
         self.refresh_settings()
+        self.profile_store.put(self.system_key.get(), self.cfg)
 
     def close(self):
+        try:
+            self.persist_system_profile()
+        except (OSError, ValueError, tk.TclError):
+            pass
         self.deactivate_manual()
         self.stop_controls()
         if self.cap is not None:

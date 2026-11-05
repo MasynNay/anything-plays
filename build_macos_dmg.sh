@@ -27,8 +27,10 @@ done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
 mkdir -p dist/AnythingPlays.app/Contents/MacOS/cores
-for core in cores/mgba_libretro.dylib cores/libretro_mgba.dylib; do
-  if [[ -f "$core" ]]; then cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/; fi
+for name in gambatte mgba snes9x; do
+  core="cores/${name}_libretro.dylib"
+  [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
+  cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
 done
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"

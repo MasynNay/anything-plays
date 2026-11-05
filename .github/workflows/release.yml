@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: python -m compileall -q app.py cameras.py gba_emulator.py fetch_mgba_core.py
+      - run: python -m compileall -q app.py cameras.py gba_emulator.py fetch_mgba_core.py systems.py
       - run: python -m unittest discover -s tests -v
   windows:
     needs: source-checks
@@ -53,7 +53,7 @@ jobs:
       - name: Build macOS DMG
         run: bash build_macos_dmg.sh
       - name: Rename artifact by architecture
-        run: mv release/AnythingPlays.dmg release/AnythingPlays-1.5.0-macos-${{ matrix.arch }}.dmg
+        run: mv release/AnythingPlays.dmg release/AnythingPlays-2.0.0-macos-${{ matrix.arch }}.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
