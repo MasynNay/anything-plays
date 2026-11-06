@@ -1,0 +1,171 @@
+name: Assemble private v2.0 draft candidate
+# Do not automatically publish. Everything remains in a private draft release.
+on:
+  push:
+    branches: [release/v2-core-candidate]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+  AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
+  DRAFT_TAG: v2.0.0-rc.1
+
+jobs:
+  source-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install system dependencies
+        timeout-minutes: 20
+        run: |
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y --no-install-recommends libgl1 libglib2.0-0 libportaudio2 xvfb pulseaudio
+          python -m pip install -r requirements.txt
+      - name: Test source and headless application
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          python -m compileall -q app.py anything_plays fetch_mgba_core.py verify_bundle.py tools tests
+          python -m unittest discover -s tests -v
+          PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+
+  private-draft:
+    needs: source-checks
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-core-candidate'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or reuse private, unapproved GitHub release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$DRAFT_TAG" >/dev/null 2>&1; then
+            test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true || {
+              echo "Candidate tag already published; refusing to upload"; exit 1;
+            }
+          else
+            {
+              echo "**PRIVATE RELEASE CANDIDATE. NOT APPROVED FOR PUBLIC DISTRIBUTION.**"
+              echo
+              echo "Native ZIPs are verified against candidate hashes, but independent source correspondence and full redistribution review remain outstanding."
+              echo
+              cat docs/RELEASE_NOTES.md
+            } > candidate-notes.md
+            gh release create "$DRAFT_TAG" --draft --target "$GITHUB_SHA" --title "Anything Plays v2.0 candidate (PRIVATE DRAFT)" --notes-file candidate-notes.md
+          fi
+
+  windows:
+    needs: private-draft
+    runs-on: windows-latest
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build and verify Windows candidate
+        shell: cmd
+        run: call build_windows.bat
+      - name: Preserve and validate Windows candidate inputs
+        shell: bash
+        run: python -m tools.stage_candidate_assets windows-x86_64 release/AnythingPlaysSetup-2.0.0.exe
+      - name: Upload Windows assets to PRIVATE draft only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$DRAFT_TAG" candidate-assets/* --clobber
+
+  macos:
+    needs: private-draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build and verify macOS DMG
+        run: bash build_macos_dmg.sh
+      - name: Name DMG by architecture
+        run: mv release/AnythingPlays.dmg release/AnythingPlays-2.0.0-macos-${{ matrix.arch }}.dmg
+      - name: Preserve and validate macOS candidate inputs
+        run: python -m tools.stage_candidate_assets macos-${{ matrix.arch }} release/AnythingPlays-2.0.0-macos-${{ matrix.arch }}.dmg
+      - name: Upload macOS assets to PRIVATE draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$DRAFT_TAG" candidate-assets/* --clobber
+
+  linux:
+    needs: private-draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install packaging prerequisites
+        timeout-minutes: 20
+        run: |
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
+      - name: Build and verify Linux DEB
+        run: bash build_linux_deb.sh
+      - name: Preserve and validate Linux candidate inputs
+        run: python -m tools.stage_candidate_assets linux-x86_64 release/anything-plays_2.0.0_amd64.deb
+      - name: Upload Linux assets to PRIVATE draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$DRAFT_TAG" candidate-assets/* --clobber
+
+  finalize-private-draft:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all draft assets for integrity review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p draft-assets
+          gh release download "$DRAFT_TAG" --dir draft-assets
+          rm -f draft-assets/SHA256SUMS.txt draft-assets/DRAFT_REVIEW_STATUS.json
+      - name: Verify all 16 candidate assets and generate checksums
+        run: python -m tools.validate_draft_assets draft-assets
+      - name: Attach evidence to private draft (not public)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$DRAFT_TAG" draft-assets/SHA256SUMS.txt draft-assets/DRAFT_REVIEW_STATUS.json --clobber

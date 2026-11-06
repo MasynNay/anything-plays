@@ -182,6 +182,7 @@ def fetch_core(name, destination=CORE_FOLDER):
 
     _validate_binary(content, extension)
     digest = hashlib.sha256(content).hexdigest()
+    archive_digest = hashlib.sha256(archive_data).hexdigest()
     release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
@@ -198,10 +199,26 @@ def fetch_core(name, destination=CORE_FOLDER):
     target = destination / filename
     target.write_bytes(content)
     identity = inspect_core_identity(target, name)
+    # Preserve exact ZIP bytes separately from the extracted core when a
+    # candidate audit explicitly requests them. Capturing never approves them.
+    capture_directory = os.environ.get("AP_CORE_ARCHIVE_CAPTURE_DIR", "").strip()
+    if capture_directory:
+        archive_folder = Path(capture_directory).expanduser()
+        if archive_folder.is_symlink():
+            raise ValueError("Refusing symlinked core archive capture directory")
+        archive_folder.mkdir(parents=True, exist_ok=True)
+        archive_path = archive_folder / f"{filename}.zip"
+        if archive_path.is_symlink():
+            raise ValueError("Refusing symlinked captured core archive")
+        archive_path.write_bytes(archive_data)
+        print(f"Preserved candidate ZIP {archive_path} sha256={archive_digest}",
+              flush=True)
     print(f"{name} ready: {target} ({len(content):,} bytes), "
           f"reported version {identity['libretro_library_version']}", flush=True)
     return {"name": name, "file": filename, "source_url": url,
-            "sha256": digest, "size_bytes": len(content), **identity}
+            "sha256": digest, "size_bytes": len(content),
+            "archive_sha256": archive_digest, "archive_size_bytes": len(archive_data),
+            **identity}
 
 
 def fetch_all(destination=CORE_FOLDER):
