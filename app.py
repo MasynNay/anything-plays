@@ -133,8 +133,13 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.bind('<F11>', self.toggle_fullscreen)
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.scan_cameras)
-        root.after(45, self.tick)
-        root.after(8000, lambda: self.check_emulator_updates(automatic=True))
+        # Keep exactly one camera timer and one game timer alive. Record their
+        # identifiers so all pending callbacks can be cancelled on shutdown.
+        self._camera_tick_job = root.after(45, self.tick)
+        self._game_tick_job = root.after(16, self.game_render_tick)
+        self._updates_start_job = root.after(
+            8000, lambda: self.check_emulator_updates(automatic=True)
+        )
 
     def uses_embedded_emulator(self, system=None):
         """Distinguish the experimental in-panel N64 core from GPU launchers."""
@@ -159,6 +164,17 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         if self._closing:
             return
         self._closing = True
+        # A long-lived window may have several pending after() callbacks.
+        # Cancel the periodic loops before destroying Tk widgets.
+        for job_name in ("_camera_tick_job", "_game_tick_job",
+                         "_updates_start_job"):
+            job = getattr(self, job_name, None)
+            if job is not None:
+                try:
+                    self.root.after_cancel(job)
+                except tk.TclError:
+                    pass
+                setattr(self, job_name, None)
         pending_rom_scan = getattr(self, "_rom_scan_cancel", None)
         if pending_rom_scan is not None:
             pending_rom_scan.set()
@@ -181,6 +197,15 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
                     pass
         self.emu.stop()
         self.stop_external_emulator()
+        # Drop the last images and cartridge thumbnails at shutdown. Worker
+        # frames are also discarded so native/PIL buffers can be collected.
+        with self.emu.lock:
+            self.emu.frame = None
+        self.frame = None
+        self.game_photo = None
+        self.camera_photo = None
+        self._zone_art = None
+        self.library_images.clear()
         self.root.destroy()
 
 
