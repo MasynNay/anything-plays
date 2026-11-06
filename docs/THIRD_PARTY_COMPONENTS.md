@@ -23,44 +23,53 @@ this release plan; its old license text is retained in `docs/history/` for
 historical attribution. Moving from Gambatte to mGBA changes GB/GBC
 emulation and requires targeted compatibility verification.
 
-## Known reproducibility gap
+## Reproducibility and release inputs
 
-`fetch_mgba_core.py` currently downloads the latest matching Libretro
-nightly archives. It writes `cores/CORE_PROVENANCE.json` with the download URL,
-SHA-256, file size, embedded Libretro library version, and any source revision
-reported by the library itself. Verification compares these recorded fields
-against the staged binary. These are **self-reported source identifiers**, not
-independent build reproducibility or proof that no patch was applied.
-Release-mode checks now also require the explicit, initially unapproved
-[core fingerprint lock](CORE_RELEASE_PINNING.md). That lock will reject changed
-or unapproved cores; it does not turn changing nightly URLs into immutable
-build inputs. Approval still requires preserving binary archives, verifying
-corresponding source and licensing, and locking inputs for every supported
-architecture.
+Ordinary local development may fetch the latest matching Libretro nightly core.
+The audited v2.0 candidate instead preserved all eight exact core ZIP archives
+with verified SHA-256s, and upstream mGBA/Snes9x source snapshots at the
+reported 40-character commits. The new private RC2 workflow restores the
+original core ZIP bytes from the RC1 draft and verifies their archive and
+extracted-library hashes *before* each build. See
+[core pinning](CORE_RELEASE_PINNING.md) and the
+[private candidate workflow](../.github/workflows/candidate-draft.yml).
+Release-mode approval is still explicitly **false**, even when a package
+build passes. The cores' reported Git revisions are not independent proof
+of the buildbot compilation instructions or applied patches.
+
+The source code, nightly artifacts and third-party license obligations
+therefore remain separate verification dimensions; having the source
+snapshot on GitHub does not automatically authorize redistributing the binary.
 
 ## Other third-party dependencies
 
-The frozen application includes OpenCV, NumPy, Pillow, sounddevice and
-platform-specific dependencies such as PyObjC, plus transitive native
-libraries. The build scripts collect installed wheel license/notice files
+The frozen application includes camera-capable
+`opencv-python-headless`, NumPy, Pillow, sounddevice and platform-specific
+dependencies such as PyObjC, plus transitive native libraries. Verified
+four-platform headless candidate inventories contain **no bundled Qt GUI
+libraries**; the Linux native-library count declined from 177 to 145.
+The headless build still carries FFmpeg/media-codec components, including
+x264/x265 on Apple Silicon, whose exact licensing and source obligations must
+be resolved before public distribution. The build scripts collect installed wheel license/notice files
 under the packaged `licenses/python-distribution-notices/` directory and
 write a version inventory to `licenses/PYTHON_DISTRIBUTIONS.json`. The
 inventory includes **build-only packages**, so it does not prove which
 libraries were actually frozen or whether native/transitive licenses are
 fully satisfied. The source artwork and icon rights must also be confirmed.
-The dependency ranges are declared in `../requirements.txt`.
+Flexible source dependencies are declared in `../requirements.txt`; verified
+packaging versions are pinned in `../requirements-build.txt`.
 
 ## Remaining binary publication requirements
 
 - [ ] Verify that the mGBA and Snes9x versions shipped are licensed as stated.
 - [ ] Confirm Snes9x's noncommercial redistribution conditions cover the
       complete intended distribution and respect all component notices.
-- [ ] Identify corresponding source revisions for each shipped platform binary,
-      provide any required source, and lock checksums/versions.
+- [x] Retain all eight exact core ZIPs with locked checksums and matching reported Git source snapshots in the private release candidate.
+- [ ] Verify upstream buildbot binary-to-source correspondence independently and provide all required final-release source access.
 - [ ] Review frozen dependencies, native libraries, and asset provenance.
 - [ ] Inspect final Windows, macOS and Linux packages for complete notices,
       exact core hashes, source pointers and permitted content.
-- [ ] Validate the GB/GBC mGBA core transition with focused tests.
+- [x] Verify GB/GBC native mGBA ROM loading and representative battery-backed save restoration using generated test ROMs.
 - [ ] Approve publication separately from source integration.
 
 **Status: binary release clearance is not complete.** See the
