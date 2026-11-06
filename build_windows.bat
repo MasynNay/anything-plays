@@ -34,7 +34,10 @@ if defined AP_CUSTOM_OPENCV_WHEEL (
 )
 .build-venv\Scripts\python.exe tools/check_opencv_build.py
 if errorlevel 1 exit /b 1
-.build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon assets\anything_plays.ico --add-data "assets\anything_plays.png;assets" --collect-all cv2 --collect-all PIL app.py
+REM The corrected 2.1 icon is built independently from stable 2.0 artwork.
+.build-venv\Scripts\python.exe tools\render_v21_icon.py
+if errorlevel 1 exit /b 1
+.build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon build\v21-icon\anything_plays.ico --add-data "assets\anything_plays.png;assets" --add-data "assets\anything_plays_v21.webp;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
 set "CORE_LIST=mgba snes9x"
