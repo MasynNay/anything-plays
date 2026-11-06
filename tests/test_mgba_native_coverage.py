@@ -49,6 +49,14 @@ class RealMGBASupport(unittest.TestCase):
                     # A 32 KiB ROM-only image with a valid cartridge header.
                     # Entry at 0100h jumps to a two-byte idle loop at 0150h.
                     payload[0x100:0x104] = b"\x00\xc3\x50\x01"
+                    # Standard Game Boy cartridge compatibility header data.
+                    # No commercial game program, artwork, or firmware is included.
+                    logo = bytes.fromhex(
+                        "CE ED 66 66 CC 0D 00 0B 03 73 00 83 00 0C 00 0D "
+                        "00 08 11 1F 88 89 00 0E DC CC 6E E6 DD DD D9 99 "
+                        "BB BB 67 63 6E 0E EC CC DD DC 99 9F BB B9 33 3E"
+                    )
+                    payload[0x104:0x134] = logo
                     payload[0x134:0x141] = b"ANYTHINGPLAYS"
                     payload[0x143] = 0x80 if system == "gbc" else 0x00
                     payload[0x147] = 0x00  # ROM-only
