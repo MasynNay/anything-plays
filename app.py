@@ -17,6 +17,7 @@ from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
 from anything_plays.ui_gameplay import GameplayMixin
 from anything_plays.ui_layout import LayoutMixin
+from anything_plays.ui_panels import AuxiliaryPanelsMixin
 from anything_plays.ui_library import LibraryMixin
 from anything_plays.ui_profiles import ProfilesMixin
 from anything_plays.ui_theme import ThemeMixin
@@ -27,7 +28,7 @@ from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 
 
-class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
+class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
           ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
           ShortcutsMixin, ExternalBackendMixin, UpdatesMixin):
     """Own application state and delegate UI behavior to focused modules."""
