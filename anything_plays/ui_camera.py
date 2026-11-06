@@ -28,13 +28,17 @@ class CameraMixin:
         self.stop_camera()
         self.camera_scanning = True
         self.status.set('Searching for available webcams…')
-        self._camera_scan_results = Queue(maxsize=1)
+        results = Queue(maxsize=1)
+        self._camera_scan_results = results
 
         def worker():
+            # Capture this scan's queue, not the mutable App reference.
+            # An old discovery thread must never send into a newer scan's
+            # queue or keep the entire interface alive after it closes.
             try:
-                self._camera_scan_results.put((discover(), None))
+                results.put((discover(), None))
             except Exception as exc:
-                self._camera_scan_results.put(([], str(exc)))
+                results.put(([], str(exc)))
 
         threading.Thread(target=worker, daemon=True, name='camera-discovery').start()
         self.root.after(80, self._poll_camera_scan)
