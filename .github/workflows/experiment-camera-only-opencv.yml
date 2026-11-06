@@ -47,7 +47,7 @@ jobs:
           import zipfile
 
           info = cv2.getBuildInformation()
-          ffmpeg = re.search(r'^\\s*FFMPEG:\\s*(YES|NO)', info, re.MULTILINE)
+          ffmpeg = re.search(r'^\s*FFMPEG:\s*(YES|NO)', info, re.MULTILINE)
           if ffmpeg is None or ffmpeg.group(1) != 'NO':
               raise SystemExit('FFmpeg must be OFF in the custom wheel')
           if not cv2.videoio_registry.hasBackend(cv2.CAP_AVFOUNDATION):
@@ -81,7 +81,7 @@ jobs:
               'hardware_camera_tested': False,
           }
           Path('opencv-camera-only-evidence.json').write_text(
-              json.dumps(result, indent=2)+'\\n', encoding='utf-8')
+              json.dumps(result, indent=2)+'\n', encoding='utf-8')
           print(json.dumps(result, indent=2))
           PY
       - uses: actions/upload-artifact@v4
