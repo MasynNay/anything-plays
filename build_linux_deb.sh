@@ -10,7 +10,7 @@ python3 -m venv .build-venv
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" app.py
 # All emulator cores are required and shipped inside the installed application.
 mkdir -p dist/AnythingPlays/cores
-for name in gambatte mgba snes9x; do
+for name in mgba snes9x; do
   core="cores/${name}_libretro.so"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays/cores/
@@ -25,7 +25,7 @@ cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
 
-python3 verify_bundle.py linux dist/AnythingPlays
+python3 verify_bundle.py --check-native linux dist/AnythingPlays
 
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"

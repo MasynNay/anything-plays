@@ -36,12 +36,14 @@ keyboard. A webcam is optional for manual play.
 
 | Console | Accepted ROMs | Libretro core |
 | :-- | :-- | :-- |
-| Game Boy | `.gb` | Gambatte |
-| Game Boy Color | `.gbc` | Gambatte |
+| Game Boy | `.gb` | mGBA |
+| Game Boy Color | `.gbc` | mGBA |
 | Game Boy Advance | `.gba` | mGBA |
 | Super Nintendo | `.sfc`, `.smc` | Snes9x |
 
-The console selector chooses the matching emulator automatically. Native cores
+The console selector chooses the matching emulator automatically. GB, GBC and GBA
+share the mGBA core while retaining independent game libraries and controls.
+Native cores
 are downloaded and bundled **at build time** for packaged applications.
 **No commercial game ROMs or BIOS files are distributed.** You supply your own
 legally usable game files.
@@ -210,7 +212,7 @@ platforms.** Use the [QA checklist](docs/QA_CHECKLIST.md) before shipping.
 | macOS | `bash build_macos_dmg.sh` | `.app` and DMG |
 | Ubuntu/Debian | `bash build_linux_deb.sh` | `.deb` package |
 
-Build on the target OS and architecture. The scripts download all three emulator
+Build on the target OS and architecture. The scripts download both required emulator
 cores, package them with their provenance manifest, and fail if a required core
 cannot be retrieved. **Nightly downloads are not pinned to a reproducible
 revision**, even when SHA-256 values are recorded afterward. Platform installers
@@ -259,9 +261,9 @@ official releases free of charge.
 
 ### Third-party emulator licenses
 
-Anything Plays uses independently developed emulator cores:
+Anything Plays uses independently developed emulator cores. Public binary
+builds use mGBA for GB/GBC/GBA and Snes9x for SNES:
 
-- **Gambatte:** GNU General Public License v2
 - **mGBA:** Mozilla Public License 2.0
 - **Snes9x:** Custom noncommercial license
 

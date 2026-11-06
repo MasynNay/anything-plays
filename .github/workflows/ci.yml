@@ -39,3 +39,85 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Headless GUI smoke test
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+
+  native-mgba-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install runtime dependencies for native gameplay smoke test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libportaudio2 libgl1 libglib2.0-0 pulseaudio
+          python -m pip install -r requirements.txt
+      - name: Start virtual audio server for headless emulator test
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl info
+      - name: Download the actual Linux mGBA core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mgba')"
+      - name: Validate GB, GBC and GBA support in native core
+        env:
+          AP_TEST_NATIVE_CORE: '1'
+        run: python -m unittest discover -s tests -p 'test_mgba_native_coverage.py' -v
+
+  # Package checks use real host OSes and verify staged license/core files.
+  # No build artifacts are uploaded or published until redistribution approval.
+  package-windows:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    needs: [test, native-mgba-compatibility]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build and verify the Windows installer locally on runner
+        shell: cmd
+        run: call build_windows.bat
+
+  package-macos:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    needs: [test, native-mgba-compatibility]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build and verify a macOS DMG locally on runner
+        run: bash build_macos_dmg.sh
+
+  package-linux:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    needs: [test, native-mgba-compatibility]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install OS packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
+      - name: Build and verify Debian package locally on runner
+        run: bash build_linux_deb.sh

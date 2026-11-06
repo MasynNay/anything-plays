@@ -18,7 +18,7 @@ if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon assets\anything_plays.ico --add-data "assets\anything_plays.png;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
-for %%C in (gambatte mgba snes9x) do (
+for %%C in (mgba snes9x) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
   if errorlevel 1 exit /b 1
@@ -38,7 +38,7 @@ if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 
-py verify_bundle.py windows dist\AnythingPlays
+py verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
 if not exist release mkdir release
 set "ISCC="

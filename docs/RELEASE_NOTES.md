@@ -7,13 +7,14 @@ independent layouts, a more expressive ROM shelf, and improved desktop builds.
 ## Highlights
 
 - Game Boy, Game Boy Color, Game Boy Advance, and Super Nintendo support
-- Gambatte, mGBA, and Snes9x core selection based on the chosen system
+- mGBA for GB, GBC and GBA; Snes9x for SNES
 - Independent profiles, button mappings, and ROM folders per console
 - Even control grids, optional button disabling, custom drawing, and Shuffle
 - Sixteen application themes and console-specific cartridge artwork
 - Camera tracking, manual keyboard play, game audio, and battery-backed saves
 - Refactored application architecture and expanded automated regression coverage
 - Per-build SHA-256 provenance manifest for downloaded Libretro cores
+- Removed Gambatte from the planned public installer to avoid GPLv2/noncommercial combination
 
 ## Planned downloads
 
@@ -41,6 +42,8 @@ licenses and conditions, including Snes9x's non-commercial restrictions.
 
 The maintainer completed functional testing of Windows EXE, macOS DMG and
 Linux DEB installers and confirmed the v2.0 application works on all three.
+Those earlier builds used Gambatte for GB/GBC; the new mGBA mapping needs a
+focused compatibility check before publishing updated binaries.
 The remaining **public binary release** gates are third-party licensing
 compatibility, corresponding-source materials, immutable binary provenance,
 and confirmation of the updated installer notice packaging where applicable.
