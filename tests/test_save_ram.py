@@ -59,5 +59,17 @@ class SaveRAMTests(unittest.TestCase):
             self.assertFalse(save.persist())
             self.assertEqual(memory.raw, b'ABCD')
 
+    def test_incomplete_saved_ram_file_is_normalized_on_next_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = C.create_string_buffer(4)
+            save = SaveRAM(Path(tmp) / 'game.gba',
+                           lambda kind: C.addressof(memory), lambda kind: 4)
+            save.path.write_bytes(b'AB')
+            save.restore()
+            self.assertEqual(memory.raw[:2], b'AB')
+            self.assertTrue(save.persist())
+            self.assertEqual(save.path.stat().st_size, 4)
+            self.assertFalse(save.persist())
+
 if __name__ == "__main__":
     unittest.main()
