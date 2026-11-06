@@ -2,7 +2,7 @@ name: Assemble private v2.0 candidate from immutable emulator ZIPs
 # Do not automatically publish. Everything remains in a private draft release.
 on:
   push:
-    branches: [release/v2-rc2-headless]
+    branches: [release/v2-rc5-ffmpeg-free]
   workflow_dispatch:
 
 permissions:
@@ -11,41 +11,16 @@ permissions:
 env:
   AP_RELEASE_BUILD: '0'
   AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
-  DRAFT_TAG: v2.0.0-rc.2
+  DRAFT_TAG: v2.0.0-rc.5
   SOURCE_TAG: v2.0.0-rc.1
 
 jobs:
-  source-checks:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 50
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12', '3.13']
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install system dependencies
-        timeout-minutes: 20
-        run: |
-          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y --no-install-recommends libgl1 libglib2.0-0 libportaudio2 xvfb pulseaudio
-          python -m pip install -r requirements.txt
-      - name: Test source and headless application
-        run: |
-          pulseaudio --start --exit-idle-time=-1
-          python -m compileall -q app.py anything_plays fetch_mgba_core.py verify_bundle.py tools tests
-          python -m unittest discover -s tests -v
-          PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
-
   private-draft:
-    needs: source-checks
-    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc2-headless'
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc5-ffmpeg-free'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Create or reuse private, unapproved GitHub release draft
@@ -72,9 +47,10 @@ jobs:
     env:
       AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: windows-latest
-    timeout-minutes: 55
+    timeout-minutes: 70
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -94,9 +70,44 @@ jobs:
           gh release download "$SOURCE_TAG" --pattern "windows-x86_64-*.zip" --dir frozen-inputs
           gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-windows-x86_64.json" --dir frozen-inputs
           python -m tools.prepare_candidate_inputs "windows-x86_64" frozen-inputs release-inputs
+      - name: Download reviewed Windows x64 FFmpeg-free OpenCV wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-camera-only-wheel-verified
+          run-id: 42249929138
+          github-token: ${{ github.token }}
+          path: frozen-opencv
+      - name: Lock reviewed Windows x64 wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find frozen-opencv -name '*.whl' -type f | wc -l | tr -d ' ')" = 1
+          echo "AP_CUSTOM_OPENCV_WHEEL=$(find frozen-opencv -name '*.whl' -type f)" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=8f824a062ff42d18104478619a3165e8121ddd17275b49fc5797499a1f776914" >> "$GITHUB_ENV"
       - name: Build and verify Windows candidate
         shell: cmd
         run: call build_windows.bat
+      - name: Verify FFmpeg-free staged windows-x86_64 binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-audit
+          python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays native-audit/windows-x86_64.json
+          python - native-audit/windows-x86_64.json <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          names = ('libavcodec','libavformat','libavutil','libavdevice','libavfilter','libswscale','libswresample','libx264','libx265','opencv_videoio_ffmpeg')
+          unexpected = [r['path'] for r in d['native_files'] if any(x in r['path'].lower() for x in names)]
+          if unexpected or len(d['verified_cores']) != 2:
+              raise SystemExit('FFmpeg/codec/core integrity failure: ' + str(unexpected))
+          print('Verified FFmpeg-free',d['target'],'with',d['native_file_count'],'native binaries and 2 verified cores')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-inventory-windows-x86_64
+          path: native-audit/windows-x86_64.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Preserve and validate Windows candidate inputs
         shell: bash
         run: python -m tools.stage_candidate_assets windows-x86_64 release/AnythingPlaysSetup-2.0.0.exe
@@ -119,9 +130,10 @@ jobs:
           - runner: macos-15-intel
             arch: x86_64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 55
+    timeout-minutes: 70
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -137,10 +149,58 @@ jobs:
           gh release download "$SOURCE_TAG" --pattern "macos-${{ matrix.arch }}-*.zip" --dir frozen-inputs
           gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-macos-${{ matrix.arch }}.json" --dir frozen-inputs
           python -m tools.prepare_candidate_inputs "macos-${{ matrix.arch }}" frozen-inputs release-inputs
+      - name: Download reviewed Apple Silicon FFmpeg-free OpenCV
+        if: matrix.arch == 'arm64'
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: frozen-opencv
+      - name: Download reviewed Intel FFmpeg-free OpenCV
+        if: matrix.arch == 'x86_64'
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-only-wheel-macos-x86_64
+          run-id: 42246559996
+          github-token: ${{ github.token }}
+          path: frozen-opencv
+      - name: Lock matching macOS wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find frozen-opencv -name '*.whl' -type f | wc -l | tr -d ' ')" = 1
+          echo "AP_CUSTOM_OPENCV_WHEEL=$(find frozen-opencv -name '*.whl' -type f)" >> "$GITHUB_ENV"
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            echo "AP_CUSTOM_OPENCV_SHA256=3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd" >> "$GITHUB_ENV"
+          else
+            echo "AP_CUSTOM_OPENCV_SHA256=1a9815cee13c8efa8c350fc6cea22c960909bb2ec2366319719dbd608ac63c40" >> "$GITHUB_ENV"
+          fi
       - name: Build and verify macOS DMG
         run: bash build_macos_dmg.sh
       - name: Name DMG by architecture
         run: mv release/AnythingPlays.dmg release/AnythingPlays-2.0.0-macos-${{ matrix.arch }}.dmg
+      - name: Verify FFmpeg-free staged macos-${{ matrix.arch }} binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-audit
+          python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app native-audit/macos-${{ matrix.arch }}.json
+          python - native-audit/macos-${{ matrix.arch }}.json <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          names = ('libavcodec','libavformat','libavutil','libavdevice','libavfilter','libswscale','libswresample','libx264','libx265','opencv_videoio_ffmpeg')
+          unexpected = [r['path'] for r in d['native_files'] if any(x in r['path'].lower() for x in names)]
+          if unexpected or len(d['verified_cores']) != 2:
+              raise SystemExit('FFmpeg/codec/core integrity failure: ' + str(unexpected))
+          print('Verified FFmpeg-free',d['target'],'with',d['native_file_count'],'native binaries and 2 verified cores')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-inventory-macos-${{ matrix.arch }}
+          path: native-audit/macos-${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Preserve and validate macOS candidate inputs
         run: python -m tools.stage_candidate_assets macos-${{ matrix.arch }} release/AnythingPlays-2.0.0-macos-${{ matrix.arch }}.dmg
       - name: Upload macOS assets to PRIVATE draft only
@@ -153,9 +213,10 @@ jobs:
     env:
       AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 70
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -176,8 +237,43 @@ jobs:
           gh release download "$SOURCE_TAG" --pattern "linux-x86_64-*.zip" --dir frozen-inputs
           gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-linux-x86_64.json" --dir frozen-inputs
           python -m tools.prepare_candidate_inputs "linux-x86_64" frozen-inputs release-inputs
+      - name: Download reviewed Linux x64 FFmpeg-free OpenCV wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-only-wheel-linux-x86_64
+          run-id: 42246559996
+          github-token: ${{ github.token }}
+          path: frozen-opencv
+      - name: Lock reviewed Linux x64 wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find frozen-opencv -name '*.whl' -type f | wc -l | tr -d ' ')" = 1
+          echo "AP_CUSTOM_OPENCV_WHEEL=$(find frozen-opencv -name '*.whl' -type f)" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=a4bff6a1596aa2e41721748aa12fa56819224efd6701b040eebe6e3c07d3787f" >> "$GITHUB_ENV"
       - name: Build and verify Linux DEB
         run: bash build_linux_deb.sh
+      - name: Verify FFmpeg-free staged linux-x86_64 binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p native-audit
+          python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays native-audit/linux-x86_64.json
+          python - native-audit/linux-x86_64.json <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          names = ('libavcodec','libavformat','libavutil','libavdevice','libavfilter','libswscale','libswresample','libx264','libx265','opencv_videoio_ffmpeg')
+          unexpected = [r['path'] for r in d['native_files'] if any(x in r['path'].lower() for x in names)]
+          if unexpected or len(d['verified_cores']) != 2:
+              raise SystemExit('FFmpeg/codec/core integrity failure: ' + str(unexpected))
+          print('Verified FFmpeg-free',d['target'],'with',d['native_file_count'],'native binaries and 2 verified cores')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-inventory-linux-x86_64
+          path: native-audit/linux-x86_64.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Preserve and validate Linux candidate inputs
         run: python -m tools.stage_candidate_assets linux-x86_64 release/anything-plays_2.0.0_amd64.deb
       - name: Upload Linux assets to PRIVATE draft only
@@ -191,6 +287,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Download all draft assets for integrity review
@@ -213,6 +310,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Reproduce upstream Git source snapshot archives
@@ -223,3 +321,70 @@ jobs:
         run: |
           test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true
           gh release upload "$DRAFT_TAG" source-snapshots/* --clobber
+
+  preserve-verified-opencv-source-and-wheels:
+    needs: source-snapshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve frozen windows-x86_64 wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-camera-only-wheel-verified
+          run-id: 42249929138
+          github-token: ${{ github.token }}
+          path: frozen-wheel/windows
+      - name: Preserve frozen linux-x86_64 wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-only-wheel-linux-x86_64
+          run-id: 42246559996
+          github-token: ${{ github.token }}
+          path: frozen-wheel/linux
+      - name: Preserve frozen macos-arm64 wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: frozen-wheel/apple
+      - name: Preserve frozen macos-x86_64 wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-only-wheel-macos-x86_64
+          run-id: 42246559996
+          github-token: ${{ github.token }}
+          path: frozen-wheel/intel
+      - name: Verify all four exact wheel inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/verify_custom_opencv_wheel.py frozen-wheel/windows/*.whl 8f824a062ff42d18104478619a3165e8121ddd17275b49fc5797499a1f776914 windows-x86_64
+          python tools/verify_custom_opencv_wheel.py frozen-wheel/linux/*.whl a4bff6a1596aa2e41721748aa12fa56819224efd6701b040eebe6e3c07d3787f linux-x86_64
+          python tools/verify_custom_opencv_wheel.py frozen-wheel/apple/*.whl 3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd macos-arm64
+          python tools/verify_custom_opencv_wheel.py frozen-wheel/intel/*.whl 1a9815cee13c8efa8c350fc6cea22c960909bb2ec2366319719dbd608ac63c40 macos-x86_64
+          cat > CAMERA_ONLY_OPENCV_BUILD.txt <<'RECIPE'
+          Anything Plays v2.0 camera-only OpenCV input record
+          Package: opencv-python-headless==4.14.0.94; source https://pypi.org/project/opencv-python-headless/4.14.0.94/
+          Python 3.13 on each target. CMAKE_ARGS: -DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF.
+          Windows source build used an isolated packaging patch, retained in workflow 42249929138.
+          Windows source+wheel: https://github.com/MasynNay/anything-plays/actions/runs/42249929138
+          Linux and Intel macOS wheel source: https://github.com/MasynNay/anything-plays/actions/runs/42246559996
+          Apple Silicon wheel source: https://github.com/MasynNay/anything-plays/actions/runs/42245121687
+          Windows SHA256: 8f824a062ff42d18104478619a3165e8121ddd17275b49fc5797499a1f776914
+          Linux SHA256: a4bff6a1596aa2e41721748aa12fa56819224efd6701b040eebe6e3c07d3787f
+          Intel macOS SHA256: 1a9815cee13c8efa8c350fc6cea22c960909bb2ec2366319719dbd608ac63c40
+          Apple Silicon SHA256: 3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd
+          Hardware camera testing and legal redistribution clearance are NOT granted by these results.
+          RECIPE
+      - name: Upload four wheel inputs and build recipe to PRIVATE draft only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true
+          gh release upload "$DRAFT_TAG" frozen-wheel/*/*.whl CAMERA_ONLY_OPENCV_BUILD.txt --clobber
