@@ -57,9 +57,11 @@ class N64BridgeTests(unittest.TestCase):
         bridge.press("A", 8)
         bridge.set_manual("B", True)
         bridge.flush()
+        self.assertEqual(socket.sendto.call_count, 1)
+        bridge.flush()  # Receiver accepts at most one event per frame.
         self.assertEqual(len(bridge._sent), 2)
         bridge.release_camera()
-        bridge.flush()
+        bridge.flush()  # Release A before any pending presses.
         self.assertEqual(bridge._sent, {(JOY, 0, 0): 1})
         bridge.release_manual()
         bridge.flush()
