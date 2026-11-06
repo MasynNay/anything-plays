@@ -121,12 +121,14 @@ are bundled or silently downloaded.
   keyboard focus; when RetroArch/Dolphin has focus, its own local controller
   mappings apply instead. Camera tracking can continue in the background.
 
-**Do not confuse input integration with video integration.** The N64 and
-GameCube graphics are **NOT yet drawn in the Anything Plays game panel**.
-A proper hardware-accelerated Libretro frontend would need to own a GPU
-context, render the core's framebuffer and manage its lifecycle. The existing
-Tk canvas/software-video path cannot do this by itself. No real-GPU game
-startup, saved-game, latency or camera compatibility has been confirmed yet.
+**Do not confuse input integration with GPU video integration.**
+Experimental software-rendered N64 mode draws its frames in the app's game
+panel, but this has not been verified with real games on the target systems.
+The N64 *external fallback* and the GameCube launcher still draw in separate
+GPU windows. Hardware-accelerated Libretro embedding requires an actual GPU
+context, framebuffer ownership and render lifecycle; the existing Tk/software
+frame path cannot provide that by itself. Real-game compatibility, latency,
+save/load and multi-hour reliability still require hardware testing.
 
 **Security:** RetroArch's Network RetroPad receiver has no authentication.
 Although Anything Plays sends only to localhost, RetroArch may listen on
@@ -154,6 +156,49 @@ The embedded Game only view is limited to software-rendered Libretro cores.
    errors, and release-on-stop. Check GameCube saves in the isolated test
    profile rather than regular Dolphin.
 8. Compare FPS, idle CPU, memory usage and latency with stable 2.0.
+
+## Long-running stability and memory testing
+
+**Long uptime is a release requirement.** A clean short build does not prove
+that an app can run overnight, or that the native emulator/driver never leaks.
+
+The 2.1 alpha now has several bounded-resource protections:
+
+- Tk image canvas items are **reused** rather than deleted and recreated
+  for each game or camera frame; native image pixel storage is also reused
+  where dimensions permit.
+- Game rendering runs on its own timer, and idles at a lower polling rate
+  without a running game. Camera processing also slows for still images.
+- ROM shelf thumbnails, controller/audio command queues, and resized
+  camera-zone artwork caches all have explicit size limits.
+- Stopping a camera releases capture and stale frame buffers; exiting cancels
+  the recurring UI/update timers and releases images and emulator resources.
+- Identical SRAM is not rewritten to disk every few seconds. A temporary
+  save-write error is surfaced in the UI without terminating gameplay.
+- Emulator updates are checked at startup and every 24 hours during
+  continued uptime, without unverified changes to signed app bundles.
+
+Every test build runs a **30-second synthetic GUI soak** and uploads a
+JSON memory/resource report to GitHub Actions. To run a longer soak on a
+Mac development checkout with dependencies installed:
+
+```bash
+PYTHONPATH=. python3 tests/soak_gui.py --seconds 21600 \\
+  --max-growth-mb 96 --report long-soak.json
+```
+
+On Linux, prefix the command with `xvfb-run -a` when no display is
+available. The report measures resident memory after a warm-up and checks
+that Tk image/callback counts and thumbnail caches stay bounded. This is
+**synthetic**: it uses generated game video and camera frames, not an actual
+N64/GameCube game or physical camera.
+
+Before releasing 2.1, perform additional **4-hour and overnight tests with
+real webcams and legally obtained test/homebrew ROMs** on macOS Apple Silicon,
+Intel macOS, Windows and Linux. Record process memory, CPU use, controller
+latency, audio continuity, save integrity, camera reconnection and close/
+relaunch behavior. If steady-state memory keeps climbing, the release should
+remain blocked until the responsible native component or UI resource is fixed.
 
 ## Known technical boundaries
 
