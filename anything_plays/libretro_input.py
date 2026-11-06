@@ -35,6 +35,8 @@ class InputBuffer:
         self.commands = Queue(maxsize=32)
         self.manual_buttons = set()
         self.manual_lock = Lock()
+        # The Tk thread can disarm while the Libretro worker advances a frame.
+        self.state_lock = Lock()
         self.remaining = {}
         self.pressed = set()
 
@@ -66,8 +68,9 @@ class InputBuffer:
             self.manual_buttons.clear()
 
     def disarm(self):
-        self.remaining.clear()
-        self.pressed.clear()
+        with self.state_lock:
+            self.remaining.clear()
+            self.pressed.clear()
         while True:
             try:
                 self.commands.get_nowait()
@@ -79,25 +82,32 @@ class InputBuffer:
         if not armed:
             self.disarm()
         else:
-            # Limit per-frame consumption to avoid input floods starving the core.
+            # Drain a bounded command batch off-lock, then update the active
+            # pulse state atomically. UI disarm can never corrupt iteration.
+            commands = []
             for _ in range(8):
                 try:
-                    button_id, duration = self.commands.get_nowait()
+                    commands.append(self.commands.get_nowait())
                 except Empty:
                     break
-                self.remaining[button_id] = duration
-            self.pressed.clear()
-            self.pressed.update(self.remaining)
+            with self.state_lock:
+                for button_id, duration in commands:
+                    self.remaining[button_id] = duration
+                self.pressed.clear()
+                self.pressed.update(self.remaining)
         with self.manual_lock:
-            self.pressed.update(self.id_for(name) for name in self.manual_buttons
-                                if self.id_for(name) is not None)
+            manual = {self.id_for(name) for name in self.manual_buttons}
+        with self.state_lock:
+            self.pressed.update(item for item in manual if item is not None)
 
     def after_frame(self):
-        for button_id in tuple(self.remaining):
-            self.remaining[button_id] -= 1
-            if self.remaining[button_id] <= 0:
-                del self.remaining[button_id]
+        with self.state_lock:
+            for button_id in tuple(self.remaining):
+                self.remaining[button_id] -= 1
+                if self.remaining[button_id] <= 0:
+                    del self.remaining[button_id]
 
     def state(self, port, device, index, button_id):
         """Libretro callback: only player one's joypad is supported."""
-        return int(port == 0 and device == 1 and button_id in self.pressed)
+        with self.state_lock:
+            return int(port == 0 and device == 1 and button_id in self.pressed)
