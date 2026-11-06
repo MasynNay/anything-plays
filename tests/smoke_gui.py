@@ -114,10 +114,29 @@ def main():
                     assert zones["Shuffle"] == unchanged
                     app.shuffle_enabled.set(True)
 
-                    # Rendering a camera frame is independent from live hardware.
+                    # Simulate many repeated draws. The Tk canvas item count
+                    # must remain bounded during an overnight session.
                     app.frame = np.zeros((160, 240, 3), dtype=np.uint8)
                     app.draw_camera()
                     assert app.camera_photo is not None
+                    for _ in range(50):
+                        app.draw_camera()
+                    assert len(app.canvas.find_all()) == 1
+                    app.reference_image = False
+                    app.stop_camera()
+                    assert app.frame is None
+                    assert app.camera_photo is None
+                    assert not app.canvas.find_all()
+
+                    with app.emu.lock:
+                        app.emu.frame = np.zeros((180, 240, 3), dtype=np.uint8)
+                        app.emu.frame_serial += 1
+                    app.draw_game()
+                    for _ in range(100):
+                        with app.emu.lock:
+                            app.emu.frame_serial += 1
+                        app.draw_game()
+                    assert len(app.game_canvas.find_all()) == 1
                     root.after(200, app.close)
                     root.mainloop()
                     assert app._closing
