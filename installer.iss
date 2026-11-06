@@ -1,6 +1,6 @@
 #define AppName "Anything Plays 2.1 Test"
 #ifndef AppVersion
-  #define AppVersion "2.0.0"
+  #define AppVersion "2.1.0-alpha.1"
 #endif
 [Setup]
 AppId={{1DCC721E-A1D2-4A91-8B49-C7A453EEDB21}
