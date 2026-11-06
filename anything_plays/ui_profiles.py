@@ -89,6 +89,9 @@ class ProfilesMixin:
         if key not in SYSTEMS:
             return
         self.stop_controls()
+        # External games have their own window. Close any blank game-only overlay.
+        if SYSTEMS[key].backend != "libretro" and self.view_mode.get() == "Game only":
+            self.set_view_mode("Windowed")
         # The combobox has already changed, so save the previous system explicitly.
         previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
         try:
