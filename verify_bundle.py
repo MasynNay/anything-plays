@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 import sys
 
+from fetch_mgba_core import inspect_core_identity
+
 
 CORE_NAMES = ("mgba", "snes9x")
 REQUIRED_DOCUMENTS = (
@@ -98,8 +100,21 @@ def verify_bundle(bundle, platform_name, check_native=False):
             raise ValueError(f"Size mismatch: {path}")
         if not isinstance(record.get("source_url"), str) or not record["source_url"].startswith("https://"):
             raise ValueError(f"Missing HTTPS source URL for {name}")
+        if not isinstance(record.get("libretro_library_version"), str) or not record["libretro_library_version"]:
+            raise ValueError(f"Missing recorded native version for {name}")
+        if not isinstance(record.get("source_repository_url"), str) or not record["source_repository_url"].startswith("https://"):
+            raise ValueError(f"Missing upstream source repository for {name}")
     if check_native:
         _validate_mgba_core(cores / f"mgba_libretro{EXTENSIONS[platform_name]}")
+        for record in records:
+            name = record["name"]
+            path = cores / record["file"]
+            observed = inspect_core_identity(path, name)
+            for field in ("libretro_library_name", "libretro_library_version",
+                          "reported_source_revision", "source_repository_url",
+                          "reported_source_commit_url"):
+                if record.get(field) != observed[field]:
+                    raise ValueError(f"Recorded {field} mismatch for {name}: {path}")
     print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums"
           + (" and native GB/GBC/GBA coverage" if check_native else ""))
 
