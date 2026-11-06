@@ -113,6 +113,7 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.refresh_settings()
         self.refresh_system_buttons()
         self.update_external_setup()
+        self.show_external_placeholder()
         self._active_profile_system = self.system_key.get()
         if self.view_mode.get() != 'Windowed':
             self.set_view_mode(self.view_mode.get(), persist=False)
