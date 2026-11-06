@@ -101,7 +101,17 @@ def verify_bundle(bundle, platform_name, check_native=False):
         raise ValueError("Empty Python dependency inventory")
     python_notices = 0
     for distribution in distributions:
-        for notice in distribution.get("license_files", []):
+        listed_notice_files = distribution.get("license_files", [])
+        # OpenCV wheels include FFmpeg on all platforms and Qt on non-headless
+        # Linux wheels. Their distinct third-party terms must not be omitted.
+        if (distribution.get("name", "").casefold() == "opencv-python"
+                and not any(
+                    Path(record.get("original_path", "")).name.casefold()
+                    == "license-3rd-party.txt"
+                    for record in listed_notice_files
+                )):
+            raise ValueError("Missing OpenCV third-party dependency license notice")
+        for notice in listed_notice_files:
             relative = Path(notice.get("bundled_path", ""))
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("Unsafe Python dependency notice path")
