@@ -45,6 +45,23 @@ their hashes, obtain/retain corresponding source revisions and build
 instructions, and populate the explicitly unapproved
 [core lock](CORE_RELEASE_PINNING.md).
 
+### CI artifact retention check (2026-11-05)
+
+GitHub Actions reported seven successful jobs in run
+[`42164654048`](https://github.com/MasynNay/anything-plays/actions/runs/42164654048),
+including Windows, Linux, and both macOS package targets. A check of the
+run-artifact API for runs `42164654048`, `42163068042`, and `42159955003`
+returned **zero downloadable artifacts for each run**. The existing package
+jobs verify staged build output but do not upload immutable emulator core ZIPs
+or completed installers. Therefore the earlier successful builds cannot be
+used as a preserved, audited binary release input. Do not claim the eight
+candidate SHA-256 values are re-obtainable merely because they were recorded.
+
+The next release candidate must explicitly retain immutable core archives,
+corresponding source snapshots, build dependency inventories, and the exact
+final installers in a controlled location. Do not make unapproved installers
+public simply to retain them as CI artifacts.
+
 ## Frozen Python and native libraries
 
 - Direct requirement ranges in `requirements.txt` include OpenCV, NumPy,
@@ -63,10 +80,12 @@ instructions, and populate the explicitly unapproved
 
 ## Assets and distribution materials
 
-- The app icon, branding and other files under `assets/` require provenance:
-  see the [asset inventory and ownership sign-off](ASSET_PROVENANCE.md).
-  Identify creators, permission to publish and modify assets, and
-  third-party/trademark limitations.
+- The maintainer states that the betta illustration was commissioned, that
+  full ownership or commercial rights were purchased, and that it was later
+  AI-recolored. See the [asset provenance record](ASSET_PROVENANCE.md).
+  Exact contractual scope and mapping of each file to its source remain to be
+  established; this attestation is not proof of rights for unrelated artwork
+  or third-party trademarks.
 - No commercial ROMs or game BIOS files are included in the planned releases.
 - Windows setup is currently unsigned, and macOS uses ad-hoc signing without
   Apple Developer ID notarization. Release notes must accurately describe
