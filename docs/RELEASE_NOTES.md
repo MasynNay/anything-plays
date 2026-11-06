@@ -42,8 +42,10 @@ licenses and conditions, including Snes9x's non-commercial restrictions.
 
 The maintainer completed functional testing of Windows EXE, macOS DMG and
 Linux DEB installers and confirmed the v2.0 application works on all three.
-Those earlier builds used Gambatte for GB/GBC; the new mGBA mapping needs a
-focused compatibility check before publishing updated binaries.
+Those earlier builds used Gambatte for GB/GBC. On the revised mGBA integration,
+a real native Linux core passed generated GB/GBC ROM loading and video checks.
+Compatibility with existing GB/GBC save files and representative games still
+requires separate verification before public binary distribution.
 The remaining **public binary release** gates are third-party licensing
 compatibility, corresponding-source materials, immutable binary provenance,
 and confirmation of the updated installer notice packaging where applicable.
