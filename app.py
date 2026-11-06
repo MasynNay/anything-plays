@@ -10,16 +10,16 @@ from pathlib import Path
 import sys
 import tkinter as tk
 
-from gba_emulator import Emulator
-from settings_defaults import DEFAULT
-from system_profiles import ProfileStore
-from ui_camera import CameraMixin
-from ui_gameplay import GameplayMixin
-from ui_layout import LayoutMixin
-from ui_library import LibraryMixin
-from ui_profiles import ProfilesMixin
-from ui_theme import ThemeMixin
-from ui_zones import ZonesMixin
+from anything_plays.gba_emulator import Emulator
+from anything_plays.settings_defaults import DEFAULT
+from anything_plays.system_profiles import ProfileStore
+from anything_plays.ui_camera import CameraMixin
+from anything_plays.ui_gameplay import GameplayMixin
+from anything_plays.ui_layout import LayoutMixin
+from anything_plays.ui_library import LibraryMixin
+from anything_plays.ui_profiles import ProfilesMixin
+from anything_plays.ui_theme import ThemeMixin
+from anything_plays.ui_zones import ZonesMixin
 
 
 class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,

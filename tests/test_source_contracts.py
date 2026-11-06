@@ -9,15 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SourceContracts(unittest.TestCase):
     def test_python_modules_parse(self):
-        for file in (*ROOT.glob("*.py"), *ROOT.glob("tests/*.py")):
+        for file in (*ROOT.glob("*.py"), *ROOT.glob("anything_plays/*.py"), *ROOT.glob("tests/*.py")):
             with self.subTest(file=file.name):
                 ast.parse(file.read_text(encoding="utf-8"))
 
     def test_legacy_preferences_location_preserved(self):
         from app import App
-        from settings_defaults import DEFAULT
-        from system_profiles import ProfileStore
-        from ui_profiles import ProfilesMixin
+        from anything_plays.settings_defaults import DEFAULT
+        from anything_plays.system_profiles import ProfileStore
+        from anything_plays.ui_profiles import ProfilesMixin
         self.assertIn(ProfilesMixin, App.__mro__)
         self.assertTrue(callable(App.load_profile))
         self.assertTrue(callable(App.save_profile))

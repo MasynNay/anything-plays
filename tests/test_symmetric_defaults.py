@@ -1,5 +1,5 @@
 import unittest
-from system_profiles import default_for, BUTTONS_BY_SYSTEM
+from anything_plays.system_profiles import default_for, BUTTONS_BY_SYSTEM
 
 BASE = {'zones': {}, 'mapping': {}, 'shuffle_enabled': True}
 

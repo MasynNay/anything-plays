@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from system_profiles import ProfileStore, default_for, normalize, BUTTONS_BY_SYSTEM
+from anything_plays.system_profiles import ProfileStore, default_for, normalize, BUTTONS_BY_SYSTEM
 
 BASE = {'zones': {'A': [0, 0, .3, .3]}, 'mapping': {'A': 'A'}, 'zone_font_size': 44}
 

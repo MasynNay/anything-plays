@@ -5,8 +5,8 @@ import unittest
 
 import numpy as np
 
-from libretro_audio import AudioSink
-from libretro_input import IDS, InputBuffer
+from anything_plays.libretro_audio import AudioSink
+from anything_plays.libretro_input import IDS, InputBuffer
 
 
 class InputBufferTests(unittest.TestCase):

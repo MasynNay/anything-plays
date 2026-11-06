@@ -6,8 +6,8 @@ import unittest
 
 from PIL import Image
 
-from cartridge_art import cartridge_image
-from rom_library import find_cover_art, scan_rom_directory
+from anything_plays.cartridge_art import cartridge_image
+from anything_plays.rom_library import find_cover_art, scan_rom_directory
 
 
 class ROMLibraryTests(unittest.TestCase):

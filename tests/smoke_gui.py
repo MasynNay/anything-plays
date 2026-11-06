@@ -18,7 +18,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="anything-plays-ui-") as temp_home:
         # Both settings and application-support directory lookups use Path.home.
         with patch("pathlib.Path.home", return_value=Path(temp_home)):
-            with patch("ui_camera.discover", return_value=[]):
+            with patch("anything_plays.ui_camera.discover", return_value=[]):
                 root = tk.Tk()
                 app = None
                 try:

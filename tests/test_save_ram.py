@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from libretro_save import SaveRAM
+from anything_plays.libretro_save import SaveRAM
 
 
 class SaveRAMTests(unittest.TestCase):

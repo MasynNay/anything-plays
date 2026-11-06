@@ -6,9 +6,9 @@ import unittest
 import cv2
 import numpy as np
 
-from libretro_video import RGB1555, RGB565, XRGB8888, decode_frame
-from tracking import locate_target, zone_at
-from zone_rendering import render_zone_overlay
+from anything_plays.libretro_video import RGB1555, RGB565, XRGB8888, decode_frame
+from anything_plays.tracking import locate_target, zone_at
+from anything_plays.zone_rendering import render_zone_overlay
 
 
 class VideoDecoderTests(unittest.TestCase):
