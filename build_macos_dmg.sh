@@ -44,8 +44,8 @@ mkdir -p "$LICENSE_DIR"
 
 cp LICENSE "$LICENSE_DIR/AnythingPlays-MIT.txt"
 cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
-cp THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
-cp THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
+cp docs/THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
+cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
 
 "$PYTHON" verify_bundle.py macos dist/AnythingPlays.app
