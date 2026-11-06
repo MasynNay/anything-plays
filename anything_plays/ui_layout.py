@@ -112,6 +112,9 @@ class LayoutMixin:
                    style='Accent.TButton').grid(row=0, column=0, sticky='ew', padx=(0, 4))
         ttk.Button(rom_actions, text='Refresh ROM Library', command=self.populate_inline_library).grid(
             row=0, column=1, sticky='ew', padx=(4, 0))
+        ttk.Button(rom_actions, text='Clear selected ROM folder',
+                   command=self.clear_rom_directory).grid(
+            row=1, column=0, columnspan=2, sticky='ew', pady=(5, 0))
         ttk.Button(game, text='Open game ROM', command=self.load_rom).pack(fill='x', pady=(5, 0))
         view_row = ttk.Frame(game)
         view_row.pack(fill='x', pady=(7, 0))
