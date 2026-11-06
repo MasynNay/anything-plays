@@ -24,7 +24,7 @@ Purpose: Super Nintendo emulation
 Project: https://github.com/libretro/snes9x
 License: Snes9x custom noncommercial license
 Original source: https://github.com/snes9xgit/snes9x
-License text: licenses/Snes9x-LICENSE.txt
+License text: ../licenses/Snes9x-LICENSE.txt
 
 Snes9x permits noncommercial redistribution subject to its license
 conditions. Its copyright and license notices must accompany
