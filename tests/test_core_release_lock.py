@@ -8,6 +8,7 @@ from tools.core_release_lock import (
     candidate_fingerprint,
     release_target,
     verify_release_lock,
+    verify_download_before_loading,
 )
 
 SOURCE_COMMITS = {
@@ -134,6 +135,60 @@ class ReleaseCoreLockTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "not approved"):
                     fetch_all(folder)
             self.assertTrue((folder / "CORE_PROVENANCE.json").is_file())
+
+    def test_approved_core_bytes_pass_preload_verification(self):
+        core = self.manifest["cores"][0]
+        self.assertEqual(
+            verify_download_before_loading(
+                self.lock, "linux", "x86_64", core["name"], core["file"],
+                core["source_url"], core["size_bytes"], core["sha256"],
+            ),
+            "linux-x86_64",
+        )
+
+    def test_changed_binary_rejected_before_native_load(self):
+        core = self.manifest["cores"][0]
+        with self.assertRaisesRegex(ValueError, "sha256"):
+            verify_download_before_loading(
+                self.lock, "linux", "x86_64", core["name"], core["file"],
+                core["source_url"], core["size_bytes"], "0" * 64,
+            )
+
+    def test_unapproved_download_does_not_load_native_code(self):
+        """Even a well-formed library must be rejected before ctypes loading."""
+        import io
+        import json
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        import zipfile
+
+        from fetch_mgba_core import fetch_core
+
+        zip_bytes = io.BytesIO()
+        with zipfile.ZipFile(zip_bytes, "w") as archive:
+            archive.writestr("mgba_libretro.so", b"\\x7fELF" + b"X" * 11000)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lockfile = root / "lock.json"
+            lockfile.write_text(json.dumps({
+                "schema_version": 1,
+                "approved_for_binary_distribution": False,
+                "targets": {},
+            }))
+            with (
+                patch("fetch_mgba_core.request.urlopen",
+                      return_value=io.BytesIO(zip_bytes.getvalue())),
+                patch("fetch_mgba_core.platform.machine", return_value="x86_64"),
+                patch("fetch_mgba_core.inspect_core_identity") as inspect,
+                patch("tools.core_release_lock.LOCK_PATH", lockfile),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+            ):
+                with self.assertRaisesRegex(ValueError, "not approved"):
+                    fetch_core("mgba", root)
+                inspect.assert_not_called()
+                self.assertFalse((root / "mgba_libretro.so").exists())
 
     def test_legacy_linux_x86_development_build_still_works(self):
         """A non-release 32-bit development target must not need approval."""
