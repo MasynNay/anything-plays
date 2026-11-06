@@ -1,0 +1,91 @@
+name: Experiment - Apple Silicon camera-only OpenCV without FFmpeg
+
+on:
+  push:
+    branches: [experiment/opencv-camera-only-arm64]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-camera-only-wheel:
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      CMAKE_ARGS: "-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+      ENABLE_HEADLESS: "1"
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Inspect build tools
+        run: |
+          python --version
+          cmake --version
+          clang --version
+      - name: Install fixed Python build prerequisites
+        run: python -m pip install --upgrade pip==26.3 numpy==2.5.4
+      - name: Build headless wheel from upstream source with FFmpeg disabled
+        timeout-minutes: 65
+        run: |
+          mkdir -p wheelhouse
+          python -m pip wheel --no-deps --no-binary=opencv-python-headless opencv-python-headless==4.14.0.94 --wheel-dir wheelhouse -v
+      - name: Install the custom camera-only wheel
+        run: python -m pip install wheelhouse/opencv_python_headless-*.whl
+      - name: Verify AVFoundation, image processing, and absence of FFmpeg
+        run: |
+          python - <<'PY'
+          import cv2
+          import hashlib
+          import json
+          import numpy as np
+          from pathlib import Path
+          import re
+          import zipfile
+
+          info = cv2.getBuildInformation()
+          ffmpeg = re.search(r'^\\s*FFMPEG:\\s*(YES|NO)', info, re.MULTILINE)
+          if ffmpeg is None or ffmpeg.group(1) != 'NO':
+              raise SystemExit('FFmpeg must be OFF in the custom wheel')
+          if not cv2.videoio_registry.hasBackend(cv2.CAP_AVFOUNDATION):
+              raise SystemExit('AVFoundation camera support missing')
+          sample = np.zeros((120,160,3), dtype=np.uint8)
+          sample[10:40, 20:60] = (0,255,0)
+          hsv = cv2.cvtColor(sample, cv2.COLOR_BGR2HSV)
+          mask = cv2.inRange(hsv, (40,100,100), (85,255,255))
+          contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+          if not contours or max(cv2.contourArea(x) for x in contours) < 100:
+              raise SystemExit('Camera frame tracking operations are broken')
+          wheel = next(Path('wheelhouse').glob('opencv_python_headless-*.whl'))
+          with zipfile.ZipFile(wheel) as archive:
+              entries = archive.namelist()
+          forbidden = [n for n in entries if any(
+              tag in n.lower() for tag in ('libavcodec','libavformat','libx264','libx265','ffmpeg')
+          )]
+          if forbidden:
+              raise SystemExit(f'Unexpected FFmpeg/GPL encoder files: {forbidden}')
+          digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+          result = {
+              'schema_version': 1,
+              'platform': 'macos-arm64',
+              'opencv_version': cv2.__version__,
+              'ffmpeg_enabled': False,
+              'avfoundation_available': True,
+              'tracking_image_processing_passed': True,
+              'wheel_sha256': digest,
+              'wheel_file': wheel.name,
+              'redistribution_approved': False,
+              'hardware_camera_tested': False,
+          }
+          Path('opencv-camera-only-evidence.json').write_text(
+              json.dumps(result, indent=2)+'\\n', encoding='utf-8')
+          print(json.dumps(result, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-evidence
+          path: opencv-camera-only-evidence.json
+          if-no-files-found: error
