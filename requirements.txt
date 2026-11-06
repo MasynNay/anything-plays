@@ -1,4 +1,4 @@
-opencv-python>=4.8,<5
+opencv-python-headless>=4.8,<5
 numpy>=1.26,<3
 Pillow>=10,<13
 pyobjc-framework-AVFoundation>=10; sys_platform == "darwin"
