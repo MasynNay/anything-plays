@@ -91,7 +91,7 @@ class GameplayMixin:
         if backend == "libretro" and not self.emu.running:
             messagebox.showinfo('Emulator required', 'Open a compatible ROM first. No system-wide keyboard fallback is available.')
             return
-        if backend == "retroarch":
+        if backend in ("retroarch", "dolphin"):
             process = self.external_process
             if self.external_input is None or process is None or process.poll() is not None:
                 messagebox.showinfo('N64 emulator required',
