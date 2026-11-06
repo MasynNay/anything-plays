@@ -85,7 +85,8 @@ def main():
                     app.shuffle_enabled.set(True)
                     app.make_symmetric_grid()
                     zones = app.cfg["zones"]
-                    names = list(app.cfg["mapping"]) + ["Shuffle"]
+                    from anything_plays.system_profiles import enabled_zones
+                    names = enabled_zones(app.cfg, app.system_key.get()) + ["Shuffle"]
                     sizes = {
                         (round(zones[name][2] - zones[name][0], 8),
                          round(zones[name][3] - zones[name][1], 8))
