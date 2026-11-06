@@ -39,3 +39,18 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Headless GUI smoke test
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+
+  native-mgba-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download the actual Linux mGBA core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mgba')"
+      - name: Validate GB, GBC and GBA support in native core
+        env:
+          AP_TEST_NATIVE_CORE: '1'
+        run: python -m unittest discover -s tests -p 'test_mgba_native_coverage.py' -v
