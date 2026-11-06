@@ -24,6 +24,37 @@ class SaveRAMTests(unittest.TestCase):
             self.assertFalse(save.path.with_suffix(".sav.tmp").exists())
 
 
+    def test_oversized_native_sram_is_rejected_without_reading_memory(self):
+        from anything_plays.libretro_save import MAX_SAVE_RAM_BYTES
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = C.create_string_buffer(4)
+            save = SaveRAM(
+                Path(tmp) / "game.gba",
+                lambda kind: C.addressof(memory),
+                lambda kind: MAX_SAVE_RAM_BYTES + 1,
+            )
+            with self.assertRaisesRegex(ValueError, "64 MiB limit"):
+                save.persist()
+            with self.assertRaisesRegex(ValueError, "64 MiB limit"):
+                save.restore()
+            self.assertFalse(save.path.exists())
+
+    def test_oversized_existing_save_is_read_only_to_memory_limit(self):
+        # The existing file is larger than the core SRAM. Read only the
+        # expected bytes + 1 to detect the mismatch and repair on persist.
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = C.create_string_buffer(4)
+            save = SaveRAM(
+                Path(tmp) / "game.gba",
+                lambda kind: C.addressof(memory),
+                lambda kind: 4,
+            )
+            save.path.write_bytes(b"ABCD" + b"extra bytes")
+            save.restore()
+            self.assertEqual(memory.raw, b"ABCD")
+            self.assertTrue(save.persist())
+            self.assertEqual(save.path.read_bytes(), b"ABCD")
+
     def test_unchanged_sram_does_not_rewrite_for_thousands_of_cycles(self):
         # One saved digest means that days of idle emulation do not cause
         # repeated writes of identical game progress.
