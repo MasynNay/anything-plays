@@ -1,55 +1,57 @@
-# Third-party components and redistribution review
+# Third-party components and redistribution status
 
-Anything Plays includes third-party Python libraries and (in packaged builds)
-native emulator cores. **This file is an inventory, not a declaration that
-redistribution obligations have been satisfied.** It does not replace upstream
-license texts, a corresponding-source offer, or review of combined-work terms.
+Anything Plays is an MIT-licensed application (for the original code whose
+authors may grant that license). **The bundled application includes software
+under other licenses; do not describe the complete installer as MIT-licensed or
+wholly OSI-approved open source.** Official distributions will be free of
+charge, with no advertising, subscriptions, donations or paid functionality.
 
-## Native Libretro cores
+## Emulator components packaged by v2.0
 
-| Core | Used for | License identified by Libretro | Upstream information |
-| :-- | :-- | :-- | :-- |
-| Gambatte | GB, GBC | GPLv2 | [Libretro Gambatte documentation](https://docs.libretro.com/library/gambatte/) |
-| mGBA | GBA | MPL 2.0 | [Libretro mGBA documentation](https://docs.libretro.com/library/mgba/) |
-| Snes9x | SNES | Non-commercial terms | [Libretro Snes9x documentation](https://docs.libretro.com/library/snes9x/) |
+| System | Core | License | Authoritative information |
+| --- | --- | --- | --- |
+| GB / GBC / GBA | mGBA | MPL 2.0 | [Libretro mGBA](https://docs.libretro.com/library/mgba/) |
+| SNES | Snes9x | Custom noncommercial terms | [Libretro Snes9x](https://docs.libretro.com/library/snes9x/) |
 
-The exact license terms attached to a **specific downloaded binary**, its
-copyright notices, source availability, and permitted uses must be inspected
-before redistribution. Snes9x's non-commercial condition must be respected.
-Because Gambatte is GPL-covered, the integration and distribution of the
-combined application warrants a separate license-compliance review.
+The build scripts bundle **two** native cores. mGBA supports Game Boy and Game
+Boy Color as well as Game Boy Advance. Snes9x permits certain noncommercial
+copying/distribution provided its full notices accompany copies. The terms of
+each *actual binary* and its dependencies still need validation.
 
-The downloader obtains the latest matching Libretro nightly packages. Each
-build's `cores/CORE_PROVENANCE.json` lists its downloaded source URL and
-SHA-256 hash. **Hashes establish what was downloaded, not which source commit
-produced it.** Pinning source revisions and keeping corresponding-source
-materials are still outstanding release tasks.
+Earlier development builds bundled Gambatte under GPLv2. It is **not** part of
+this release plan; its old license text is retained in `docs/history/` for
+historical attribution. Moving from Gambatte to mGBA changes GB/GBC
+emulation and requires targeted compatibility verification.
 
-## Python dependencies
+## Known reproducibility gap
 
-The application depends on OpenCV, NumPy, Pillow, SoundDevice and, on macOS,
-PyObjC's AVFoundation bridge. Their license texts and any redistributable
-native libraries must be reviewed for the actual versions collected by
-PyInstaller. See `requirements.txt` for declared dependency ranges; a release
-build may resolve newer patch versions than a previous build.
+`fetch_mgba_core.py` currently downloads the latest matching Libretro
+nightly archives. It writes `cores/CORE_PROVENANCE.json` with the actual
+download URL, SHA-256, and file size. This does **not** identify the source
+commit that produced each binary. Approval requires source/version mapping,
+corresponding source materials and immutable versions for each platform.
 
-## Release checklist for third-party compliance
+## Other third-party dependencies
 
-- [ ] Identify exact upstream version and corresponding source for **every**
-  shipped native core; review their actual license texts and notices.
-- [ ] Resolve GPL-related combined-distribution obligations for Gambatte and
-  the application's own licensing plan.
-- [ ] Confirm that the intended no-monetization release complies with Snes9x's
-  full non-commercial terms.
-- [ ] Include required third-party copyright notices and license texts in
-  every installable artifact.
-- [ ] Make required source material or a compliant source offer available.
-- [ ] Review Python dependencies, images, icons and any other bundled assets.
-- [ ] Verify final packages, test on target OSes, and approve publication.
+The frozen application includes OpenCV, NumPy, Pillow, sounddevice and
+platform-specific dependencies such as PyObjC, plus transitive native
+libraries. Review their actual versions, licenses, copyright notices and
+redistribution obligations. The source artwork and icon rights must also
+be confirmed. The complete Python dependency list is in `../requirements.txt`.
 
-Anything Plays is intended to remain free of charge and non-commercial in
-its official distribution. Original project code is offered under the MIT
-License where contributors have the rights to grant that license.
-Third-party components retain their separate licensing requirements.
-Bundled installers must not be published until the outstanding compliance
-requirements above have been resolved.
+## Remaining binary publication requirements
+
+- [ ] Verify that the mGBA and Snes9x versions shipped are licensed as stated.
+- [ ] Confirm Snes9x's noncommercial redistribution conditions cover the
+      complete intended distribution and respect all component notices.
+- [ ] Identify corresponding source revisions for each shipped platform binary,
+      provide any required source, and lock checksums/versions.
+- [ ] Review frozen dependencies, native libraries, and asset provenance.
+- [ ] Inspect final Windows, macOS and Linux packages for complete notices,
+      exact core hashes, source pointers and permitted content.
+- [ ] Validate the GB/GBC mGBA core transition with focused tests.
+- [ ] Approve publication separately from source integration.
+
+**Status: binary release clearance is not complete.** A successful
+`verify_bundle.py` run proves the presence/integrity of required files,
+not the copyright status of those files.
