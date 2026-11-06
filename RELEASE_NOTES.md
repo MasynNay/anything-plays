@@ -39,8 +39,10 @@ licenses and conditions, including Snes9x's non-commercial restrictions.
 
 ## Before publishing
 
-Complete the real-device and installer testing in `QA_CHECKLIST.md`, verify the
-new refactor on each supported platform, and resolve the exact third-party
-copyright, license, and corresponding-source obligations in
-`THIRD_PARTY_COMPONENTS.md`. **The source package is not yet an authorized
-public v2.0 installer release.**
+The maintainer completed functional testing of Windows EXE, macOS DMG and
+Linux DEB installers and confirmed the v2.0 application works on all three.
+The remaining **public binary release** gates are third-party licensing
+compatibility, corresponding-source materials, immutable binary provenance,
+and confirmation of the updated installer notice packaging where applicable.
+See `RELEASE_LICENSE_REVIEW.md`. **A source merge into `main` is not approval
+to redistribute the bundled binaries.**
