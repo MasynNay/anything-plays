@@ -24,6 +24,7 @@ from anything_plays.libretro_abi import (
 from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
 from anything_plays.libretro_save import SaveRAM
+from anything_plays.n64_software import SoftwareN64Options
 from anything_plays.libretro_video import SUPPORTED_FORMATS, decode_frame
 from anything_plays.systems import SYSTEMS
 
@@ -104,6 +105,7 @@ class CoreSession:
         self.native = None
         self.audio = AudioSink()
         self.pixel_format = 0  # Libretro defaults to RGB1555.
+        self._software_options = SoftwareN64Options() if system == "n64" else None
         self.save_ram = None
         self._rom_buffers = []
         self._rom_path_bytes = os.fsencode(str(self.rom))
@@ -120,6 +122,10 @@ class CoreSession:
 
     def environment(self, command, data):
         """Respond to the subset of environment requests our cores require."""
+        if self._software_options is not None:
+            response = self._software_options.environment(command, data)
+            if response is not None:
+                return response
         if command == 10 and data:  # RETRO_ENVIRONMENT_SET_PIXEL_FORMAT
             requested = C.cast(data, C.POINTER(C.c_int))[0]
             if requested not in SUPPORTED_FORMATS:
