@@ -81,10 +81,13 @@ def soak(seconds, max_growth_mb, report_path):
 
     with tempfile.TemporaryDirectory(prefix="anything-plays-soak-") as home:
         with (patch("pathlib.Path.home", return_value=Path(home)),
-              patch.object(App, "scan_cameras", lambda self: None)):
+              patch.object(App, "scan_cameras", lambda self: None),
+              patch.object(App, "check_emulator_updates",
+                           lambda self, automatic=False: None)):
             root = tk.Tk()
             app = App(root)
-            app.cap = SyntheticCamera()
+            camera = SyntheticCamera()
+            app.cap = camera
             app.reference_image = False
             app.emu.running = True
             app.current_rom = "synthetic-frame.gba"
@@ -143,7 +146,7 @@ def soak(seconds, max_growth_mb, report_path):
                 if not app._closing:
                     app.close()
             report["frames_emitted"] = frame_number
-            report["camera_frames"] = app.cap.frame_number if app.cap else None
+            report["camera_frames"] = camera.frame_number
 
     samples = report["samples"]
     baseline = next((s for s in samples if s["seconds"] >= warmup), None)
