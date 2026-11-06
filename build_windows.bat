@@ -37,6 +37,8 @@ copy /Y docs\THIRD_PARTY_COMPONENTS.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
+.build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
+if errorlevel 1 exit /b 1
 
 py verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
