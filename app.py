@@ -68,6 +68,7 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         if not isinstance(self.n64_core_override, str):
             self.n64_core_override = ''
         self.external_process = None
+        self.external_input = None  # Local camera/keyboard bridge for N64
         self._game_only_window = None
         self._game_only_canvas = None
         self._shortcut_window = None
