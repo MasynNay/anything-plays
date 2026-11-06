@@ -68,30 +68,29 @@ class InputBuffer:
             self.manual_buttons.clear()
 
     def disarm(self):
+        # Clear queued presses under the same lock as before_frame: a pending
+        # camera command cannot be applied AFTER the user presses Stop.
         with self.state_lock:
             self.remaining.clear()
             self.pressed.clear()
-        while True:
-            try:
-                self.commands.get_nowait()
-            except Empty:
-                break
+            while True:
+                try:
+                    self.commands.get_nowait()
+                except Empty:
+                    break
 
     def before_frame(self, armed):
         """Update pressed IDs before a ``retro_run()`` invocation."""
         if not armed:
             self.disarm()
         else:
-            # Drain a bounded command batch off-lock, then update the active
-            # pulse state atomically. UI disarm can never corrupt iteration.
-            commands = []
-            for _ in range(8):
-                try:
-                    commands.append(self.commands.get_nowait())
-                except Empty:
-                    break
+            # Keep command consumption atomic with the emergency stop.
             with self.state_lock:
-                for button_id, duration in commands:
+                for _ in range(8):
+                    try:
+                        button_id, duration = self.commands.get_nowait()
+                    except Empty:
+                        break
                     self.remaining[button_id] = duration
                 self.pressed.clear()
                 self.pressed.update(self.remaining)
