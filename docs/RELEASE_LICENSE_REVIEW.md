@@ -1,84 +1,60 @@
-# v2.0 redistribution clearance (not yet approved)
+# v2.0 binary release readiness
 
-This is a release gate, not a declaration that the project or bundled
-emulator cores are cleared for redistribution. Official builds are intended
-to be free of charge. Noncommercial distribution does not remove the license
-conditions of third-party code.
+**Application functionality:** The maintainer supplied Windows EXE, macOS
+DMG and Linux DEB installers and confirmed that v2.0 worked on all three
+operating systems. This prior gameplay testing is complete and should not be
+repeated merely for changes to documentation.
 
-## Current integration
+**Source:** The v2.0 application is merged into `main`. Original code is
+licensed under MIT (where contributors have rights to grant that license).
 
-- `systems.py` selects Gambatte for Game Boy and Game Boy Color, mGBA
-  for Game Boy Advance, and Snes9x for SNES.
-- `gba_emulator.py` loads a native Libretro library with `ctypes.CDLL`.
-  This is in-process integration, not an independent command-line program.
-- The downloader `fetch_mgba_core.py` currently fetches `/latest/`
-  nightlies; it records resulting hashes but **not** matching source commits.
-- The three build scripts bundle all three core binaries in platform installers.
-- Project and core license texts are committed to `develop/v2.0` and copied
-  into all three platform packages. `verify_bundle.py` checks presence and
-  matches packaged core hashes to the generated manifest; this is **not** a
-  compatibility, source-availability, or license-compliance audit.
+**Binary distribution:** Not yet approved. This record is technical evidence,
+not legal advice or a claim of copyright clearance.
 
-## Current evidence (as of November 2026)
+## Core licensing strategy
 
-| Check | Verified finding | Release implication |
-| --- | --- | --- |
-| Original code license | MIT license file committed | Applies only to code whose contributors may grant it |
-| Packaging instructions | Windows, macOS and Linux scripts stage core licenses and notices | The staged outputs still need artifact inspection on each OS |
-| macOS Apple Silicon package | Local rebuild reported that staging verification and DMG creation succeeded | Confirms files and checksums for that build, not legal clearance or notarization |
-| Windows and Ubuntu | Maintainer supplied EXE and DEB artifacts and confirmed successful application testing | Functional testing is complete; updated license-file packaging alone is not independently verified |
-| Core provenance | Buildbot `latest` nightlies with post-download SHA-256 | Corresponding source revisions not established; not reproducible |
-| Third-party rights | Gambatte GPLv2, mGBA MPL 2.0, Snes9x noncommercial | Combined-work and specific redistribution obligations still outstanding |
+For the prospective public binary build, Game Boy, Game Boy Color, and Game
+Boy Advance use the already-integrated mGBA Libretro core (MPL 2.0); SNES
+uses Snes9x under its custom noncommercial terms. That removes Gambatte
+GPLv2 from the *proposed* packaged binary, avoiding the specific Gambatte /
+Snes9x combined-work conflict that blocked the earlier three-core design.
+This does not automatically resolve all third-party redistribution obligations.
 
-**Naming:** The original Anything Plays source is MIT-licensed. The complete
-bundle includes noncommercial Snes9x; do not represent every bundled component
-as OSI-approved open source or apply MIT to those third-party binaries.
+Libretro documents [mGBA supporting GB/GBC/GBA](https://docs.libretro.com/library/mgba/)
+and [Snes9x's noncommercial license](https://docs.libretro.com/library/snes9x/).
+The application's original MIT license does **not** govern Snes9x.
 
-**Cross-platform functional testing is complete.** The maintainer provided the
-Windows EXE, macOS DMG and Linux DEB and confirmed they work. Do not request
-more gameplay testing merely because documentation, notices or CI changed.
-If required, validate only the modified packaging contents independently.
+## Evidence
 
-## Required decisions and evidence
+| Check | State |
+| --- | --- |
+| Existing v2 functionality on Windows/macOS/Ubuntu | Maintainer confirmed completed |
+| Package structure / imports | Refactor passed source checks and headless UI tests |
+| Revised native core mapping | mGBA for GB/GBC/GBA; Snes9x for SNES |
+| Targeted GB/GBC gameplay with mGBA | Still needs validation; earlier GB/GBC testing used Gambatte |
+| macOS previous three-core notice/integrity packaging | Passed locally, before changing core mapping |
+| Exact corresponding source commits for downloaded binaries | Not established |
+| Python/native dependency and asset rights | Not fully audited |
+| Newly packaged two-core installers | Not yet checked |
+| Public publishing job | Disabled pending release clearance |
 
-- [ ] **Combined-work review — release blocker.** Determine whether the
-      in-process GPLv2 Gambatte integration and Snes9x's noncommercial terms
-      can be distributed together. Seek qualified open-source licensing review
-      or relevant rights-holder permission, or test an appropriately licensed
-      alternative to Gambatte (for example SameBoy). A separate file directory
-      or a free download does not itself resolve this issue.
-- [ ] **Gambatte.** Identify the exact core build, its source revision,
-      complete GPL notices, and corresponding source obligations.
-- [ ] **mGBA.** Identify the exact core build and source revision; make
-      MPL-covered source and notices accessible as required.
-- [ ] **Snes9x.** Check the full notices and noncommercial terms for the
-      exact Libretro build, and confirm the planned distribution is authorized.
-- [ ] **Dependencies and assets.** Inventory the versions and notices for
-      frozen Python/native dependencies and packaged assets on all OSes.
-- [ ] **Installer contents.** Ship all notices, required licenses and
-      corresponding-source information in each installer. Check the actual
-      built artifacts, not only the scripts.
-- [ ] **Release immutability.** Lock approved core binaries by target
-      architecture and SHA-256 before release. Preserve source archives
-      and a verifiable build/source mapping.
-- [ ] **Testing and approval.** Complete application smoke tests on Windows
-      x64, macOS arm64/x86_64, Linux x64, and explicitly authorize publication.
+## Binary publication checklist
 
-## Automatic publishing safeguard
+- [ ] Approve an exact mGBA and Snes9x build for each architecture and
+      preserve its corresponding source code and full license notices.
+- [ ] Freeze each approved binary by cryptographic hash and source revision;
+      avoid mutable `latest` URLs for actual releases.
+- [ ] Check the full Snes9x terms and embedded component notices for this
+      explicitly noncommercial release.
+- [ ] Confirm all bundled Python/native dependencies and app assets are
+      redistributable with their required notices.
+- [ ] Validate the changed GB/GBC core with targeted real-core testing;
+      preserve existing console profiles and `.sav` behavior.
+- [ ] Inspect the final two-core installers on Windows, macOS and Linux,
+      including license files and core checksum manifest.
+- [ ] Obtain release approval, restore a controlled publication mechanism,
+      and publish signed/unsigned limitations accurately.
 
-The `publish` job in `../.github/workflows/release.yml` is disabled on
-`develop/v2.0`. **It is acceptable to merge the verified v2 source into
-`main` without publishing new binaries; this does not constitute release
-licensing approval.** Before merging, confirm that the disabled job will
-remain disabled on `main`. Until that merge is complete, pushing a version tag
-based on the old `main` may still publish. Do not create version tags or
-manually publish installers until redistribution review is completed.
-
-## References
-
-- [GNU GPL FAQ: combined works and plug-ins](https://www.gnu.org/licenses/gpl-faq.html)
-- [Libretro core license overview](https://github.com/libretro/docs/blob/master/docs/development/licenses.md)
-- [Libretro mGBA](https://docs.libretro.com/library/mgba/)
-- [Libretro Snes9x](https://docs.libretro.com/library/snes9x/)
-
-This is a technical compliance checklist, not legal advice or a legal opinion.
+Do not create a v2.0 release tag or distribute bundled installers before
+these items are resolved. The source code being publicly available on GitHub
+does **not** mean the native installers have been cleared for redistribution.
