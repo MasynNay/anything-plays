@@ -48,6 +48,9 @@ def main():
                     app.system_key.set("n64")
                     app.switch_system()
                     assert app.external_setup.winfo_manager()
+                    app.set_view_mode("Game only", persist=False)
+                    assert app.view_mode.get() == "Windowed"
+                    assert app._game_only_canvas is None
                     app.system_key.set("genesis")
                     app.switch_system()
                     assert not app.external_setup.winfo_manager()
