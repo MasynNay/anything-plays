@@ -15,8 +15,13 @@ def verify_opencv_build(cv2_module=None, platform=None):
         platform = sys.platform
     info = cv2_module.getBuildInformation()
     gui = re.search(r"^\s*GUI:\s*(\S+)", info, flags=re.MULTILINE)
-    if not gui or gui.group(1).upper() != "NONE":
-        raise RuntimeError(f"OpenCV must be built without GUI/Qt (observed: {gui.group(1) if gui else 'unknown'})")
+    detected_gui = gui.group(1).upper() if gui else "UNKNOWN"
+    # Official macOS headless wheels can still report COCOA due to native
+    # Apple frameworks; bundled Qt GUI libraries remain disallowed.
+    allowed_gui = {"NONE", "COCOA"} if platform == "darwin" else {"NONE"}
+    if detected_gui not in allowed_gui:
+        raise RuntimeError(f"OpenCV must be built without bundled Qt/GUI extras "
+                           f"(observed: {detected_gui})")
     backend_by_platform = {
         "win32": ("DirectShow", "CAP_DSHOW"),
         "darwin": ("AVFoundation", "CAP_AVFOUNDATION"),
@@ -25,7 +30,7 @@ def verify_opencv_build(cv2_module=None, platform=None):
     backend_id = getattr(cv2_module, constant, None)
     if backend_id is None or not cv2_module.videoio_registry.hasBackend(backend_id):
         raise RuntimeError(f"Headless OpenCV does not support required {name} capture backend")
-    result = {"opencv_version": cv2_module.__version__, "gui": "NONE",
+    result = {"opencv_version": cv2_module.__version__, "gui": detected_gui,
               "capture_backend": name, "backend_id": backend_id,
               "camera_hardware_tested": False}
     print(f"OpenCV {result['opencv_version']} headless: {name} capture backend available; "
