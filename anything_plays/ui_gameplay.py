@@ -221,12 +221,20 @@ class GameplayMixin:
         image = Image.fromarray(frame[:, :, :3]).resize(
             (width, height), Image.Resampling.NEAREST
         )
-        self.game_photo = ImageTk.PhotoImage(image)
+        photo = ImageTk.PhotoImage(image)
+        x = (canvas_width - width) // 2
+        y = (canvas_height - height) // 2
+        item = getattr(self, "_game_image_item", None)
+        if (getattr(self, "_game_image_canvas", None) is not canvas
+                or item is None or not canvas.type(item)):
+            # A new canvas (e.g. Game only) needs one image item. Reuse it
+            # across frames to keep Tk's item count permanently bounded.
+            canvas.delete("all")
+            item = canvas.create_image(x, y, image=photo, anchor="nw")
+            self._game_image_item = item
+            self._game_image_canvas = canvas
+        else:
+            canvas.coords(item, x, y)
+            canvas.itemconfigure(item, image=photo)
+        self.game_photo = photo
         self._last_game_render = revision
-        canvas.delete('all')
-        canvas.create_image(
-            (canvas_width - width) // 2,
-            (canvas_height - height) // 2,
-            image=self.game_photo,
-            anchor='nw',
-        )
