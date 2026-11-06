@@ -1,0 +1,67 @@
+"""Headless tests for independent game input and audio buffering."""
+
+import ctypes as C
+import unittest
+
+import numpy as np
+
+from libretro_audio import AudioSink
+from libretro_input import IDS, InputBuffer
+
+
+class InputBufferTests(unittest.TestCase):
+    def test_camera_press_expires_on_exact_frame(self):
+        inputs = InputBuffer()
+        inputs.queue_press("A", 2)
+        for _ in range(2):
+            inputs.before_frame(armed=True)
+            self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+            inputs.after_frame()
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 0)
+
+    def test_manual_input_survives_disarmed_camera(self):
+        inputs = InputBuffer()
+        inputs.set_manual("B", True)
+        inputs.queue_press("A", 5)
+        inputs.before_frame(armed=False)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["B"]), 1)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 0)
+        inputs.release_manual()
+        inputs.before_frame(armed=False)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["B"]), 0)
+
+    def test_input_is_restricted_to_first_joypad(self):
+        inputs = InputBuffer()
+        inputs.set_manual("A", True)
+        inputs.before_frame(armed=False)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["A"]), 0)
+        self.assertEqual(inputs.state(0, 2, 0, IDS["A"]), 0)
+
+    def test_camera_queue_is_bounded(self):
+        inputs = InputBuffer()
+        for _ in range(100):
+            inputs.queue_press("Left", 1)
+        self.assertEqual(inputs.commands.qsize(), 32)
+
+
+class AudioBufferTests(unittest.TestCase):
+    def test_silence_is_filled_after_audio_runs_out(self):
+        audio = AudioSink()
+        audio.push(np.array([[10, 20], [-1, -2]], dtype=np.int16))
+        output = np.full((4, 2), 900, dtype=np.int16)
+        audio.callback(output, 4, None, None)
+        self.assertEqual(output.tolist(), [[10, 20], [-1, -2], [0, 0], [0, 0]])
+
+    def test_native_audio_batch_copies_core_owned_buffer(self):
+        audio = AudioSink()
+        samples = (C.c_int16 * 4)(1, 2, 3, 4)
+        self.assertEqual(audio.batch(C.cast(samples, C.c_void_p), 2), 2)
+        samples[0] = 99
+        out = np.zeros((2, 2), dtype=np.int16)
+        audio.callback(out, 2, None, None)
+        self.assertEqual(out.tolist(), [[1, 2], [3, 4]])
+
+
+if __name__ == "__main__":
+    unittest.main()

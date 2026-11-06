@@ -27,13 +27,28 @@ done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
 mkdir -p dist/AnythingPlays.app/Contents/MacOS/cores
-for core in cores/mgba_libretro.dylib cores/libretro_mgba.dylib; do
-  if [[ -f "$core" ]]; then cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/; fi
+for name in gambatte mgba snes9x; do
+  core="cores/${name}_libretro.dylib"
+  [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
+  cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
 done
+# Include a hash manifest identifying the exact nightly cores in this build.
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/MacOS/cores/
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Anything Plays uses the camera to track moving objects for game controls." "$PLIST"
+# Include project and third-party licensing documentation.
+LICENSE_DIR="dist/AnythingPlays.app/Contents/Resources/licenses"
+mkdir -p "$LICENSE_DIR"
+
+cp LICENSE "$LICENSE_DIR/AnythingPlays-MIT.txt"
+cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
+cp THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
+cp THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
+cp licenses/*.txt "$LICENSE_DIR/"
+
+"$PYTHON" verify_bundle.py macos dist/AnythingPlays.app
 codesign --force --deep --sign - dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg

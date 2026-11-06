@@ -1,193 +1,314 @@
-"""Embedded GBA via the mGBA *libretro* core. No OS keyboard injection.
-The native mGBA core is downloaded and bundled by platform build scripts.
+"""Run Gambatte, mGBA and Snes9x through the native Libretro API.
+
+This module owns the emulator thread and Libretro lifecycle. Video conversion,
+audio output, joypad state, core discovery, and SRAM persistence each live in
+small modules with tests. No operating-system keyboard events are injected.
+
+The public ``Emulator`` interface is kept compatible with the original app.
+In particular, ``frame`` is protected by ``lock`` and ``armed`` only controls
+camera input; manual controls operate independently.
 """
+
 import ctypes as C
-import json
 import os
 from pathlib import Path
-import queue
 import sys
 import threading
 import time
 
-import numpy as np
+from core_locator import find_core
+from libretro_abi import (
+    AUDIO, AUDIO_BATCH, AVInfo, CoreInfo, ENV, GameInfo, INPUT_POLL,
+    INPUT_STATE, VIDEO,
+)
+from libretro_audio import AudioSink
+from libretro_input import BUTTONS, IDS, InputBuffer
+from libretro_save import SaveRAM
+from libretro_video import SUPPORTED_FORMATS, decode_frame
+from systems import SYSTEMS
 
-BUTTONS = ('Up','Down','Left','Right','A','B','Start','Select')
-IDS = {'B':0,'Select':2,'Start':3,'Up':4,'Down':5,'Left':6,'Right':7,'A':8}
-VIDEO = C.CFUNCTYPE(None, C.c_void_p,C.c_uint,C.c_uint,C.c_size_t)
-AUDIO = C.CFUNCTYPE(None,C.c_int16,C.c_int16)
-AUDIO_BATCH = C.CFUNCTYPE(C.c_size_t,C.c_void_p,C.c_size_t)
-INPUT_POLL = C.CFUNCTYPE(None)
-INPUT_STATE = C.CFUNCTYPE(C.c_int16,C.c_uint,C.c_uint,C.c_uint,C.c_uint)
-ENV = C.CFUNCTYPE(C.c_bool,C.c_uint,C.c_void_p)
-class GameInfo(C.Structure):
-    _fields_=[('path',C.c_char_p),('data',C.c_void_p),('size',C.c_size_t),('meta',C.c_char_p)]
-class Geometry(C.Structure):
-    _fields_=[('base_width',C.c_uint),('base_height',C.c_uint),('max_width',C.c_uint),('max_height',C.c_uint),('aspect_ratio',C.c_float)]
-class Timing(C.Structure):
-    _fields_=[('fps',C.c_double),('sample_rate',C.c_double)]
-class AVInfo(C.Structure):
-    _fields_=[('geometry',Geometry),('timing',Timing)]
 
-def find_core():
-    suffix = '.dll' if sys.platform == 'win32' else '.dylib' if sys.platform == 'darwin' else '.so'
-    names = ['mgba_libretro'+suffix, 'libretro_mgba'+suffix]
-    dirs = [Path(__file__).resolve().parent/'cores', Path(sys.executable).resolve().parent/'cores', Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))/'cores', Path.home()/'.config'/'retroarch'/'cores',Path('/usr/lib/libretro'),Path('/usr/lib/x86_64-linux-gnu/libretro'),Path('/usr/local/lib/libretro')]
-    if sys.platform == 'darwin':
-        dirs += [Path.home()/'Library/Application Support/RetroArch/cores',Path('/Applications/RetroArch.app/Contents/Resources/cores')]
-    return next((str(d/n) for d in dirs for n in names if (d/n).is_file()),None)
+class NativeCore:
+    """Bind one dynamic library with explicit Libretro argument signatures."""
+
+    def __init__(self, path):
+        self.library = C.CDLL(str(path))
+        self.set_environment = self._function("retro_set_environment", None, [ENV])
+        self.set_video = self._function("retro_set_video_refresh", None, [VIDEO])
+        self.set_audio = self._function("retro_set_audio_sample", None, [AUDIO])
+        self.set_audio_batch = self._function(
+            "retro_set_audio_sample_batch", None, [AUDIO_BATCH]
+        )
+        self.set_poll = self._function("retro_set_input_poll", None, [INPUT_POLL])
+        self.set_state = self._function("retro_set_input_state", None, [INPUT_STATE])
+        self.init = self._function("retro_init", None, [])
+        self.deinit = self._function("retro_deinit", None, [])
+        self.load = self._function("retro_load_game", C.c_bool, [C.POINTER(GameInfo)])
+        self.unload = self._function("retro_unload_game", None, [])
+        self.run = self._function("retro_run", None, [])
+        self.system_info = self._function(
+            "retro_get_system_info", None, [C.POINTER(CoreInfo)]
+        )
+        self.av_info = self._function(
+            "retro_get_system_av_info", None, [C.POINTER(AVInfo)]
+        )
+        self.memory_data = self._function("retro_get_memory_data", C.c_void_p, [C.c_uint])
+        self.memory_size = self._function("retro_get_memory_size", C.c_size_t, [C.c_uint])
+        self.callbacks = []
+        self.initialized = False
+        self.loaded = False
+
+    def _function(self, name, result, arguments):
+        function = getattr(self.library, name)
+        function.restype = result
+        function.argtypes = arguments
+        return function
+
+    def configure(self, environment, video, audio, inputs):
+        """Register and retain callbacks until the core has been deinitialized."""
+        self.callbacks = [
+            ENV(environment), VIDEO(video), AUDIO(audio.sample),
+            AUDIO_BATCH(audio.batch), INPUT_POLL(lambda: None),
+            INPUT_STATE(inputs.state),
+        ]
+        self.set_environment(self.callbacks[0])
+        self.set_video(self.callbacks[1])
+        self.set_audio(self.callbacks[2])
+        self.set_audio_batch(self.callbacks[3])
+        self.set_poll(self.callbacks[4])
+        self.set_state(self.callbacks[5])
+
+    def close(self):
+        """Release game memory before core state, then drop callback references."""
+        try:
+            if self.loaded:
+                self.unload()
+        finally:
+            try:
+                if self.initialized:
+                    self.deinit()
+            finally:
+                self.callbacks.clear()
+                self.loaded = False
+                self.initialized = False
+
+
+class CoreSession:
+    """Own everything that must live on the Libretro worker thread."""
+
+    def __init__(self, emulator, system, rom, core_path):
+        self.emulator = emulator
+        self.system = system
+        self.rom = Path(rom).resolve()
+        self.core_path = core_path
+        self.native = None
+        self.audio = AudioSink()
+        self.pixel_format = 0  # Libretro defaults to RGB1555.
+        self.save_ram = None
+        self._rom_buffers = []
+        self._rom_path_bytes = os.fsencode(str(self.rom))
+        self._system_dir_buffer = self._make_system_directory()
+
+    @staticmethod
+    def _make_system_directory():
+        if sys.platform == "darwin":
+            folder = Path.home() / "Library" / "Application Support" / "AnythingPlays"
+        else:
+            folder = Path.home() / ".config" / "anything-plays"
+        folder.mkdir(parents=True, exist_ok=True)
+        return C.create_string_buffer(os.fsencode(str(folder)))
+
+    def environment(self, command, data):
+        """Respond to the subset of environment requests our cores require."""
+        if command == 10 and data:  # RETRO_ENVIRONMENT_SET_PIXEL_FORMAT
+            requested = C.cast(data, C.POINTER(C.c_int))[0]
+            if requested not in SUPPORTED_FORMATS:
+                return False
+            self.pixel_format = requested
+            return True
+        if command in (9, 31) and data:  # GET_SYSTEM_DIRECTORY / GET_SAVE_DIRECTORY
+            C.cast(data, C.POINTER(C.c_char_p))[0] = C.cast(
+                self._system_dir_buffer, C.c_char_p
+            )
+            return True
+        if command == 3 and data:  # GET_CAN_DUPE: repeat the previous frame.
+            C.cast(data, C.POINTER(C.c_bool))[0] = True
+            return True
+        if command == 18:  # SET_SUPPORT_NO_GAME (no content-less mode used).
+            return True
+        return False
+
+    def video(self, data, width, height, pitch):
+        """Copy a core-owned video frame before the native callback returns."""
+        try:
+            frame = decode_frame(data, width, height, pitch, self.pixel_format)
+        except (ValueError, OverflowError):
+            return
+        if frame is not None:
+            with self.emulator.lock:
+                self.emulator.frame = frame
+
+    def _game_info(self, full_path):
+        """Build one retro_game_info and retain its buffers for the core's life."""
+        path_bytes = self._rom_path_bytes
+        if full_path:
+            return GameInfo(path_bytes, None, 0, None)
+        rom_bytes = self.rom.read_bytes()
+        buffer = C.create_string_buffer(rom_bytes)
+        self._rom_buffers.append(buffer)
+        return GameInfo(path_bytes, C.cast(buffer, C.c_void_p), len(rom_bytes), None)
+
+    def _load_game(self):
+        if not self.rom.is_file():
+            raise FileNotFoundError(f"ROM not found: {self.rom}")
+
+        info = CoreInfo()
+        self.native.system_info(C.byref(info))
+        game = self._game_info(bool(info.need_fullpath))
+        accepted = bool(self.native.load(C.byref(game)))
+
+        # Some Gambatte builds disagree with their advertised loading mode.
+        # A single alternate-mode attempt preserves previously working ROMs.
+        if not accepted and self.system in ("gb", "gbc"):
+            mode = "path" if info.need_fullpath else "memory"
+            print(
+                f"[AnythingPlays] Gambatte rejected {self.rom.name} via {mode}; "
+                "retrying alternate mode.", file=sys.stderr, flush=True,
+            )
+            alternate = self._game_info(not bool(info.need_fullpath))
+            accepted = bool(self.native.load(C.byref(alternate)))
+
+        if not accepted:
+            library = (info.library_name or b"unknown").decode(errors="replace")
+            raise RuntimeError(
+                f"{SYSTEMS[self.system].title} core ({library}) rejected "
+                f"{self.rom.name} (need_fullpath={bool(info.need_fullpath)}). "
+                "Check the Terminal for details."
+            )
+        self.native.loaded = True
+
+    def run(self):
+        if not self.core_path or not Path(self.core_path).is_file():
+            raise RuntimeError(
+                f"{SYSTEMS[self.system].title} bundled emulator core not found. "
+                "Please reinstall Anything Plays."
+            )
+        self.native = NativeCore(self.core_path)
+        try:
+            self.native.configure(
+                self.environment, self.video, self.audio, self.emulator.inputs
+            )
+            self.native.init()
+            self.native.initialized = True
+            self._load_game()
+
+            av = AVInfo()
+            self.native.av_info(C.byref(av))
+            frames_per_second = (
+                av.timing.fps if 20 < av.timing.fps < 240 else 59.7275
+            )
+            self.audio.start(av.timing.sample_rate)
+            self.save_ram = SaveRAM(
+                self.rom, self.native.memory_data, self.native.memory_size
+            )
+            self.save_ram.restore()
+            self.emulator.running = True
+
+            frame_number = 0
+            next_frame = time.monotonic()
+            while not self.emulator.stop_event.is_set():
+                self.emulator.inputs.before_frame(self.emulator.armed)
+                self.native.run()
+                self.emulator.inputs.after_frame()
+                frame_number += 1
+                if frame_number % 300 == 0:
+                    self.save_ram.persist()
+
+                next_frame += 1 / frames_per_second
+                remaining = next_frame - time.monotonic()
+                if remaining > 0:
+                    self.emulator.stop_event.wait(remaining)
+                elif remaining < -0.25:
+                    next_frame = time.monotonic()
+            self.save_ram.persist()
+        finally:
+            self.audio.close()
+            if self.native is not None:
+                self.native.close()
+
 
 class Emulator:
-    """Run a libretro core in a worker thread and expose frame-safe controls."""
+    """Thread-safe facade used by the Tkinter application."""
 
     def __init__(self):
-        self.commands=queue.Queue(maxsize=32)
-        self.manual_buttons=set()
-        self.manual_lock=threading.Lock()
-        self.stop_event=threading.Event()
-        self.thread=None
-        self.running=False
-        self.armed=False
-        self.error=None
-        self.frame=None
-        self.lock=threading.Lock()
-        self.core_path=find_core()
-        self.rom=None
-    def start(self,rom):
+        self.inputs = InputBuffer()
+        # Expose legacy attributes for compatibility with existing extensions.
+        self.commands = self.inputs.commands
+        self.manual_buttons = self.inputs.manual_buttons
+        self.manual_lock = self.inputs.manual_lock
+        self.stop_event = threading.Event()
+        self.thread = None
+        self.running = False
+        self.armed = False
+        self.error = None
+        self.frame = None
+        self.lock = threading.Lock()
+        self.system = "gba"
+        self.core_path = find_core(self.system)
+        self.rom = None
+
+    def find_system_core(self):
+        """Look up the core for the console selected in the interface."""
+        return find_core(self.system)
+
+    def start(self, rom):
+        """Stop the previous session before starting a fresh worker thread."""
         self.stop()
-        self.rom=str(rom)
-        self.error=None
+        if self.thread is not None and self.thread.is_alive():
+            raise RuntimeError("The previous emulator is still shutting down")
+        self.rom = str(rom)
+        self.error = None
         self.stop_event.clear()
-        self.thread=threading.Thread(target=self._run,daemon=True)
+        with self.lock:
+            self.frame = None
+        self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
-    def press(self,button,frames=8):
-        if not self.running or not self.armed or button not in BUTTONS: return
-        try:self.commands.put_nowait((button,max(1,min(60,int(frames)))))
-        except queue.Full:pass
+
+    def press(self, button, frames=8):
+        if self.running and self.armed and button in IDS:
+            self.inputs.queue_press(button, frames)
+
     def set_manual(self, button, down):
-        if button not in BUTTONS:
-            return
-        with self.manual_lock:
-            if down: self.manual_buttons.add(button)
-            else: self.manual_buttons.discard(button)
+        self.inputs.set_manual(button, down)
 
     def release_manual(self):
-        with self.manual_lock:
-            self.manual_buttons.clear()
+        self.inputs.release_manual()
 
     def disarm(self):
-        self.armed=False
-        while True:
-            try:self.commands.get_nowait()
-            except queue.Empty:break
+        self.armed = False
+        # Commands are drained in the worker on the next frame. Avoid mutating
+        # its held-button dictionary concurrently with native callbacks.
+
     def stop(self):
+        """Request worker shutdown, keeping it tracked if it does not exit."""
         self.release_manual()
         self.disarm()
         self.stop_event.set()
-        if self.thread and self.thread.is_alive():self.thread.join(timeout=4)
-        self.thread=None
-        self.running=False
+        worker = self.thread
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=4)
+        if worker is None or not worker.is_alive():
+            self.thread = None
+            self.running = False
+            self.inputs.disarm()
+
     def _run(self):
-        core=None; initialized=False; loaded=False
         try:
-            if not self.core_path or not Path(self.core_path).is_file():
-                raise RuntimeError('mGBA libretro core not found. Install libretro-mgba or choose a core library.')
-            core=C.CDLL(self.core_path)
-            def fn(name,restype,args):
-                f=getattr(core,name);f.restype=restype;f.argtypes=args;return f
-            set_env=fn('retro_set_environment',None,[ENV])
-            set_video=fn('retro_set_video_refresh',None,[VIDEO])
-            set_audio=fn('retro_set_audio_sample',None,[AUDIO])
-            set_audio_batch=fn('retro_set_audio_sample_batch',None,[AUDIO_BATCH])
-            set_poll=fn('retro_set_input_poll',None,[INPUT_POLL])
-            set_state=fn('retro_set_input_state',None,[INPUT_STATE])
-            init=fn('retro_init',None,[]);deinit=fn('retro_deinit',None,[])
-            load=fn('retro_load_game',C.c_bool,[C.POINTER(GameInfo)])
-            unload=fn('retro_unload_game',None,[])
-            run=fn('retro_run',None,[])
-            avinfo=fn('retro_get_system_av_info',None,[C.POINTER(AVInfo)])
-            get_memory_data=fn('retro_get_memory_data',C.c_void_p,[C.c_uint])
-            get_memory_size=fn('retro_get_memory_size',C.c_size_t,[C.c_uint])
-            pressed=set();remaining={};pixel_format=0
-            def environment(cmd,data):
-                nonlocal pixel_format
-                if cmd==10 and data: # SET_PIXEL_FORMAT: 0 RGB1555, 1 XRGB8888, 2 RGB565
-                    pixel_format=C.cast(data,C.POINTER(C.c_int))[0]
-                    return pixel_format in (0,1,2)
-                if cmd==18: return True # SET_SUPPORT_NO_GAME (ignored)
-                return False
-            def video(data,width,height,pitch):
-                if not data or width==0 or height==0:return
-                raw=C.string_at(data,int(pitch)*int(height))
-                if pixel_format==1:
-                    pixels=np.ndarray((height,width),dtype='<u4',buffer=raw,strides=(pitch,4))
-                    rgb=np.stack(((pixels>>16)&255,(pixels>>8)&255,pixels&255),axis=-1).astype('uint8')
-                else:
-                    pixels=np.ndarray((height,width),dtype='<u2',buffer=raw,strides=(pitch,2))
-                    if pixel_format==2:
-                        r=(pixels>>11)&31;g=(pixels>>5)&63;b=pixels&31
-                        rgb=np.stack((r*255//31,g*255//63,b*255//31),axis=-1).astype('uint8')
-                    else:
-                        r=(pixels>>10)&31;g=(pixels>>5)&31;b=pixels&31
-                        rgb=np.stack((r*255//31,g*255//31,b*255//31),axis=-1).astype('uint8')
-                with self.lock:self.frame=rgb
-            def input_state(port,device,index,button):
-                return int(port==0 and device==1 and button in pressed)
-            callbacks=[ENV(environment),VIDEO(video),AUDIO(lambda l,r:None),AUDIO_BATCH(lambda p,n:n),INPUT_POLL(lambda:None),INPUT_STATE(input_state)]
-            set_env(callbacks[0]);set_video(callbacks[1]);set_audio(callbacks[2]);set_audio_batch(callbacks[3]);set_poll(callbacks[4]);set_state(callbacks[5])
-            init();initialized=True
-            rom_bytes=Path(self.rom).read_bytes()
-            rom_buffer=C.create_string_buffer(rom_bytes)
-            path_bytes=os.fsencode(str(Path(self.rom).resolve()))
-            game=GameInfo(path_bytes,C.cast(rom_buffer,C.c_void_p),len(rom_bytes),None)
-            if not load(C.byref(game)):raise RuntimeError('mGBA could not load this ROM.')
-            loaded=True
-            info=AVInfo();avinfo(C.byref(info))
-            fps=info.timing.fps if 20 < info.timing.fps < 240 else 59.7275
-            save=Path(self.rom).with_suffix('.sav')
-            def restore():
-                p=get_memory_data(0);n=get_memory_size(0)
-                if p and n and save.exists():
-                    data=save.read_bytes()
-                    C.memmove(p,data,min(n,len(data)))
-            def persist():
-                p=get_memory_data(0);n=get_memory_size(0)
-                if p and n:save.write_bytes(C.string_at(p,n))
-            restore()
-            self.running=True
-            counter=0;next_tick=time.monotonic()
-            while not self.stop_event.is_set():
-                if not self.armed:
-                    pressed.clear();remaining.clear()
-                    while True:
-                        try:self.commands.get_nowait()
-                        except queue.Empty:break
-                else:
-                    for _ in range(8):
-                        try:button,duration=self.commands.get_nowait()
-                        except queue.Empty:break
-                        remaining[IDS[button]]=duration
-                    pressed=set(remaining)
-                with self.manual_lock:
-                    pressed.update(IDS[b] for b in self.manual_buttons)
-                run();counter+=1
-                for key in list(remaining):
-                    remaining[key]-=1
-                    if remaining[key]<=0:del remaining[key]
-                if counter%300==0:persist()
-                next_tick+=1/fps
-                wait=next_tick-time.monotonic()
-                if wait>0:self.stop_event.wait(wait)
-                elif wait < -.25:next_tick=time.monotonic()
-            pressed.clear()
-            self.release_manual()
-            persist()
+            CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
-            self.error=f'{type(exc).__name__}: {exc}'
+            self.error = f"{type(exc).__name__}: {exc}"
         finally:
-            self.armed=False;self.running=False
-            if core is not None:
-                try:
-                    if loaded:unload()
-                    if initialized:deinit()
-                except Exception:pass
+            self.armed = False
+            self.running = False
+            self.inputs.release_manual()
+            # Do not race Tk's UI thread by clearing the video frame here.

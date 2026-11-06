@@ -1,0 +1,88 @@
+"""Thread-safe, bounded game input without OS keyboard injection.
+
+Camera presses are finite-duration pulses. Manual key presses remain held until
+released and continue to work when object controls are disarmed.
+"""
+
+from queue import Empty, Full, Queue
+from threading import Lock
+
+BUTTONS = ("Up", "Down", "Left", "Right", "A", "B", "Start", "Select",
+           "X", "Y", "L", "R")
+
+# These indices are defined by RETRO_DEVICE_ID_JOYPAD_* in libretro.h.
+IDS = {
+    "B": 0, "Y": 1, "Select": 2, "Start": 3,
+    "Up": 4, "Down": 5, "Left": 6, "Right": 7,
+    "A": 8, "X": 9, "L": 10, "R": 11,
+}
+
+
+class InputBuffer:
+    """Combine camera pulses with manually held buttons for one emulator frame."""
+
+    def __init__(self):
+        self.commands = Queue(maxsize=32)
+        self.manual_buttons = set()
+        self.manual_lock = Lock()
+        self.remaining = {}
+        self.pressed = set()
+
+    def queue_press(self, button, frames):
+        """Enqueue one camera button pulse, dropping events if already saturated."""
+        if button not in IDS:
+            return
+        duration = max(1, min(60, int(frames)))
+        try:
+            self.commands.put_nowait((IDS[button], duration))
+        except Full:
+            pass
+
+    def set_manual(self, button, down):
+        if button not in IDS:
+            return
+        with self.manual_lock:
+            if down:
+                self.manual_buttons.add(button)
+            else:
+                self.manual_buttons.discard(button)
+
+    def release_manual(self):
+        with self.manual_lock:
+            self.manual_buttons.clear()
+
+    def disarm(self):
+        self.remaining.clear()
+        self.pressed.clear()
+        while True:
+            try:
+                self.commands.get_nowait()
+            except Empty:
+                break
+
+    def before_frame(self, armed):
+        """Update pressed IDs before a ``retro_run()`` invocation."""
+        if not armed:
+            self.disarm()
+        else:
+            # Limit per-frame consumption to avoid input floods starving the core.
+            for _ in range(8):
+                try:
+                    button_id, duration = self.commands.get_nowait()
+                except Empty:
+                    break
+                self.remaining[button_id] = duration
+            self.pressed.clear()
+            self.pressed.update(self.remaining)
+        with self.manual_lock:
+            self.pressed.update(IDS[name] for name in self.manual_buttons)
+
+    def after_frame(self):
+        for button_id in tuple(self.remaining):
+            self.remaining[button_id] -= 1
+            if self.remaining[button_id] <= 0:
+                del self.remaining[button_id]
+
+    def state(self, port, device, index, button_id):
+        """Libretro callback: only player one's joypad is supported."""
+        return int(port == 0 and device == 1 and button_id in self.pressed)

@@ -1,18 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION="${VERSION:-1.5.0}"
+VERSION="${VERSION:-2.0.0}"
 ARCH="$(dpkg --print-architecture)"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip
 .build-venv/bin/python -m pip install -r requirements.txt pyinstaller
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" app.py
-# Optional native core: bundle a locally supplied compatible libretro core.
+# All emulator cores are required and shipped inside the installed application.
 mkdir -p dist/AnythingPlays/cores
-for core in cores/mgba_libretro.so cores/libretro_mgba.so; do
-  if [[ -f "$core" ]]; then cp "$core" dist/AnythingPlays/cores/; fi
+for name in gambatte mgba snes9x; do
+  core="cores/${name}_libretro.so"
+  [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
+  cp "$core" dist/AnythingPlays/cores/
 done
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
+
+# Include project and third-party licensing documentation.
+mkdir -p dist/AnythingPlays/licenses
+cp LICENSE dist/AnythingPlays/licenses/AnythingPlays-MIT.txt
+cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
+cp THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
+cp THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
+cp licenses/*.txt dist/AnythingPlays/licenses/
+
+python3 verify_bundle.py linux dist/AnythingPlays
+
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays" "$PKG/usr/bin" "$PKG/usr/share/applications"
@@ -26,9 +40,9 @@ Section: games
 Priority: optional
 Architecture: $ARCH
 Maintainer: Anything Plays Project <noreply@example.invalid>
-Depends: libc6, libgl1, libglib2.0-0
-Description: Anything Plays camera-controlled GBA gaming studio
- Embedded GBA gameplay and configurable camera object tracking.
+Depends: libc6, libgl1, libglib2.0-0, libportaudio2
+Description: Anything Plays camera-controlled multi-system gaming studio
+ Embedded GB, GBC, GBA and SNES gameplay and configurable camera object tracking.
 CONTROL
 cat > "$PKG/usr/bin/anything-plays" <<'LAUNCH'
 #!/bin/sh
@@ -39,7 +53,7 @@ cat > "$PKG/usr/share/applications/anything-plays.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=Anything Plays
-Comment=Camera-controlled GBA gaming studio
+Comment=Camera-controlled multi-system gaming studio
 Exec=anything-plays
 Icon=anything-plays
 Terminal=false
