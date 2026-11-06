@@ -4,9 +4,9 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-from systems import SYSTEMS
-from system_profiles import DISABLED_MAPPING
-from gba_emulator import BUTTONS as ACTIVE_BUTTONS
+from anything_plays.systems import SYSTEMS
+from anything_plays.system_profiles import DISABLED_MAPPING
+from anything_plays.gba_emulator import BUTTONS as ACTIVE_BUTTONS
 
 
 class LayoutMixin:

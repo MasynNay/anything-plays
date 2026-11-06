@@ -31,9 +31,9 @@ copy /Y LICENSE dist\AnythingPlays\licenses\AnythingPlays-MIT.txt >nul
 if errorlevel 1 exit /b 1
 copy /Y CODE_OF_CONDUCT.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
-copy /Y THIRD_PARTY_NOTICES.md dist\AnythingPlays\licenses\ >nul
+copy /Y docs\THIRD_PARTY_NOTICES.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
-copy /Y THIRD_PARTY_COMPONENTS.md dist\AnythingPlays\licenses\ >nul
+copy /Y docs\THIRD_PARTY_COMPONENTS.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1

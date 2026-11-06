@@ -6,9 +6,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageTk
-from systems import SYSTEMS
-from cartridge_art import cartridge_image, cartridge_font
-from rom_library import scan_rom_directory, find_cover_art
+from anything_plays.systems import SYSTEMS
+from anything_plays.cartridge_art import cartridge_image, cartridge_font
+from anything_plays.rom_library import scan_rom_directory, find_cover_art
 
 
 class LibraryMixin:

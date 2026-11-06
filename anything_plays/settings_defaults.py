@@ -1,6 +1,6 @@
 """Legacy-compatible tracking defaults used when creating console profiles."""
 
-from gba_emulator import BUTTONS
+from anything_plays.gba_emulator import BUTTONS
 
 DEFAULT = {
     'rgb': [255, 0, 0], 'tolerance': 20, 'min_area': 120,

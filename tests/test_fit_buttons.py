@@ -1,6 +1,6 @@
 import copy
 import unittest
-from system_profiles import default_for, normalize, fit_to_grid, enabled_zones, DISABLED_MAPPING
+from anything_plays.system_profiles import default_for, normalize, fit_to_grid, enabled_zones, DISABLED_MAPPING
 
 BASE = {'zones': {}, 'mapping': {}}
 

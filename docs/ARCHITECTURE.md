@@ -8,14 +8,14 @@ does not send global keyboard events to the operating system.
 
 | Area | Modules | Responsibility |
 | :-- | :-- | :-- |
-| Application | `app.py`, `settings_defaults.py` | Startup, state ownership, lifecycle, legacy defaults |
-| Desktop UI | `ui_layout.py`, `ui_theme.py` | Layout construction, scrolling, 16 themes |
-| Camera and zones | `ui_camera.py`, `tracking.py`, `ui_zones.py`, `zone_rendering.py` | Capture, HSV detection, hit testing, editor and preview |
-| Profiles | `ui_profiles.py`, `system_profiles.py` | Console switching, migration, validation, atomic JSON writes |
-| ROM library | `ui_library.py`, `rom_library.py`, `cartridge_art.py` | Bounded scanning, shelf interactions, local cartridge rendering |
-| Emulator facade | `gba_emulator.py` | Worker lifecycle and native core initialization |
-| Libretro adapters | `libretro_abi.py`, `core_locator.py`, `libretro_input.py`, `libretro_audio.py`, `libretro_video.py`, `libretro_save.py` | Native API, isolation, bounded queues, frame and save conversions |
-| Console map | `systems.py` | One source of truth for core IDs and ROM extensions |
+| Application | `app.py`, `anything_plays/settings_defaults.py` | Startup, state ownership, lifecycle, legacy defaults |
+| Desktop UI | `anything_plays/ui_layout.py`, `anything_plays/ui_theme.py` | Layout construction, scrolling, 16 themes |
+| Camera and zones | `anything_plays/ui_camera.py`, `anything_plays/tracking.py`, `anything_plays/ui_zones.py`, `anything_plays/zone_rendering.py` | Capture, HSV detection, hit testing, editor and preview |
+| Profiles | `anything_plays/ui_profiles.py`, `anything_plays/system_profiles.py` | Console switching, migration, validation, atomic JSON writes |
+| ROM library | `anything_plays/ui_library.py`, `anything_plays/rom_library.py`, `anything_plays/cartridge_art.py` | Bounded scanning, shelf interactions, local cartridge rendering |
+| Emulator facade | `anything_plays/gba_emulator.py` | Worker lifecycle and native core initialization |
+| Libretro adapters | `anything_plays/libretro_abi.py`, `anything_plays/core_locator.py`, `anything_plays/libretro_input.py`, `anything_plays/libretro_audio.py`, `anything_plays/libretro_video.py`, `anything_plays/libretro_save.py` | Native API, isolation, bounded queues, frame and save conversions |
+| Console map | `anything_plays/systems.py` | One source of truth for core IDs and ROM extensions |
 | Build and verification | `fetch_mgba_core.py`, `build_*`, `.github/workflows/`, `tests/` | Native packaging and regression protection |
 
 ## Why UI mixins?

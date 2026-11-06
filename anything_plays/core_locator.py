@@ -8,7 +8,7 @@ offline and never execute an unreviewed native binary from the network.
 from pathlib import Path
 import sys
 
-from systems import SYSTEMS
+from anything_plays.systems import SYSTEMS
 
 
 def _library_extension():
@@ -24,6 +24,7 @@ def _search_directories():
     executable = Path(sys.executable).resolve().parent
     frozen = Path(getattr(sys, "_MEIPASS", source))
     folders = [
+        source.parent / "cores",  # source checkout lives one level above the package
         source / "cores",
         executable / "cores",
         frozen / "cores",

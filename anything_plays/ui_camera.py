@@ -9,9 +9,9 @@ from tkinter import colorchooser, filedialog, messagebox
 import cv2
 from PIL import Image, ImageTk
 
-from cameras import discover
-from system_profiles import DISABLED_MAPPING
-from tracking import locate_target, zone_at
+from anything_plays.cameras import discover
+from anything_plays.system_profiles import DISABLED_MAPPING
+from anything_plays.tracking import locate_target, zone_at
 
 
 class CameraMixin:

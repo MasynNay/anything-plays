@@ -19,7 +19,7 @@ jobs:
           sudo apt-get install -y libgl1 libglib2.0-0 libportaudio2 xvfb
           python -m pip install -r requirements.txt
       - name: Compile source and tests
-        run: python -m compileall -q app.py cameras.py cartridge_art.py core_locator.py fetch_mgba_core.py gba_emulator.py libretro_abi.py libretro_audio.py libretro_input.py libretro_save.py libretro_video.py rom_library.py settings_defaults.py system_profiles.py systems.py tracking.py ui_camera.py ui_gameplay.py ui_layout.py ui_library.py ui_profiles.py ui_theme.py ui_zones.py zone_rendering.py
+        run: python -m compileall -q app.py anything_plays fetch_mgba_core.py verify_bundle.py tests
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
       - name: Headless GUI smoke test
@@ -104,4 +104,4 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" release/*.exe release/*.dmg release/*.deb release/SHA256SUMS.txt --title "Anything Plays ${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md --verify-tag
+        run: gh release create "${GITHUB_REF_NAME}" release/*.exe release/*.dmg release/*.deb release/SHA256SUMS.txt --title "Anything Plays ${GITHUB_REF_NAME}" --notes-file docs/RELEASE_NOTES.md --verify-tag

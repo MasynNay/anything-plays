@@ -9,8 +9,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core_locator import find_core
-from libretro_abi import AVInfo, CoreInfo, GameInfo, Geometry, Timing
+from anything_plays.core_locator import find_core
+from anything_plays.libretro_abi import AVInfo, CoreInfo, GameInfo, Geometry, Timing
 
 
 class LibretroBoundaryTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class LibretroBoundaryTests(unittest.TestCase):
                                 ctypes.sizeof(Geometry) + ctypes.sizeof(Timing))
 
     def test_system_core_mapping_is_preserved(self):
-        from systems import SYSTEMS
+        from anything_plays.systems import SYSTEMS
         self.assertEqual(SYSTEMS['gb'].core, SYSTEMS['gbc'].core)
         self.assertEqual(SYSTEMS['gba'].core, 'mgba')
         self.assertEqual(SYSTEMS['snes'].core, 'snes9x')

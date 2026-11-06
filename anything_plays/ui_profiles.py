@@ -5,10 +5,10 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from settings_defaults import DEFAULT
-from system_profiles import (BUTTONS_BY_SYSTEM, DISABLED_MAPPING,
+from anything_plays.settings_defaults import DEFAULT
+from anything_plays.system_profiles import (BUTTONS_BY_SYSTEM, DISABLED_MAPPING,
                              default_for, normalize)
-from systems import DEFAULT_SYSTEM, SYSTEMS
+from anything_plays.systems import DEFAULT_SYSTEM, SYSTEMS
 
 
 class ProfilesMixin:

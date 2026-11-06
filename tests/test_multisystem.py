@@ -10,7 +10,7 @@ class MultiSystemContracts(unittest.TestCase):
     def test_supported_systems_and_extensions(self):
         import sys
         sys.path.insert(0, str(ROOT))
-        from systems import SYSTEMS
+        from anything_plays.systems import SYSTEMS
         self.assertEqual(set(SYSTEMS), {'gb', 'gbc', 'gba', 'snes'})
         self.assertEqual(SYSTEMS['gb'].core, SYSTEMS['gbc'].core)
         self.assertEqual(SYSTEMS['gba'].core, 'mgba')
@@ -19,7 +19,7 @@ class MultiSystemContracts(unittest.TestCase):
     def test_snes_button_ids(self):
         import sys
         sys.path.insert(0, str(ROOT))
-        from gba_emulator import BUTTONS, IDS
+        from anything_plays.gba_emulator import BUTTONS, IDS
         for name in ('X', 'Y', 'L', 'R'):
             self.assertIn(name, BUTTONS)
             self.assertIn(name, IDS)

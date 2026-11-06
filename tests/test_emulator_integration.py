@@ -13,7 +13,7 @@ import tempfile
 import time
 import unittest
 
-from gba_emulator import Emulator
+from anything_plays.gba_emulator import Emulator
 
 
 SYNTHETIC_CORE = r'''

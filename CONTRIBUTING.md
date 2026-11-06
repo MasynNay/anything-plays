@@ -17,7 +17,7 @@ virtual environment; do not commit `.venv`, `cores/`, `dist/`, or `release/`.
 
 ## Code expectations
 
-- Keep responsibilities in the modules listed in `ARCHITECTURE.md`.
+- Keep responsibilities in the modules listed in `docs/ARCHITECTURE.md`.
 - Write straightforward functions with descriptive names and comments that
   explain constraints or unusual decisions, not every line of syntax.
 - Do not perform Tk widget operations in background threads.
@@ -44,7 +44,7 @@ PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
 ```
 
 If you touched camera capture, core startup, audio, or packaging, use the
-`QA_CHECKLIST.md` to verify the affected platforms with a real device and a
+`docs/QA_CHECKLIST.md` to verify the affected platforms with a real device and a
 homebrew or otherwise legally obtained ROM. Automated tests do not prove the
 installer is correct.
 

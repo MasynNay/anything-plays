@@ -1,5 +1,0 @@
-Anything Plays v23
-- Default symmetrical 3x3 camera control zones, Outline appearance. Reset profile to apply defaults to an existing saved profile.
-- Restored mouse wheel / macOS trackpad vertical scrolling, routed to the pane under the pointer.
-- Removed black outside the rounded cyan icon frame; transparent corners in PNG and Windows ICO.
-- Existing webcam Shuffle zone, opacity, and manual zone editing retained.

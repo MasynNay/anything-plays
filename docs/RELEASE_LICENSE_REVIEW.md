@@ -66,7 +66,7 @@ If required, validate only the modified packaging contents independently.
 
 ## Automatic publishing safeguard
 
-The `publish` job in `.github/workflows/release.yml` is disabled on
+The `publish` job in `../.github/workflows/release.yml` is disabled on
 `develop/v2.0`. **It is acceptable to merge the verified v2 source into
 `main` without publishing new binaries; this does not constitute release
 licensing approval.** Before merging, confirm that the disabled job will

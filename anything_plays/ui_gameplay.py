@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox
 import cv2
 from PIL import Image, ImageTk
 
-from systems import SYSTEMS
+from anything_plays.systems import SYSTEMS
 
 
 class GameplayMixin:
