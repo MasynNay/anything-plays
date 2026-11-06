@@ -48,7 +48,7 @@ class RealMGBASupport(unittest.TestCase):
                     payload = bytearray(32768)
                     # A 32 KiB ROM-only image with a valid cartridge header.
                     # Entry at 0100h jumps to a two-byte idle loop at 0150h.
-                    payload[0x100:0x104] = b"\\x00\\xc3\\x50\\x01"
+                    payload[0x100:0x104] = b"\x00\xc3\x50\x01"
                     payload[0x134:0x141] = b"ANYTHINGPLAYS"
                     payload[0x143] = 0x80 if system == "gbc" else 0x00
                     payload[0x147] = 0x00  # ROM-only
@@ -58,7 +58,7 @@ class RealMGBASupport(unittest.TestCase):
                     for address in range(0x134, 0x14D):
                         header_check = (header_check - payload[address] - 1) & 0xFF
                     payload[0x14D] = header_check
-                    payload[0x150:0x152] = b"\\x18\\xfe"  # JR -2
+                    payload[0x150:0x152] = b"\x18\xfe"  # JR -2
                     rom.write_bytes(payload)
 
                     emulator = Emulator()
