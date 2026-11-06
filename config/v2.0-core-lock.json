@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "approved_for_binary_distribution": false,
+  "approval_note": "Not approved. Fill target fingerprints from independently reviewed, immutable core binaries; preserve matching sources and obtain redistribution clearance before release.",
+  "targets": {}
+}
