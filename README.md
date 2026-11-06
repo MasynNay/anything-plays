@@ -222,9 +222,11 @@ files and a version inventory for third-party attribution review.
 revision**, even when SHA-256 values are recorded afterward. Platform installers
 still require independent testing and a completed third-party licensing review.
 
-A version tag matching `v*` triggers the GitHub Actions build workflow.
-**Automatic public publishing is disabled** until bundled-core redistribution
-requirements are resolved. Do not create release tags prematurely.
+Public release packaging and publishing are currently disabled in
+`.github/workflows/release.yml`, including automatic version-tag triggers.
+Source and native-core regression checks still run through CI. Do not create
+a v2.0 release tag until the bundled-core redistribution requirements are
+resolved and an intentional release approval process is enabled.
 
 ## Settings and saves
 
