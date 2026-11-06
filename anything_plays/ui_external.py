@@ -17,6 +17,7 @@ class ExternalBackendMixin:
         if backend != "libretro":
             # Do not present an enabled action that cannot control the game.
             self.arm_button.configure(state="disabled", text="Camera controls unavailable for external emulator")
+            self.shortcuts_button.configure(state="disabled")
             self.external_setup.pack(fill="x", pady=(0, 7))
             if backend == "retroarch":
                 self.external_executable_button.configure(text="Locate RetroArch executable")
@@ -34,6 +35,7 @@ class ExternalBackendMixin:
                 )
         else:
             self.arm_button.configure(state="normal", text="Enable object controls")
+            self.shortcuts_button.configure(state="normal")
             self.external_setup.pack_forget()
 
     def choose_external_executable(self):
