@@ -10,7 +10,6 @@ permissions:
 
 env:
   AP_RELEASE_BUILD: '0'
-  AP_V21_TEST_CORES: '1'
 
 jobs:
   source-and-gui:
@@ -36,6 +35,8 @@ jobs:
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
 
   windows-test-installer:
+    env:
+      AP_V21_TEST_CORES: '1'
     runs-on: windows-latest
     timeout-minutes: 75
     steps:
@@ -62,6 +63,8 @@ jobs:
           retention-days: 21
 
   macos-test-installer:
+    env:
+      AP_V21_TEST_CORES: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +94,8 @@ jobs:
           retention-days: 21
 
   linux-test-installer:
+    env:
+      AP_V21_TEST_CORES: '1'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
