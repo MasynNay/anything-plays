@@ -46,7 +46,7 @@ iconutil -c icns "$ICONSET" -o dist/AnythingPlays21Test.app/Contents/Resources/A
 mkdir -p dist/AnythingPlays21Test.app/Contents/Resources/cores
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
-  CORE_LIST+=(fceumm genesis_plus_gx)
+  CORE_LIST+=(fceumm genesis_plus_gx parallel_n64)
 fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
