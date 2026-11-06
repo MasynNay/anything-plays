@@ -31,8 +31,12 @@ SHA-256, file size, embedded Libretro library version, and any source revision
 reported by the library itself. Verification compares these recorded fields
 against the staged binary. These are **self-reported source identifiers**, not
 independent build reproducibility or proof that no patch was applied.
-Approval still requires verifying corresponding source material and locking
-immutable versions for every supported architecture.
+Release-mode checks now also require the explicit, initially unapproved
+[core fingerprint lock](CORE_RELEASE_PINNING.md). That lock will reject changed
+or unapproved cores; it does not turn changing nightly URLs into immutable
+build inputs. Approval still requires preserving binary archives, verifying
+corresponding source and licensing, and locking inputs for every supported
+architecture.
 
 ## Other third-party dependencies
 
