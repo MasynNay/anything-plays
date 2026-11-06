@@ -72,7 +72,7 @@ class ViewMixin:
         canvas.bind("<KeyPress>", self.manual_key_down)
         canvas.bind("<KeyRelease>", self.manual_key_up)
         canvas.bind("<FocusOut>", self.deactivate_manual)
-        popup.bind("<Escape>", lambda _: self.set_view_mode("Windowed"))
+        popup.bind("<Escape>", self.exit_view_or_stop)  # Also disarms camera input.
         popup.bind("<F10>", lambda _: self.set_view_mode("Borderless"))
         popup.bind("<F11>", lambda _: self.set_view_mode("Windowed"))
         popup.protocol("WM_DELETE_WINDOW", lambda: self.set_view_mode("Windowed"))
