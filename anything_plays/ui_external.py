@@ -15,6 +15,8 @@ class ExternalBackendMixin:
     def update_external_setup(self):
         backend = SYSTEMS[self.system_key.get()].backend
         if backend != "libretro":
+            # Do not present an enabled action that cannot control the game.
+            self.arm_button.configure(state="disabled", text="Camera controls unavailable for external emulator")
             self.external_setup.pack(fill="x", pady=(0, 7))
             if backend == "retroarch":
                 self.external_executable_button.configure(text="Locate RetroArch executable")
@@ -31,6 +33,7 @@ class ExternalBackendMixin:
                          "Configure keyboard or a controller in Dolphin."
                 )
         else:
+            self.arm_button.configure(state="normal", text="Enable object controls")
             self.external_setup.pack_forget()
 
     def choose_external_executable(self):
