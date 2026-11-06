@@ -145,9 +145,15 @@ class GameplayMixin:
                     self.stop_camera()
                     self.status.set('Camera disconnected. Refresh and select another.')
             if self.frame is not None:
-                self.draw_camera()
-            # Render game video on its own faster timer. Camera detection
-            # may be expensive; it must not cap game playback to ~22 FPS.
+                # A still reference image needs only periodic redraw. Without
+                # a live camera, repeatedly detecting the same pixels wastes
+                # CPU and makes a week-long session unnecessarily expensive.
+                now = time.monotonic()
+                live = self.cap is not None and self.cap.isOpened()
+                if live or now >= getattr(self, "_static_preview_next_draw", 0):
+                    self.draw_camera()
+                    self._static_preview_next_draw = now + 0.5
+            # Render game video on its own faster timer, not at camera speed.
             if self.emu.error:
                 self.game_status.set('Emulator error: ' + self.emu.error)
                 self.stop_controls()
@@ -157,23 +163,44 @@ class GameplayMixin:
                     self.game_status.set('Playing ' + Path(self.current_rom).stem)
         except Exception as exc:
             self.stop_controls()
+            # A capture or image-processing failure must not cause the same
+            # exception to be thrown 20 times per second indefinitely.
+            if self.cap is not None:
+                self.stop_camera()
             self.status.set('Tracking error: ' + str(exc)[:120])
         finally:
             if not self._closing:
-                self.root.after(45, self.tick)
+                active_camera = self.cap is not None and self.cap.isOpened()
+                interval = 45 if active_camera else (
+                    500 if self.reference_image else 200
+                )
+                self._camera_tick_job = self.root.after(interval, self.tick)
 
     def game_render_tick(self):
-        """Paint only new native frames at up to 60 FPS, independent of camera."""
+        """Refresh game video, keeping idle resource use and errors bounded."""
         if self._closing:
             return
+        now = time.monotonic()
         try:
-            self.draw_game()
+            if now >= getattr(self, "_game_render_retry_at", 0):
+                self.draw_game()
         except tk.TclError:
-            # A game-only window can be destroyed between adjacent Tk ticks.
-            pass
+            # A game-only window can disappear between two scheduled frames.
+            self._game_render_retry_at = now + 0.5
+        except Exception as exc:
+            # A bad frame should not produce thousands of exceptions while
+            # the emulator stays open. Retry later and surface a readable status.
+            self._game_render_retry_at = now + 2.0
+            if now >= getattr(self, "_game_render_warning_at", 0):
+                self._game_render_warning_at = now + 30.0
+                self.game_status.set("Display error (retrying): " + str(exc)[:100])
         finally:
             if not self._closing:
-                self.root.after(16, self.game_render_tick)
+                # Idle at 4 Hz, switch to 60 Hz when a core is running.
+                interval = 16 if self.emu.running else 250
+                self._game_tick_job = self.root.after(
+                    interval, self.game_render_tick
+                )
 
     def draw_game(self):
         """Render a fresh frame only when the game or canvas changed."""
