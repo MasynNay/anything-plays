@@ -13,6 +13,14 @@ import shutil
 from tools.core_release_lock import LOCK_PATH
 from tools.verify_candidate_archives import verify_candidate_archives
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 INSTALLERS = {
     "windows-x86_64": "AnythingPlaysSetup-2.0.0.exe",
     "macos-arm64": "AnythingPlays-2.0.0-macos-arm64.dmg",
@@ -52,7 +60,7 @@ def stage_assets(target, installer, manifest_path, archive_dir, output, lock_pat
     for path in copied:
         print(f"Candidate draft asset: {path.name} "
               f"{path.stat().st_size} bytes "
-              f"sha256={hashlib.sha256(path.read_bytes()).hexdigest()}")
+              f"sha256={sha256_file(path)}")
     return copied
 
 
