@@ -40,6 +40,10 @@ class DolphinBridgeTests(unittest.TestCase):
         finished = gamecube_commands(set(), {"A", "Left", "Up"})
         self.assertIn("RELEASE A", finished)
         self.assertIn("SET MAIN 0.50 0.50", finished)
+        c_pressed = gamecube_commands({"C Up", "C Right"}, set())
+        self.assertIn("SET C 1.00 1.00", c_pressed)
+        c_released = gamecube_commands(set(), {"C Up", "C Right"})
+        self.assertIn("SET C 0.50 0.50", c_released)
 
     def test_transmit_button_pulses_through_real_fifo(self):
         with TemporaryDirectory() as tmp:
