@@ -244,6 +244,10 @@ Anything Plays uses independently developed emulator cores:
 - **Snes9x:** Custom noncommercial license
 
 These components are not covered by the Anything Plays MIT License.
+**Only the project's original MIT-licensed code is represented as open source
+under MIT.** Because Snes9x has noncommercial restrictions, the complete
+bundled installer must not be described as wholly OSI-approved open source.
+Official Anything Plays downloads will nevertheless remain free of charge.
 
 See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for attribution,
 license information, and outstanding redistribution requirements.
