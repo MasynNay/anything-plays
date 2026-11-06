@@ -35,9 +35,9 @@ The application's original MIT license does **not** govern Snes9x.
 | Revised native core mapping | mGBA for GB/GBC/GBA; Snes9x for SNES |
 | Targeted GB/GBC emulation with mGBA | Native Linux mGBA successfully loaded generated GB/GBC test ROMs and delivered video frames in CI; prior representative-game testing used Gambatte |
 | macOS previous three-core notice/integrity packaging | Passed locally, before changing core mapping |
-| Core source revision evidence | Build scripts now record versions and reported Git revisions; the [release core lock](CORE_RELEASE_PINNING.md) starts explicitly unapproved and checks exact fingerprint identity for future releases. Independent binary-to-source matching and archival remain pending |
-| Python/native dependency and asset rights | Build scripts collect installed Python-wheel license files and versions for audit; native/transitive notices and asset rights still need independent review |
-| Newly packaged two-core installers | Windows x64, macOS Apple Silicon and Intel, and Ubuntu/Debian x64 build and staged license/native core checks passed on GitHub Actions |
+| Core source revision evidence | Per-target core archives and hashes preserved in a [private draft](https://github.com/MasynNay/anything-plays/actions/runs/42173630332); exact upstream Git source snapshots preserved and verified in [run 42174478479](https://github.com/MasynNay/anything-plays/actions/runs/42174478479). Reproducible binary-to-source build correspondence is **not** independently proven |
+| Python/native dependency and asset rights | Exact Python build distribution versions are pinned and wheel notices are collected. The owner attests purchased betta artwork rights. Native FFmpeg/codec and precise artwork-license-scope reviews remain open |
+| Newly packaged two-core installers | Four actual installer archives and original emulator ZIPs were produced and verified in the [private RC1 draft workflow](https://github.com/MasynNay/anything-plays/actions/runs/42173630332); macOS DMGs and Linux DEB payloads were inspected after packaging |
 | Public publishing job and tag-triggered release builds | Disabled pending release clearance; a version tag alone must not package or publish binaries |
 
 **Release-build control:** The checked-in [v2.0 core lock](../config/v2.0-core-lock.json) has `approved_for_binary_distribution: false`. When a future release workflow is enabled, `AP_RELEASE_BUILD=1` will require both staged immutable ZIP archives through `AP_CORE_ARCHIVE_DIR` (never mutable-nightly network fallback) and approved fingerprints at core download and again after package staging. Ordinary development builds remain available. The lock does **not** imply binary redistribution clearance. See [core release pinning](CORE_RELEASE_PINNING.md).
@@ -52,7 +52,7 @@ inspection of the actual staged native binaries found:
   extension binaries (for example, `_imaging.cp315-win_amd64.pyd`). The script
   has been changed to use a single explicit `python` executable from PATH,
   requiring Python 3.12 or 3.13, for core download, venv creation and final
-  bundle verification. Verify that the next Windows inventory shows `cp313`.
+  bundle verification. Subsequent [four-target CI](https://github.com/MasynNay/anything-plays/actions/runs/42172205627) confirmed Windows Python 3.13.
 - **macOS core mutation after verification:** Both macOS inventory reports show
   that `codesign --deep` changed the nested emulator dylib sizes/hashes
   *after* their provenance hashes were verified. For example, the Apple
@@ -64,8 +64,7 @@ inspection of the actual staged native binaries found:
   into `Contents/Resources/cores`; runtime lookup and verification now agree
   on that location. Ad-hoc signing targets the outer app without `--deep`,
   followed by mandatory verification both after signing and after mounting
-  the final DMG. The next platform build must confirm preserved hashes,
-  discoverable cores and valid signing.
+  the final DMG. Subsequent [four-target CI](https://github.com/MasynNay/anything-plays/actions/runs/42172205627) confirmed unchanged staged core hashes and macOS packaging.
 
 Neither finding was visible from the older staged-bundle checks alone. The
 updated checks reduce the chance of distributing a broken binary, but do not
@@ -93,8 +92,9 @@ alter third-party rights clearance or mark the distribution gate approved.
 
 Targeted save compatibility: [GitHub Actions run 42163546612](https://github.com/MasynNay/anything-plays/actions/runs/42163546612) verified restoration and persistence of an existing raw 8 KiB MBC1 `.sav` in native mGBA, for both GB and GBC synthetic cartridges. Other mapper formats are not covered.
 
-Latest platform package verification: [GitHub Actions run 42159955003](https://github.com/MasynNay/anything-plays/actions/runs/42159955003), which completed successfully on all four target architectures. These are automated packaging and native-core checks, not distribution authorization.
+Latest complete four-platform *private candidate* verification: [GitHub Actions run 42173630332](https://github.com/MasynNay/anything-plays/actions/runs/42173630332), which produced all four installers, eight exact native ZIPs, four manifests, and draft-only checksums. The source snapshot job [42174478479](https://github.com/MasynNay/anything-plays/actions/runs/42174478479) added matching upstream Git tree archives. These are automated package and provenance checks, **not** third-party redistribution authorization.
 
-Do not create a v2.0 release tag or distribute bundled installers before
+An unapproved `v2.0.0-rc.1` **draft release** exists with all candidate inputs.
+Do not publish a public `v2.0.0` tag or redistribute the bundled installers before
 these items are resolved. The source code being publicly available on GitHub
 does **not** mean the native installers have been cleared for redistribution.
