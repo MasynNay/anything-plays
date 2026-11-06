@@ -79,6 +79,26 @@ def main():
                     assert app.rom_directories["genesis"] == ""
                     assert "Choose a ROM folder" in app.library_summary.get()
 
+                    # A previously custom-positioned Shuffle must snap to
+                    # exactly the same cells as enabled console buttons.
+                    app.cfg["zones"]["Shuffle"] = [.13, .21, .41, .56]
+                    app.shuffle_enabled.set(True)
+                    app.make_symmetric_grid()
+                    zones = app.cfg["zones"]
+                    names = list(app.cfg["mapping"]) + ["Shuffle"]
+                    sizes = {
+                        (round(zones[name][2] - zones[name][0], 8),
+                         round(zones[name][3] - zones[name][1], 8))
+                        for name in names
+                    }
+                    assert len(sizes) == 1
+                    assert "Shuffle" in app.status.get()
+                    app.shuffle_enabled.set(False)
+                    unchanged = zones["Shuffle"][:]
+                    app.make_symmetric_grid()
+                    assert zones["Shuffle"] == unchanged
+                    app.shuffle_enabled.set(True)
+
                     # Rendering a camera frame is independent from live hardware.
                     app.frame = np.zeros((160, 240, 3), dtype=np.uint8)
                     app.draw_camera()
