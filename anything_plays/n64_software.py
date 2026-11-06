@@ -9,6 +9,7 @@ compatibility are not verified. The normal RetroArch GPU launcher stays
 available, and the N64 core is never run with hardware rendering requested.
 """
 import ctypes as C
+import platform
 from pathlib import Path
 
 from anything_plays.core_locator import _library_extension, _search_directories
@@ -44,6 +45,12 @@ class SoftwareN64Options:
     def __init__(self):
         # Retain references for the lifetime of native callback pointers.
         self.values = dict(SOFTWARE_OPTIONS)
+        # Ari64's native recompilation path is not universally available.
+        # Prefer the portable interpreter on Apple Silicon and other ARM
+        # hosts rather than risk requesting an unsupported x86 dynarec.
+        machine = platform.machine().lower()
+        if machine in ("arm64", "aarch64") or machine.startswith("arm"):
+            self.values[b"parallel-n64-cpucore"] = b"Cached Interpreter"
 
     def environment(self, command, data):
         if command == 15 and data:  # RETRO_ENVIRONMENT_GET_VARIABLE
