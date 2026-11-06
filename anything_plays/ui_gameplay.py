@@ -228,7 +228,14 @@ class GameplayMixin:
         image = Image.fromarray(frame[:, :, :3]).resize(
             (width, height), Image.Resampling.NEAREST
         )
-        photo = ImageTk.PhotoImage(image)
+        photo = self.game_photo
+        if (photo is None or photo.width() != width or
+                photo.height() != height):
+            # Recreate Tk's native image only when resolution changes. A new
+            # PhotoImage every 16 ms churns native/Tcl allocations over days.
+            photo = ImageTk.PhotoImage(image)
+        else:
+            photo.paste(image)
         x = (canvas_width - width) // 2
         y = (canvas_height - height) // 2
         item = getattr(self, "_game_image_item", None)
