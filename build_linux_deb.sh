@@ -50,7 +50,7 @@ cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-21-test/"
 mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
 cp assets/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-test.png"
 cat > "$PKG/DEBIAN/control" <<CONTROL
-Package: anything-plays
+Package: anything-plays-21-test
 Version: $VERSION
 Section: games
 Priority: optional
@@ -68,10 +68,10 @@ chmod +x "$PKG/usr/bin/anything-plays-21-test"
 cat > "$PKG/usr/share/applications/anything-plays-test.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Anything Plays
+Name=Anything Plays 2.1 Test
 Comment=Camera-controlled multi-system gaming studio
-Exec=anything-plays
-Icon=anything-plays
+Exec=anything-plays-21-test
+Icon=anything-plays-test
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
