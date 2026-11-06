@@ -4,6 +4,7 @@ This is a transitional control bridge, not an in-process GPU renderer.
 RetroArch's Network RetroPad receiver must be enabled for player one.
 The bridge binds no listening socket and sends only to 127.0.0.1.
 """
+from pathlib import Path
 import socket
 import struct
 from threading import Event, Lock, Thread
@@ -31,6 +32,27 @@ N64_AXES = {
     "C Up": (1, 1, -FULL_AXIS), "C Down": (1, 1, FULL_AXIS),
 }
 N64_BUTTONS = frozenset((*N64_DIGITAL, *N64_AXES))
+
+
+def write_retroarch_config(path, *, port=DEFAULT_PORT):
+    """Enable network controls only for this test launch, not global config.
+
+    RetroArch reads this file with --appendconfig. No network command
+    interface is enabled, and config_save_on_exit=False prevents the
+    temporary gamepad setting from becoming a permanent global preference.
+    """
+    if not 1024 <= port <= 65535:
+        raise ValueError("Invalid local RetroPad UDP port")
+    target = Path(path).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        'network_remote_enable = "true"\\n'
+        'network_remote_enable_user_p1 = "true"\\n'
+        f'network_remote_base_port = "{port}"\\n'
+        'config_save_on_exit = "false"\\n',
+        encoding="utf-8",
+    )
+    return target
 
 
 def encode_message(device, index, button_id, state, *, player=0):
