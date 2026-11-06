@@ -149,10 +149,22 @@ def fetch_core(name, destination=CORE_FOLDER):
         content = archive.read(item)
 
     _validate_binary(content, extension)
+    digest = hashlib.sha256(content).hexdigest()
+    release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
+    if release_mode not in ("0", "1"):
+        raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
+    if release_mode == "1":
+        # Enforce binary integrity before writing or executing a native core.
+        from tools.core_release_lock import LOCK_PATH, verify_download_before_loading
+
+        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        verify_download_before_loading(
+            lock, sys.platform, platform.machine(), name,
+            filename, url, len(content), digest,
+        )
     destination.mkdir(parents=True, exist_ok=True)
     target = destination / filename
     target.write_bytes(content)
-    digest = hashlib.sha256(content).hexdigest()
     identity = inspect_core_identity(target, name)
     print(f"{name} ready: {target} ({len(content):,} bytes), "
           f"reported version {identity['libretro_library_version']}", flush=True)
