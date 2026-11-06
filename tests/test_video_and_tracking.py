@@ -5,6 +5,7 @@ import unittest
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from anything_plays.libretro_video import RGB1555, RGB565, XRGB8888, decode_frame
 from anything_plays.tracking import locate_target, zone_at
@@ -50,6 +51,22 @@ class TrackingTests(unittest.TestCase):
         self.assertIsNone(zone_at((80, 50), (100, 100), zones, mapping, False))
         self.assertEqual(zone_at((80, 50), (100, 100), zones, mapping, True),
                          "Shuffle")
+
+    def test_zone_art_cache_remains_bounded_after_many_resizes(self):
+        frame = np.zeros((96, 160, 3), dtype=np.uint8)
+        artwork = Image.new("RGBA", (128, 128), (100, 200, 240, 220))
+        cache = {}
+        zones = {"A": [0, 0, 1, 1]}
+        kwargs = dict(opacity=90, size=18, style="Bold",
+                      artwork=artwork, artwork_cache=cache)
+        render_zone_overlay(frame, zones, {"A": "A"}, None, **kwargs)
+        first = next(iter(cache.values()))
+        render_zone_overlay(frame, zones, {"A": "A"}, None, **kwargs)
+        self.assertIs(next(iter(cache.values())), first)
+        for i in range(60):
+            rect = {"A": [0, 0, (70 + i) / 160, 1]}
+            render_zone_overlay(frame, rect, {"A": "A"}, None, **kwargs)
+            self.assertLessEqual(len(cache), 12)
 
     def test_zone_overlay_does_not_mutate_input(self):
         frame = np.zeros((100, 100, 3), dtype=np.uint8)
