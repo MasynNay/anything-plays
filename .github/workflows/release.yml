@@ -1,12 +1,16 @@
-name: Build and publish release
+name: Build and publish release (disabled pending redistribution review)
+# Release builds, artifact uploads and publication are intentionally locked.
+# They must only be re-enabled after core/dependency licensing and corresponding
+# source checks are completed and reviewed in docs/RELEASE_LICENSE_REVIEW.md.
+# A version tag alone must never trigger unapproved binary distribution.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   source-checks:
+    # All downstream packaging jobs depend on this explicit release gate.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
