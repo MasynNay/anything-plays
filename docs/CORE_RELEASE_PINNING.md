@@ -38,12 +38,22 @@ build-to-source correspondence.
 The same reported versions appeared on Windows x64, Linux x64, macOS arm64
 and macOS x86_64 in [the passing audited package build](https://github.com/MasynNay/anything-plays/actions/runs/42163068042).
 
+## Captured candidate fingerprints
+
+The candidate lock now includes exact SHA-256 checksums, byte sizes, reported
+versions and upstream full source identifiers for **all eight native core
+binaries** (mGBA and Snes9x for each of four target architectures).
+[Inspect these candidate values](../config/v2.0-core-lock.json). All remain
+**unapproved**, and neither the original nightly ZIPs nor their corresponding
+source snapshots have been preserved as immutable release inputs. A passing
+hash check later cannot substitute for this missing source and rights review.
+
 ## Required release procedure
 
-1. Record candidate fingerprints for all four release targets:
+1. Review the candidate fingerprints already recorded for all four targets
+   in [the unapproved core lock](../config/v2.0-core-lock.json):
    `windows-x86_64`, `linux-x86_64`, `macos-arm64`, and
-   `macos-x86_64`. Ordinary development builds emit candidate metadata
-   without approving it.
+   `macos-x86_64`. These were captured from [passing CI run 42164654048](https://github.com/MasynNay/anything-plays/actions/runs/42164654048), not independently reproduced; ordinary development builds can emit newer candidates without approving them.
 2. **Do not ship directly from mutable nightly URLs.** Preserve exact approved
    binary archives in an immutable, access-controlled release-build input
    location. Verify their cryptographic hashes before use.
@@ -71,8 +81,9 @@ and macOS x86_64 in [the passing audited package build](https://github.com/Masyn
   not license compliance, reproducible builds, or ownership of source assets.
 - A mutable URL may stop working once its content changes; the correct
   solution is an immutable approved binary archive, **not** weakening the lock.
-- The lock starts empty and unapproved intentionally. Neither CI nor a
-  release tag may automatically approve it.
+- The lock contains **candidate** fingerprints from the successful four-architecture
+  CI run, but remains unapproved. Neither CI nor a release tag may automatically
+  approve those candidates.
 - `AP_RELEASE_BUILD=0` is for development and regression builds only; never
   use those outputs to publish official installers.
 - Original GB/GBC save and video compatibility was tested separately with
