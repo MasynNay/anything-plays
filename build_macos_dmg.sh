@@ -29,7 +29,9 @@ if [[ -n "${AP_CUSTOM_OPENCV_WHEEL:-}" ]]; then
   export AP_REQUIRE_OPENCV_FFMPEG_OFF=1
 fi
 .build-venv/bin/python tools/check_opencv_build.py
-.build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" app.py
+# Generate platform icons from the corrected v2.1 source, not the v2.0 PNG.
+.build-venv/bin/python tools/render_v21_icon.py
+.build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
 # Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
 mv dist/AnythingPlays.app dist/AnythingPlays21Test.app
