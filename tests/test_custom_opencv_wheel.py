@@ -18,11 +18,11 @@ class CustomWheelTests(unittest.TestCase):
         self.wheel = Path(self.temp.name) / FILENAME
         self.pack()
 
-    def pack(self, extra=None):
+    def pack(self, extra=None, name="opencv-python-headless"):
         with zipfile.ZipFile(self.wheel, "w") as archive:
             archive.writestr(
                 "opencv_python_headless-4.14.0.94.dist-info/METADATA",
-                "Metadata-Version: 2.3\nName: opencv-python-headless\nVersion: 4.14.0.94\n"
+                "Metadata-Version: 2.3\nName: " + name + "\nVersion: 4.14.0.94\n"
             )
             archive.writestr("cv2/cv2.abi3.so", b"test Mach-O")
             if extra:
@@ -34,6 +34,16 @@ class CustomWheelTests(unittest.TestCase):
         self.assertEqual(report["sha256"], self.sha)
         self.assertEqual(report["distribution"], "opencv-python-headless")
         self.assertFalse(report["redistribution_approved"])
+
+    def test_accepts_actual_upstream_underscore_metadata(self):
+        self.pack(name="opencv_python_headless")
+        self.assertEqual(verify_custom_wheel(self.wheel, self.sha)["distribution"],
+                         "opencv-python-headless")
+
+    def test_rejects_unrelated_distribution_name(self):
+        self.pack(name="opencv-python")
+        with self.assertRaisesRegex(ValueError, "metadata differs"):
+            verify_custom_wheel(self.wheel, self.sha)
 
     def test_rejects_changed_hash(self):
         with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
