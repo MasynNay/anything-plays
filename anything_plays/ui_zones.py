@@ -54,6 +54,7 @@ class ZonesMixin:
 
     def load_zone_art(self, silent=False):
         self._zone_art = None
+        self._zone_thumbnail_cache.clear()
         path = self.zone_image_path.get()
         if not path:
             return
@@ -70,6 +71,7 @@ class ZonesMixin:
     def clear_zone_art(self):
         self.zone_image_path.set('')
         self._zone_art = None
+        self._zone_thumbnail_cache.clear()
 
     def update_shuffle_visibility(self):
         """The checkbox controls whether the tracked Shuffle zone is active/visible."""
@@ -122,4 +124,5 @@ class ZonesMixin:
             label_position=self.zone_label_position.get(),
             artwork=self._zone_art,
             shuffle_enabled=self.shuffle_enabled.get(),
+            artwork_cache=self._zone_thumbnail_cache,
         )
