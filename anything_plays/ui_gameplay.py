@@ -146,7 +146,8 @@ class GameplayMixin:
                     self.status.set('Camera disconnected. Refresh and select another.')
             if self.frame is not None:
                 self.draw_camera()
-            self.draw_game()
+            # Render game video on its own faster timer. Camera detection
+            # may be expensive; it must not cap game playback to ~22 FPS.
             if self.emu.error:
                 self.game_status.set('Emulator error: ' + self.emu.error)
                 self.stop_controls()
@@ -161,16 +162,32 @@ class GameplayMixin:
             if not self._closing:
                 self.root.after(45, self.tick)
 
-    def draw_game(self):
-        """Copy the worker's latest RGB frame before touching Tk image state."""
-        with self.emu.lock:
-            frame = None if self.emu.frame is None else self.emu.frame.copy()
-        if frame is None:
+    def game_render_tick(self):
+        """Paint only new native frames at up to 60 FPS, independent of camera."""
+        if self._closing:
             return
+        try:
+            self.draw_game()
+        except tk.TclError:
+            # A game-only window can be destroyed between adjacent Tk ticks.
+            pass
+        finally:
+            if not self._closing:
+                self.root.after(16, self.game_render_tick)
 
+    def draw_game(self):
+        """Render a fresh frame only when the game or canvas changed."""
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
         canvas_width = max(1, canvas.winfo_width())
         canvas_height = max(1, canvas.winfo_height())
+        with self.emu.lock:
+            serial = getattr(self.emu, "frame_serial", 0)
+            revision = (serial, id(canvas), canvas_width, canvas_height)
+            if revision == getattr(self, "_last_game_render", None):
+                return
+            frame = None if self.emu.frame is None else self.emu.frame.copy()
+        if frame is None:
+            return
         scale = min(canvas_width / frame.shape[1], canvas_height / frame.shape[0])
         width = max(1, int(frame.shape[1] * scale))
         height = max(1, int(frame.shape[0] * scale))
@@ -178,6 +195,7 @@ class GameplayMixin:
             (width, height), Image.Resampling.NEAREST
         )
         self.game_photo = ImageTk.PhotoImage(image)
+        self._last_game_render = revision
         canvas.delete('all')
         canvas.create_image(
             (canvas_width - width) // 2,
