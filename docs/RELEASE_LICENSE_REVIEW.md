@@ -9,7 +9,9 @@ repeated merely for changes to documentation.
 licensed under MIT (where contributors have rights to grant that license).
 
 **Binary distribution:** Not yet approved. This record is technical evidence,
-not legal advice or a claim of copyright clearance.
+not legal advice or a claim of copyright clearance. Consult the
+[third-party rights audit](REDISTRIBUTION_AUDIT.md) and the
+[release core pinning procedure](CORE_RELEASE_PINNING.md) before sign-off.
 
 ## Core licensing strategy
 
