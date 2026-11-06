@@ -9,6 +9,7 @@ import unittest
 from anything_plays.emulator_updates import (
     check_emulator_updates, find_provenance, github_head, summary_text,
 )
+from anything_plays.ui_updates import CHECK_INTERVAL_SECONDS, UpdatesMixin
 
 
 SHA = "b" * 40
@@ -51,6 +52,23 @@ class EmulatorUpdaterTests(unittest.TestCase):
             json.dumps({"cores": [record]}), encoding="utf-8"
         )
         return core
+
+    def test_update_monitor_reschedules_once_per_day_and_stops_on_shutdown(self):
+        monitor = UpdatesMixin()
+        monitor._closing = False
+        monitor.check_emulator_updates = Mock()
+        monitor.root = Mock()
+        monitor.schedule_emulator_update_checks()
+        monitor.check_emulator_updates.assert_called_once_with(automatic=True)
+        monitor.root.after.assert_called_once_with(
+            CHECK_INTERVAL_SECONDS * 1000,
+            monitor.schedule_emulator_update_checks,
+        )
+        self.assertIs(monitor._updates_repeat_job, monitor.root.after.return_value)
+        monitor.root.after.reset_mock()
+        monitor._closing = True
+        monitor.schedule_emulator_update_checks()
+        monitor.root.after.assert_not_called()
 
     def test_matches_packaged_core_revision_and_does_not_modify_it(self):
         with TemporaryDirectory() as tmp:
