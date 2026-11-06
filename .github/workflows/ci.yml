@@ -48,6 +48,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Install runtime dependencies for native gameplay smoke test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libportaudio2 libgl1 libglib2.0-0
+          python -m pip install -r requirements.txt
       - name: Download the actual Linux mGBA core
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mgba')"
       - name: Validate GB, GBC and GBA support in native core
