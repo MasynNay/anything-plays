@@ -36,7 +36,7 @@ The application's original MIT license does **not** govern Snes9x.
 | Exact corresponding source commits for downloaded binaries | Not established |
 | Python/native dependency and asset rights | Not fully audited |
 | Newly packaged two-core installers | Windows x64, macOS Apple Silicon and Intel, and Ubuntu/Debian x64 build and staged license/native core checks passed on GitHub Actions |
-| Public publishing job | Disabled pending release clearance |
+| Public publishing job and tag-triggered release builds | Disabled pending release clearance; a version tag alone must not package or publish binaries |
 
 ## Binary publication checklist
 
@@ -55,7 +55,7 @@ The application's original MIT license does **not** govern Snes9x.
 - [ ] Obtain release approval, restore a controlled publication mechanism,
       and publish signed/unsigned limitations accurately.
 
-Latest platform package verification: [GitHub Actions run 42159955003](https://github.com/MasynNay/anything-plays/actions/runs/42159955003).
+Latest platform package verification: [GitHub Actions run 42159955003](https://github.com/MasynNay/anything-plays/actions/runs/42159955003), which completed successfully on all four target architectures. These are automated packaging and native-core checks, not distribution authorization.
 
 Do not create a v2.0 release tag or distribute bundled installers before
 these items are resolved. The source code being publicly available on GitHub
