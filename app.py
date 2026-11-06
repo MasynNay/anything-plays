@@ -117,6 +117,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.shuffle_enabled = tk.BooleanVar(value=True)
         self.zone_image_path = tk.StringVar(value='')
         self._zone_art = None
+        self._zone_thumbnail_cache = {}  # Bounded to 12 resized assets.
         self.cfg = self.profile_store.get(self.system_key.get())
         self.build()
         self.refresh_settings()
@@ -205,6 +206,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.game_photo = None
         self.camera_photo = None
         self._zone_art = None
+        self._zone_thumbnail_cache.clear()
         self.library_images.clear()
         self.root.destroy()
 
