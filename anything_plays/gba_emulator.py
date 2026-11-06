@@ -1,4 +1,4 @@
-"""Run Gambatte, mGBA and Snes9x through the native Libretro API.
+"""Run mGBA and Snes9x through the native Libretro API.
 
 This module owns the emulator thread and Libretro lifecycle. Video conversion,
 audio output, joypad state, core discovery, and SRAM persistence each live in
