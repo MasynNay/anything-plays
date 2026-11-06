@@ -48,9 +48,17 @@ The frozen application includes camera-capable
 dependencies such as PyObjC, plus transitive native libraries. Verified
 four-platform headless candidate inventories contain **no bundled Qt GUI
 libraries**; the Linux native-library count declined from 177 to 145.
-The headless build still carries FFmpeg/media-codec components, including
-x264/x265 on Apple Silicon, whose exact licensing and source obligations must
-be resolved before public distribution. The build scripts collect installed wheel license/notice files
+Earlier RC2/RC3 headless builds still carried FFmpeg/media codecs, including
+x264/x265 on Apple Silicon. The [fully checked private RC5](RC5_VERIFICATION.md)
+instead uses four custom camera-capable headless OpenCV builds with FFmpeg
+disabled; all four frozen inventories contain **zero** bundled FFmpeg/x264/x265
+binaries. Their exact wheel hashes, source and the Windows packaging patch
+are retained privately. This resolves that specific bundled media-codec
+problem, **not** all native dependency obligations. The Linux inventory also
+contains system-built GNU Readline, JACK, Berkeley DB and ALSA libraries:
+the [RC5 ELF linkage audit](https://github.com/MasynNay/anything-plays/actions/runs/42257248885)
+identifies their actual consumers for further licensing decisions.
+The build scripts collect installed wheel license/notice files
 under the packaged `licenses/python-distribution-notices/` directory and
 write a version inventory to `licenses/PYTHON_DISTRIBUTIONS.json`. The
 inventory includes **build-only packages**, so it does not prove which
