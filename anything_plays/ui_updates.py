@@ -23,6 +23,21 @@ CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 class UpdatesMixin:
     """Add a safe emulator-update check without slowing Tk or opening a game."""
 
+    def schedule_emulator_update_checks(self):
+        """Check again every 24 hours while the same application stays open."""
+        if self._closing:
+            return
+        try:
+            self.check_emulator_updates(automatic=True)
+        finally:
+            # One scheduled check at a time; do not accumulate timers on
+            # machines that remain logged in for days or weeks.
+            if not self._closing:
+                self._updates_repeat_job = self.root.after(
+                    CHECK_INTERVAL_SECONDS * 1000,
+                    self.schedule_emulator_update_checks,
+                )
+
     def check_emulator_updates(self, automatic=False):
         if self._closing or getattr(self, "_updates_busy", False):
             return
