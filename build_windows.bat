@@ -38,6 +38,8 @@ if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 
+py verify_bundle.py windows dist\AnythingPlays
+if errorlevel 1 exit /b 1
 if not exist release mkdir release
 set "ISCC="
 for %%P in ("%ProgramFiles%\Inno Setup 7\ISCC.exe" "%ProgramFiles(x86)%\Inno Setup 7\ISCC.exe" "%LOCALAPPDATA%\Programs\Inno Setup 7\ISCC.exe" "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%ProgramFiles%\Inno Setup 6\ISCC.exe" "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe") do if exist "%%~P" set "ISCC=%%~P"
