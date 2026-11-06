@@ -65,9 +65,12 @@ The candidate lock now includes exact SHA-256 checksums, byte sizes, reported
 versions and upstream full source identifiers for **all eight native core
 binaries** (mGBA and Snes9x for each of four target architectures).
 [Inspect these candidate values](../config/v2.0-core-lock.json). All remain
-**unapproved**, and neither the original nightly ZIPs nor their corresponding
-source snapshots have been preserved as immutable release inputs. A passing
-hash check later cannot substitute for this missing source and rights review.
+**unapproved for public distribution**, but the original eight archived ZIPs
+and complete mGBA/Snes9x upstream source snapshots **have now been retained**
+in the 31-asset [private RC5 draft](RC5_VERIFICATION.md). The release job
+checked every original ZIP and extracted binary against the recorded hashes
+before building. Retention proves artifact identity; it does **not** independently
+reproduce the upstream buildbot's binaries or establish redistribution rights.
 
 ## Required release procedure
 
