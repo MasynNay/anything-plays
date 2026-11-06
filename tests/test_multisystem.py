@@ -13,6 +13,8 @@ class MultiSystemContracts(unittest.TestCase):
         from anything_plays.systems import SYSTEMS
         self.assertEqual(set(SYSTEMS), {'gb', 'gbc', 'gba', 'snes'})
         self.assertEqual(SYSTEMS['gb'].core, SYSTEMS['gbc'].core)
+        self.assertEqual(SYSTEMS['gb'].core, 'mgba')
+        self.assertEqual(SYSTEMS['gbc'].core, 'mgba')
         self.assertEqual(SYSTEMS['gba'].core, 'mgba')
         self.assertEqual(SYSTEMS['snes'].core, 'snes9x')
 
@@ -27,11 +29,11 @@ class MultiSystemContracts(unittest.TestCase):
     def test_every_platform_bundles_all_cores(self):
         for filename in ('build_windows.bat', 'build_macos_dmg.sh', 'build_linux_deb.sh'):
             script = (ROOT / filename).read_text()
-            for name in ('gambatte', 'mgba', 'snes9x'):
+            for name in ('mgba', 'snes9x'):
                 with self.subTest(script=filename, core=name):
                     self.assertIn(name, script)
         fetcher = (ROOT / 'fetch_mgba_core.py').read_text()
-        self.assertIn('CORE_NAMES = ("gambatte", "mgba", "snes9x")', fetcher)
+        self.assertIn('CORE_NAMES = ("mgba", "snes9x")', fetcher)
 
     def test_no_manual_core_selection_button(self):
         source = (ROOT / 'app.py').read_text()
