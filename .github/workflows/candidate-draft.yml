@@ -1,8 +1,8 @@
-name: Assemble private v2.0 draft candidate
+name: Assemble private v2.0 candidate from immutable emulator ZIPs
 # Do not automatically publish. Everything remains in a private draft release.
 on:
   push:
-    branches: [release/v2-core-candidate]
+    branches: [release/v2-rc2-headless]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,8 @@ permissions:
 env:
   AP_RELEASE_BUILD: '0'
   AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
-  DRAFT_TAG: v2.0.0-rc.1
+  DRAFT_TAG: v2.0.0-rc.2
+  SOURCE_TAG: v2.0.0-rc.1
 
 jobs:
   source-checks:
@@ -41,7 +42,7 @@ jobs:
 
   private-draft:
     needs: source-checks
-    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-core-candidate'
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc2-headless'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -68,6 +69,8 @@ jobs:
 
   windows:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: windows-latest
     timeout-minutes: 55
     permissions:
@@ -81,6 +84,16 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
+      - name: Restore and verify locked windows-x86_64 core ZIPs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "windows-x86_64-*.zip" --dir frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-windows-x86_64.json" --dir frozen-inputs
+          python -m tools.prepare_candidate_inputs "windows-x86_64" frozen-inputs release-inputs
       - name: Build and verify Windows candidate
         shell: cmd
         run: call build_windows.bat
@@ -95,6 +108,8 @@ jobs:
 
   macos:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +127,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Restore and verify locked macos-${{ matrix.arch }} core ZIPs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "macos-${{ matrix.arch }}-*.zip" --dir frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-macos-${{ matrix.arch }}.json" --dir frozen-inputs
+          python -m tools.prepare_candidate_inputs "macos-${{ matrix.arch }}" frozen-inputs release-inputs
       - name: Build and verify macOS DMG
         run: bash build_macos_dmg.sh
       - name: Name DMG by architecture
@@ -125,6 +150,8 @@ jobs:
 
   linux:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     permissions:
@@ -139,6 +166,16 @@ jobs:
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
+      - name: Restore and verify locked linux-x86_64 core ZIPs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "linux-x86_64-*.zip" --dir frozen-inputs
+          gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-linux-x86_64.json" --dir frozen-inputs
+          python -m tools.prepare_candidate_inputs "linux-x86_64" frozen-inputs release-inputs
       - name: Build and verify Linux DEB
         run: bash build_linux_deb.sh
       - name: Preserve and validate Linux candidate inputs
@@ -169,3 +206,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$DRAFT_TAG" draft-assets/SHA256SUMS.txt draft-assets/DRAFT_REVIEW_STATUS.json --clobber
+
+  source-snapshots:
+    needs: finalize-private-draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reproduce upstream Git source snapshot archives
+        run: python -m tools.capture_candidate_sources source-snapshots
+      - name: Attach source snapshots and checksums to PRIVATE draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true
+          gh release upload "$DRAFT_TAG" source-snapshots/* --clobber
