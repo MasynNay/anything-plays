@@ -64,7 +64,8 @@ instructions, and populate the explicitly unapproved
 ## Assets and distribution materials
 
 - The app icon, branding and other files under `assets/` require provenance:
-  identify who created each asset, rights to publish and modify it, and
+  see the [asset inventory and ownership sign-off](ASSET_PROVENANCE.md).
+  Identify creators, permission to publish and modify assets, and
   third-party/trademark limitations.
 - No commercial ROMs or game BIOS files are included in the planned releases.
 - Windows setup is currently unsigned, and macOS uses ad-hoc signing without
