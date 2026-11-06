@@ -16,6 +16,12 @@ BUTTONS_BY_SYSTEM = {
     "gbc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
     "gba": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "L", "R"),
     "snes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y", "L", "R"),
+    "nes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "genesis": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "Mode", "C"),
+    # For 3D backends these are visual planning profiles. External emulators
+    # handle their own input; camera-zone injection is NOT currently supported.
+    "n64": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Z", "L", "R", "C Up", "C Down", "C Left", "C Right"),
+    "gamecube": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "L", "R"),
 }
 
 DISABLED_MAPPING = "(None)"
