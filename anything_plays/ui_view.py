@@ -5,6 +5,7 @@ tracking alive without moving or destroying the original game canvas.
 """
 import tkinter as tk
 from tkinter import ttk
+from anything_plays.systems import SYSTEMS
 
 VIEW_MODES = ("Windowed", "Borderless", "Fullscreen", "Game only")
 
