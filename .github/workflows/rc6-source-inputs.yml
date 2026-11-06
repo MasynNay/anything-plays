@@ -1,0 +1,40 @@
+name: Retain exact OpenCV original source and Windows patch with RC6
+
+on:
+  push:
+    branches: [release/v2-rc6-source-inputs]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-verified-source:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc6-source-inputs'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy verified original OpenCV source and Windows patch from RC5 to RC6
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view v2.0.0-rc.5 --json isDraft --jq .isDraft)" = true
+          test "$(gh release view v2.0.0-rc.6 --json isDraft --jq .isDraft)" = true
+          mkdir -p inputs
+          for pattern in \
+            opencv_python_headless-4.14.0.94.tar.gz \
+            WINDOWS_OPENCV_SETUP_PATCH.diff \
+            WINDOWS_OPENCV_PATCH_PROVENANCE.json \
+            camera-only-windows-x86_64.json; do
+            gh release download v2.0.0-rc.5 --pattern "$pattern" --dir inputs
+          done
+          cat > inputs/SOURCE_INPUTS_SHA256SUMS.txt <<'SHA'
+          4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577  opencv_python_headless-4.14.0.94.tar.gz
+          dff3cb43dbf8614eb0422a1e29956ff17397d7f8eabfbe720e36f801872ac5c7  WINDOWS_OPENCV_SETUP_PATCH.diff
+          d8dc98658740a7346d92f26a4d3f036c3a3675fcd88deac8e70a472bae9dd648  WINDOWS_OPENCV_PATCH_PROVENANCE.json
+          52573a6c6ed7c6d2547c0c7cec93bb6c7676117972cd2f6d66e49fcbd391ffbf  camera-only-windows-x86_64.json
+          SHA
+          (cd inputs && sha256sum -c SOURCE_INPUTS_SHA256SUMS.txt)
+          gh release upload v2.0.0-rc.6 inputs/* --clobber
