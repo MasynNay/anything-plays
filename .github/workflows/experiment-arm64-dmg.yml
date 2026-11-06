@@ -5,8 +5,10 @@ on:
     branches: [experiment/v2-camera-only-arm64-dmg]
   workflow_dispatch:
 
+# Accessing unapproved GitHub release drafts requires contents: write.
+# This workflow only reads the draft and uploads JSON metadata to CI.
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 jobs:
