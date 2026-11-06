@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+# Release mode forces exact approved core fingerprints at download AND staging.
+# Keep the publication and source-checks jobs disabled pending legal review.
+env:
+  AP_RELEASE_BUILD: '1'
 jobs:
   source-checks:
     # All downstream packaging jobs depend on this explicit release gate.
