@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-set "VERSION=2.0.0"
+set "VERSION=2.1.0-alpha.1"
 REM Use one explicit interpreter for the downloader, build venv and bundle
 REM verification. The unqualified Windows 'py' launcher may select a different
 REM installation than actions/setup-python (observed Python 3.15 vs 3.13).
@@ -37,7 +37,9 @@ if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon assets\anything_plays.ico --add-data "assets\anything_plays.png;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
-for %%C in (mgba snes9x) do (
+set "CORE_LIST=mgba snes9x"
+if "%AP_V21_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx"
+for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
   if errorlevel 1 exit /b 1
