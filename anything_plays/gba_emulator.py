@@ -182,6 +182,7 @@ class CoreSession:
                 f"{SYSTEMS[self.system].title} bundled emulator core not found. "
                 "Please reinstall Anything Plays."
             )
+        self.emulator.inputs.system = self.system
         self.native = NativeCore(self.core_path)
         try:
             self.native.configure(
@@ -264,7 +265,7 @@ class Emulator:
         self.thread.start()
 
     def press(self, button, frames=8):
-        if self.running and self.armed and button in IDS:
+        if self.running and self.armed and self.inputs.id_for(button) is not None:
             self.inputs.queue_press(button, frames)
 
     def set_manual(self, button, down):
