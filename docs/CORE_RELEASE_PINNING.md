@@ -1,6 +1,6 @@
 # v2.0 native core release lock
 
-**Status: candidate preparation only; public binary distribution is NOT approved.**
+**Status: exact v2.0.0 core hashes approved for the [published free/noncommercial release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).** The historical candidate-building steps below are retained as an audit trail. See [distribution review](RELEASE_DISTRIBUTION_REVIEW.md) and [RC6 verification](RC6_VERIFICATION.md).
 
 The existing Anything Plays v2.0 app has been functionally tested on Windows,
 macOS and Ubuntu. The later mGBA GB/GBC transition and both core packaging paths
@@ -42,8 +42,10 @@ reported revision and source repository against the lock. Builds fail closed
 if a fingerprint changes, if an architecture is missing, or if
 `approved_for_binary_distribution` is not explicitly `true`.
 
-The workflow remains **disabled** regardless of the lock's state. A Git tag
-cannot bypass release review or automatically upload an installer.
+The old automatic rebuild workflow remains **disabled**. The reviewed
+one-time publish workflow promoted only exact verified RC6 binaries after
+checking the approved lock, complete source and SHA-256 manifests. A Git tag
+alone still cannot download changing nightly core builds.
 
 ## Core identities observed in passing platform checks
 
@@ -105,11 +107,15 @@ reproduce the upstream buildbot's binaries or establish redistribution rights.
   not license compliance, reproducible builds, or ownership of source assets.
 - A mutable URL may stop working once its content changes; the correct
   solution is an immutable approved binary archive, **not** weakening the lock.
-- The lock contains **candidate** fingerprints from the successful four-architecture
-  CI run, but remains unapproved. Neither CI nor a release tag may automatically
-  approve those candidates.
-- `AP_RELEASE_BUILD=0` is for development and regression builds only; never
-  use those outputs to publish official installers.
+- The lock contains exact fingerprints from the original four-architecture
+  candidates and was approved **only for the unchanged v2.0.0 bytes** in
+  [the release decision](RELEASE_DISTRIBUTION_REVIEW.md). A new binary version
+  requires a new approval, independently of CI or any Git tag.
+- `AP_RELEASE_BUILD=0` was used to assemble privately reviewed RC6
+  candidates from immutable pinned inputs. The official published installers
+  were promoted *byte for byte* only after an independent promotion check
+  against the approved release lock. Never publish an arbitrary development
+  build merely because that environment variable is set.
 - Original GB/GBC save and video compatibility was tested separately with
   native mGBA using generated synthetic ROMs. Other cartridge mappers require
   their own compatibility evidence if included in release claims.
