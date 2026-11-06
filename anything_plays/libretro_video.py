@@ -13,6 +13,7 @@ RGB1555 = 0
 XRGB8888 = 1
 RGB565 = 2
 SUPPORTED_FORMATS = (RGB1555, XRGB8888, RGB565)
+MAX_FRAME_BYTES = 64 * 1024 * 1024  # Bound a malformed core's frame allocation.
 
 
 def decode_frame(buffer, width, height, pitch, pixel_format):
@@ -30,6 +31,8 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
         raise ValueError("Video pitch is shorter than the image row")
     if width > 4096 or height > 4096 or pitch > 65536:
         raise ValueError("Unexpected Libretro video dimensions")
+    if pitch * height > MAX_FRAME_BYTES:
+        raise ValueError("Libretro video frame exceeds safe memory budget")
 
     raw = C.string_at(buffer, pitch * height)
     if pixel_format == XRGB8888:
