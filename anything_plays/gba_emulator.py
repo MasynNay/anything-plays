@@ -187,9 +187,9 @@ class CoreSession:
         """Keep gameplay alive if a removable/network ROM drive stops writing."""
         try:
             return self.save_ram.persist()
-        except OSError as exc:
-            # Native game execution must not stop solely because saving
-            # failed. Keep surfacing a visible warning until writes succeed.
+        except (OSError, ValueError, MemoryError) as exc:
+            # A broken save path or absurd native SRAM size must not kill
+            # the emulation worker. The user can still play or fix storage.
             self.emulator.save_warning = (
                 "Save failed; game is still running: " + str(exc)[:140]
             )
@@ -220,7 +220,14 @@ class CoreSession:
             self.save_ram = SaveRAM(
                 self.rom, self.native.memory_data, self.native.memory_size
             )
-            self.save_ram.restore()
+            try:
+                self.save_ram.restore()
+            except (OSError, ValueError, MemoryError) as exc:
+                # Continue gameplay even when an existing .sav is corrupt
+                # or on disconnected storage. Warn instead of crashing.
+                self.emulator.save_warning = (
+                    "Could not restore saved game: " + str(exc)[:140]
+                )
             self.emulator.running = True
 
             frame_number = 0
