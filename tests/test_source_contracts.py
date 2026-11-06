@@ -23,8 +23,23 @@ class SourceContracts(unittest.TestCase):
         self.assertTrue(callable(App.save_profile))
         self.assertTrue(callable(ProfileStore.get))
         self.assertIn("rgb", DEFAULT)
+        # 2.1 copies settings from the stable 2.0 path into a dedicated
+        # test directory rather than writing directly into the old location.
+        from anything_plays.test_preferences import (
+            LEGACY_DIR, TEST_DIR, prepare_test_preferences,
+        )
+        self.assertEqual(
+            LEGACY_DIR / "preferences.json",
+            Path(".config/fish-plays-pokemon-studio/preferences.json"),
+        )
+        self.assertEqual(
+            TEST_DIR / "preferences.json",
+            Path(".config/anything-plays-21-test/preferences.json"),
+        )
+        self.assertNotEqual(LEGACY_DIR, TEST_DIR)
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn("'fish-plays-pokemon-studio' / 'preferences.json'", source)
+        self.assertIn("self.preferences_path = prepare_test_preferences()", source)
+        self.assertTrue(callable(prepare_test_preferences))
 
     def test_platform_build_scripts_retained(self):
         names = (
