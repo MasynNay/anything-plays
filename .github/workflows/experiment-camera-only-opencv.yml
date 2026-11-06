@@ -48,8 +48,11 @@ jobs:
 
           info = cv2.getBuildInformation()
           ffmpeg = re.search(r'^\s*FFMPEG:\s*(YES|NO)', info, re.MULTILINE)
-          if ffmpeg is None or ffmpeg.group(1) != 'NO':
-              raise SystemExit('FFmpeg must be OFF in the custom wheel')
+          if ffmpeg is not None and ffmpeg.group(1) != 'NO':
+              raise SystemExit('FFmpeg is enabled in the custom wheel')
+          # When FFMPEG is disabled, macOS OpenCV can omit its build-info line.
+          if cv2.videoio_registry.hasBackend(cv2.CAP_FFMPEG):
+              raise SystemExit('FFmpeg capture backend is still available')
           if not cv2.videoio_registry.hasBackend(cv2.CAP_AVFOUNDATION):
               raise SystemExit('AVFoundation camera support missing')
           sample = np.zeros((120,160,3), dtype=np.uint8)
@@ -67,12 +70,20 @@ jobs:
           )]
           if forbidden:
               raise SystemExit(f'Unexpected FFmpeg/GPL encoder files: {forbidden}')
+          import subprocess
+          binary = next(Path(cv2.__file__).parent.glob('*.so'))
+          linked = subprocess.check_output(['otool', '-L', str(binary)], text=True)
+          forbidden_links = [name for name in ('libavcodec','libavformat','libx264','libx265')
+                             if name in linked.lower()]
+          if forbidden_links:
+              raise SystemExit(f'Unexpected native FFmpeg/codec links: {forbidden_links}')
           digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
           result = {
               'schema_version': 1,
               'platform': 'macos-arm64',
               'opencv_version': cv2.__version__,
               'ffmpeg_enabled': False,
+              'ffmpeg_build_info': ffmpeg.group(1) if ffmpeg else 'not listed',
               'avfoundation_available': True,
               'tracking_image_processing_passed': True,
               'wheel_sha256': digest,
@@ -84,6 +95,12 @@ jobs:
               json.dumps(result, indent=2)+'\n', encoding='utf-8')
           print(json.dumps(result, indent=2))
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: experimental-camera-only-opencv-macos-arm64-evidence
