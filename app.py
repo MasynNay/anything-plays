@@ -32,7 +32,7 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
 
     def __init__(self, root):
         self.root = root
-        root.title('Anything Plays')
+        root.title('Anything Plays 2.1 · Testing')
         self.set_app_icon()
         root.geometry('1400x880')
         root.minsize(820, 540)
@@ -53,7 +53,20 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.armed = False
         self._closing = False
         self.emu = Emulator()
-        self.preferences_path = Path.home() / '.config' / 'fish-plays-pokemon-studio' / 'preferences.json'  # Preserve existing settings on upgrade
+        # Copy the user's stable settings once, then keep test changes separate.
+        # Stable 2.0 remains installed and its preferences remain untouched.
+        legacy_preferences = Path.home() / '.config' / 'fish-plays-pokemon-studio' / 'preferences.json'
+        self.preferences_path = Path.home() / '.config' / 'anything-plays-21-test' / 'preferences.json'
+        try:
+            if not self.preferences_path.exists() and legacy_preferences.is_file():
+                from shutil import copy2
+                self.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+                copy2(legacy_preferences, self.preferences_path)
+                old_profiles = legacy_preferences.with_name('system_profiles.json')
+                if old_profiles.is_file():
+                    copy2(old_profiles, self.preferences_path.with_name('system_profiles.json'))
+        except OSError:
+            pass
         self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
         preferences = self.read_preferences()
         self._shortcut_bindings = preferences.get('key_bindings', {})
