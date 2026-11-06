@@ -8,6 +8,10 @@ import ctypes as C
 import hashlib
 from pathlib import Path
 
+# Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
+# rather than allocating unlimited buffers while a game is running.
+MAX_SAVE_RAM_BYTES = 64 * 1024 * 1024
+
 
 class SaveRAM:
     """Read and write memory type 0 (RETRO_MEMORY_SAVE_RAM)."""
@@ -22,13 +26,21 @@ class SaveRAM:
 
     def _memory(self):
         pointer = self.get_data(0)
-        size = self.get_size(0)
+        size = int(self.get_size(0))
+        if size < 0 or size > MAX_SAVE_RAM_BYTES:
+            raise ValueError(
+                f"Libretro save RAM size exceeds the {MAX_SAVE_RAM_BYTES // (1024 * 1024)} MiB limit"
+            )
         return pointer, size
 
     def restore(self):
         pointer, size = self._memory()
         if pointer and size and self.path.is_file():
-            data = self.path.read_bytes()
+            # Read only as much as this core can hold, plus one byte to
+            # detect oversized/partial legacy saves. A corrupt multi-GB save
+            # must not exhaust memory before gameplay even begins.
+            with self.path.open("rb") as stream:
+                data = stream.read(size + 1)
             C.memmove(pointer, data, min(size, len(data)))
             # An incomplete or oversized legacy .sav must be normalized on
             # the next safe persist, rather than mistaken for a valid full
