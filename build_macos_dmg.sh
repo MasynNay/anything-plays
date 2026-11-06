@@ -48,6 +48,7 @@ cp THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
 cp THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
 
+"$PYTHON" verify_bundle.py macos dist/AnythingPlays.app
 codesign --force --deep --sign - dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg
