@@ -32,6 +32,16 @@ class VerifyBundleTests(unittest.TestCase):
         for name in REQUIRED_DOCUMENTS:
             (licenses / name).write_text(f"Test fixture for {name}\n", encoding="utf-8")
 
+        notice_path = licenses / "python-distribution-notices" / "example" / "LICENSE.txt"
+        notice_path.parent.mkdir(parents=True, exist_ok=True)
+        notice_path.write_text("Example test license\n", encoding="utf-8")
+        (licenses / "PYTHON_DISTRIBUTIONS.json").write_text(json.dumps({
+            "schema_version": 1,
+            "distributions": [{"name": "Example", "version": "1",
+                               "license_files": [{"bundled_path":
+                                   "python-distribution-notices/example/LICENSE.txt"}]}],
+        }), encoding="utf-8")
+
         records = []
         for name in CORE_NAMES:
             filename = f"{name}_libretro{EXTENSIONS[platform_name]}"
@@ -79,6 +89,12 @@ class VerifyBundleTests(unittest.TestCase):
         (licenses / "Snes9x-LICENSE.txt").unlink()
         with self.assertRaisesRegex(ValueError, "Missing bundled license"):
             verify_bundle(bundle, "macos")
+
+    def test_missing_python_dependency_notice_fails(self):
+        bundle, licenses, _, _ = self.make_bundle("linux")
+        (licenses / "python-distribution-notices" / "example" / "LICENSE.txt").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing/empty Python dependency notice"):
+            verify_bundle(bundle, "linux")
 
     def test_empty_license_document_fails(self):
         bundle, licenses, _, _ = self.make_bundle("windows")

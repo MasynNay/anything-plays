@@ -34,7 +34,7 @@ The application's original MIT license does **not** govern Snes9x.
 | Targeted GB/GBC emulation with mGBA | Native Linux mGBA successfully loaded generated GB/GBC test ROMs and delivered video frames in CI; prior representative-game testing used Gambatte |
 | macOS previous three-core notice/integrity packaging | Passed locally, before changing core mapping |
 | Core source revision evidence | Build scripts will record the native cores' embedded version and any reported Git revision; independent matching and source archival are not yet complete |
-| Python/native dependency and asset rights | Not fully audited |
+| Python/native dependency and asset rights | Build scripts collect installed Python-wheel license files and versions for audit; native/transitive notices and asset rights still need independent review |
 | Newly packaged two-core installers | Windows x64, macOS Apple Silicon and Intel, and Ubuntu/Debian x64 build and staged license/native core checks passed on GitHub Actions |
 | Public publishing job and tag-triggered release builds | Disabled pending release clearance; a version tag alone must not package or publish binaries |
 

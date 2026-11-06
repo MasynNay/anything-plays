@@ -24,6 +24,7 @@ cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
+.build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
 

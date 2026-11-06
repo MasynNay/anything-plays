@@ -47,6 +47,7 @@ cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
+.build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays.app
 codesign --force --deep --sign - dist/AnythingPlays.app

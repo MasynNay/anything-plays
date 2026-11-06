@@ -72,6 +72,26 @@ def verify_bundle(bundle, platform_name, check_native=False):
         if not (licenses / filename).read_bytes().strip():
             raise ValueError(f"Empty bundled license document: {filename}")
 
+    python_inventory_path = licenses / "PYTHON_DISTRIBUTIONS.json"
+    if not python_inventory_path.is_file():
+        raise ValueError(f"Missing Python dependency inventory: {python_inventory_path}")
+    python_inventory = json.loads(python_inventory_path.read_text(encoding="utf-8"))
+    distributions = python_inventory.get("distributions")
+    if not isinstance(distributions, list) or not distributions:
+        raise ValueError("Empty Python dependency inventory")
+    python_notices = 0
+    for distribution in distributions:
+        for notice in distribution.get("license_files", []):
+            relative = Path(notice.get("bundled_path", ""))
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("Unsafe Python dependency notice path")
+            notice_path = licenses / relative
+            if not notice_path.is_file() or not notice_path.read_bytes().strip():
+                raise ValueError(f"Missing/empty Python dependency notice: {relative}")
+            python_notices += 1
+    if not python_notices:
+        raise ValueError("No bundled Python dependency notices")
+
     manifest_path = cores / "CORE_PROVENANCE.json"
     if not manifest_path.is_file():
         raise ValueError(f"Missing core manifest: {manifest_path}")

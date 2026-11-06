@@ -216,7 +216,9 @@ platforms.** Use the [QA checklist](docs/QA_CHECKLIST.md) before shipping.
 
 Build on the target OS and architecture. The scripts download both required emulator
 cores, package them with their provenance manifest, and fail if a required core
-cannot be retrieved. **Nightly downloads are not pinned to a reproducible
+cannot be retrieved. They also include installed Python distribution license
+files and a version inventory for third-party attribution review.
+**Nightly downloads are not pinned to a reproducible
 revision**, even when SHA-256 values are recorded afterward. Platform installers
 still require independent testing and a completed third-party licensing review.
 
