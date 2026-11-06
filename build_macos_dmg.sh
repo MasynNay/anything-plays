@@ -31,7 +31,7 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
-# Do not overwrite a user's installed AnythingPlays21Test.app (the stable 2.0 app).
+# Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
 mv dist/AnythingPlays.app dist/AnythingPlays21Test.app
 # Generate a native macOS icon from the branded PNG.
 ICONSET="build/AnythingPlays.iconset"
