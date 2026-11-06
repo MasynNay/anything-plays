@@ -12,10 +12,11 @@ import os
 from pathlib import Path
 import sys
 
-from fetch_mgba_core import inspect_core_identity
+from fetch_mgba_core import inspect_core_identity, core_names_for_build
 
 
 CORE_NAMES = ("mgba", "snes9x")
+OPTIONAL_V21_LICENSES = ("FCEUmm-GPL-2.0.txt", "Genesis-Plus-GX-LICENSE.txt")
 REQUIRED_DOCUMENTS = (
     "AnythingPlays-MIT.txt",
     "CODE_OF_CONDUCT.md",
@@ -32,7 +33,8 @@ EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
 # as with any extension-based check, manual artifact inspection remains needed.
 DISALLOWED_GAME_EXTENSIONS = frozenset({
     ".gb", ".gbc", ".gba", ".sfc", ".smc",
-    ".nes", ".n64", ".z64", ".v64", ".rom", ".bios",
+    ".nes", ".unf", ".unif", ".n64", ".z64", ".v64", ".rom", ".bios",
+    ".smd", ".gen", ".gcm", ".rvz", ".gcz", ".ciso", ".iso",
 })
 
 
@@ -84,11 +86,16 @@ def verify_bundle(bundle, platform_name, check_native=False):
         licenses = bundle / "licenses"
         cores = bundle / "cores"
 
-    missing = [str(licenses / filename) for filename in REQUIRED_DOCUMENTS
+    expected_cores = core_names_for_build()
+    required_notices = (
+        REQUIRED_DOCUMENTS + OPTIONAL_V21_LICENSES
+        if len(expected_cores) > len(CORE_NAMES) else REQUIRED_DOCUMENTS
+    )
+    missing = [str(licenses / filename) for filename in required_notices
                if not (licenses / filename).is_file()]
     if missing:
         raise ValueError("Missing bundled license documents:\n" + "\n".join(missing))
-    for filename in REQUIRED_DOCUMENTS:
+    for filename in required_notices:
         if not (licenses / filename).read_bytes().strip():
             raise ValueError(f"Empty bundled license document: {filename}")
 
@@ -127,14 +134,14 @@ def verify_bundle(bundle, platform_name, check_native=False):
         raise ValueError(f"Missing core manifest: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     records = manifest.get("cores")
-    if not isinstance(records, list) or len(records) != len(CORE_NAMES):
+    if not isinstance(records, list) or len(records) != len(expected_cores):
         raise ValueError("Manifest must identify all required cores")
     found = set()
     for record in records:
         if not isinstance(record, dict):
             raise ValueError("Invalid core manifest entry")
         name = record.get("name")
-        if name not in CORE_NAMES or name in found:
+        if name not in expected_cores or name in found:
             raise ValueError(f"Unexpected or duplicated core: {name}")
         found.add(name)
         expected_filename = f"{name}_libretro{EXTENSIONS[platform_name]}"
@@ -176,7 +183,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                           "reported_source_commit_url"):
                 if record.get(field) != observed[field]:
                     raise ValueError(f"Recorded {field} mismatch for {name}: {path}")
-    print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums"
+    print(f"Verified {platform_name} bundle: license files and {len(expected_cores)} core checksums"
           + (" and native GB/GBC/GBA coverage" if check_native else ""))
 
 
