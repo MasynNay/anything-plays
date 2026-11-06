@@ -5,6 +5,10 @@ on:
     branches: [feature/v2.1-unified-test]
   workflow_dispatch:
 
+concurrency:
+  group: anything-plays-v21-branch
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
