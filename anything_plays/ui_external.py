@@ -1,7 +1,7 @@
-"""Optional external 3D emulator setup and lifecycle.
+"""3D emulator launch and experimental camera gamepad bridges.
 
-RetroArch and Dolphin each run in their own window. Webcam button presses
-cannot be sent to a separate process by this release's safe Libretro bridge.
+Hardware GPU games still render in their own windows; only controller input
+is relayed from Anything Plays via RetroPad or the Dolphin POSIX pipe.
 """
 from pathlib import Path
 import sys
@@ -114,6 +114,13 @@ class ExternalBackendMixin:
             if self.external_input is not None:
                 self.external_input.close()
                 self.external_input = None
+            process = self.external_process
+            self.external_process = None
+            if process is not None and process.poll() is None:
+                try:
+                    process.terminate()
+                except OSError:
+                    pass
             self.game_status.set(str(exc))
             messagebox.showerror("External emulator setup", str(exc), parent=self.root)
             return False
