@@ -24,11 +24,12 @@ from anything_plays.ui_zones import ZonesMixin
 from anything_plays.ui_view import ViewMixin
 from anything_plays.ui_shortcuts import ShortcutsMixin
 from anything_plays.ui_external import ExternalBackendMixin
+from anything_plays.ui_updates import UpdatesMixin
 
 
 class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
           ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
-          ShortcutsMixin, ExternalBackendMixin):
+          ShortcutsMixin, ExternalBackendMixin, UpdatesMixin):
     """Own application state and delegate UI behavior to focused modules."""
 
     def __init__(self, root):
@@ -53,6 +54,10 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self._shuffle_latched = False
         self.armed = False
         self._closing = False
+        self._updates_busy = False
+        self._emulator_update_status = tk.StringVar(
+            value='Emulator update checks run automatically every 24 hours'
+        )
         self.emu = Emulator()
         # Preserve stable 2.0 preferences; make an independent alpha copy.
         self.preferences_path = prepare_test_preferences()
@@ -125,6 +130,7 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.scan_cameras)
         root.after(45, self.tick)
+        root.after(8000, lambda: self.check_emulator_updates(automatic=True))
 
     def set_app_icon(self):
         """Use the same branded icon for source and frozen applications."""
