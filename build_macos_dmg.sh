@@ -27,7 +27,7 @@ done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
 mkdir -p dist/AnythingPlays.app/Contents/MacOS/cores
-for name in gambatte mgba snes9x; do
+for name in mgba snes9x; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
