@@ -121,8 +121,9 @@ class LayoutMixin:
                                   width=15)
         view_combo.pack(side='left', padx=(0, 8))
         view_combo.bind('<<ComboboxSelected>>', lambda _: self.set_view_mode())
-        ttk.Button(view_row, text='Keyboard shortcuts',
-                   command=self.configure_shortcuts).pack(side='right')
+        self.shortcuts_button = ttk.Button(view_row, text='Keyboard shortcuts',
+                                           command=self.configure_shortcuts)
+        self.shortcuts_button.pack(side='right')
         # Embedded emulators use the existing on-canvas software-video renderer.
         self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)
