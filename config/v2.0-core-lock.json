@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "approved_for_binary_distribution": false,
-  "approval_note": "CANDIDATES ONLY from successful GitHub Actions run 42164654048; binaries were fetched from mutable URLs. Reported commits resolve upstream but exact binary-to-source correspondence, immutable archives, license and asset reviews are incomplete. Do not approve distribution.",
+  "approved_for_binary_distribution": true,
+  "approval_note": "Scoped to free, nonpromotional Anything Plays v2.0.0 and the eight exact SHA-256-locked Libretro libraries preserved in the 8-job RC6 candidate. The full upstream source trees, original archives and third-party notices are retained; all four FFmpeg-free OpenCV wheels and the Windows source patch are also archived. This is technical identity and scoped distribution approval, not a claim of byte-reproducible upstream builds or permission for commercial Snes9x/artwork reuse.",
   "targets": {
     "windows-x86_64": {
       "mgba": {
@@ -92,5 +92,7 @@
       }
     }
   },
-  "candidate_evidence_url": "https://github.com/MasynNay/anything-plays/actions/runs/42164654048"
+  "candidate_evidence_url": "https://github.com/MasynNay/anything-plays/actions/runs/42164654048",
+  "approved_release": "v2.0.0",
+  "review_evidence": "docs/RELEASE_DISTRIBUTION_REVIEW.md"
 }
