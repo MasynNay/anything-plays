@@ -28,9 +28,46 @@ jobs:
           mkdir -p extracted evidence
           dpkg-deb -x frozen/anything-plays_2.0.0_amd64.deb extracted
           python -m tools.audit_linux_linkage extracted/opt/anything-plays evidence/linux-native-linkage.json
+      - name: Try removing optional GPL and system-supplied audio libraries
+        run: |
+          set -euo pipefail
+          mkdir -p pruned
+          cp -a extracted/. pruned/
+          INTERNAL=pruned/opt/anything-plays/_internal
+          # The .deb already declares libportaudio2 as a system dependency.
+          # Avoid freezing its JACK/ALSA/Berkeley DB transitive dependencies.
+          for name in libportaudio.so.2 libjack.so.0 libdb-5.3.so libasound.so.2 libreadline.so.8; do
+            test -f "$INTERNAL/$name"
+            rm "$INTERNAL/$name"
+          done
+          find "$INTERNAL/python3.13/lib-dynload" -maxdepth 1 -name 'readline*.so' -print -delete
+          python -m tools.audit_linux_linkage pruned/opt/anything-plays evidence/pruned-native-linkage.json
+          python verify_bundle.py --check-native linux pruned/opt/anything-plays
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          before=json.loads(Path('evidence/linux-native-linkage.json').read_text())
+          after=json.loads(Path('evidence/pruned-native-linkage.json').read_text())
+          for key in ('libreadline','libdb-','libjack','libasound','libportaudio'):
+              assert not after['direct_consumers'].get(key), (key,after['direct_consumers'][key])
+          assert after['native_files_scanned'] == before['native_files_scanned'] - 6
+          print("All five system-library dependencies and the unused Python readline module excluded without breaking core integrity")
+          PY
+          # Validate that system PortAudio can be supplied by the installed
+          # Ubuntu libportaudio2 package (the .deb already Depends on it).
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libportaudio2
+          python - <<'PY'
+          import ctypes
+          lib=ctypes.CDLL('libportaudio.so.2')
+          lib.Pa_GetVersionText.restype=ctypes.c_char_p
+          print('System PortAudio:', lib.Pa_GetVersionText().decode())
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: rc5-linux-system-library-linkage
-          path: evidence/linux-native-linkage.json
+          path: |
+            evidence/linux-native-linkage.json
+            evidence/pruned-native-linkage.json
           if-no-files-found: error
           retention-days: 30
