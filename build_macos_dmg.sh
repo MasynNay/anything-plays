@@ -41,7 +41,11 @@ done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
 mkdir -p dist/AnythingPlays.app/Contents/Resources/cores
-for name in mgba snes9x; do
+CORE_LIST=(mgba snes9x)
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  CORE_LIST+=(fceumm genesis_plus_gx)
+fi
+for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays.app/Contents/Resources/cores/
