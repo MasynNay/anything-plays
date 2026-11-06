@@ -113,6 +113,20 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
                 "bundled_notice_count": len(record.get("license_files", [])),
             })
 
+    # Explicitly reject Qt GUI libraries if this is a headless OpenCV build.
+    # The old Linux wheel bundled LGPL-3.0 Qt GUI components unnecessarily.
+    if any((d["name"] or "").lower() == "opencv-python-headless"
+           for d in python_distributions):
+        gui_files = [
+            entry["path"] for entry in files
+            if "/cv2/qt/" in ("/" + entry["path"]).lower()
+            or "/libqt5" in ("/" + entry["path"]).lower()
+            or "/libqt6" in ("/" + entry["path"]).lower()
+        ]
+        if gui_files:
+            raise ValueError("Unexpected Qt GUI binaries in headless OpenCV bundle: "
+                             + ", ".join(gui_files[:5]))
+
     return {
         "schema_version": 1,
         "target": target,

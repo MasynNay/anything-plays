@@ -37,15 +37,18 @@ class SourceContracts(unittest.TestCase):
 
     def test_platform_installers_use_reviewed_dependency_versions(self):
         frozen = (ROOT / "requirements-build.txt").read_text(encoding="utf-8")
-        for required in ("opencv-python==4.14.0.94", "numpy==2.5.4",
+        for required in ("opencv-python-headless==4.14.0.94", "numpy==2.5.4",
                          "Pillow==12.3.0", "pyinstaller==6.22.3",
                          "sounddevice==0.5.6"):
             self.assertIn(required, frozen)
+        self.assertNotIn("opencv-python==", frozen)
+        self.assertIn("opencv-python-headless", (ROOT / "requirements.txt").read_text())
         for path in ("build_windows.bat", "build_macos_dmg.sh", "build_linux_deb.sh"):
             with self.subTest(script=path):
                 script = (ROOT / path).read_text(encoding="utf-8")
                 self.assertIn("-r requirements-build.txt", script)
                 self.assertIn("pip==26.3", script)
+                self.assertIn("tools/check_opencv_build.py", script)
                 self.assertNotIn("-r requirements.txt pyinstaller", script)
 
     def test_windows_build_uses_the_selected_python(self):

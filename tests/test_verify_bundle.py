@@ -123,7 +123,7 @@ class VerifyBundleTests(unittest.TestCase):
         inventory_path = licenses / "PYTHON_DISTRIBUTIONS.json"
         data = json.loads(inventory_path.read_text(encoding="utf-8"))
         data["distributions"].append({
-            "name": "opencv-python", "version": "4.14.0.94",
+            "name": "opencv-python-headless", "version": "4.14.0.94",
             "license_files": [{"original_path": "LICENSE.txt",
                                "bundled_path": "python-distribution-notices/example/LICENSE.txt"}],
         })

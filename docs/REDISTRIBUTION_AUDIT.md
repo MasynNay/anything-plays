@@ -112,12 +112,29 @@ native file and compare inventories with frozen Python notices. Final release
 binaries still require independent archival, archive-level inspection, and
 separate redistribution approval.
 
+### Headless OpenCV candidate (pending new installer checks)
+
+Anything Plays uses Tkinter for its interface and relies on OpenCV for
+camera capture, frame processing and drawing, not for `cv2.imshow` or
+other OpenCV-owned windows. The upstream
+[opencv-python wheel instructions](https://github.com/opencv/opencv-python)
+recommend `opencv-python-headless` when a separate GUI toolkit is used.
+The pinned build and source requirements now use that headless variant at
+4.14.0.94. Its wheels exclude Qt/HighGUI libraries, eliminating the previously
+observed bundled Linux Qt 5 GUI stack if platform verification confirms it.
+**The FFmpeg and other native library obligations still require review.**
+The release candidate currently stored in the private GitHub draft was
+assembled before this change; it is not replaced or publicly distributed
+merely by merging the dependency change. Validate four fresh platform
+inventories, video capture backends, and packaged installers before promoting
+a new candidate.
+
 ### Pinned v2 Python build dependencies
 
 The four reviewed CI inventories from
 [run 42172205627](https://github.com/MasynNay/anything-plays/actions/runs/42172205627)
 recorded identical versions for the shared Python runtime packages, including
-NumPy 2.5.4, OpenCV 4.14.0.94, Pillow 12.3.0, sounddevice 0.5.6,
+NumPy 2.5.4, OpenCV headless 4.14.0.94, Pillow 12.3.0, sounddevice 0.5.6,
 PyInstaller 6.22.3 and pyinstaller-hooks-contrib 2026.9. Platform-specific
 PyObjC, macholib, pefile and Windows compatibility packages were also
 recorded. Those exact versions are now pinned in

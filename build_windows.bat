@@ -19,6 +19,8 @@ if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m pip install --upgrade pip==26.3
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.build-venv\Scripts\python.exe tools/check_opencv_build.py
+if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon assets\anything_plays.ico --add-data "assets\anything_plays.png;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1

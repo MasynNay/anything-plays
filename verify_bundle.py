@@ -104,7 +104,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
         listed_notice_files = distribution.get("license_files", [])
         # OpenCV wheels include FFmpeg on all platforms and Qt on non-headless
         # Linux wheels. Their distinct third-party terms must not be omitted.
-        if (distribution.get("name", "").casefold() == "opencv-python"
+        if (distribution.get("name", "").casefold() in {"opencv-python", "opencv-python-headless"}
                 and not any(
                     Path(record.get("original_path", "")).name.casefold()
                     == "license-3rd-party.txt"

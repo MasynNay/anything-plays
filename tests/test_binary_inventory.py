@@ -98,6 +98,28 @@ class BundleInventoryTests(unittest.TestCase):
             self.assertEqual(report["python_distributions"][0]["version"], "12.0")
             self.assertEqual(report["python_distributions"][0]["bundled_notice_count"], 1)
 
+    def test_headless_cv2_inventory_rejects_bundled_qt(self):
+        with TemporaryDirectory() as temp:
+            bundle = Path(temp)
+            licenses = bundle / "licenses"
+            licenses.mkdir()
+            (licenses / "PYTHON_DISTRIBUTIONS.json").write_text(
+                json.dumps({"distributions": [
+                    {"name": "opencv-python-headless", "version": "4.14.0.94",
+                     "license_files": []}
+                ]}), encoding="utf-8"
+            )
+            qt = bundle / "_internal" / "opencv_python_headless.libs"
+            qt.mkdir(parents=True)
+            file = qt / "libQt5Core-example.so"
+            file.write_bytes(b"\x7fELF")
+            with self.assertRaisesRegex(ValueError, "Unexpected Qt GUI binaries"):
+                collect_bundle_inventory(bundle, "linux-x86_64")
+            file.unlink()
+            report = collect_bundle_inventory(bundle, "linux-x86_64")
+            self.assertEqual(report["python_distributions"][0]["name"],
+                             "opencv-python-headless")
+
     def test_reports_macos_and_pe_magic(self):
         with TemporaryDirectory() as tmp:
             bundle = Path(tmp)
