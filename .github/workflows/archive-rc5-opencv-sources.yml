@@ -39,10 +39,19 @@ jobs:
                              (patch,metadata['patch_sha256'])):
               assert f.is_file(), f"Missing reproducibility input: {f}"
               h=hashlib.sha256()
-              with f.open('rb') as src:
-                  for block in iter(lambda: src.read(1024*1024), b''):
-                      h.update(block)
-              assert h.hexdigest() == expected, f"Modified source artifact: {f}"
+              if f == patch:
+                  # Windows wrote a CRLF diff, but the recorded patch digest
+                  # hashes LF canonical source text. Normalize line endings
+                  # without changing or weakening the patch's contents.
+                  normalized = f.read_bytes().replace(b'\\r\\n', b'\\n')
+                  h.update(normalized)
+                  assert h.hexdigest() == expected, f"Unexpected patch content: {f}"
+                  f.write_bytes(normalized)
+              else:
+                  with f.open('rb') as src:
+                      for block in iter(lambda: src.read(1024*1024), b''):
+                          h.update(block)
+                  assert h.hexdigest() == expected, f"Modified source artifact: {f}"
               print(f"Verified immutable source input {f.name}: {expected}")
           assert metadata['version'] == '4.14.0.94'
           assert metadata['distribution'] == 'opencv-python-headless'
