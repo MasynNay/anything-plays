@@ -38,7 +38,7 @@ if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 
-py verify_bundle.py windows dist\AnythingPlays
+py verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
 if not exist release mkdir release
 set "ISCC="
