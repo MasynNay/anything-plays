@@ -59,6 +59,45 @@ class BundleInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Invalid target"):
                 collect_bundle_inventory(bundle, "../escape")
 
+    def test_matches_staged_cores_against_manifest(self):
+        with TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            cores = bundle / "cores"
+            cores.mkdir()
+            records = []
+            for name in ("mgba", "snes9x"):
+                payload = (b"\x7fELF" + name.encode("ascii"))
+                (cores / f"{name}_libretro.so").write_bytes(payload)
+                records.append({
+                    "name": name, "file": f"{name}_libretro.so",
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "size_bytes": len(payload),
+                })
+            (cores / "CORE_PROVENANCE.json").write_text(
+                json.dumps({"cores": records}), encoding="utf-8")
+            report = collect_bundle_inventory(bundle, "linux-x86_64")
+            self.assertEqual({x["name"] for x in report["verified_cores"]},
+                             {"mgba", "snes9x"})
+            (cores / "mgba_libretro.so").write_bytes(b"changed after signing")
+            with self.assertRaisesRegex(ValueError, "Post-packaging core integrity mismatch"):
+                collect_bundle_inventory(bundle, "linux-x86_64")
+
+    def test_reports_python_versions_from_build_environment(self):
+        with TemporaryDirectory() as tmp:
+            bundle = Path(tmp)
+            licenses = bundle / "licenses"
+            licenses.mkdir()
+            (licenses / "PYTHON_DISTRIBUTIONS.json").write_text(json.dumps({
+                "distributions": [
+                    {"name": "Pillow", "version": "12.0", "license_expression": "MIT",
+                     "license_files": [{"bundled_path": "license.txt"}]},
+                ],
+            }), encoding="utf-8")
+            report = collect_bundle_inventory(bundle, "windows-x86_64")
+            self.assertEqual(report["python_distributions"][0]["name"], "Pillow")
+            self.assertEqual(report["python_distributions"][0]["version"], "12.0")
+            self.assertEqual(report["python_distributions"][0]["bundled_notice_count"], 1)
+
     def test_reports_macos_and_pe_magic(self):
         with TemporaryDirectory() as tmp:
             bundle = Path(tmp)
