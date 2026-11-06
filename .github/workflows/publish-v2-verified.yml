@@ -1,0 +1,143 @@
+name: Publish verified Anything Plays v2.0.0
+# This one-time promotion takes exact RC6 checksummed binaries from a private
+# draft. It never fetches mutable emulator nightlies or compiles new sources.
+on:
+  push:
+    branches: [release/publish-v2.0.0]
+
+permissions:
+  contents: write
+
+jobs:
+  publish-reviewed-v2:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/publish-v2.0.0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate reviewed release gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          lock=json.loads(Path('config/v2.0-core-lock.json').read_text(encoding='utf-8'))
+          assert lock.get('approved_for_binary_distribution') is True
+          assert lock.get('approved_release') == 'v2.0.0'
+          assert Path('docs/RELEASE_DISTRIBUTION_REVIEW.md').is_file()
+          assert Path('docs/RELEASE_SOURCE_ACCESS.md').is_file()
+          assert Path('docs/RC6_VERIFICATION.md').is_file()
+          assert set(lock['targets']) == {'windows-x86_64','linux-x86_64','macos-arm64','macos-x86_64'}
+          for target,core in lock['targets'].items():
+              assert set(core) == {'mgba','snes9x'}, target
+          print('Approved exact two-core x four-platform distribution gate present')
+          PY
+      - name: Download verified private RC6 candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view v2.0.0-rc.6 --json isDraft --jq '.isDraft')" = true
+          if gh release view v2.0.0 >/dev/null 2>&1; then
+            echo "Official release already exists; refusing overwrite"
+            exit 1
+          fi
+          mkdir -p review
+          gh release download v2.0.0-rc.6 --dir review
+      - name: Verify all archived SHA-256s and exact eight native core identities
+        run: |
+          set -euo pipefail
+          test "$(find review -maxdepth 1 -type f | wc -l | tr -d ' ')" = 32
+          (cd review && sha256sum -c SHA256SUMS.txt)
+          (cd review && sha256sum -c SOURCE_SNAPSHOT_SHA256SUMS.txt)
+          (cd review && sha256sum -c SOURCE_INPUTS_SHA256SUMS.txt)
+          python - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          from tools.core_release_lock import verify_release_lock
+          directory=Path('review')
+          lock=json.loads(Path('config/v2.0-core-lock.json').read_text())
+          expected_installer_hashes={
+            'AnythingPlaysSetup-2.0.0.exe':'78781389a4d7855b55ca7a41339645d69f6c64bc94d5574a2055fc4cdd249a0d',
+            'anything-plays_2.0.0_amd64.deb':'b37cf8ead48abf73369782b5b2f796fdbb8697dd38cd5bead11e45fb50538ab3',
+            'AnythingPlays-2.0.0-macos-arm64.dmg':'b6f2bfabe60d1bf19d59003dd0ef6a5d6b23298e419f29886e11d2611f42f4b8',
+            'AnythingPlays-2.0.0-macos-x86_64.dmg':'9e8d14f2f6f8e62eda1254b846d149f64c49ff4f7bf4f8d34ab52f4689510f67'}
+          for name,sha in expected_installer_hashes.items():
+              assert hashlib.sha256((directory/name).read_bytes()).hexdigest() == sha, name
+          for target,expected in lock['targets'].items():
+              record=json.loads((directory/f'CORE_PROVENANCE-{target}.json').read_text())
+              assert verify_release_lock(record,lock)==target
+              for core in record['cores']:
+                  filename=f"{target}-{core['file']}.zip"
+                  binary=directory/filename
+                  assert hashlib.sha256(binary.read_bytes()).hexdigest()==core['archive_sha256'],filename
+                  with zipfile.ZipFile(binary) as z:
+                      names=z.namelist()
+                      assert core['file'] in names,filename
+                      data=z.read(core['file'])
+                  pinned=expected[core['name']]
+                  assert hashlib.sha256(data).hexdigest()==pinned['sha256'],filename
+                  assert len(data)==pinned['size_bytes'],filename
+          print('PASS: all 4 exact installers, 8 immutable core archives, 8 extracted core hashes, source archives and notices')
+          PY
+      - name: Create clean public release asset set
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          cp review/AnythingPlaysSetup-2.0.0.exe public/
+          cp review/anything-plays_2.0.0_amd64.deb public/
+          cp review/AnythingPlays-2.0.0-macos-arm64.dmg public/
+          cp review/AnythingPlays-2.0.0-macos-x86_64.dmg public/
+          cp review/source-mgba-*.tar.gz public/
+          cp review/source-snes9x-*.tar.gz public/
+          cp review/opencv_python_headless-4.14.0.94.tar.gz public/
+          cp review/WINDOWS_OPENCV_SETUP_PATCH.diff public/
+          cp review/WINDOWS_OPENCV_PATCH_PROVENANCE.json public/
+          cp docs/RELEASE_SOURCE_ACCESS.md public/
+          cp docs/THIRD_PARTY_NOTICES.md public/
+          (cd public && sha256sum \
+            AnythingPlaysSetup-2.0.0.exe \
+            anything-plays_2.0.0_amd64.deb \
+            AnythingPlays-2.0.0-macos-arm64.dmg \
+            AnythingPlays-2.0.0-macos-x86_64.dmg \
+            source-mgba-*.tar.gz source-snes9x-*.tar.gz \
+            opencv_python_headless-4.14.0.94.tar.gz \
+            WINDOWS_OPENCV_SETUP_PATCH.diff \
+            WINDOWS_OPENCV_PATCH_PROVENANCE.json \
+            RELEASE_SOURCE_ACCESS.md THIRD_PARTY_NOTICES.md \
+            > SHA256SUMS.txt)
+          (cd public && sha256sum -c SHA256SUMS.txt)
+      - name: Create draft release and check all uploaded assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          MAIN_SHA="$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha')"
+          test -n "$MAIN_SHA"
+          gh release create v2.0.0 public/* \
+            --target "$MAIN_SHA" --draft \
+            --title "Anything Plays 2.0.0" \
+            --notes-file docs/RELEASE_NOTES.md
+          test "$(gh release view v2.0.0 --json isDraft --jq '.isDraft')" = true
+          python - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          assets=json.loads(subprocess.check_output(
+              ['gh','api',f"repos/{os.environ['REPO']}/releases/tags/v2.0.0"],
+              text=True))['assets']
+          expected={p.name:hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path('public').iterdir() if p.is_file()}
+          actual={a['name']:(a.get('digest') or '') for a in assets}
+          assert set(expected)==set(actual),(sorted(expected),sorted(actual))
+          for name,digest in expected.items():
+              assert actual[name]==f'sha256:{digest}',f'Uploaded asset hash mismatch: {name}'
+          print(f'Verified all {len(expected)} release assets against exact local SHA-256')
+          PY
+      - name: Publish verified free and noncommercial 2.0 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit v2.0.0 --draft=false --latest
+          test "$(gh release view v2.0.0 --json isDraft --jq '.isDraft')" = false
+          gh release view v2.0.0 --web=false
