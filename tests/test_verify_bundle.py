@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 import unittest
 
 from verify_bundle import CORE_NAMES, EXTENSIONS, REQUIRED_DOCUMENTS, verify_bundle
@@ -52,6 +53,12 @@ class VerifyBundleTests(unittest.TestCase):
             with self.subTest(platform=platform_name):
                 bundle, _, _, _ = self.make_bundle(platform_name)
                 verify_bundle(bundle, platform_name)
+
+    def test_native_core_check_can_be_requested_explicitly(self):
+        bundle, _, cores, _ = self.make_bundle("linux")
+        with patch("verify_bundle._validate_mgba_core") as check:
+            verify_bundle(bundle, "linux", check_native=True)
+        check.assert_called_once_with(cores / "mgba_libretro.so")
 
     def test_missing_license_document_fails(self):
         bundle, licenses, _, _ = self.make_bundle("macos")
