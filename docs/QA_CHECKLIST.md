@@ -20,7 +20,7 @@ installer permissions, or every Libretro platform combination.
 - [ ] macOS Apple Silicon DMG opens from Finder and launches on first attempt.
 - [ ] macOS Intel DMG opens from Finder and launches on first attempt.
 - [ ] Ubuntu 24.04 x64 DEB installs, launches from the app menu and runs offline.
-- [ ] A freshly installed app finds all three bundled cores without manual setup.
+- [ ] A freshly installed app finds both required bundled cores without manual setup.
 - [ ] The installed `CORE_PROVENANCE.json` matches the bundled binaries.
 - [ ] Window resizing, both independently scrolling panes, and all 16 themes
   work without clipping controls.
