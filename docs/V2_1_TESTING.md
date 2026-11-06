@@ -37,6 +37,9 @@ The app never provides or downloads commercial game ROMs or BIOS images.
 - Bolder camera control zones: new **Bold** style, centered label option,
   border thickness 2–16 px and stronger readable button labels. Existing
   Outline, High contrast, Minimal, opacity and image overlays remain.
+- **Shuffle snaps into the same grid** as other enabled buttons when using
+  Fit buttons to grid. Hidden Shuffle and disabled controls retain their
+  saved positions, and the default layouts remain horizontally symmetric.
 - Legacy 2.0 profiles, separate ROM shelves, live camera color tracking,
   fit-to-grid controls, manual keyboard play, themes and saves remain.
 
