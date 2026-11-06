@@ -116,10 +116,14 @@ jobs:
         run: bash build_macos_dmg.sh
       - name: Record staged macOS binary inventory
         run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app release-evidence/macos-${{ matrix.arch }}.json
+      - name: Audit macOS FFmpeg and encoder Mach-O link dependencies
+        run: python tools/audit_codec_linkage.py dist/AnythingPlays.app release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: evidence-macos-${{ matrix.arch }}
-          path: release-evidence/macos-${{ matrix.arch }}.json
+          path: |
+            release-evidence/macos-${{ matrix.arch }}.json
+            release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
           if-no-files-found: error
 
   package-linux:
