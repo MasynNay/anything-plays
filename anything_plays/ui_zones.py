@@ -114,6 +114,8 @@ class ZonesMixin:
             opacity=self.zone_opacity.get(),
             size=self.zone_font_size.get(),
             style=self.zone_style.get(),
+            border_width=self.zone_border_width.get(),
+            label_position=self.zone_label_position.get(),
             artwork=self._zone_art,
             shuffle_enabled=self.shuffle_enabled.get(),
         )
