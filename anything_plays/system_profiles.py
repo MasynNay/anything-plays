@@ -18,10 +18,11 @@ BUTTONS_BY_SYSTEM = {
     "snes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y", "L", "R"),
     "nes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
     "genesis": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "Mode", "C"),
-    # For 3D backends these are visual planning profiles. External emulators
-    # handle their own input; camera-zone injection is NOT currently supported.
+    # N64 and GameCube use camera-to-controller bridges while their 3D
+    # video is still rendered in an external GPU window.
     "n64": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Z", "L", "R", "C Up", "C Down", "C Left", "C Right"),
-    "gamecube": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "L", "R"),
+    "gamecube": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "L", "R",
+                 "C Up", "C Down", "C Left", "C Right"),
 }
 
 DISABLED_MAPPING = "(None)"
@@ -66,11 +67,8 @@ def default_for(system, base):
     profile = copy.deepcopy(base)
     buttons = BUTTONS_BY_SYSTEM[system]
     cell_count = len(buttons) + 1  # Reserve a separate cell for Shuffle.
-    columns, rows = (
-        (3, 3) if cell_count == 9
-        else (3, 4) if cell_count == 11
-        else (5, 3)
-    )
+    columns = 3 if cell_count <= 11 else 5
+    rows = math.ceil(cell_count / columns)
 
     full_rows, remainder = divmod(cell_count, columns)
     positions = [
