@@ -165,6 +165,8 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         if self._closing:
             return
         self._closing = True
+        # Stopping a camera manually or closing the app always cancels retries.
+        self.cancel_camera_reconnect()
         # A long-lived window may have several pending after() callbacks.
         # Cancel the periodic loops before destroying Tk widgets.
         for job_name in ("_camera_tick_job", "_game_tick_job",
