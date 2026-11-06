@@ -13,7 +13,6 @@ env:
   AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
   DRAFT_TAG: v2.0.0-rc.2
   SOURCE_TAG: v2.0.0-rc.1
-  AP_CORE_ARCHIVE_DIR: release-inputs
 
 jobs:
   source-checks:
@@ -70,6 +69,8 @@ jobs:
 
   windows:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: windows-latest
     timeout-minutes: 55
     permissions:
@@ -107,6 +108,8 @@ jobs:
 
   macos:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     strategy:
       fail-fast: false
       matrix:
@@ -147,6 +150,8 @@ jobs:
 
   linux:
     needs: private-draft
+    env:
+      AP_CORE_ARCHIVE_DIR: release-inputs
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     permissions:
