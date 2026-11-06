@@ -67,7 +67,7 @@ class VerifyBundleTests(unittest.TestCase):
 
     def test_changed_binary_fails(self):
         bundle, _, cores, _ = self.make_bundle("linux")
-        (cores / "gambatte_libretro.so").write_bytes(b"modified")
+        (cores / "mgba_libretro.so").write_bytes(b"modified")
         with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
             verify_bundle(bundle, "linux")
 
