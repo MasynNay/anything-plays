@@ -4,11 +4,13 @@ RetroArch and Dolphin each run in their own window. Webcam button presses
 cannot be sent to a separate process by this release's safe Libretro bridge.
 """
 from pathlib import Path
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from anything_plays.external_emulators import ExternalLaunchError, launch
 from anything_plays.remote_retropad import N64RemoteController, write_retroarch_config
+from anything_plays.dolphin_pipe import DolphinPipeController
 from anything_plays.systems import SYSTEMS
 
 
@@ -16,13 +18,15 @@ class ExternalBackendMixin:
     def update_external_setup(self):
         backend = SYSTEMS[self.system_key.get()].backend
         if backend != "libretro":
-            # N64 has an app-local camera / keyboard RetroPad bridge. Dolphin
-            # does not yet have equivalent gamepad injection.
-            available = backend == "retroarch"
+            # N64 uses Remote RetroPad; Dolphin uses an isolated named pipe.
+            # Dolphin's pipe backend is only supported on Unix-like systems.
+            available = backend == "retroarch" or (
+                backend == "dolphin" and sys.platform != "win32"
+            )
             self.arm_button.configure(
                 state="normal" if available else "disabled",
                 text="Enable object controls" if available else
-                     "Camera controls unavailable for Dolphin",
+                     "Camera controls unavailable on this platform",
             )
             self.shortcuts_button.configure(
                 state="normal" if available else "disabled"
@@ -40,8 +44,14 @@ class ExternalBackendMixin:
                 self.external_executable_button.configure(text="Locate Dolphin executable")
                 self.external_core_button.pack_forget()
                 self.external_setup_label.configure(
-                    text="GameCube launches in Dolphin's own 3D window. "
-                         "Configure keyboard or a controller in Dolphin."
+                    text=(
+                        "GameCube graphics run in Dolphin. Anything Plays sends "
+                        "camera and keyboard controls through a private controller "
+                        "pipe; Dolphin displays the game in its own window."
+                        if sys.platform != "win32" else
+                        "GameCube runs in Dolphin's window. Windows pipe input "
+                        "integration is not currently supported."
+                    )
                 )
         else:
             self.arm_button.configure(state="normal", text="Enable object controls")
@@ -79,10 +89,14 @@ class ExternalBackendMixin:
         self.emu.stop()
         try:
             network_config = None
+            dolphin_user = None
             if system == "n64":
                 network_config = write_retroarch_config(
                     self.preferences_path.with_name("n64-retropad.cfg")
                 )
+            elif system == "gamecube" and sys.platform != "win32":
+                dolphin_user = self.preferences_path.parent / "dolphin-user"
+                self.external_input = DolphinPipeController(dolphin_user)
             self.external_process = launch(
                 system, rom,
                 executable=self.external_emulators.get(system) or None,
@@ -90,19 +104,24 @@ class ExternalBackendMixin:
                 fullscreen=self.view_mode.get() in ("Fullscreen", "Game only"),
                 borderless=self.view_mode.get() == "Borderless",
                 network_config=network_config,
+                dolphin_user=dolphin_user,
             )
             if system == "n64":
                 self.external_input = N64RemoteController()
+            if self.external_input is not None:
                 self.external_input.start()
-        except ExternalLaunchError as exc:
+        except (ExternalLaunchError, OSError, RuntimeError) as exc:
+            if self.external_input is not None:
+                self.external_input.close()
+                self.external_input = None
             self.game_status.set(str(exc))
             messagebox.showerror("External emulator setup", str(exc), parent=self.root)
             return False
         self.game_status.set(
             f"Launched {Path(rom).stem} in an external emulator. "
             + ("Camera/keyboard controls are available in Anything Plays; "
-               "RetroArch displays the N64 game in its own GPU window."
-               if system == "n64" else
+               "the game is displayed in the external GPU window."
+               if self.external_input is not None else
                "Configure keyboard/controller input in Dolphin.")
         )
         return True
