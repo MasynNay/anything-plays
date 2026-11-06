@@ -64,16 +64,43 @@ pinned source and independent native gameplay verification first.
 | Nintendo 64 | RetroArch with Mupen64Plus-Next core | Anything Plays scans N64 games and launches RetroArch with the selected native core |
 | Nintendo GameCube | Dolphin Emulator | Anything Plays scans discs and launches Dolphin's own GPU window |
 
-Select the external executable (and, for N64, the RetroArch core) in the
-system's panel if it cannot be found automatically. No external software is
-silently downloaded or executed. **Camera-zone input and the embedded
-game-only canvas cannot control games launched in a separate RetroArch or
-Dolphin process yet.** Use the controller/keyboard options inside those
-emulators. N64 analog-stick and Dolphin webcam-controller bridging is future
-work, not represented as complete in this alpha. The camera and in-app
-keyboard shortcut buttons are disabled for external backends; configure them
-in RetroArch or Dolphin. Dolphin accepts fullscreen and borderless display
-settings when starting a game. Game-only view is limited to embedded cores.
+Select the external executable (and, for N64, its RetroArch core) if
+auto-discovery fails. No external emulator binaries or commercial game files
+are bundled or silently downloaded.
+
+**New experimental camera and keyboard bridges:**
+
+- **N64:** Anything Plays writes a temporary RetroArch configuration for
+  Network RetroPad input, then sends controller button/axis events to
+  `127.0.0.1:55400`. The main-stick camera zones become analog stick input;
+  the C-button zones become right-stick input. RetroArch remains a separate
+  GPU-rendered game window.
+- **GameCube on macOS and Linux:** Anything Plays creates a dedicated 2.1
+  Dolphin user folder with a named-pipe controller. The camera zones provide
+  A/B/X/Y, Z, shoulder buttons, main stick and C-stick directions. Dolphin
+  remains a separate GPU-rendered game window. This isolated test profile
+  stores its saves separately from a regular Dolphin installation.
+- **GameCube on Windows:** The named-pipe bridge is not supported in this
+  alpha. Use Dolphin's own controller settings.
+- **Manual keys:** Custom keys work while the Anything Plays game panel has
+  keyboard focus; when RetroArch/Dolphin has focus, its own local controller
+  mappings apply instead. Camera tracking can continue in the background.
+
+**Do not confuse input integration with video integration.** The N64 and
+GameCube graphics are **NOT yet drawn in the Anything Plays game panel**.
+A proper hardware-accelerated Libretro frontend would need to own a GPU
+context, render the core's framebuffer and manage its lifecycle. The existing
+Tk canvas/software-video path cannot do this by itself. No real-GPU game
+startup, saved-game, latency or camera compatibility has been confirmed yet.
+
+**Security:** RetroArch's Network RetroPad receiver has no authentication.
+Although Anything Plays sends only to localhost, RetroArch may listen on
+other network interfaces. The per-launch `--appendconfig` file sets
+`config_save_on_exit = false`; don't test this bridge on untrusted networks.
+Dolphin uses local named pipes and its separate alpha user profile.
+
+Dolphin accepts fullscreen and borderless display settings at startup.
+The embedded Game only view is limited to software-rendered Libretro cores.
 
 ## Testing priorities
 
@@ -88,7 +115,9 @@ settings when starting a game. Game-only view is limited to embedded cores.
 6. Set Bold camera zones to 8–12px borders and centered text; check target
    tracking on the raw camera feed and readability at real camera distance.
 7. Launch N64 through installed RetroArch and GameCube through Dolphin;
-   check clear errors for missing external dependencies.
+   confirm camera and manual gamepad responses, analog directions, launcher
+   errors, and release-on-stop. Check GameCube saves in the isolated test
+   profile rather than regular Dolphin.
 8. Compare FPS, idle CPU, memory usage and latency with stable 2.0.
 
 ## Known technical boundaries
