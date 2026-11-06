@@ -1,0 +1,36 @@
+name: Audit RC5 Linux native ELF dependencies
+
+on:
+  push:
+    branches: [audit/v2-rc5-linux-library-links]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inspect-frozen-linux-binaries:
+    if: github.repository == 'MasynNay/anything-plays'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact private RC5 Linux DEB
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p frozen
+          test "$(gh release view 'v2.0.0-rc.5' --json isDraft --jq '.isDraft')" = true
+          gh release download 'v2.0.0-rc.5' --pattern 'anything-plays_2.0.0_amd64.deb' --dir frozen
+          echo '5554cb7bac9eca3131ac22423ae418bc4c34172bd5e268531bdfcf01e6ec091b  frozen/anything-plays_2.0.0_amd64.deb' | sha256sum -c -
+      - name: Extract and inspect exact ELF dependency chain
+        run: |
+          mkdir -p extracted evidence
+          dpkg-deb -x frozen/anything-plays_2.0.0_amd64.deb extracted
+          python -m tools.audit_linux_linkage extracted/opt/anything-plays evidence/linux-native-linkage.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc5-linux-system-library-linkage
+          path: evidence/linux-native-linkage.json
+          if-no-files-found: error
+          retention-days: 30
