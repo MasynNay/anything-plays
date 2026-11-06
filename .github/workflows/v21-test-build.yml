@@ -80,12 +80,12 @@ jobs:
       - name: Build 2.1 macOS DMG with four native test cores
         run: bash build_macos_dmg.sh
       - name: Inspect staged test app
-        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app test-evidence/macos-${{ matrix.arch }}.json
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays21Test.app test-evidence/macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-2.1.0-alpha1-macOS-${{ matrix.arch }}-TEST
           path: |
-            release/AnythingPlays.dmg
+            release/AnythingPlays-2.1.0-alpha.1.dmg
             test-evidence/macos-${{ matrix.arch }}.json
           if-no-files-found: error
           retention-days: 21
@@ -110,7 +110,7 @@ jobs:
         with:
           name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
           path: |
-            release/anything-plays_2.1.0~alpha1_amd64.deb
+            release/anything-plays-test_2.1.0~alpha1_amd64.deb
             test-evidence/linux-x86_64.json
           if-no-files-found: error
           retention-days: 21
