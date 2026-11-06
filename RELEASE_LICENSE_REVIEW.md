@@ -26,7 +26,7 @@ conditions of third-party code.
 | Original code license | MIT license file committed | Applies only to code whose contributors may grant it |
 | Packaging instructions | Windows, macOS and Linux scripts stage core licenses and notices | The staged outputs still need artifact inspection on each OS |
 | macOS Apple Silicon package | Local rebuild reported that staging verification and DMG creation succeeded | Confirms files and checksums for that build, not legal clearance or notarization |
-| Other platforms | Maintainer reports prior Windows and Ubuntu gameplay testing | This is not confirmation that *updated* installer contents passed verification |
+| Windows and Ubuntu | Maintainer supplied EXE and DEB artifacts and confirmed successful application testing | Functional testing is complete; updated license-file packaging alone is not independently verified |
 | Core provenance | Buildbot `latest` nightlies with post-download SHA-256 | Corresponding source revisions not established; not reproducible |
 | Third-party rights | Gambatte GPLv2, mGBA MPL 2.0, Snes9x noncommercial | Combined-work and specific redistribution obligations still outstanding |
 
@@ -34,9 +34,10 @@ conditions of third-party code.
 bundle includes noncommercial Snes9x; do not represent every bundled component
 as OSI-approved open source or apply MIT to those third-party binaries.
 
-**No repeat gameplay testing by default.** Existing cross-platform functional
-checks are recorded; verify only changed packaging and licensing details on
-Windows and Linux unless a future code change actually affects gameplay.
+**Cross-platform functional testing is complete.** The maintainer provided the
+Windows EXE, macOS DMG and Linux DEB and confirmed they work. Do not request
+more gameplay testing merely because documentation, notices or CI changed.
+If required, validate only the modified packaging contents independently.
 
 ## Required decisions and evidence
 
@@ -66,11 +67,12 @@ Windows and Linux unless a future code change actually affects gameplay.
 ## Automatic publishing safeguard
 
 The `publish` job in `.github/workflows/release.yml` is disabled on
-`develop/v2.0`. **Tags using the workflow already present on `main`
-could still publish. Do not create or push version tags, or manually
-publish installers, until this review is completed.** After the
-requirements above are met, restore publishing with an intentional
-release approval process.
+`develop/v2.0`. **It is acceptable to merge the verified v2 source into
+`main` without publishing new binaries; this does not constitute release
+licensing approval.** Before merging, confirm that the disabled job will
+remain disabled on `main`. Until that merge is complete, pushing a version tag
+based on the old `main` may still publish. Do not create version tags or
+manually publish installers until redistribution review is completed.
 
 ## References
 
