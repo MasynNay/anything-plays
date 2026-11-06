@@ -15,6 +15,16 @@ class ViewMixin:
         mode = mode or self.view_mode.get()
         if mode not in VIEW_MODES:
             mode = "Windowed"
+        # An external emulator renders in its own GPU window. A fullscreen
+        # Tk canvas here would cover that window with a blank game display.
+        if (mode == "Game only"
+                and SYSTEMS[self.system_key.get()].backend != "libretro"):
+            self.view_mode.set(getattr(self, "_current_view_mode", "Windowed"))
+            self.game_status.set(
+                "Game only works with embedded consoles. Nintendo 64 and "
+                "GameCube render in RetroArch or Dolphin."
+            )
+            return
         if getattr(self, "_view_transition", False):
             return
         self._view_transition = True
@@ -63,6 +73,7 @@ class ViewMixin:
         canvas.bind("<KeyRelease>", self.manual_key_up)
         canvas.bind("<FocusOut>", self.deactivate_manual)
         popup.bind("<Escape>", lambda _: self.set_view_mode("Windowed"))
+        popup.bind("<F10>", lambda _: self.set_view_mode("Borderless"))
         popup.bind("<F11>", lambda _: self.set_view_mode("Windowed"))
         popup.protocol("WM_DELETE_WINDOW", lambda: self.set_view_mode("Windowed"))
         canvas.focus_set()
