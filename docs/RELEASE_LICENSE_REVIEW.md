@@ -42,6 +42,30 @@ The application's original MIT license does **not** govern Snes9x.
 
 **Release-build control:** The checked-in [v2.0 core lock](../config/v2.0-core-lock.json) has `approved_for_binary_distribution: false`. When a future release workflow is enabled, `AP_RELEASE_BUILD=1` will require both staged immutable ZIP archives through `AP_CORE_ARCHIVE_DIR` (never mutable-nightly network fallback) and approved fingerprints at core download and again after package staging. Ordinary development builds remain available. The lock does **not** imply binary redistribution clearance. See [core release pinning](CORE_RELEASE_PINNING.md).
 
+## Release-candidate packaging defects discovered from audit artifacts
+
+During the [four-platform inventory run](https://github.com/MasynNay/anything-plays/actions/runs/42169745287),
+inspection of the actual staged native binaries found:
+
+- **Windows Python mismatch:** Despite CI selecting Python 3.13, the Windows
+  packaging script used the unqualified `py` launcher and froze Python 3.15
+  extension binaries (for example, `_imaging.cp315-win_amd64.pyd`). The script
+  has been changed to use a single explicit `python` executable from PATH,
+  requiring Python 3.12 or 3.13, for core download, venv creation and final
+  bundle verification. Verify that the next Windows inventory shows `cp313`.
+- **macOS core mutation after verification:** Both macOS inventory reports show
+  that `codesign --deep` changed the nested emulator dylib sizes/hashes
+  *after* their provenance hashes were verified. For example, the Apple
+  Silicon mGBA binary changed from the candidate lock's 2,829,600 bytes to
+  2,847,744 staged bytes, so its `CORE_PROVENANCE.json` could no longer
+  verify the packaged bytes. Ad-hoc signing now targets the outer app without
+  `--deep`, followed by a mandatory second core verification. The next
+  platform build must confirm preserved hashes and valid signing.
+
+Neither finding was visible from the older staged-bundle checks alone. The
+updated checks reduce the chance of distributing a broken binary, but do not
+alter third-party rights clearance or mark the distribution gate approved.
+
 ## Binary publication checklist
 
 - [ ] Approve an exact mGBA and Snes9x build for each architecture and
