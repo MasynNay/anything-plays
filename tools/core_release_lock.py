@@ -50,6 +50,43 @@ def candidate_fingerprint(manifest):
     return {"target": target, "cores": cores}
 
 
+def verify_download_before_loading(
+    lock, platform_name, architecture, name, filename, url, size_bytes, digest,
+):
+    """Reject unexpected native bytes BEFORE ctypes loads the downloaded core.
+
+    This preflight checks approved metadata and an exact SHA-256 value. Full
+    source identity fields are separately checked after the approved bytes
+    are loaded by verify_release_lock().
+    """
+    if lock.get("schema_version") != 1:
+        raise ValueError("Invalid or missing core release lock schema")
+    if lock.get("approved_for_binary_distribution") is not True:
+        raise ValueError("Binary distribution is not approved in the core lock")
+    target = release_target(platform_name, architecture)
+    target_records = lock.get("targets")
+    if not isinstance(target_records, dict):
+        raise ValueError("Missing approved release core targets")
+    expected = target_records.get(target)
+    if not isinstance(expected, dict) or set(expected) != set(CORE_NAMES):
+        raise ValueError(f"Missing or incomplete approved core set for {target}")
+    if name not in CORE_NAMES:
+        raise ValueError(f"Unknown core: {name}")
+    pinned = expected[name]
+    if not isinstance(pinned, dict):
+        raise ValueError(f"Invalid core record: {target}/{name}")
+    observed = {
+        "file": filename,
+        "source_url": url,
+        "size_bytes": size_bytes,
+        "sha256": digest,
+    }
+    for field, value in observed.items():
+        if pinned.get(field) != value:
+            raise ValueError(f"Core pre-load mismatch: {target}/{name}/{field}")
+    return target
+
+
 def verify_release_lock(manifest, lock):
     """Fail if the requested binary release is unapproved or any core changed.
 
