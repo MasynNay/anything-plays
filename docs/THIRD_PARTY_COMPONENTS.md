@@ -63,6 +63,8 @@ The dependency ranges are declared in `../requirements.txt`.
 - [ ] Validate the GB/GBC mGBA core transition with focused tests.
 - [ ] Approve publication separately from source integration.
 
-**Status: binary release clearance is not complete.** A successful
+**Status: binary release clearance is not complete.** See the
+[redistribution audit](REDISTRIBUTION_AUDIT.md) for the complete outstanding
+Snes9x, MPL, native-library and asset-rights checks. A successful
 `verify_bundle.py` run proves the presence/integrity of required files,
 not the copyright status of those files.
