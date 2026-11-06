@@ -8,6 +8,7 @@ import argparse
 import ctypes as C
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -124,6 +125,17 @@ def verify_bundle(bundle, platform_name, check_native=False):
             raise ValueError(f"Missing recorded native version for {name}")
         if not isinstance(record.get("source_repository_url"), str) or not record["source_repository_url"].startswith("https://"):
             raise ValueError(f"Missing upstream source repository for {name}")
+    # Verify the staged file hashes against the approved release lock BEFORE
+    # any ctypes-based native-core inspection can load the libraries.
+    release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
+    if release_mode not in ("0", "1"):
+        raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
+    if release_mode == "1":
+        from tools.core_release_lock import LOCK_PATH, verify_release_lock
+
+        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        verify_release_lock(manifest, lock)
+
     if check_native:
         _validate_mgba_core(cores / f"mgba_libretro{EXTENSIONS[platform_name]}")
         for record in records:

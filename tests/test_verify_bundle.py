@@ -4,6 +4,7 @@ These fixtures test packaging integrity only, not third-party license clearance.
 """
 
 import hashlib
+import os
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -83,6 +84,21 @@ class VerifyBundleTests(unittest.TestCase):
             verify_bundle(bundle, "linux", check_native=True)
         check.assert_called_once_with(cores / "mgba_libretro.so")
         self.assertEqual(identify.call_count, len(CORE_NAMES))
+
+    def test_release_mode_rejects_unapproved_staged_binaries(self):
+        bundle, _, _, _ = self.make_bundle("linux")
+        lock_path = self.root / "unapproved-core-lock.json"
+        lock_path.write_text(json.dumps({
+            "schema_version": 1,
+            "approved_for_binary_distribution": False,
+            "targets": {},
+        }), encoding="utf-8")
+        with (
+            patch("tools.core_release_lock.LOCK_PATH", lock_path),
+            patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+        ):
+            with self.assertRaisesRegex(ValueError, "not approved"):
+                verify_bundle(bundle, "linux")
 
     def test_missing_license_document_fails(self):
         bundle, licenses, _, _ = self.make_bundle("macos")

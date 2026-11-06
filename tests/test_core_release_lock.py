@@ -1,0 +1,224 @@
+"""Offline tests for exact binary release-core lock verification."""
+
+import copy
+import hashlib
+import unittest
+
+from tools.core_release_lock import (
+    candidate_fingerprint,
+    release_target,
+    verify_release_lock,
+    verify_download_before_loading,
+)
+
+SOURCE_COMMITS = {
+    "mgba": "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6",
+    "snes9x": "fae2fea08f74180759ef540ee94259213f503480",
+}
+
+
+class ReleaseCoreLockTests(unittest.TestCase):
+    def setUp(self):
+        self.manifest = {
+            "build_platform": "linux",
+            "build_architecture": "x86_64",
+            "cores": [],
+        }
+        for name, revision in (("mgba", "7a12d6d"), ("snes9x", "fae2fea")):
+            content = f"fixture-{name}".encode()
+            self.manifest["cores"].append({
+                "name": name,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size_bytes": len(content),
+                "file": f"{name}_libretro.so",
+                "source_url": f"https://example.invalid/{name}_libretro.so.zip",
+                "libretro_library_version": f"fixture {revision}",
+                "reported_source_revision": revision,
+                "source_repository_url": f"https://github.com/libretro/{name}",
+            })
+        candidate = candidate_fingerprint(self.manifest)
+        self.lock = {
+            "schema_version": 1,
+            "approved_for_binary_distribution": True,
+            "targets": {
+                candidate["target"]: {
+                    name: {
+                        **record,
+                        "source_commit_sha": SOURCE_COMMITS[name],
+                    }
+                    for name, record in candidate["cores"].items()
+                },
+            },
+        }
+
+    def test_supported_release_architectures(self):
+        self.assertEqual(release_target("win32", "AMD64"), "windows-x86_64")
+        self.assertEqual(release_target("darwin", "arm64"), "macos-arm64")
+        self.assertEqual(release_target("darwin", "x86_64"), "macos-x86_64")
+        self.assertEqual(release_target("linux", "x86_64"), "linux-x86_64")
+        with self.assertRaisesRegex(ValueError, "Unsupported"):
+            release_target("linux", "armv7l")
+
+    def test_candidate_identifies_both_cores(self):
+        candidate = candidate_fingerprint(self.manifest)
+        self.assertEqual(candidate["target"], "linux-x86_64")
+        self.assertEqual(set(candidate["cores"]), {"mgba", "snes9x"})
+
+    def test_matching_approved_fingerprints_succeed(self):
+        self.assertEqual(
+            verify_release_lock(self.manifest, self.lock), "linux-x86_64"
+        )
+
+    def test_unapproved_lock_fails(self):
+        lock = copy.deepcopy(self.lock)
+        lock["approved_for_binary_distribution"] = False
+        with self.assertRaisesRegex(ValueError, "not approved"):
+            verify_release_lock(self.manifest, lock)
+
+    def test_missing_target_fails(self):
+        lock = copy.deepcopy(self.lock)
+        lock["targets"] = {}
+        with self.assertRaisesRegex(ValueError, "No approved"):
+            verify_release_lock(self.manifest, lock)
+
+    def test_changed_binary_hash_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["cores"][0]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "sha256"):
+            verify_release_lock(manifest, self.lock)
+
+    def test_changed_binary_version_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["cores"][1]["libretro_library_version"] = "new upstream nightly"
+        with self.assertRaisesRegex(ValueError, "libretro_library_version"):
+            verify_release_lock(manifest, self.lock)
+
+    def test_source_revision_mismatch_fails(self):
+        lock = copy.deepcopy(self.lock)
+        lock["targets"]["linux-x86_64"]["mgba"]["source_commit_sha"] = "f" * 40
+        with self.assertRaisesRegex(ValueError, "Source revision mismatch"):
+            verify_release_lock(self.manifest, lock)
+
+    def test_missing_corresponding_commit_fails(self):
+        lock = copy.deepcopy(self.lock)
+        lock["targets"]["linux-x86_64"]["mgba"].pop("source_commit_sha")
+        with self.assertRaisesRegex(ValueError, "Full corresponding source commit"):
+            verify_release_lock(self.manifest, lock)
+
+    def test_unapproved_release_download_fails_before_distribution(self):
+        """Release mode must reject unapproved core locks."""
+        import json
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        from fetch_mgba_core import fetch_all
+
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lockfile = folder / "release-lock.json"
+            lockfile.write_text(json.dumps({
+                "schema_version": 1,
+                "approved_for_binary_distribution": False,
+                "targets": {},
+            }))
+            records = self.manifest["cores"]
+            def fake_fetch(name, destination):
+                return next(dict(item) for item in records if item["name"] == name)
+
+            with (
+                patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
+                patch("tools.core_release_lock.LOCK_PATH", lockfile),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+            ):
+                with self.assertRaisesRegex(ValueError, "not approved"):
+                    fetch_all(folder)
+            self.assertTrue((folder / "CORE_PROVENANCE.json").is_file())
+
+    def test_approved_core_bytes_pass_preload_verification(self):
+        core = self.manifest["cores"][0]
+        self.assertEqual(
+            verify_download_before_loading(
+                self.lock, "linux", "x86_64", core["name"], core["file"],
+                core["source_url"], core["size_bytes"], core["sha256"],
+            ),
+            "linux-x86_64",
+        )
+
+    def test_changed_binary_rejected_before_native_load(self):
+        core = self.manifest["cores"][0]
+        with self.assertRaisesRegex(ValueError, "sha256"):
+            verify_download_before_loading(
+                self.lock, "linux", "x86_64", core["name"], core["file"],
+                core["source_url"], core["size_bytes"], "0" * 64,
+            )
+
+    def test_unapproved_download_does_not_load_native_code(self):
+        """Even a well-formed library must be rejected before ctypes loading."""
+        import io
+        import json
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        import zipfile
+
+        from fetch_mgba_core import fetch_core
+
+        zip_bytes = io.BytesIO()
+        with zipfile.ZipFile(zip_bytes, "w") as archive:
+            archive.writestr("mgba_libretro.so", b"\x7fELF" + b"X" * 11000)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lockfile = root / "lock.json"
+            lockfile.write_text(json.dumps({
+                "schema_version": 1,
+                "approved_for_binary_distribution": False,
+                "targets": {},
+            }))
+            with (
+                patch("fetch_mgba_core.request.urlopen",
+                      return_value=io.BytesIO(zip_bytes.getvalue())),
+                patch("fetch_mgba_core.platform.machine", return_value="x86_64"),
+                patch("fetch_mgba_core.inspect_core_identity") as inspect,
+                patch("tools.core_release_lock.LOCK_PATH", lockfile),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+            ):
+                with self.assertRaisesRegex(ValueError, "not approved"):
+                    fetch_core("mgba", root)
+                inspect.assert_not_called()
+                self.assertFalse((root / "mgba_libretro.so").exists())
+
+    def test_legacy_linux_x86_development_build_still_works(self):
+        """A non-release 32-bit development target must not need approval."""
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        from fetch_mgba_core import fetch_all
+
+        def fake_fetch(name, destination):
+            return next(dict(item) for item in self.manifest["cores"]
+                        if item["name"] == name)
+
+        with TemporaryDirectory() as tmp:
+            with (
+                patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
+                patch("fetch_mgba_core.platform.machine", return_value="i686"),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "0"}),
+            ):
+                manifest = fetch_all(Path(tmp))
+                self.assertEqual(manifest["build_architecture"], "i686")
+                self.assertTrue((Path(tmp) / "CORE_PROVENANCE.json").is_file())
+
+    def test_duplicate_core_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["cores"][1]["name"] = "mgba"
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            candidate_fingerprint(manifest)
+
+
+if __name__ == "__main__":
+    unittest.main()

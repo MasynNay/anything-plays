@@ -9,7 +9,9 @@ repeated merely for changes to documentation.
 licensed under MIT (where contributors have rights to grant that license).
 
 **Binary distribution:** Not yet approved. This record is technical evidence,
-not legal advice or a claim of copyright clearance.
+not legal advice or a claim of copyright clearance. Consult the
+[third-party rights audit](REDISTRIBUTION_AUDIT.md) and the
+[release core pinning procedure](CORE_RELEASE_PINNING.md) before sign-off.
 
 ## Core licensing strategy
 
@@ -33,10 +35,12 @@ The application's original MIT license does **not** govern Snes9x.
 | Revised native core mapping | mGBA for GB/GBC/GBA; Snes9x for SNES |
 | Targeted GB/GBC emulation with mGBA | Native Linux mGBA successfully loaded generated GB/GBC test ROMs and delivered video frames in CI; prior representative-game testing used Gambatte |
 | macOS previous three-core notice/integrity packaging | Passed locally, before changing core mapping |
-| Core source revision evidence | Build scripts will record the native cores' embedded version and any reported Git revision; independent matching and source archival are not yet complete |
+| Core source revision evidence | Build scripts now record versions and reported Git revisions; the [release core lock](CORE_RELEASE_PINNING.md) starts explicitly unapproved and checks exact fingerprint identity for future releases. Independent binary-to-source matching and archival remain pending |
 | Python/native dependency and asset rights | Build scripts collect installed Python-wheel license files and versions for audit; native/transitive notices and asset rights still need independent review |
 | Newly packaged two-core installers | Windows x64, macOS Apple Silicon and Intel, and Ubuntu/Debian x64 build and staged license/native core checks passed on GitHub Actions |
 | Public publishing job and tag-triggered release builds | Disabled pending release clearance; a version tag alone must not package or publish binaries |
+
+**Release-build control:** The checked-in [v2.0 core lock](../config/v2.0-core-lock.json) has `approved_for_binary_distribution: false`. When a future release workflow is enabled, `AP_RELEASE_BUILD=1` will require approved fingerprints at core download and again after package staging. Ordinary development builds remain available. The lock does **not** imply binary redistribution clearance. See [core release pinning](CORE_RELEASE_PINNING.md).
 
 ## Binary publication checklist
 
