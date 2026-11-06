@@ -37,47 +37,21 @@ def enabled_zones(profile, system):
     ]
 
 
-def fit_to_grid(profile, system):
-    """Fit enabled buttons into equal cells, centering an incomplete last row.
+def _grid_cells(count):
+    """Return evenly sized, symmetric grid slots for enabled control zones.
 
-    Disabled buttons retain their saved rectangles so re-enabling them does
-    not discard the user's previous layout. Shuffle is handled separately.
+    Incomplete final rows occupy whole columns so Shuffle can never hang
+    outside the same grid or partially overlap a neighboring control.
     """
-    buttons = enabled_zones(profile, system)
-    if not buttons:
-        return profile
-
-    columns = math.ceil(math.sqrt(len(buttons)))
-    rows = math.ceil(len(buttons) / columns)
-    zones = profile.setdefault("zones", {})
-
-    for index, button in enumerate(buttons):
-        row, column = divmod(index, columns)
-        buttons_in_row = min(columns, len(buttons) - row * columns)
-        offset = (columns - buttons_in_row) / 2
-        left = (column + offset) / columns
-        zones[button] = [
-            left, row / rows, left + 1 / columns, (row + 1) / rows
-        ]
-    return profile
-
-
-def default_for(system, base):
-    """Build an independent, horizontally balanced layout for one console."""
-    profile = copy.deepcopy(base)
-    buttons = BUTTONS_BY_SYSTEM[system]
-    cell_count = len(buttons) + 1  # Reserve a separate cell for Shuffle.
-    columns = 3 if cell_count <= 11 else 5
-    rows = math.ceil(cell_count / columns)
-
-    full_rows, remainder = divmod(cell_count, columns)
+    columns = 3 if count <= 11 else 5
+    rows = math.ceil(count / columns)
+    full_rows, remainder = divmod(count, columns)
     positions = [
         (column, row)
         for row in range(full_rows)
         for column in range(columns)
     ]
     if remainder:
-        # Two cells in a three-column row belong on opposite sides.
         if columns == 3 and remainder == 2:
             final_columns = (0, 2)
         elif columns == 5 and remainder == 2:
@@ -88,7 +62,39 @@ def default_for(system, base):
             first = (columns - remainder) // 2
             final_columns = range(first, first + remainder)
         positions.extend((column, full_rows) for column in final_columns)
+    return columns, rows, positions
 
+
+def fit_to_grid(profile, system):
+    """Snap all visible controls, including Shuffle, into equal grid cells.
+
+    Disabled button zones and the hidden Shuffle zone retain their stored
+    rectangles so they can be enabled again without losing their positions.
+    """
+    names = enabled_zones(profile, system)
+    if profile.get("shuffle_enabled", True):
+        names.append("Shuffle")
+    if not names:
+        return profile
+
+    columns, rows, positions = _grid_cells(len(names))
+    zones = profile.setdefault("zones", {})
+    for name, (column, row) in zip(names, positions):
+        zones[name] = [
+            column / columns,
+            row / rows,
+            (column + 1) / columns,
+            (row + 1) / rows,
+        ]
+    return profile
+
+
+def default_for(system, base):
+    """Build an independent, horizontally balanced layout for one console."""
+    profile = copy.deepcopy(base)
+    buttons = BUTTONS_BY_SYSTEM[system]
+    count = len(buttons) + 1  # Shuffle has an equal-sized, separate grid cell.
+    columns, rows, positions = _grid_cells(count)
     profile["zones"] = {
         button: [column / columns, row / rows,
                  (column + 1) / columns, (row + 1) / rows]
