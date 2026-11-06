@@ -78,10 +78,6 @@ packaging versions are pinned in `../requirements-build.txt`.
 - [ ] Inspect final Windows, macOS and Linux packages for complete notices,
       exact core hashes, source pointers and permitted content.
 - [x] Verify GB/GBC native mGBA ROM loading and representative battery-backed save restoration using generated test ROMs.
-- [ ] Approve publication separately from source integration.
+- [x] Approve the exact reviewed free/nonpromotional v2.0.0 release separately from source integration; [scoped distribution decision](RELEASE_DISTRIBUTION_REVIEW.md).
 
-**Status: binary release clearance is not complete.** See the
-[redistribution audit](REDISTRIBUTION_AUDIT.md) for the complete outstanding
-Snes9x, MPL, native-library and asset-rights checks. A successful
-`verify_bundle.py` run proves the presence/integrity of required files,
-not the copyright status of those files.
+**Status: [v2.0.0 is published](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)** under a narrowly reviewed free/noncommercial distribution scope, with exact byte hashes and source/notice files attached. Independent upstream buildbot *reproducibility* remains an explicitly documented technical limitation, not a claim of unverified commercial rights. A successful `verify_bundle.py` only proves integrity, not copyright ownership.
