@@ -18,6 +18,11 @@ RESERVED_KEYS = frozenset({"Escape", "F10", "F11"})
 _ALLOWED = re.compile(r"^[a-zA-Z0-9_]{1,32}$")
 
 
+def _key_identity(keysym):
+    """Treat single-letter Tk keysyms case-insensitively."""
+    return keysym.lower() if len(keysym) == 1 else keysym
+
+
 def normalize_bindings(system, saved=None):
     """Provide the active console's complete, conflict-free key bindings."""
     names = BUTTONS_BY_SYSTEM[system]
@@ -29,7 +34,7 @@ def normalize_bindings(system, saved=None):
             continue
         if key == result[name]:
             continue
-        if key in (value for button, value in result.items() if button != name):
+        if _key_identity(key) in (_key_identity(value) for button, value in result.items() if button != name):
             continue
         result[name] = key
     return result
@@ -48,7 +53,7 @@ def rebind(system, bindings, button, keysym):
     if not valid_keysym(keysym):
         raise ValueError("Use a regular keyboard key; Esc/F10/F11 are reserved for view and safety")
     updated = normalize_bindings(system, bindings)
-    if keysym in (key for other, key in updated.items() if other != button):
+    if _key_identity(keysym) in (_key_identity(key) for other, key in updated.items() if other != button):
         raise ValueError(f"{keysym} is already assigned to another button")
     updated[button] = keysym
     return updated
@@ -58,8 +63,8 @@ def button_for_key(system, bindings, keysym):
     """Resolve a Tk keysym to a game input, ignoring case for letter keys."""
     if not isinstance(keysym, str):
         return None
-    normalized = keysym.lower() if len(keysym) == 1 else keysym
+    normalized = _key_identity(keysym)
     for button, mapped in normalize_bindings(system, bindings).items():
-        if (mapped.lower() if len(mapped) == 1 else mapped) == normalized:
+        if _key_identity(mapped) == normalized:
             return button
     return None
