@@ -112,6 +112,25 @@ native file and compare inventories with frozen Python notices. Final release
 binaries still require independent archival, archive-level inspection, and
 separate redistribution approval.
 
+### Pinned v2 Python build dependencies
+
+The four reviewed CI inventories from
+[run 42172205627](https://github.com/MasynNay/anything-plays/actions/runs/42172205627)
+recorded identical versions for the shared Python runtime packages, including
+NumPy 2.5.4, OpenCV 4.14.0.94, Pillow 12.3.0, sounddevice 0.5.6,
+PyInstaller 6.22.3 and pyinstaller-hooks-contrib 2026.9. Platform-specific
+PyObjC, macholib, pefile and Windows compatibility packages were also
+recorded. Those exact versions are now pinned in
+[`requirements-build.txt`](../requirements-build.txt), installed by all
+three installer scripts; source development retains its flexible
+[`requirements.txt`](../requirements.txt).
+
+This freezes *package versions*, not wheel SHA-256 hashes or the contents of
+system libraries supplied by the operating system. The recorded package list
+also includes build-only distributions, so the native-file inventory still
+requires attribution and source/access review. Do not claim complete
+reproducibility or distribution clearance from these pins alone.
+
 ## Assets and distribution materials
 
 - The maintainer states that the betta illustration was commissioned, that
