@@ -155,17 +155,38 @@ ROM library ─► System/core selection ─────────────
 The Tkinter event loop owns UI widgets and camera previews. A separate worker
 owns the emulator core, including its callback pointers, save files, and frame
 clock. Camera detection, audio queues, pixel conversion, and ROM discovery are
-split into testable modules. See [ARCHITECTURE.md](ARCHITECTURE.md) for the design
+split into testable modules. See [architecture guide](docs/ARCHITECTURE.md) for the design
 and threading invariants.
+
+## Repository structure
+
+```text
+anything-plays/
+├── anything_plays/       Application, UI, tracking and Libretro adapters
+├── app.py                Desktop application entry point
+├── tests/                Unit, integration and headless UI tests
+├── assets/               Branded artwork and application icons
+├── licenses/             Third-party license texts
+├── docs/                 Architecture, release notes and compliance tracking
+│   └── history/          Archived development snapshots
+├── .github/workflows/    Continuous integration and release build workflow
+├── build_windows.bat     Windows installer
+├── build_macos_dmg.sh    macOS disk image
+├── build_linux_deb.sh    Debian package
+├── fetch_mgba_core.py    Build-time Libretro downloader
+└── verify_bundle.py      License-presence and core-integrity verification
+```
+
+The application logic is in the `anything_plays` Python package; `app.py`
+remains the stable launcher. Files in `docs/history/` describe past development,
+not the current build status. No ROMs, BIOS files or third-party core binaries
+are committed to this repository.
 
 ## Develop and test
 
 ```bash
 python -m unittest discover -s tests -v
-python -m compileall -q app.py cameras.py cartridge_art.py core_locator.py \
-    fetch_mgba_core.py gba_emulator.py libretro_*.py rom_library.py \
-    settings_defaults.py system_profiles.py systems.py tracking.py \
-    ui_*.py zone_rendering.py
+python -m compileall -q app.py anything_plays fetch_mgba_core.py verify_bundle.py tests
 ```
 
 On a Linux machine with Xvfb installed, you can also run the optional UI smoke
@@ -179,7 +200,7 @@ The tests cover console profiles, source compatibility, tracking, button timing,
 ROM discovery, cartridge artwork, audio buffering, video pixel formats, save
 files, and a small synthetic Libretro native integration test on Linux. **They
 are not a substitute for playing actual games with a real webcam on the target
-platforms.** Use the [QA checklist](QA_CHECKLIST.md) before shipping.
+platforms.** Use the [QA checklist](docs/QA_CHECKLIST.md) before shipping.
 
 ### Build for your platform
 
@@ -195,9 +216,9 @@ cannot be retrieved. **Nightly downloads are not pinned to a reproducible
 revision**, even when SHA-256 values are recorded afterward. Platform installers
 still require independent testing and a completed third-party licensing review.
 
-A push of a version tag matching `v*` triggers the GitHub Actions release
-workflow. **Do not create or push a release tag until the release has been
-approved.**
+A version tag matching `v*` triggers the GitHub Actions build workflow.
+**Automatic public publishing is disabled** until bundled-core redistribution
+requirements are resolved. Do not create release tags prematurely.
 
 ## Settings and saves
 
@@ -215,13 +236,13 @@ ROMs, `.sav` files, and settings before replacing an installed build.
 
 ## Project resources
 
-- [Architecture and module boundaries](ARCHITECTURE.md)
-- [Pre-release QA checklist](QA_CHECKLIST.md)
-- [Release candidate notes](RELEASE_NOTES.md)
-- [Refactor and verification report](REFACTOR_REPORT.md)
+- [Architecture and module boundaries](docs/ARCHITECTURE.md)
+- [Pre-release QA checklist](docs/QA_CHECKLIST.md)
+- [Release candidate notes](docs/RELEASE_NOTES.md)
+- [Historical refactor report](docs/history/REFACTOR_REPORT.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Security reporting](SECURITY.md)
-- [Third-party components and licensing](THIRD_PARTY_COMPONENTS.md)
+- [Third-party components and licensing](docs/THIRD_PARTY_COMPONENTS.md)
 
 ## Free and open source
 
@@ -250,7 +271,7 @@ under MIT.** Because Snes9x has noncommercial restrictions, the complete
 bundled installer must not be described as wholly OSI-approved open source.
 Official Anything Plays downloads will nevertheless remain free of charge.
 
-See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for attribution,
+See [Third-Party Notices](docs/THIRD_PARTY_NOTICES.md) for attribution,
 license information, and outstanding redistribution requirements.
 
 **Bundled installers are not approved for public release until
