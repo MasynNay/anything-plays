@@ -1,0 +1,87 @@
+name: Remove obsolete 2.0 release-candidate drafts
+on:
+  push:
+    branches:
+      - maintenance/remove-obsolete-v2-release-drafts
+
+permissions:
+  contents: write
+
+jobs:
+  remove-six-obsolete-drafts:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/maintenance/remove-obsolete-v2-release-drafts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete only the six exact release-candidate drafts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          expected_drafts = {
+              "v2.0.0-rc.1": 436169878,
+              "v2.0.0-rc.2": 436624573,
+              "v2.0.0-rc.3": 436620439,
+              "v2.0.0-rc.4": 436722423,
+              "v2.0.0-rc.5": 436749630,
+              "v2.0.0-rc.6": 436780600,
+          }
+          published = {
+              "v1.5.0": 434599607,
+              "v2.0.0": 436793215,
+          }
+
+          def list_releases():
+              response = subprocess.check_output(
+                  ["gh", "api", f"repos/{repo}/releases?per_page=100"],
+                  text=True,
+              )
+              return json.loads(response)
+
+          releases = list_releases()
+          by_tag = {r["tag_name"]: r for r in releases}
+          if len(by_tag) != len(releases):
+              raise RuntimeError("Duplicate release tags; aborting cleanup")
+
+          for tag, release_id in published.items():
+              r = by_tag.get(tag)
+              if not r or r["id"] != release_id or r["draft"] or r["prerelease"]:
+                  raise RuntimeError(f"Published {tag} changed; refusing cleanup")
+
+          if set(by_tag) - set(published) - set(expected_drafts):
+              raise RuntimeError("Found unexpected release entries; refusing cleanup")
+
+          for tag, release_id in expected_drafts.items():
+              r = by_tag.get(tag)
+              if r is None:
+                  continue  # Safe retry following partial deletion
+              if r["id"] != release_id or not r["draft"] or r["prerelease"]:
+                  raise RuntimeError(f"{tag} is no longer the expected draft; aborting")
+
+          print("Published v1.5.0 and v2.0.0 verified; removing obsolete drafts only.")
+          for tag, release_id in expected_drafts.items():
+              if tag not in by_tag:
+                  continue
+              subprocess.run(
+                  ["gh", "api", "-X", "DELETE",
+                   f"repos/{repo}/releases/{release_id}"],
+                  check=True,
+              )
+              print(f"Deleted draft {tag}, release ID {release_id}")
+
+          remaining = list_releases()
+          if (len(remaining) != 2 or
+                  set(r["tag_name"] for r in remaining) != set(published)):
+              raise RuntimeError(
+                  f"Unexpected remaining releases: {[(r['tag_name'], r['draft']) for r in remaining]}"
+              )
+          for r in remaining:
+              if r["draft"] or r["prerelease"] or r["id"] != published[r["tag_name"]]:
+                  raise RuntimeError("Published release preservation check failed")
+          print("SUCCESS: Releases page contains only v1.5.0 and v2.0.0.")
+          PY
