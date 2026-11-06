@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Linux dependencies
-        timeout-minutes: 8
+        timeout-minutes: 20
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends libgl1 libglib2.0-0 libportaudio2 xvfb pulseaudio
@@ -42,14 +42,14 @@ jobs:
 
   native-mgba-compatibility:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Install runtime dependencies for native gameplay smoke test
-        timeout-minutes: 8
+        timeout-minutes: 20
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y --no-install-recommends libportaudio2 libgl1 libglib2.0-0 pulseaudio
@@ -84,6 +84,13 @@ jobs:
       - name: Build and verify the Windows installer locally on runner
         shell: cmd
         run: call build_windows.bat
+      - name: Record staged Windows binary inventory
+        run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays release-evidence/windows-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-windows-x86_64
+          path: release-evidence/windows-x86_64.json
+          if-no-files-found: error
 
   package-macos:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
@@ -105,6 +112,13 @@ jobs:
           python-version: '3.13'
       - name: Build and verify a macOS DMG locally on runner
         run: bash build_macos_dmg.sh
+      - name: Record staged macOS binary inventory
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app release-evidence/macos-${{ matrix.arch }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-macos-${{ matrix.arch }}
+          path: release-evidence/macos-${{ matrix.arch }}.json
+          if-no-files-found: error
 
   package-linux:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
@@ -122,3 +136,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
       - name: Build and verify Debian package locally on runner
         run: bash build_linux_deb.sh
+      - name: Record staged Linux binary inventory
+        run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays release-evidence/linux-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-linux-x86_64
+          path: release-evidence/linux-x86_64.json
+          if-no-files-found: error

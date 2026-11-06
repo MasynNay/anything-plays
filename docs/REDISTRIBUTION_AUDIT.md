@@ -28,6 +28,21 @@ Libretro binary.** Inspect the exact compiled source/build options and bundled
 dependencies to establish which notices and source obligations apply. Retain
 the complete core-specific LICENSE; avoid replacing it with a short paraphrase.
 
+### Snes9x source-level component finding
+
+The [upstream Libretro source tree at `fae2fea`](https://github.com/libretro/snes9x/tree/fae2fea08f74180759ef540ee94259213f503480)
+contains `filter/snes_ntsc-license.txt` and its
+[`libretro/Makefile.common`](https://github.com/libretro/snes9x/blob/fae2fea08f74180759ef540ee94259213f503480/libretro/Makefile.common)
+lists `filter/snes_ntsc.c` among the C sources without a conditional
+feature flag. Thus the NTSC filter's LGPL 2.1 notice is relevant to builds
+using that Makefile. The complete upstream license text is now committed at
+`licenses/Snes9x-snes_ntsc-LGPL-2.1.txt`, and staged-bundle verification
+requires it. The inspected source tree did not expose JMA or xBRZ component
+directories mentioned by the general Snes9x LICENSE; this does not prove
+their absence from every published native build. Inspect exact build logs
+and source archives and review LGPL source/relinking requirements rather
+than treating a license copy as full compliance.
+
 ## Source and binary traceability
 
 The core builds in [a successful four-architecture CI run](https://github.com/MasynNay/anything-plays/actions/runs/42163068042)
@@ -77,6 +92,25 @@ public simply to retain them as CI artifacts.
 - Create target-specific lock files for Python dependencies once the exact
   versions and artifacts are approved. Do not treat the existing version ranges
   as sufficiently pinned.
+
+### Review-only staged binary inventories
+
+The `tools/binary_inventory.py` utility inspects the actual staged app folder
+and writes SHA-256 checksums, sizes, native binary signatures (ELF, PE,
+Mach-O), and internal symlink targets for every staged file. It refuses
+symlinks that resolve outside the app folder. Unit tests cover known binary
+formats and symlink boundaries.
+
+Pull requests from `release/` branches run the four platform packaging checks
+and upload **JSON metadata only** (`evidence-windows-x86_64`,
+`evidence-macos-arm64`, `evidence-macos-x86_64`, and
+`evidence-linux-x86_64`). The `.exe`, `.dmg`, `.deb`, and native core bytes
+are **not** uploaded or approved by these jobs. Evidence JSON files support
+review of what PyInstaller actually staged; they are not a complete software
+bill of materials or verification of every linked system library. Review each
+native file and compare inventories with frozen Python notices. Final release
+binaries still require independent archival, archive-level inspection, and
+separate redistribution approval.
 
 ## Assets and distribution materials
 

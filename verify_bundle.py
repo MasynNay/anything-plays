@@ -23,6 +23,7 @@ REQUIRED_DOCUMENTS = (
     "THIRD_PARTY_COMPONENTS.md",
     "mGBA-MPL-2.0.txt",
     "Snes9x-LICENSE.txt",
+    "Snes9x-snes_ntsc-LGPL-2.1.txt",
 )
 EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
 

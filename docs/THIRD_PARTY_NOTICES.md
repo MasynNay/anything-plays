@@ -27,6 +27,16 @@ Snes9x's permission to distribute applies only subject to its terms, including
 its noncommercial restrictions and required copyright notices. Snes9x is **not**
 MIT-licensed or OSI-approved open source.
 
+The checked Snes9x Libretro source at commit
+[`fae2fea`](https://github.com/libretro/snes9x/commit/fae2fea08f74180759ef540ee94259213f503480)
+lists `filter/snes_ntsc.c` in `libretro/Makefile.common`. The filter is
+separately licensed under LGPL 2.1; the verbatim upstream
+`filter/snes_ntsc-license.txt` is bundled as
+`licenses/Snes9x-snes_ntsc-LGPL-2.1.txt` (installed beside this notice).
+Including the license text is required but does **not** alone establish all
+LGPL source, relinking or other distribution compliance obligations.
+Review the actual compiled binary and corresponding source before release.
+
 Gambatte (GPLv2) appeared in historical development builds but is not
 included in this release plan. Historical license:
 `history/Gambatte-GPL-2.0.txt`.

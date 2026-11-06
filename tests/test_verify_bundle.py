@@ -106,6 +106,12 @@ class VerifyBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing bundled license"):
             verify_bundle(bundle, "macos")
 
+    def test_missing_snes_ntsc_lgpl_notice_fails(self):
+        bundle, licenses, _, _ = self.make_bundle("linux")
+        (licenses / "Snes9x-snes_ntsc-LGPL-2.1.txt").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing bundled license"):
+            verify_bundle(bundle, "linux")
+
     def test_missing_python_dependency_notice_fails(self):
         bundle, licenses, _, _ = self.make_bundle("linux")
         (licenses / "python-distribution-notices" / "example" / "LICENSE.txt").unlink()
