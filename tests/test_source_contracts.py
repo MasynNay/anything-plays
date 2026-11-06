@@ -55,6 +55,13 @@ class SourceContracts(unittest.TestCase):
         dmg = script.index("hdiutil create")
         self.assertLess(signing, verification)
         self.assertLess(verification, dmg)
+        self.assertIn("hdiutil attach -readonly", script)
+        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"', script)
+
+    def test_linux_verifies_extracted_debian_payload(self):
+        script = (ROOT / "build_linux_deb.sh").read_text(encoding="utf-8")
+        self.assertIn('dpkg-deb -x', script)
+        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"', script)
 
     def test_ui_boundary_is_explicit(self):
         from app import App
