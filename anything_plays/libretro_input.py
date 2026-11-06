@@ -7,6 +7,8 @@ released and continue to work when object controls are disarmed.
 from queue import Empty, Full, Queue
 from threading import Lock
 
+from anything_plays.remote_retropad import N64_AXES, N64_DIGITAL, desired_state
+
 BUTTONS = ("Up", "Down", "Left", "Right", "A", "B", "Start", "Select",
            "X", "Y", "L", "R")
 
@@ -27,6 +29,16 @@ GENESIS_IDS = {
 }
 
 
+# Name -> stable identity, so the existing frame-pulse buffer can hold
+# both N64 digital buttons and analog stick directions without changing
+# other consoles' controller IDs.
+N64_INPUT = {
+    **{button: ("joypad", number) for button, number in N64_DIGITAL.items()},
+    **{button: ("analog", index, axis, value)
+       for button, (index, axis, value) in N64_AXES.items()},
+}
+
+
 class InputBuffer:
     """Combine camera pulses with manually held buttons for one emulator frame."""
 
@@ -41,6 +53,8 @@ class InputBuffer:
         self.pressed = set()
 
     def id_for(self, button):
+        if self.system == "n64":
+            return N64_INPUT.get(button)
         return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
 
     def queue_press(self, button, frames):
@@ -107,6 +121,14 @@ class InputBuffer:
                     del self.remaining[button_id]
 
     def state(self, port, device, index, button_id):
-        """Libretro callback: only player one's joypad is supported."""
+        """Libretro callback: player-one digital and N64 analog input."""
+        if port != 0:
+            return 0
         with self.state_lock:
-            return int(port == 0 and device == 1 and button_id in self.pressed)
+            if self.system != "n64":
+                return int(device == 1 and button_id in self.pressed)
+            active = {
+                button for button, identity in N64_INPUT.items()
+                if identity in self.pressed
+            }
+        return desired_state(active).get((device, index, button_id), 0)
