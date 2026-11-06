@@ -27,9 +27,10 @@ button inside an embedded emulator—**not a system-wide keyboard event**.
 Prefer a conventional controller? Click the game display and play using the
 keyboard. A webcam is optional for manual play.
 
-> **Version 2.0 status:** This is refactored release-candidate source, **not a
-> published v2.0 installer**. Final package testing, exact third-party license
-> compliance, and release approval are still required.
+> **Version 2.0 status:** The maintainer has completed functional testing of
+> Windows EXE, macOS DMG, and Ubuntu/Debian DEB builds. The source is ready for
+> integration into `main`, but public v2.0 installers remain withheld until
+> third-party redistribution and corresponding-source requirements are resolved.
 
 ## Supported consoles
 
