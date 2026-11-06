@@ -11,11 +11,37 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 env:
   AP_RELEASE_BUILD: '0'
 
 jobs:
+  cancel-superseded-v21-builds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only earlier 2.1 test workflow runs on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          repo = os.environ["GITHUB_REPOSITORY"]
+          current = os.environ["GITHUB_RUN_ID"]
+          url = f"repos/{repo}/actions/runs?branch=feature/v2.1-unified-test&per_page=100"
+          runs = json.loads(subprocess.check_output(["gh", "api", url], text=True))["workflow_runs"]
+          for run in runs:
+              if (run["name"] == "Anything Plays 2.1 unified TEST build"
+                  and str(run["id"]) != current
+                  and run["status"] in ("queued", "in_progress", "waiting", "requested")):
+                  subprocess.run(
+                      ["gh", "api", "-X", "POST",
+                       f"repos/{repo}/actions/runs/{run['id']}/cancel"],
+                      check=False,
+                  )
+                  print("Cancelled superseded test run", run["id"])
+          PY
   source-and-gui:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
