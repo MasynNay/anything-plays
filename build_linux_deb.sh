@@ -7,6 +7,7 @@ python3 fetch_mgba_core.py
 python3 -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip==26.3
 .build-venv/bin/python -m pip install -r requirements-build.txt
+.build-venv/bin/python tools/check_opencv_build.py
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" app.py
 # All emulator cores are required and shipped inside the installed application.
 mkdir -p dist/AnythingPlays/cores
