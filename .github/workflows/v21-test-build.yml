@@ -63,6 +63,19 @@ jobs:
           python -m unittest discover -s tests -v
       - name: Tk startup, view controls and shutdown smoke test
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+      - name: 30-second sustained camera and game redraw soak
+        timeout-minutes: 3
+        run: |
+          PYTHONPATH=. xvfb-run -a python tests/soak_gui.py \
+            --seconds 30 --max-growth-mb 96 \
+            --report test-evidence/soak-gui-30s.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1.0-alpha1-UI-soak-evidence
+          path: test-evidence/soak-gui-30s.json
+          if-no-files-found: warn
+          retention-days: 21
 
   windows-test-installer:
     env:
