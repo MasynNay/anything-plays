@@ -5,7 +5,8 @@ from anything_plays.gba_emulator import BUTTONS
 DEFAULT = {
     'rgb': [255, 0, 0], 'tolerance': 20, 'min_area': 120,
     'hold_frames': 8, 'cooldown_ms': 450, 'mirror': False,
-    'zone_font_size': 44, 'zone_opacity': 85, 'zone_style': 'Outline',
+    'zone_font_size': 50, 'zone_opacity': 90, 'zone_style': 'Bold',
+    'zone_border_width': 6, 'zone_label_position': 'Center',
     'zone_image': '', 'shuffle_enabled': True,
     'zones': {
         'Left': [0.00000000, 0.00000000, 0.33333333, 0.33333333],
