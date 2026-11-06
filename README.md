@@ -7,7 +7,7 @@
 
   Turn everyday movement into a controller for classic video games.
 
-  **Camera-powered play · Four consoles · Windows, macOS & Linux**
+  **Camera-powered play · Eight console families · Windows, macOS & Linux**
 
   [Releases](https://github.com/MasynNay/anything-plays/releases) ·
   [Get started](#get-started) ·
@@ -35,6 +35,12 @@ keyboard. A webcam is optional for manual play.
 > [source/license notices](docs/RELEASE_SOURCE_ACCESS.md) available.
 > The app includes no game ROMs or BIOS files.
 
+> **2.1 testing branch:** This branch adds clearer camera zones, window modes,
+> custom keyboard mappings, embedded NES/Genesis emulation, and external
+> N64/GameCube launching. It is not a public release. Follow the
+> [2.1 test guide](docs/V2_1_TESTING.md) for installers that coexist with
+> stable 2.0. Camera presses currently control embedded systems only.
+
 ## Supported consoles
 
 | Console | Accepted ROMs | Libretro core |
@@ -43,6 +49,10 @@ keyboard. A webcam is optional for manual play.
 | Game Boy Color | `.gbc` | mGBA |
 | Game Boy Advance | `.gba` | mGBA |
 | Super Nintendo | `.sfc`, `.smc` | Snes9x |
+| Nintendo Entertainment System | `.nes`, `.unf`, `.unif` | FCEUmm (native test core) |
+| Sega Genesis / Mega Drive | `.md`, `.gen`, `.smd`, `.bin` | Genesis Plus GX (native test core) |
+| Nintendo 64 | `.n64`, `.z64`, `.v64` | Installed RetroArch + Mupen64Plus-Next (external) |
+| Nintendo GameCube | `.iso`, `.gcm`, `.rvz`, `.gcz`, `.ciso` | Installed Dolphin (external) |
 
 The console selector chooses the matching emulator automatically. GB, GBC and GBA
 share the mGBA core while retaining independent game libraries and controls.
