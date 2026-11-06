@@ -203,14 +203,15 @@ class ReleaseCoreLockTests(unittest.TestCase):
             return next(dict(item) for item in self.manifest["cores"]
                         if item["name"] == name)
 
-        with TemporaryDirectory() as tmp, (
-            patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
-            patch("fetch_mgba_core.platform.machine", return_value="i686"),
-            patch.dict(os.environ, {"AP_RELEASE_BUILD": "0"}),
-        ):
-            manifest = fetch_all(Path(tmp))
-            self.assertEqual(manifest["build_architecture"], "i686")
-            self.assertTrue((Path(tmp) / "CORE_PROVENANCE.json").is_file())
+        with TemporaryDirectory() as tmp:
+            with (
+                patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
+                patch("fetch_mgba_core.platform.machine", return_value="i686"),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "0"}),
+            ):
+                manifest = fetch_all(Path(tmp))
+                self.assertEqual(manifest["build_architecture"], "i686")
+                self.assertTrue((Path(tmp) / "CORE_PROVENANCE.json").is_file())
 
     def test_duplicate_core_fails(self):
         manifest = copy.deepcopy(self.manifest)
