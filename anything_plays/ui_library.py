@@ -46,7 +46,7 @@ class LibraryMixin:
                     "Very large ROM folder",
                     "This is a very broad folder and may contain thousands of "
                     "unrelated files. Choose a dedicated ROM folder instead? "
-                    "Select Yes to browse again, or No to use this folder.",
+                    "Select Yes to browse again, or No to cancel.",
                     parent=self.root):
                 return
             self.root.after_idle(self.set_rom_directory)
