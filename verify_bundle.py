@@ -61,7 +61,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
         raise ValueError(f"Unsupported platform: {platform_name}")
     if platform_name == "macos":
         licenses = bundle / "Contents" / "Resources" / "licenses"
-        cores = bundle / "Contents" / "MacOS" / "cores"
+        cores = bundle / "Contents" / "Resources" / "cores"
     else:
         licenses = bundle / "licenses"
         cores = bundle / "cores"
