@@ -27,7 +27,7 @@ def cached_zone_font(size):
     return ImageFont.load_default()
 
 
-def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, artwork=None, shuffle_enabled=True, border_width=6, label_position='Center'):
+def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, artwork=None, shuffle_enabled=True, border_width=6, label_position='Center', artwork_cache=None):
     # Render translucent zones and readable labels at native camera
     # resolution; scaling to the preview happens afterward.
     height, width = frame.shape[:2]
@@ -56,11 +56,23 @@ def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, 
             # Bold has a dark readable panel plus a vivid translucent fill.
             draw.rectangle(box, fill=(*color, max(100, tint_alpha) if style == 'Bold' else tint_alpha))
         if artwork is not None:
-            art = artwork.copy()
-            art.thumbnail((max(1, box[2]-box[0]-12), max(1, box[3]-box[1]-12)))
-            px = box[0] + (box[2]-box[0]-art.width)//2
-            py = box[1] + (box[3]-box[1]-art.height)//2
-            # Keep imported artwork's own alpha; tint opacity controls zone fills.
+            # Zone art usually has the same dimensions for every camera frame.
+            # Cache at most 12 resized thumbnails instead of copying and
+            # downsampling the same PIL image hundreds of times per minute.
+            art_width = max(1, box[2] - box[0] - 12)
+            art_height = max(1, box[3] - box[1] - 12)
+            key = (id(artwork), art_width, art_height)
+            art = artwork_cache.get(key) if artwork_cache is not None else None
+            if art is None:
+                art = artwork.copy()
+                art.thumbnail((art_width, art_height))
+                if artwork_cache is not None:
+                    if len(artwork_cache) >= 12:
+                        artwork_cache.pop(next(iter(artwork_cache)))
+                    artwork_cache[key] = art
+            px = box[0] + (box[2] - box[0] - art.width) // 2
+            py = box[1] + (box[3] - box[1] - art.height) // 2
+            # Keep artwork alpha; overlay opacity controls only zone fills.
             overlay.alpha_composite(art, (px, py))
         label_box = draw.textbbox((0, 0), name, font=font, stroke_width=1)
         tw = label_box[2] - label_box[0]
