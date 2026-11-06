@@ -44,10 +44,13 @@ The maintainer completed functional testing of Windows EXE, macOS DMG and
 Linux DEB installers and confirmed the v2.0 application works on all three.
 Those earlier builds used Gambatte for GB/GBC. On the revised mGBA integration,
 a real native Linux core passed generated GB/GBC ROM loading and video checks.
-Compatibility with existing GB/GBC save files and representative games still
-requires separate verification before public binary distribution.
-The remaining **public binary release** gates are third-party licensing
-compatibility, corresponding-source materials, immutable binary provenance,
-and confirmation of the updated installer notice packaging where applicable.
-See `RELEASE_LICENSE_REVIEW.md`. **A source merge into `main` is not approval
-to redistribute the bundled binaries.**
+A later native mGBA integration test also verified 8 KiB MBC1
+battery-backed save-file restoration and persistence for generated GB and GBC
+cartridges; that test does not cover every mapper or commercial title.
+The latest four-architecture CI packaging run included recorded core identities
+and Python dependency notice inventories. The remaining **public binary
+release** gates are exact immutable core inputs and corresponding source,
+license/asset rights review, and final distributor sign-off.
+See `RELEASE_LICENSE_REVIEW.md`, `CORE_RELEASE_PINNING.md` and
+`REDISTRIBUTION_AUDIT.md`. **A source merge into `main` is not approval to
+redistribute the bundled binaries.**
