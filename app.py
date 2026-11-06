@@ -20,10 +20,14 @@ from anything_plays.ui_library import LibraryMixin
 from anything_plays.ui_profiles import ProfilesMixin
 from anything_plays.ui_theme import ThemeMixin
 from anything_plays.ui_zones import ZonesMixin
+from anything_plays.ui_view import ViewMixin
+from anything_plays.ui_shortcuts import ShortcutsMixin
+from anything_plays.ui_external import ExternalBackendMixin
 
 
 class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
-          ProfilesMixin, LibraryMixin, ZonesMixin):
+          ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
+          ShortcutsMixin, ExternalBackendMixin):
     """Own application state and delegate UI behavior to focused modules."""
 
     def __init__(self, root):
@@ -51,6 +55,25 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.emu = Emulator()
         self.preferences_path = Path.home() / '.config' / 'fish-plays-pokemon-studio' / 'preferences.json'  # Preserve existing settings on upgrade
         self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
+        preferences = self.read_preferences()
+        self._shortcut_bindings = preferences.get('key_bindings', {})
+        if not isinstance(self._shortcut_bindings, dict):
+            self._shortcut_bindings = {}
+        self.external_emulators = preferences.get('external_emulators', {})
+        if not isinstance(self.external_emulators, dict):
+            self.external_emulators = {}
+        self.n64_core_override = preferences.get('n64_core_path', '')
+        if not isinstance(self.n64_core_override, str):
+            self.n64_core_override = ''
+        self.external_process = None
+        self._game_only_window = None
+        self._game_only_canvas = None
+        self._shortcut_window = None
+        self._windowed_geometry = root.geometry()
+        self._current_view_mode = 'Windowed'
+        self._view_transition = False
+        saved_view_mode = preferences.get('view_mode', 'Windowed')
+        self.view_mode = tk.StringVar(value=saved_view_mode if saved_view_mode in ('Windowed', 'Borderless', 'Fullscreen') else 'Windowed')
         self.theme_name = tk.StringVar(value=self.read_theme_preference())
         self.apply_theme(self.theme_name.get())
         self.system_key = tk.StringVar(value=self.read_selected_system())
@@ -76,7 +99,9 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.mapping_vars = {}
         self.zone_font_size = tk.IntVar(value=44)
         self.zone_opacity = tk.IntVar(value=85)
-        self.zone_style = tk.StringVar(value='Outline')
+        self.zone_style = tk.StringVar(value='Bold')
+        self.zone_border_width = tk.IntVar(value=6)
+        self.zone_label_position = tk.StringVar(value='Center')
         self.shuffle_enabled = tk.BooleanVar(value=True)
         self.zone_image_path = tk.StringVar(value='')
         self._zone_art = None
@@ -84,10 +109,15 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.build()
         self.refresh_settings()
         self.refresh_system_buttons()
+        self.update_external_setup()
         self._active_profile_system = self.system_key.get()
+        if self.view_mode.get() != 'Windowed':
+            self.set_view_mode(self.view_mode.get(), persist=False)
         root.bind('<Control-Alt-F11>', lambda _: self.toggle())
         root.bind('<Control-Alt-F12>', lambda _: self.stop_controls())
-        root.bind('<Escape>', lambda _: self.stop_controls())
+        root.bind('<Escape>', self.exit_view_or_stop)
+        root.bind('<F10>', self.toggle_borderless)
+        root.bind('<F11>', self.toggle_fullscreen)
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.scan_cameras)
         root.after(45, self.tick)
@@ -126,6 +156,7 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
                 except tk.TclError:
                     pass
         self.emu.stop()
+        self.stop_external_emulator()
         self.root.destroy()
 
 
