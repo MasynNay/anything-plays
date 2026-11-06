@@ -53,7 +53,7 @@ def find_external_emulator(system, override=None):
     )
 
 
-def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None):
+def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None, dolphin_user=None):
     """Return a safe argument vector, never a shell string."""
     if system not in ("n64", "gamecube"):
         raise ValueError("Only external systems can use this launcher")
@@ -63,6 +63,11 @@ def command_for(system, game, *, executable=None, n64_core=None, fullscreen=Fals
     exe = find_external_emulator(system, executable)
     if system == "gamecube":
         args = [str(exe), "--batch"]
+        if dolphin_user is not None:
+            user_dir = Path(dolphin_user).expanduser()
+            if not user_dir.is_dir():
+                raise ExternalLaunchError("GameCube controller user directory is missing")
+            args.append("--user=" + str(user_dir))
         # Dolphin's command-line overrides affect only this launch, not saved
         # emulator preferences. Honor fullscreen and borderless selections.
         if fullscreen or borderless:
@@ -88,9 +93,9 @@ def command_for(system, game, *, executable=None, n64_core=None, fullscreen=Fals
     return args
 
 
-def launch(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None):
+def launch(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None, dolphin_user=None):
     command = command_for(system, game, executable=executable,
-                          n64_core=n64_core, fullscreen=fullscreen, borderless=borderless, network_config=network_config)
+                          n64_core=n64_core, fullscreen=fullscreen, borderless=borderless, network_config=network_config, dolphin_user=dolphin_user)
     try:
         return subprocess.Popen(command, shell=False)
     except OSError as exc:
