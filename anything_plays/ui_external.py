@@ -68,6 +68,7 @@ class ExternalBackendMixin:
                 executable=self.external_emulators.get(system) or None,
                 n64_core=self.n64_core_override or None,
                 fullscreen=self.view_mode.get() in ("Fullscreen", "Game only"),
+                borderless=self.view_mode.get() == "Borderless",
             )
         except ExternalLaunchError as exc:
             self.game_status.set(str(exc))
