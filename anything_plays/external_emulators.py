@@ -53,7 +53,7 @@ def find_external_emulator(system, override=None):
     )
 
 
-def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False):
+def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None):
     """Return a safe argument vector, never a shell string."""
     if system not in ("n64", "gamecube"):
         raise ValueError("Only external systems can use this launcher")
@@ -78,14 +78,19 @@ def command_for(system, game, *, executable=None, n64_core=None, fullscreen=Fals
             "N64 cannot run in the embedded software-only video frontend."
         )
     args = [str(exe), "-L", str(Path(core).expanduser().resolve()), str(rom)]
+    if network_config is not None:
+        config = Path(network_config).expanduser()
+        if not config.is_file():
+            raise ExternalLaunchError("Missing temporary RetroArch network gamepad config")
+        args[1:1] = ["--appendconfig", str(config)]
     if fullscreen:
         args.insert(1, "--fullscreen")
     return args
 
 
-def launch(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False):
+def launch(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False, network_config=None):
     command = command_for(system, game, executable=executable,
-                          n64_core=n64_core, fullscreen=fullscreen, borderless=borderless)
+                          n64_core=n64_core, fullscreen=fullscreen, borderless=borderless, network_config=network_config)
     try:
         return subprocess.Popen(command, shell=False)
     except OSError as exc:
