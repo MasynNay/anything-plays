@@ -23,7 +23,7 @@ def verify_opencv_build(cv2_module=None, platform=None):
     if detected_gui not in allowed_gui:
         raise RuntimeError(f"OpenCV must be built without bundled Qt/GUI extras "
                            f"(observed: {detected_gui})")
-    ffmpeg = re.search(r"^\\s*FFMPEG:\\s*(YES|NO)", info, flags=re.MULTILINE)
+    ffmpeg = re.search(r"^\s*FFMPEG:\s*(YES|NO)", info, flags=re.MULTILINE)
     ffmpeg_status = ffmpeg.group(1) if ffmpeg else "UNKNOWN"
     if os.environ.get("AP_REQUIRE_OPENCV_FFMPEG_OFF") == "1":
         # A source build that disables FFmpeg may omit its build-info line
