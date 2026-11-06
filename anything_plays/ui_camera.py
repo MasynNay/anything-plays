@@ -183,7 +183,10 @@ class CameraMixin:
         elif active and self.armed and time.monotonic() - self.last_action >= max(.05, int(self.cooldown.get()) / 1000):
             button = self.mapping_vars[active].get()
             if button != DISABLED_MAPPING:
-                self.emu.press(button, self.hold_frames.get())
+                if self.system_key.get() == "n64" and self.external_input is not None:
+                    self.external_input.press(button, self.hold_frames.get())
+                else:
+                    self.emu.press(button, self.hold_frames.get())
                 self.last_action = time.monotonic()
                 self.action.set(f'Object zone: {active} → game button: {button} (isolated)')
         geom = self.geometry()
