@@ -28,6 +28,12 @@ class VideoDecoderTests(unittest.TestCase):
         self.assertEqual(decode_frame(raw, 1, 1, 4, XRGB8888)[0, 0].tolist(),
                          [18, 52, 86])
 
+    def test_giant_native_frame_is_rejected_before_reading_pointer(self):
+        # This tiny pointer must never be read as a 128 MB framebuffer.
+        raw = C.create_string_buffer(1)
+        with self.assertRaisesRegex(ValueError, "safe memory budget"):
+            decode_frame(raw, 4096, 4096, 32768, XRGB8888)
+
     def test_invalid_pitch_rejected(self):
         raw = C.create_string_buffer(6)
         with self.assertRaises(ValueError):
