@@ -8,6 +8,7 @@ import unittest
 
 from fetch_mgba_core import (
     _read_core_archive,
+    fetch_core,
     _validate_binary,
     build_target,
     reported_git_revision,
@@ -74,6 +75,44 @@ class DownloaderTests(unittest.TestCase):
                         "mgba_libretro.so",
                     )
                 network.assert_not_called()
+
+    def test_candidate_archive_capture_preserves_exact_zip_bytes(self):
+        import hashlib
+        import io
+        import zipfile
+
+        payload = b"\x7fELF" + b"X" * 12000
+        mem = io.BytesIO()
+        with zipfile.ZipFile(mem, "w") as archive:
+            archive.writestr("mgba_libretro.so", payload)
+        original = mem.getvalue()
+        with TemporaryDirectory() as temp:
+            destination = Path(temp) / "cores"
+            archived = Path(temp) / "release-inputs"
+            with (
+                patch.dict(os.environ, {
+                    "AP_RELEASE_BUILD": "0",
+                    "AP_CORE_ARCHIVE_CAPTURE_DIR": str(archived),
+                    "AP_CORE_ARCHIVE_DIR": "",
+                }),
+                patch("fetch_mgba_core.build_target",
+                      return_value=("linux/x86_64/latest", ".so")),
+                patch("fetch_mgba_core._read_core_archive", return_value=original),
+                patch("fetch_mgba_core.inspect_core_identity", return_value={
+                    "libretro_library_name": "mGBA",
+                    "libretro_library_version": "test 7a12d6d",
+                    "reported_source_revision": "7a12d6d",
+                    "source_repository_url": "https://github.com/libretro/mgba",
+                    "reported_source_commit_url": None,
+                }),
+            ):
+                result = fetch_core("mgba", destination)
+            self.assertEqual(
+                (archived / "mgba_libretro.so.zip").read_bytes(), original
+            )
+            self.assertEqual(result["archive_sha256"],
+                             hashlib.sha256(original).hexdigest())
+            self.assertEqual(result["archive_size_bytes"], len(original))
 
     def test_unsupported_platform_rejected(self):
         with self.assertRaises(ValueError):
