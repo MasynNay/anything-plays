@@ -60,6 +60,22 @@ class EmbeddedN64Contracts(unittest.TestCase):
         self.assertTrue(options.environment(15, C.addressof(request)))
         self.assertEqual(request.value, b"angrylion")
 
+    def test_apple_silicon_uses_portable_n64_interpreter(self):
+        # The N64 alpha must not assume the x86 Ari64 dynarec exists on ARM.
+        with patch("anything_plays.n64_software.platform.machine",
+                   return_value="arm64"):
+            arm = SoftwareN64Options()
+        self.assertEqual(
+            arm.values[b"parallel-n64-cpucore"], b"Cached Interpreter"
+        )
+        with patch("anything_plays.n64_software.platform.machine",
+                   return_value="x86_64"):
+            desktop = SoftwareN64Options()
+        self.assertEqual(
+            desktop.values[b"parallel-n64-cpucore"],
+            b"Dynamic Recompiler (Ari64)",
+        )
+
     def test_n64_analog_stick_is_supported_without_os_keyboard_injection(self):
         inputs = InputBuffer()
         inputs.system = "n64"
