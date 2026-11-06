@@ -204,7 +204,15 @@ class CameraMixin:
         if geom:
             x, y, dw, dh, _, _ = geom
             rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)), cv2.COLOR_BGR2RGB)
-            photo = ImageTk.PhotoImage(Image.fromarray(rgb))
+            image = Image.fromarray(rgb)
+            photo = self.camera_photo
+            if (photo is None or photo.width() != dw or
+                    photo.height() != dh):
+                # Reuse the Tcl image buffer while webcam dimensions stay
+                # stable; don't allocate 20 new native images per second.
+                photo = ImageTk.PhotoImage(image)
+            else:
+                photo.paste(image)
             item = getattr(self, "_camera_canvas_item", None)
             # Reuse one Tk canvas item rather than allocating and deleting
             # ~20 canvas objects a second for days at a time.
