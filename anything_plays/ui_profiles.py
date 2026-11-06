@@ -112,6 +112,7 @@ class ProfilesMixin:
         self.update_external_setup()
         self.current_rom = None
         self.game_canvas.delete('all')
+        self.show_external_placeholder()
         self.game_status.set('Load your own ' + SYSTEMS[key].title + ' ROM')
         self.show_library()
         self.populate_inline_library()
