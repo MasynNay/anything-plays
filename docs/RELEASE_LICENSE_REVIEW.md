@@ -8,10 +8,13 @@ repeated merely for changes to documentation.
 **Source:** The v2.0 application is merged into `main`. Original code is
 licensed under MIT (where contributors have rights to grant that license).
 
-**Binary distribution:** Not yet approved. This record is technical evidence,
-not legal advice or a claim of copyright clearance. Consult the
-[third-party rights audit](REDISTRIBUTION_AUDIT.md) and the
-[release core pinning procedure](CORE_RELEASE_PINNING.md) before sign-off.
+**Binary distribution:** The scoped free/noncommercial **v2.0.0 release was
+[published](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)**
+on November 6, 2026, after verified RC6 packaging and exact SHA-256
+promotion. This record documents engineering/permission evidence, not a
+legal opinion or a general grant of third-party commercial rights. See
+[the distribution decision](RELEASE_DISTRIBUTION_REVIEW.md) and
+[release source access](RELEASE_SOURCE_ACCESS.md).
 
 ## Core licensing strategy
 
@@ -36,11 +39,18 @@ The application's original MIT license does **not** govern Snes9x.
 | Targeted GB/GBC emulation with mGBA | Native Linux mGBA successfully loaded generated GB/GBC test ROMs and delivered video frames in CI; prior representative-game testing used Gambatte |
 | macOS previous three-core notice/integrity packaging | Passed locally, before changing core mapping |
 | Core source revision evidence | Per-target core archives and hashes preserved in a [private draft](https://github.com/MasynNay/anything-plays/actions/runs/42173630332); exact upstream Git source snapshots preserved and verified in [run 42174478479](https://github.com/MasynNay/anything-plays/actions/runs/42174478479). Reproducible binary-to-source build correspondence is **not** independently proven |
-| Python/native dependency and asset rights | Exact Python build distribution versions are pinned and wheel notices are collected. The owner attests purchased betta artwork rights. Native FFmpeg/codec and precise artwork-license-scope reviews remain open |
+| Python/native dependency and asset rights | The version-pinned FFmpeg-free RC6 wheels and downstream notices are retained. The owner attested purchased betta artwork rights. The published free distribution explicitly excludes third-party commercial reuse; legal/contract details remain the owners' responsibility |
 | Newly packaged two-core installers | Four actual installer archives and original emulator ZIPs were produced and verified in the [private RC1 draft workflow](https://github.com/MasynNay/anything-plays/actions/runs/42173630332); macOS DMGs and Linux DEB payloads were inspected after packaging |
-| Public publishing job and tag-triggered release builds | Disabled pending release clearance; a version tag alone must not package or publish binaries |
+| Public publishing job and tag-triggered release builds | The old automatic rebuild workflow remains disabled. The approved one-time promotion verified and published *exact* private RC6 assets; a version tag alone still cannot build from mutable nightly downloads |
 
-**Release-build control:** The checked-in [v2.0 core lock](../config/v2.0-core-lock.json) has `approved_for_binary_distribution: false`. When a future release workflow is enabled, `AP_RELEASE_BUILD=1` will require both staged immutable ZIP archives through `AP_CORE_ARCHIVE_DIR` (never mutable-nightly network fallback) and approved fingerprints at core download and again after package staging. Ordinary development builds remain available. The lock does **not** imply binary redistribution clearance. See [core release pinning](CORE_RELEASE_PINNING.md).
+**Release-build control:** The [v2.0 core lock](../config/v2.0-core-lock.json)
+now has `approved_for_binary_distribution: true` **only for the exact
+reviewed v2.0.0 native fingerprints**, backed by the
+[distribution decision](RELEASE_DISTRIBUTION_REVIEW.md). The one-time
+release workflow published the verified immutable RC6 files rather than
+building from moving nightlies. Future changes still require separate
+license/source review, new fingerprints and package validation.
+See [core release pinning](CORE_RELEASE_PINNING.md).
 
 ## Release-candidate packaging defects discovered from audit artifacts
 
@@ -104,6 +114,7 @@ This removes the bundled FFmpeg/x264/x265 problem demonstrated in the earlier
 RC2/RC3 candidate, but does **not** clear every native/system library, core
 source/license, commissioned-artwork or owner approval requirement.
 
-Do not publish a public `v2.0.0` tag or redistribute bundled installers until
-these independent requirements are met. A public GitHub source repository is
-not by itself approval to redistribute all frozen third-party binary packages.
+The [public v2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)
+was published from the exact verified RC6 bytes under the stated free,
+nonpromotional distribution scope. The source code being public is not
+permission to commercially redistribute third-party binaries or artwork.
