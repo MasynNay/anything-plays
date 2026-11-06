@@ -1,0 +1,91 @@
+name: Verify Apple Silicon DMG with FFmpeg-free OpenCV
+
+on:
+  push:
+    branches: [experiment/v2-camera-only-arm64-dmg]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  arm64-camera-only-dmg:
+    runs-on: macos-15
+    timeout-minutes: 55
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_CORE_ARCHIVE_DIR: release-inputs
+      AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
+      AP_CUSTOM_OPENCV_SHA256: 3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Restore verified Libretro archives from RC1 private draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p frozen-inputs
+          gh release download v2.0.0-rc.1 --pattern 'macos-arm64-*.zip' --dir frozen-inputs
+          gh release download v2.0.0-rc.1 --pattern 'CORE_PROVENANCE-macos-arm64.json' --dir frozen-inputs
+          python -m tools.prepare_candidate_inputs macos-arm64 frozen-inputs release-inputs
+      - name: Download verified Apple Silicon FFmpeg-free wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: camera-only-wheel
+      - name: Freeze exact custom OpenCV wheel input
+        run: |
+          set -euo pipefail
+          test "$(find camera-only-wheel -name '*.whl' -type f | wc -l | tr -d ' ')" = 1
+          echo "AP_CUSTOM_OPENCV_WHEEL=$(find camera-only-wheel -name '*.whl' -type f)" >> "$GITHUB_ENV"
+      - name: Build, sign and verify final Apple Silicon DMG
+        run: bash build_macos_dmg.sh
+      - name: Inspect packaged media links and full file inventory
+        run: |
+          mkdir -p camera-only-dmg-evidence
+          python tools/binary_inventory.py macos-arm64 dist/AnythingPlays.app camera-only-dmg-evidence/inventory.json
+          python tools/audit_codec_linkage.py dist/AnythingPlays.app camera-only-dmg-evidence/linkage.json
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          files = json.loads(Path('camera-only-dmg-evidence/inventory.json').read_text())
+          linkage = json.loads(Path('camera-only-dmg-evidence/linkage.json').read_text())
+          forbidden = ('libavcodec', 'libavformat', 'libavutil', 'libavdevice',
+                       'libavfilter', 'libswresample', 'libswscale', 'libx264',
+                       'libx265', 'ffmpeg')
+          media = [item['path'] for item in files['files']
+                   if any(name in item['path'].lower() for name in forbidden)]
+          if media:
+              raise SystemExit('Forbidden FFmpeg/media files in packaged app: ' + str(media[:8]))
+          if any(linkage['codec_direct_link_referrers'].values()):
+              raise SystemExit('FFmpeg codec links remain in bundled OpenCV')
+          dmg = Path('release/AnythingPlays.dmg')
+          digest = hashlib.sha256()
+          with dmg.open('rb') as fd:
+              for chunk in iter(lambda: fd.read(1024 * 1024), b''):
+                  digest.update(chunk)
+          Path('camera-only-dmg-evidence/summary.json').write_text(json.dumps({
+              'target': 'macos-arm64',
+              'dmg_sha256': digest.hexdigest(),
+              'dmg_size': dmg.stat().st_size,
+              'file_count': files['file_count'],
+              'native_file_count': files['native_file_count'],
+              'verified_cores': files['verified_cores'],
+              'opencv_ffmpeg_native_files': [],
+              'redistribution_approved': False,
+              'camera_hardware_tested': False,
+          }, indent=2) + '\n', encoding='utf-8')
+          print(Path('camera-only-dmg-evidence/summary.json').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experimental-apple-silicon-ffmpeg-free-dmg-evidence
+          path: camera-only-dmg-evidence/*.json
+          if-no-files-found: error
+          retention-days: 14
