@@ -1,5 +1,15 @@
 # Release candidate QA checklist · v2.0.0
 
+**Functional sign-off:** The maintainer has supplied Windows EXE, macOS DMG
+and Linux DEB installers and confirmed that Anything Plays v2.0 runs
+successfully on all three operating systems. This earlier functional work is
+complete and is not to be repeated merely because package notice files change.
+
+This checklist is retained as a reusable **future-build acceptance checklist**;
+unmarked items below are not a declaration that the existing, confirmed
+functional testing was skipped. Distinct release licensing requirements are
+tracked in `RELEASE_LICENSE_REVIEW.md`.
+
 This checklist is for **hands-on verification after installing a new build**.
 Tests in `tests/` cannot validate a physical camera, real game audio, native
 installer permissions, or every Libretro platform combination.
