@@ -153,6 +153,7 @@ class CoreSession:
         if frame is not None:
             with self.emulator.lock:
                 self.emulator.frame = frame
+                self.emulator.frame_serial += 1
 
     def _game_info(self, full_path):
         """Build one retro_game_info and retain its buffers for the core's life."""
@@ -248,6 +249,7 @@ class Emulator:
         self.armed = False
         self.error = None
         self.frame = None
+        self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
         self.system = "gba"
         self.core_path = find_core(self.system)
@@ -271,6 +273,7 @@ class Emulator:
         self.stop_event.clear()
         with self.lock:
             self.frame = None
+            self.frame_serial += 1
         self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
 
