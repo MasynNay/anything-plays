@@ -59,4 +59,12 @@ codesign --force --sign - dist/AnythingPlays.app
 codesign --verify --verbose=2 dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg
+# Verify bytes after they have been packaged into the actual distributable DMG.
+MOUNT_DIR="$(mktemp -d /tmp/anything-plays-release.XXXXXX)"
+trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/dev/null 2>&1 || true' EXIT
+hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" release/AnythingPlays.dmg
+"$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"
+hdiutil detach "$MOUNT_DIR"
+rmdir "$MOUNT_DIR"
+trap - EXIT
 echo 'Created release/AnythingPlays.dmg (unsigned; notarization required for normal public distribution)'
