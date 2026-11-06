@@ -2,7 +2,7 @@ name: Assemble private v2.0 candidate from immutable emulator ZIPs
 # Do not automatically publish. Everything remains in a private draft release.
 on:
   push:
-    branches: [release/v2-rc2-headless]
+    branches: [release/v2-rc4-camera-only]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 env:
   AP_RELEASE_BUILD: '0'
   AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
-  DRAFT_TAG: v2.0.0-rc.2
+  DRAFT_TAG: v2.0.0-rc.4
   SOURCE_TAG: v2.0.0-rc.1
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ['3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,7 +42,7 @@ jobs:
 
   private-draft:
     needs: source-checks
-    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc2-headless'
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc4-camera-only'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -122,6 +122,7 @@ jobs:
     timeout-minutes: 55
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -137,6 +138,24 @@ jobs:
           gh release download "$SOURCE_TAG" --pattern "macos-${{ matrix.arch }}-*.zip" --dir frozen-inputs
           gh release download "$SOURCE_TAG" --pattern "CORE_PROVENANCE-macos-${{ matrix.arch }}.json" --dir frozen-inputs
           python -m tools.prepare_candidate_inputs "macos-${{ matrix.arch }}" frozen-inputs release-inputs
+      - name: Download audited Apple Silicon FFmpeg-free OpenCV wheel
+        if: matrix.arch == 'arm64'
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: camera-only-wheel
+      - name: Select exact locked Apple Silicon wheel
+        if: matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find camera-only-wheel -name '*.whl' | wc -l | tr -d ' ')" = 1
+          WHEEL="$(find camera-only-wheel -name '*.whl' -type f)"
+          test -f "$WHEEL"
+          echo "AP_CUSTOM_OPENCV_WHEEL=$WHEEL" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd" >> "$GITHUB_ENV"
       - name: Build and verify macOS DMG
         run: bash build_macos_dmg.sh
       - name: Name DMG by architecture
@@ -223,3 +242,48 @@ jobs:
         run: |
           test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true
           gh release upload "$DRAFT_TAG" source-snapshots/* --clobber
+
+  retain-camera-only-wheel:
+    needs: source-snapshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve verified camera-only wheel from experiment
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-wheel
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: camera-only-wheel
+      - name: Retrieve source-build evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: experimental-camera-only-opencv-macos-arm64-evidence
+          run-id: 42245121687
+          github-token: ${{ github.token }}
+          path: camera-only-evidence
+      - name: Verify custom wheel and capture build recipe
+        run: |
+          set -euo pipefail
+          python tools/verify_custom_opencv_wheel.py camera-only-wheel/*.whl 3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd macos-arm64
+          cat > CAMERA_ONLY_OPENCV_BUILD.txt <<'RECIPE'
+          Anything Plays v2.0 Apple Silicon OpenCV build input
+          Package: opencv-python-headless==4.14.0.94
+          Source: https://pypi.org/project/opencv-python-headless/4.14.0.94/
+          Source experiment: https://github.com/MasynNay/anything-plays/actions/runs/42245121687
+          Python: 3.13 arm64
+          Flags: CMAKE_ARGS="-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+          Built wheel SHA256: 3e1d31233267fdea67311907654d8166d180f9173b87d36b480ab1468e38b6cd
+          Verified: FFmpeg backend absent, AVFoundation available, HSV/contour processing works, no FFmpeg/x264/x265 libraries or native links
+          Status: Private release candidate only; redistribution approval is NOT granted.
+          RECIPE
+      - name: Upload wheel and verification to PRIVATE draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true
+          gh release upload "$DRAFT_TAG" camera-only-wheel/*.whl camera-only-evidence/opencv-camera-only-evidence.json CAMERA_ONLY_OPENCV_BUILD.txt --clobber
