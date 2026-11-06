@@ -14,17 +14,38 @@ conditions of third-party code.
 - The downloader `fetch_mgba_core.py` currently fetches `/latest/`
   nightlies; it records resulting hashes but **not** matching source commits.
 - The three build scripts bundle all three core binaries in platform installers.
-- The checked-in branch may not yet contain the license/documentation updates
-  prepared locally by the maintainer. Reconcile local uncommitted files before
-  merging.
+- Project and core license texts are committed to `develop/v2.0` and copied
+  into all three platform packages. `verify_bundle.py` checks presence and
+  matches packaged core hashes to the generated manifest; this is **not** a
+  compatibility, source-availability, or license-compliance audit.
+
+## Current evidence (as of November 2026)
+
+| Check | Verified finding | Release implication |
+| --- | --- | --- |
+| Original code license | MIT license file committed | Applies only to code whose contributors may grant it |
+| Packaging instructions | Windows, macOS and Linux scripts stage core licenses and notices | The staged outputs still need artifact inspection on each OS |
+| macOS Apple Silicon package | Local rebuild reported that staging verification and DMG creation succeeded | Confirms files and checksums for that build, not legal clearance or notarization |
+| Other platforms | Maintainer reports prior Windows and Ubuntu gameplay testing | This is not confirmation that *updated* installer contents passed verification |
+| Core provenance | Buildbot `latest` nightlies with post-download SHA-256 | Corresponding source revisions not established; not reproducible |
+| Third-party rights | Gambatte GPLv2, mGBA MPL 2.0, Snes9x noncommercial | Combined-work and specific redistribution obligations still outstanding |
+
+**Naming:** The original Anything Plays source is MIT-licensed. The complete
+bundle includes noncommercial Snes9x; do not represent every bundled component
+as OSI-approved open source or apply MIT to those third-party binaries.
+
+**No repeat gameplay testing by default.** Existing cross-platform functional
+checks are recorded; verify only changed packaging and licensing details on
+Windows and Linux unless a future code change actually affects gameplay.
 
 ## Required decisions and evidence
 
-- [ ] **Combined-work review.** Determine whether the in-process GPLv2
-      Gambatte integration and the Snes9x noncommercial component can be
-      distributed together. Obtain suitable copyright-holder permissions or
-      change the architecture/cores if needed. Separating the binary into a
-      different directory is not by itself a solution.
+- [ ] **Combined-work review — release blocker.** Determine whether the
+      in-process GPLv2 Gambatte integration and Snes9x's noncommercial terms
+      can be distributed together. Seek qualified open-source licensing review
+      or relevant rights-holder permission, or test an appropriately licensed
+      alternative to Gambatte (for example SameBoy). A separate file directory
+      or a free download does not itself resolve this issue.
 - [ ] **Gambatte.** Identify the exact core build, its source revision,
       complete GPL notices, and corresponding source obligations.
 - [ ] **mGBA.** Identify the exact core build and source revision; make
