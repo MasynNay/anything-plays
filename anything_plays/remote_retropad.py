@@ -47,6 +47,7 @@ def write_retroarch_config(path, *, port=DEFAULT_PORT):
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         'network_remote_enable = "true"\n'
+        'network_remote_enable_user_p0 = "true"\n'
         'network_remote_enable_user_p1 = "true"\n'
         f'network_remote_base_port = "{port}"\n'
         'config_save_on_exit = "false"\n',
@@ -134,13 +135,27 @@ class N64RemoteController:
                 if expiry <= now:
                     del self._pulse_until[button]
             next_state = desired_state(self._manual | self._pulse_until.keys())
-            for key in sorted(set(self._sent) | set(next_state)):
-                state = next_state.get(key, 0)
-                if state == self._sent.get(key, 0):
-                    continue
-                data = encode_message(*key, state)
-                self.socket.sendto(data, (LOCAL_HOST, self.port))
-            self._sent = next_state
+            changed = [
+                key for key in set(self._sent) | set(next_state)
+                if next_state.get(key, 0) != self._sent.get(key, 0)
+            ]
+            if not changed:
+                return
+            # The RetroArch remote receiver reads ONE UDP message per
+            # player per emulated frame. A burst would silently queue
+            # changes and could lose a release. Send at most one per tick,
+            # prioritizing releases to prevent stuck buttons/axes.
+            key = min(changed, key=lambda item: (
+                next_state.get(item, 0) != 0, item
+            ))
+            state = next_state.get(key, 0)
+            self.socket.sendto(
+                encode_message(*key, state), (LOCAL_HOST, self.port)
+            )
+            if state:
+                self._sent[key] = state
+            else:
+                self._sent.pop(key, None)
 
     def start(self):
         """Keep pulses responsive even when the GUI redraw is slow."""
@@ -169,7 +184,16 @@ class N64RemoteController:
             self._manual.clear()
             self._pulse_until.clear()
         try:
-            self.flush()
+            # Drain each previously-latched state at the receiver's rate.
+            # No new presses are accepted once the stop event is set.
+            for _ in range(64):
+                if not self._sent:
+                    break
+                self.flush()
+                if self._sent:
+                    time.sleep(1 / 60)
+        except OSError:
+            pass
         finally:
             with self._lock:
                 self._closed = True
