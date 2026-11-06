@@ -78,11 +78,11 @@ class GameplayMixin:
             self.stop_controls()
             return
         backend = SYSTEMS[self.system_key.get()].backend
-        if backend == "dolphin":
+        if backend == "dolphin" and self.external_input is None:
             messagebox.showinfo(
                 'GameCube camera input',
-                'Dolphin is still using its own controller settings. '
-                'The N64 local bridge does not support Dolphin.'
+                'This Dolphin installation does not have an active camera '
+                'controller bridge. Launch a GameCube game first.'
             )
             return
         if self.cap is None or not self.cap.isOpened():
