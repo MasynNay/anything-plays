@@ -1,0 +1,63 @@
+name: Archive exact OpenCV source and Windows source patch in private RC5
+
+on:
+  push:
+    branches: [release/v2-rc5-source-archive]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  preserve-source-inputs:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc5-source-archive'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DRAFT_TAG: v2.0.0-rc.5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore original OpenCV PyPI source and Windows packaging patch
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-camera-only-source-and-evidence
+          run-id: 42249929138
+          github-token: ${{ github.token }}
+          path: windows-source-evidence
+      - name: Verify original archive and patch hashes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          folder = Path('windows-source-evidence')
+          metadata = json.loads((folder/'patched-source/WINDOWS_OPENCV_PATCH_PROVENANCE.json').read_text(encoding='utf-8'))
+          original = folder / 'source-tarballs' / metadata['source_archive']
+          patch = folder / 'patched-source/WINDOWS_OPENCV_SETUP_PATCH.diff'
+          for f,expected in ((original,metadata['source_archive_sha256']),
+                             (patch,metadata['patch_sha256'])):
+              assert f.is_file(), f"Missing reproducibility input: {f}"
+              h=hashlib.sha256()
+              with f.open('rb') as src:
+                  for block in iter(lambda: src.read(1024*1024), b''):
+                      h.update(block)
+              assert h.hexdigest() == expected, f"Modified source artifact: {f}"
+              print(f"Verified immutable source input {f.name}: {expected}")
+          assert metadata['version'] == '4.14.0.94'
+          assert metadata['distribution'] == 'opencv-python-headless'
+          assert metadata['public_redistribution_approved'] is False
+          PY
+      - name: Archive all matching source materials to PRIVATE draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$DRAFT_TAG" --json isDraft --jq '.isDraft')" = true || {
+            echo "Refusing to upload source materials to public release"; exit 1;
+          }
+          gh release upload "$DRAFT_TAG" \
+            windows-source-evidence/source-tarballs/*.tar.gz \
+            windows-source-evidence/patched-source/WINDOWS_OPENCV_SETUP_PATCH.diff \
+            windows-source-evidence/patched-source/WINDOWS_OPENCV_PATCH_PROVENANCE.json \
+            windows-source-evidence/evidence/camera-only-windows-x86_64.json
