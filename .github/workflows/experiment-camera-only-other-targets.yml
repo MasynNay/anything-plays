@@ -1,0 +1,67 @@
+name: Experiment - camera-only OpenCV without FFmpeg on other desktop targets
+
+on:
+  push:
+    branches: [experiment/opencv-camera-only-other-platforms]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ffmpeg-free-wheel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: linux-x86_64
+            cmake_options: "-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DWITH_V4L=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+          - runner: windows-latest
+            target: windows-x86_64
+            cmake_options: "-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DWITH_DSHOW=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+          - runner: macos-15-intel
+            target: macos-x86_64
+            cmake_options: "-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      CMAKE_ARGS: ${{ matrix.cmake_options }}
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
+      ENABLE_HEADLESS: "1"
+      AP_REQUIRE_OPENCV_FFMPEG_OFF: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux camera development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends libv4l-dev libglib2.0-0 libportaudio2
+      - name: Install source-build prerequisites
+        run: python -m pip install --upgrade pip==26.3 numpy==2.5.4
+      - name: Build 4.14.0.94 headless OpenCV from source without FFmpeg
+        run: |
+          mkdir wheelhouse
+          python -m pip wheel --no-deps --no-binary=opencv-python-headless opencv-python-headless==4.14.0.94 --wheel-dir wheelhouse -v
+      - name: Install locally compiled wheel
+        shell: bash
+        run: python -m pip install --no-deps wheelhouse/opencv_python_headless-*.whl
+      - name: Confirm camera backend, image processing and FFmpeg absence
+        shell: bash
+        run: |
+          python -m tools.probe_camera_only_wheel wheelhouse/opencv_python_headless-*.whl evidence/camera-only-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: camera-only-evidence-${{ matrix.target }}
+          path: evidence/camera-only-${{ matrix.target }}.json
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: camera-only-wheel-${{ matrix.target }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 14
