@@ -47,6 +47,28 @@ OpenCV, NumPy, Pillow, sounddevice, PyObjC (macOS), and transitive native
 libraries retain their own licensing and attribution requirements. The
 installed versions and full dependency notices need a release-specific audit.
 
+### OpenCV, FFmpeg and GUI dependency boundaries
+
+The official [opencv-python packaging project](https://github.com/opencv/opencv-python#licensing)
+states that the packaging scripts are MIT-licensed, the OpenCV library is
+Apache-2.0-licensed, and its bundled FFmpeg libraries are licensed under
+LGPL-2.1. The official [FFmpeg licensing guidance](https://ffmpeg.org/legal.html)
+explains that optional GPL components can change a particular FFmpeg build's
+applicable terms and describes obligations when redistributing binaries.
+
+The installer records each wheel's installed version and copies its license
+files, including OpenCV's `LICENSE-3RD-PARTY.txt`, to
+`licenses/python-distribution-notices/`. These notices include the FFmpeg
+LGPL language. They do not independently prove that the source corresponding
+to every frozen FFmpeg binary is available or that all LGPL installation,
+replacement and linking conditions are met.
+
+The proposed v2.0 RC2 uses `opencv-python-headless` because Anything Plays
+draws its interface with Tkinter rather than OpenCV's GUI. This removes
+unnecessary Qt GUI libraries from Linux builds, subject to verification of
+the final four platform archives. Headless OpenCV does **not** eliminate its
+FFmpeg libraries or their independent redistribution obligations.
+
 ## Redistribution status
 
 **Not yet approved for public binary distribution.** The following remain:
