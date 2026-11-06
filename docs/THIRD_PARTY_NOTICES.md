@@ -63,11 +63,15 @@ LGPL language. They do not independently prove that the source corresponding
 to every frozen FFmpeg binary is available or that all LGPL installation,
 replacement and linking conditions are met.
 
-The proposed v2.0 RC2 uses `opencv-python-headless` because Anything Plays
-draws its interface with Tkinter rather than OpenCV's GUI. This removes
-unnecessary Qt GUI libraries from Linux builds, subject to verification of
-the final four platform archives. Headless OpenCV does **not** eliminate its
-FFmpeg libraries or their independent redistribution obligations.
+Earlier RC2/RC3 used the stock `opencv-python-headless` wheel, eliminating
+Qt GUI binaries but **not** its bundled FFmpeg codec dependencies.
+The [verified private RC5](RC5_VERIFICATION.md) uses separate, SHA-256-locked
+source-built wheels for all four platforms, configured with FFmpeg disabled.
+The staged Windows, Linux, and both Mac inventories now contain no FFmpeg,
+x264 or x265 binary filenames; build-time camera backends and tracking image
+operations passed. The exact OpenCV source, its Windows packaging patch, and
+four wheel files are preserved with the private candidate. This is not proof
+that unrelated native dependencies or all source/license obligations are met.
 
 ## Redistribution status
 
