@@ -1,6 +1,7 @@
 """Offline tests for immutable candidate ZIP evidence."""
 
 import hashlib
+import json
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,6 +9,7 @@ import unittest
 import zipfile
 
 from tools.verify_candidate_archives import verify_candidate_archives
+from tools.stage_candidate_assets import stage_assets
 
 
 class CandidateArchiveTests(unittest.TestCase):
@@ -54,6 +56,23 @@ class CandidateArchiveTests(unittest.TestCase):
         self.assertEqual(len(report["cores"]), 2)
         self.assertFalse(report["redistribution_approved"])
         self.assertFalse(report["source_binary_correspondence_independently_verified"])
+
+    def test_stages_four_private_draft_assets_without_altering_zip_bytes(self):
+        installer = self.folder / "anything-plays_2.0.0_amd64.deb"
+        installer.write_bytes(b"sample candidate package")
+        manifest_path = self.folder / "CORE_PROVENANCE.json"
+        manifest_path.write_text(json.dumps(self.manifest), encoding="utf-8")
+        lock_path = self.folder / "lock.json"
+        lock_path.write_text(json.dumps(self.lock), encoding="utf-8")
+        output = self.folder / "assets"
+        assets = stage_assets("linux-x86_64", installer, manifest_path,
+                              self.folder, output, lock_path)
+        self.assertEqual(len(assets), 4)
+        self.assertTrue((output / installer.name).exists())
+        self.assertEqual(
+            (output / "linux-x86_64-mgba_libretro.so.zip").read_bytes(),
+            (self.folder / "mgba_libretro.so.zip").read_bytes(),
+        )
 
     def test_mismatched_zip_is_rejected(self):
         (self.folder / "mgba_libretro.so.zip").write_bytes(b"tampered")
