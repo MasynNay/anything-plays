@@ -75,6 +75,44 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
             raise ValueError(f"Unsupported staged filesystem entry: {relative}")
     if not files:
         raise ValueError("Empty staged application directory")
+
+    # The CI inventory is recorded AFTER macOS signing. The original core
+    # manifest must still match final bytes, otherwise codesign or a packaging
+    # step silently changed the emulator libraries after verification.
+    by_path = {entry["path"]: entry for entry in files}
+    prefix = "Contents/Resources/" if target.startswith("macos-") else ""
+    core_manifest = prefix + "cores/CORE_PROVENANCE.json"
+    verified_cores = []
+    if core_manifest in by_path:
+        metadata = json.loads((bundle / core_manifest).read_text(encoding="utf-8"))
+        for record in metadata.get("cores", []):
+            relative = prefix + "cores/" + record["file"]
+            observed = by_path.get(relative)
+            if not observed:
+                raise ValueError(f"Missing declared core in staged app: {relative}")
+            if (observed["sha256"] != record["sha256"]
+                    or observed["size_bytes"] != record["size_bytes"]):
+                raise ValueError(f"Post-packaging core integrity mismatch: {relative}")
+            verified_cores.append({"name": record["name"], "path": relative,
+                                   "sha256": observed["sha256"]})
+        if {entry["name"] for entry in verified_cores} != {"mgba", "snes9x"}:
+            raise ValueError("Expected exactly mGBA and Snes9x in core manifest")
+
+    # Record precise versions from the actual frozen build environment.
+    # This inventory includes build-only Python packages: it is not an SBOM.
+    license_prefix = "Contents/Resources/" if target.startswith("macos-") else ""
+    python_inventory = license_prefix + "licenses/PYTHON_DISTRIBUTIONS.json"
+    python_distributions = []
+    if python_inventory in by_path:
+        metadata = json.loads((bundle / python_inventory).read_text(encoding="utf-8"))
+        for record in metadata.get("distributions", []):
+            python_distributions.append({
+                "name": record.get("name"),
+                "version": record.get("version"),
+                "license_expression": record.get("license_expression"),
+                "bundled_notice_count": len(record.get("license_files", [])),
+            })
+
     return {
         "schema_version": 1,
         "target": target,
@@ -85,6 +123,9 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
         "native_file_count": len(native_files),
         "symlink_count": len(links),
         "total_regular_file_bytes": total_bytes,
+        "verified_cores": verified_cores,
+        "python_distributions": python_distributions,
+        "python_inventory_scope": "Build environment; may include build-only packages",
         "native_files": native_files,
         "symlinks": links,
         "files": files,

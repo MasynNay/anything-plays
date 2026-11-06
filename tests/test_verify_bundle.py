@@ -24,7 +24,7 @@ class VerifyBundleTests(unittest.TestCase):
         bundle = self.root / ("AnythingPlays.app" if platform_name == "macos" else "AnythingPlays")
         if platform_name == "macos":
             licenses = bundle / "Contents" / "Resources" / "licenses"
-            cores = bundle / "Contents" / "MacOS" / "cores"
+            cores = bundle / "Contents" / "Resources" / "cores"
         else:
             licenses = bundle / "licenses"
             cores = bundle / "cores"

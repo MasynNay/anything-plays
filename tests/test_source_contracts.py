@@ -35,6 +35,36 @@ class SourceContracts(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue((ROOT / name).is_file())
 
+    def test_windows_build_uses_the_selected_python(self):
+        """Windows packaging must not silently switch to py's default 3.15."""
+        script = (ROOT / "build_windows.bat").read_text(encoding="utf-8").lower()
+        self.assertIn("python -m venv .build-venv", script)
+        self.assertIn("python fetch_mgba_core.py", script)
+        self.assertIn("python verify_bundle.py", script)
+        self.assertIn("sys.version_info", script)
+        self.assertNotIn("py -m venv", script)
+        self.assertNotIn("py fetch_mgba_core.py", script)
+        self.assertNotIn("py verify_bundle.py", script)
+
+    def test_macos_core_hashes_are_checked_after_signing(self):
+        """Ad-hoc signing must never change hashed Libretro dylibs unseen."""
+        script = (ROOT / "build_macos_dmg.sh").read_text(encoding="utf-8")
+        self.assertNotIn("codesign --force --deep --sign", script)
+        signing = script.index("codesign --force --sign -")
+        verification = script.index("verify_bundle.py --check-native macos", signing)
+        dmg = script.index("hdiutil create")
+        self.assertLess(signing, verification)
+        self.assertLess(verification, dmg)
+        self.assertIn("Contents/Resources/cores", script)
+        self.assertNotIn("Contents/MacOS/cores", script)
+        self.assertIn("hdiutil attach -readonly", script)
+        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"', script)
+
+    def test_linux_verifies_extracted_debian_payload(self):
+        script = (ROOT / "build_linux_deb.sh").read_text(encoding="utf-8")
+        self.assertIn('dpkg-deb -x', script)
+        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"', script)
+
     def test_ui_boundary_is_explicit(self):
         from app import App
         self.assertLess(len((ROOT / "app.py").read_text().splitlines()), 250)

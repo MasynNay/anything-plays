@@ -9,7 +9,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from anything_plays.core_locator import find_core
+from anything_plays.core_locator import find_core, _search_directories
 from anything_plays.libretro_abi import AVInfo, CoreInfo, GameInfo, Geometry, Timing
 
 
@@ -36,6 +36,13 @@ class LibretroBoundaryTests(unittest.TestCase):
     def test_missing_core_returns_none(self):
         with patch('pathlib.Path.is_file', return_value=False):
             self.assertIsNone(find_core('snes'))
+
+    def test_macos_bundled_core_resources_directory(self):
+        executable = "/Applications/AnythingPlays.app/Contents/MacOS/AnythingPlays"
+        expected = Path("/Applications/AnythingPlays.app/Contents/Resources/cores")
+        with (patch("sys.platform", "darwin"),
+              patch("sys.executable", executable)):
+            self.assertEqual(_search_directories()[0], expected)
 
     def test_unknown_system_raises_key_error(self):
         with self.assertRaises(KeyError):

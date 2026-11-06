@@ -26,14 +26,14 @@ for SIZE in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
-mkdir -p dist/AnythingPlays.app/Contents/MacOS/cores
+mkdir -p dist/AnythingPlays.app/Contents/Resources/cores
 for name in mgba snes9x; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
-  cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
+  cp "$core" dist/AnythingPlays.app/Contents/Resources/cores/
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
-cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/MacOS/cores/
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/Resources/cores/
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
@@ -50,7 +50,21 @@ cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays.app
-codesign --force --deep --sign - dist/AnythingPlays.app
+# Sign the outer application only. --deep would mutate nested Libretro dylibs
+# after their SHA-256 values were recorded in CORE_PROVENANCE.json.
+codesign --force --sign - dist/AnythingPlays.app
+# Verify again after signing; reject even a successfully signed but modified
+# bundle instead of shipping a DMG with invalid core provenance.
+"$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays.app
+codesign --verify --verbose=2 dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg
+# Verify bytes after they have been packaged into the actual distributable DMG.
+MOUNT_DIR="$(mktemp -d /tmp/anything-plays-release.XXXXXX)"
+trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/dev/null 2>&1 || true' EXIT
+hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" release/AnythingPlays.dmg
+"$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"
+hdiutil detach "$MOUNT_DIR"
+rmdir "$MOUNT_DIR"
+trap - EXIT
 echo 'Created release/AnythingPlays.dmg (unsigned; notarization required for normal public distribution)'

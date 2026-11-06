@@ -34,6 +34,9 @@ def _search_directories():
         Path("/usr/local/lib/libretro"),
     ]
     if sys.platform == "darwin":
+        # Keep camera/Libretro payloads under Contents/Resources, where macOS
+        # signing seals the files as resources without rewriting dylib hashes.
+        folders.insert(0, executable.parent / "Resources" / "cores")
         folders.extend([
             Path.home() / "Library/Application Support/RetroArch/cores",
             Path("/Applications/RetroArch.app/Contents/Resources/cores"),

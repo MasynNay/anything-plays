@@ -2,14 +2,19 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 set "VERSION=2.0.0"
-where py >nul 2>nul
+REM Use one explicit interpreter for the downloader, build venv and bundle
+REM verification. The unqualified Windows 'py' launcher may select a different
+REM installation than actions/setup-python (observed Python 3.15 vs 3.13).
+where python >nul 2>nul
 if errorlevel 1 (
-  echo Python launcher 'py' was not found. Install Python for Windows first.
+  echo Python was not found on PATH. Install Python 3.12 or 3.13.
   exit /b 1
 )
-py fetch_mgba_core.py
+python -c "import sys; assert (3, 12) <= sys.version_info[:2] < (3, 14), 'Use Python 3.12 or 3.13'"
 if errorlevel 1 exit /b 1
-py -m venv .build-venv
+python fetch_mgba_core.py
+if errorlevel 1 exit /b 1
+python -m venv .build-venv
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m pip install --upgrade pip
 if errorlevel 1 exit /b 1
@@ -40,7 +45,7 @@ if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
 
-py verify_bundle.py --check-native windows dist\AnythingPlays
+python verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
 if not exist release mkdir release
 set "ISCC="
