@@ -108,7 +108,8 @@ On Windows, create the environment with `py -3.12 -m venv .venv` and activate it
 with `.venv\Scripts\activate`. On platforms where your configured Python isn't
 named `python3.12`, use its actual executable. The downloader retrieves matching
 native libraries from the Libretro buildbot; it also creates
-`cores/CORE_PROVENANCE.json` with source URLs and SHA-256 hashes.
+`cores/CORE_PROVENANCE.json` with source URLs, SHA-256 hashes and the cores'
+reported version/source revision when available.
 
 ### The first five minutes
 

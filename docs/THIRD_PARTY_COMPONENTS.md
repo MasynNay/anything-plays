@@ -26,10 +26,13 @@ emulation and requires targeted compatibility verification.
 ## Known reproducibility gap
 
 `fetch_mgba_core.py` currently downloads the latest matching Libretro
-nightly archives. It writes `cores/CORE_PROVENANCE.json` with the actual
-download URL, SHA-256, and file size. This does **not** identify the source
-commit that produced each binary. Approval requires source/version mapping,
-corresponding source materials and immutable versions for each platform.
+nightly archives. It writes `cores/CORE_PROVENANCE.json` with the download URL,
+SHA-256, file size, embedded Libretro library version, and any source revision
+reported by the library itself. Verification compares these recorded fields
+against the staged binary. These are **self-reported source identifiers**, not
+independent build reproducibility or proof that no patch was applied.
+Approval still requires verifying corresponding source material and locking
+immutable versions for every supported architecture.
 
 ## Other third-party dependencies
 
