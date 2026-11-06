@@ -87,7 +87,11 @@ class ZonesMixin:
         fit_to_grid(self.cfg, self.system_key.get())
         self._shuffle_latched = False
         self.profile_store.put(self.system_key.get(), self.cfg)
-        self.status.set('Enabled buttons fitted to an even grid for this console.')
+        self.status.set(
+            'Enabled buttons and Shuffle snapped to an even grid.'
+            if self.shuffle_enabled.get() else
+            'Enabled buttons snapped to an even grid; hidden Shuffle preserved.'
+        )
 
     def shuffle_zones(self):
         """Shuffle every visible control, including the camera-triggered Shuffle zone."""
