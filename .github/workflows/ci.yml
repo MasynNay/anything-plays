@@ -70,7 +70,7 @@ jobs:
   package-windows:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
-    needs: [test]
+    # Independent package check: all jobs must still pass before merging.
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -96,7 +96,7 @@ jobs:
   package-macos:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
-    needs: [test]
+    # Independent package check: all jobs must still pass before merging.
     strategy:
       fail-fast: false
       matrix:
@@ -116,16 +116,20 @@ jobs:
         run: bash build_macos_dmg.sh
       - name: Record staged macOS binary inventory
         run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app release-evidence/macos-${{ matrix.arch }}.json
+      - name: Audit macOS FFmpeg and encoder Mach-O link dependencies
+        run: python tools/audit_codec_linkage.py dist/AnythingPlays.app release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: evidence-macos-${{ matrix.arch }}
-          path: release-evidence/macos-${{ matrix.arch }}.json
+          path: |
+            release-evidence/macos-${{ matrix.arch }}.json
+            release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
           if-no-files-found: error
 
   package-linux:
     if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
-    needs: [test]
+    # Independent package check: all jobs must still pass before merging.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
