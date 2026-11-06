@@ -5,10 +5,26 @@ and returns a new BGR frame; camera tracking works on the untouched source.
 """
 
 import cv2
+from functools import lru_cache
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from anything_plays.system_profiles import DISABLED_MAPPING
+
+
+@lru_cache(maxsize=32)
+def cached_zone_font(size):
+    """Avoid opening the same TrueType file on every camera frame."""
+    for font_name in (
+        '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+        'C:/Windows/Fonts/arialbd.ttf',
+    ):
+        try:
+            return ImageFont.truetype(font_name, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, artwork=None, shuffle_enabled=True, border_width=6, label_position='Center'):
@@ -25,17 +41,7 @@ def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, 
     # Map the user-facing 75–100 range to visibly distinct alpha levels.
     tint_alpha = round(25 + (opacity - 75) / 25 * 170)
     size = max(8, min(160, int(size)))
-    font = None
-    for font_name in ('/System/Library/Fonts/Supplemental/Arial Bold.ttf',
-                      '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-                      'C:/Windows/Fonts/arialbd.ttf'):
-        try:
-            font = ImageFont.truetype(font_name, size)
-            break
-        except OSError:
-            continue
-    if font is None:
-        font = ImageFont.load_default()
+    font = cached_zone_font(size)
     for name, (x1, y1, x2, y2) in zones.items():
         if name == 'Shuffle' and not shuffle_enabled:
             continue
