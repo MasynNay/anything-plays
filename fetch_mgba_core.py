@@ -1,4 +1,4 @@
-"""Download the three platform-matched Libretro cores used by Anything Plays.
+"""Download the two platform-matched Libretro cores used by Anything Plays.
 
 Native cores are fetched *when building*, never when the app is running. Every
 build records the downloaded binary's SHA-256 and source URL so maintainers can
@@ -19,7 +19,7 @@ from urllib import request
 import zipfile
 
 BUILD_BOT = "https://buildbot.libretro.com/nightly"
-CORE_NAMES = ("gambatte", "mgba", "snes9x")
+CORE_NAMES = ("mgba", "snes9x")
 MAX_ARCHIVE_SIZE = 30 * 1024 * 1024
 MAX_BINARY_SIZE = 60 * 1024 * 1024
 CORE_FOLDER = Path(__file__).resolve().parent / "cores"
