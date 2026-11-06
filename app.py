@@ -73,6 +73,9 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.n64_core_override = preferences.get('n64_core_path', '')
         if not isinstance(self.n64_core_override, str):
             self.n64_core_override = ''
+        # The 2.1 alpha can try bundled ParaLLEl-N64 software video in the
+        # actual Tk game panel. This is experimental and user-selectable.
+        self.n64_embedded = tk.BooleanVar(value=preferences.get('n64_embedded', True) is True)
         self.external_process = None
         self.external_input = None  # Local camera/keyboard bridge for N64
         self._game_only_window = None
@@ -132,6 +135,13 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.after(100, self.scan_cameras)
         root.after(45, self.tick)
         root.after(8000, lambda: self.check_emulator_updates(automatic=True))
+
+    def uses_embedded_emulator(self, system=None):
+        """Distinguish the experimental in-panel N64 core from GPU launchers."""
+        key = self.system_key.get() if system is None else system
+        return key in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis') or (
+            key == 'n64' and self.n64_embedded.get()
+        )
 
     def set_app_icon(self):
         """Use the same branded icon for source and frozen applications."""
