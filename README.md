@@ -218,9 +218,11 @@ Build on the target OS and architecture. The scripts download both required emul
 cores, package them with their provenance manifest, and fail if a required core
 cannot be retrieved. They also include installed Python distribution license
 files and a version inventory for third-party attribution review.
-**Nightly downloads are not pinned to a reproducible
-revision**, even when SHA-256 values are recorded afterward. Platform installers
-still require independent testing and a completed third-party licensing review.
+**Development builds still use changing nightly archives.** Official release
+builds require an explicit [approved core lock](docs/CORE_RELEASE_PINNING.md)
+with matching hashes and corresponding source records; the initial lock is
+unapproved. Platform installers require an independent third-party
+redistribution review before public publication.
 
 Public release packaging and publishing are currently disabled in
 `.github/workflows/release.yml`, including automatic version-tag triggers.
