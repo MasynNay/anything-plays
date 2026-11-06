@@ -15,6 +15,7 @@ class System:
     title: str
     core: str
     extensions: tuple[str, ...]
+    backend: str = "libretro"  # Embedded software-video core, or named external emulator.
 
 
 SYSTEMS = {
@@ -22,6 +23,10 @@ SYSTEMS = {
     "gbc": System("gbc", "Game Boy Color", "mgba", (".gbc",)),
     "gba": System("gba", "Game Boy Advance", "mgba", (".gba",)),
     "snes": System("snes", "Super Nintendo", "snes9x", (".sfc", ".smc")),
+    "nes": System("nes", "Nintendo Entertainment System", "fceumm", (".nes", ".unf", ".unif")),
+    "genesis": System("genesis", "Sega Genesis / Mega Drive", "genesis_plus_gx", (".md", ".gen", ".smd", ".bin")),
+    "n64": System("n64", "Nintendo 64 (RetroArch)", "mupen64plus_next", (".n64", ".z64", ".v64"), "retroarch"),
+    "gamecube": System("gamecube", "Nintendo GameCube (Dolphin)", "dolphin", (".iso", ".gcm", ".rvz", ".gcz", ".ciso"), "dolphin"),
 }
 
 # Retain GBA as the default for users upgrading from the original application.
