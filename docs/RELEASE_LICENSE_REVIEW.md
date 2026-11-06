@@ -58,9 +58,14 @@ inspection of the actual staged native binaries found:
   *after* their provenance hashes were verified. For example, the Apple
   Silicon mGBA binary changed from the candidate lock's 2,829,600 bytes to
   2,847,744 staged bytes, so its `CORE_PROVENANCE.json` could no longer
-  verify the packaged bytes. Ad-hoc signing now targets the outer app without
-  `--deep`, followed by a mandatory second core verification. The next
-  platform build must confirm preserved hashes and valid signing.
+  verify the packaged bytes. The original nested `Contents/MacOS/cores` path
+  also caused outer-only signing to fail because the JSON manifest was
+  treated as executable content. The two cores and their manifest have moved
+  into `Contents/Resources/cores`; runtime lookup and verification now agree
+  on that location. Ad-hoc signing targets the outer app without `--deep`,
+  followed by mandatory verification both after signing and after mounting
+  the final DMG. The next platform build must confirm preserved hashes,
+  discoverable cores and valid signing.
 
 Neither finding was visible from the older staged-bundle checks alone. The
 updated checks reduce the chance of distributing a broken binary, but do not
