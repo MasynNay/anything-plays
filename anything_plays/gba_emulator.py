@@ -183,6 +183,18 @@ class CoreSession:
             )
         self.native.loaded = True
 
+    def persist_game_progress(self):
+        """Keep gameplay alive if a removable/network ROM drive stops writing."""
+        try:
+            return self.save_ram.persist()
+        except OSError as exc:
+            # Native game execution must not stop solely because saving
+            # failed. Keep surfacing a visible warning until writes succeed.
+            self.emulator.save_warning = (
+                "Save failed; game is still running: " + str(exc)[:140]
+            )
+            return False
+
     def run(self):
         if not self.core_path or not Path(self.core_path).is_file():
             raise RuntimeError(
@@ -219,7 +231,7 @@ class CoreSession:
                 self.emulator.inputs.after_frame()
                 frame_number += 1
                 if frame_number % 300 == 0:
-                    self.save_ram.persist()
+                    self.persist_game_progress()
 
                 next_frame += 1 / frames_per_second
                 remaining = next_frame - time.monotonic()
@@ -227,7 +239,7 @@ class CoreSession:
                     self.emulator.stop_event.wait(remaining)
                 elif remaining < -0.25:
                     next_frame = time.monotonic()
-            self.save_ram.persist()
+            self.persist_game_progress()
         finally:
             self.audio.close()
             if self.native is not None:
@@ -248,6 +260,7 @@ class Emulator:
         self.running = False
         self.armed = False
         self.error = None
+        self.save_warning = None
         self.frame = None
         self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
@@ -270,6 +283,7 @@ class Emulator:
             raise RuntimeError("The previous emulator is still shutting down")
         self.rom = str(rom)
         self.error = None
+        self.save_warning = None
         self.stop_event.clear()
         with self.lock:
             self.frame = None
