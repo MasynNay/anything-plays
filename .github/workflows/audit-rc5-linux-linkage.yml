@@ -63,6 +63,21 @@ jobs:
           lib.Pa_GetVersionText.restype=ctypes.c_char_p
           print('System PortAudio:', lib.Pa_GetVersionText().decode())
           PY
+      - name: Verify frozen GUI still starts after unbundling optional libraries
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends xvfb xauth libgl1 libglib2.0-0
+          set +e
+          timeout --signal=TERM 12s xvfb-run -a pruned/opt/anything-plays/AnythingPlays > evidence/pruned-startup.log 2>&1
+          code=$?
+          set -e
+          echo "Pruned Anything Plays exit code: $code"
+          tail -40 evidence/pruned-startup.log || true
+          # 124 means a running GUI was terminated deliberately by timeout.
+          if [[ "$code" -ne 124 && "$code" -ne 0 ]]; then
+            echo "Pruned GUI failed before or during smoke run"; exit "$code"
+          fi
+          echo "Frozen GUI smoke test completed successfully with system-provided PortAudio"
       - uses: actions/upload-artifact@v4
         with:
           name: rc5-linux-system-library-linkage
