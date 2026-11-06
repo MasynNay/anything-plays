@@ -48,12 +48,26 @@ def main():
                     assert app.system_key.get() == "snes"
                     app.system_key.set("n64")
                     app.switch_system()
-                    assert app.external_setup.winfo_manager()
+                    # Experimental ParaLLEl-N64 software frames use the same
+                    # game canvas. RetroArch remains an explicit fallback.
+                    assert app.uses_embedded_emulator()
+                    assert not app.external_setup.winfo_manager()
+                    assert app.n64_mode_row.winfo_manager()
                     assert not app.arm_button.instate(("disabled",))
                     assert not app.shortcuts_button.instate(("disabled",))
                     app.set_view_mode("Game only", persist=False)
+                    assert app._game_only_canvas is not None
+                    app.set_view_mode("Windowed", persist=False)
+                    app.n64_embedded.set(False)
+                    app.switch_n64_backend()
+                    assert not app.uses_embedded_emulator()
+                    assert app.external_setup.winfo_manager()
+                    app.set_view_mode("Game only", persist=False)
                     assert app.view_mode.get() == "Windowed"
                     assert app._game_only_canvas is None
+                    app.n64_embedded.set(True)
+                    app.switch_n64_backend()
+                    assert not app.external_setup.winfo_manager()
                     app.system_key.set("genesis")
                     app.switch_system()
                     assert not app.external_setup.winfo_manager()
