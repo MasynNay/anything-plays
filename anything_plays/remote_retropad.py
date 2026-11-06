@@ -46,10 +46,10 @@ def write_retroarch_config(path, *, port=DEFAULT_PORT):
     target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
-        'network_remote_enable = "true"\\n'
-        'network_remote_enable_user_p1 = "true"\\n'
-        f'network_remote_base_port = "{port}"\\n'
-        'config_save_on_exit = "false"\\n',
+        'network_remote_enable = "true"\n'
+        'network_remote_enable_user_p1 = "true"\n'
+        f'network_remote_base_port = "{port}"\n'
+        'config_save_on_exit = "false"\n',
         encoding="utf-8",
     )
     return target
