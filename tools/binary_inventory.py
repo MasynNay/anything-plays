@@ -97,7 +97,7 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
                                    "sha256": observed["sha256"]})
         expected = {"mgba", "snes9x"}
         if os.environ.get("AP_V21_TEST_CORES") == "1":
-            expected |= {"fceumm", "genesis_plus_gx"}
+            expected |= {"fceumm", "genesis_plus_gx", "parallel_n64"}
         if {entry["name"] for entry in verified_cores} != expected:
             raise ValueError(f"Unexpected core manifest: expected {sorted(expected)}")
 
