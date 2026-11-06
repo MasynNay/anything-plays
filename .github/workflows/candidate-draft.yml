@@ -2,7 +2,7 @@ name: Assemble private v2.0 candidate from immutable emulator ZIPs
 # Do not automatically publish. Everything remains in a private draft release.
 on:
   push:
-    branches: [release/v2-rc2-headless]
+    branches: [release/v2-rc3-verified]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 env:
   AP_RELEASE_BUILD: '0'
   AP_CORE_ARCHIVE_CAPTURE_DIR: release-inputs
-  DRAFT_TAG: v2.0.0-rc.2
+  DRAFT_TAG: v2.0.0-rc.3
   SOURCE_TAG: v2.0.0-rc.1
 
 jobs:
@@ -21,7 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13']
+        # Main Source checks already verifies 3.12 and 3.13. This is the
+        # candidate's packaging Python; avoid redundant 3.12 Ubuntu apt setup.
+        python-version: ['3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,7 +44,7 @@ jobs:
 
   private-draft:
     needs: source-checks
-    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc2-headless'
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-rc3-verified'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
