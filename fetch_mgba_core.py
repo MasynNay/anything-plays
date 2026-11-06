@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import ctypes as C
 import hashlib
 import io
+import os
 import json
 import platform
 import re
@@ -173,6 +174,20 @@ def fetch_all(destination=CORE_FOLDER):
     (destination / "CORE_PROVENANCE.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
+    from tools.core_release_lock import (
+        LOCK_PATH, candidate_fingerprint, verify_release_lock,
+    )
+    # Non-public builds report the observed cores for future manual review.
+    candidate = candidate_fingerprint(manifest)
+    print("Core build candidate (NOT approved for public distribution):")
+    print(json.dumps(candidate, sort_keys=True), flush=True)
+    release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
+    if release_mode not in ("0", "1"):
+        raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
+    if release_mode == "1":
+        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        target = verify_release_lock(manifest, lock)
+        print(f"Release core lock verified for {target}", flush=True)
     return manifest
 
 
