@@ -43,12 +43,12 @@ cp licenses/*.txt dist/AnythingPlays/licenses/
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
 
-PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
+PKG="build/deb/anything-plays-test_${VERSION}_${ARCH}"
 rm -rf "$PKG"
-mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays" "$PKG/usr/bin" "$PKG/usr/share/applications"
-cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays/"
+mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-21-test" "$PKG/usr/bin" "$PKG/usr/share/applications"
+cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-21-test/"
 mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
-cp assets/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays.png"
+cp assets/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-test.png"
 cat > "$PKG/DEBIAN/control" <<CONTROL
 Package: anything-plays
 Version: $VERSION
@@ -60,12 +60,12 @@ Depends: libc6, libgl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
  Embedded GB/GBC/GBA, SNES, NES and Genesis cores; external N64/GameCube launch.
 CONTROL
-cat > "$PKG/usr/bin/anything-plays" <<'LAUNCH'
+cat > "$PKG/usr/bin/anything-plays-21-test" <<'LAUNCH'
 #!/bin/sh
-exec /opt/anything-plays/AnythingPlays "$@"
+exec /opt/anything-plays-21-test/AnythingPlays "$@"
 LAUNCH
-chmod +x "$PKG/usr/bin/anything-plays"
-cat > "$PKG/usr/share/applications/anything-plays.desktop" <<'DESKTOP'
+chmod +x "$PKG/usr/bin/anything-plays-21-test"
+cat > "$PKG/usr/share/applications/anything-plays-test.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=Anything Plays
@@ -78,13 +78,13 @@ DESKTOP
 mkdir -p release
 chmod g-s "$PKG/DEBIAN"
 chmod 0755 "$PKG/DEBIAN"
-dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays_${VERSION}_${ARCH}.deb"
+dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays-test_${VERSION}_${ARCH}.deb"
 # Verify the exact DEB payload, not only the staging folder.
 AUDIT_DIR="$(mktemp -d)"
 trap 'rm -rf "$AUDIT_DIR"' EXIT
-dpkg-deb -x "release/anything-plays_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
-python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"
-python3 - "$AUDIT_DIR/opt/anything-plays" <<'PY'
+dpkg-deb -x "release/anything-plays-test_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
+python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-21-test"
+python3 - "$AUDIT_DIR/opt/anything-plays-21-test" <<'PY'
 import sys
 from pathlib import Path
 from tools.prune_linux_system_libs import EXCLUDED_RELATIVE_FILES
@@ -95,4 +95,4 @@ print("Validated clean Linux installed payload without redundant audio system li
 PY
 rm -rf "$AUDIT_DIR"
 trap - EXIT
-echo "Created release/anything-plays_${VERSION}_${ARCH}.deb"
+echo "Created release/anything-plays-test_${VERSION}_${ARCH}.deb"
