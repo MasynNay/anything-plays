@@ -8,6 +8,7 @@ import argparse
 import ctypes as C
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -135,6 +136,17 @@ def verify_bundle(bundle, platform_name, check_native=False):
                           "reported_source_commit_url"):
                 if record.get(field) != observed[field]:
                     raise ValueError(f"Recorded {field} mismatch for {name}: {path}")
+    # Public release builds must pass the same reviewed lock again after
+    # staging. The existing hash check above binds the manifest to these files.
+    release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
+    if release_mode not in ("0", "1"):
+        raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
+    if release_mode == "1":
+        from tools.core_release_lock import LOCK_PATH, verify_release_lock
+
+        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        verify_release_lock(manifest, lock)
+
     print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums"
           + (" and native GB/GBC/GBA coverage" if check_native else ""))
 
