@@ -39,7 +39,10 @@ keyboard. A webcam is optional for manual play.
 > custom keyboard mappings, embedded NES/Genesis emulation, and external
 > N64/GameCube launching. It is not a public release. Follow the
 > [2.1 test guide](docs/V2_1_TESTING.md) for installers that coexist with
-> stable 2.0. Camera presses currently control embedded systems only.
+> stable 2.0. For N64, experimental camera input is bridged to an
+> installed RetroArch; for GameCube on macOS/Linux, it is bridged to Dolphin.
+> **Both still display games in separate GPU windows.** Game video is not
+> embedded yet, and the controller bridges require hardware validation.
 
 ## Supported consoles
 
