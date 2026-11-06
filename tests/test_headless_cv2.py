@@ -35,7 +35,7 @@ class HeadlessCaptureTests(unittest.TestCase):
     def test_ffmpeg_rejected_for_verified_camera_only_wheel(self):
         mock = self.stub(gui="COCOA")
         mock.CAP_FFMPEG = 1900
-        mock.getBuildInformation = lambda: "  GUI: COCOA\\n  FFMPEG: YES\\n"
+        mock.getBuildInformation = lambda: "  GUI: COCOA\n  FFMPEG: YES\n"
         mock.videoio_registry.hasBackend = lambda backend: backend == mock.CAP_AVFOUNDATION
         with patch.dict("os.environ", {"AP_REQUIRE_OPENCV_FFMPEG_OFF": "1"}):
             with self.assertRaisesRegex(RuntimeError, "requires FFMPEG: NO"):
@@ -44,7 +44,7 @@ class HeadlessCaptureTests(unittest.TestCase):
     def test_absent_ffmpeg_line_accepted_as_not_compiled(self):
         mock = self.stub(gui="COCOA")
         mock.CAP_FFMPEG = 1900
-        mock.getBuildInformation = lambda: "  GUI: COCOA\\n  AVFoundation: YES\\n"
+        mock.getBuildInformation = lambda: "  GUI: COCOA\n  AVFoundation: YES\n"
         mock.videoio_registry.hasBackend = lambda backend: backend == mock.CAP_AVFOUNDATION
         with patch.dict("os.environ", {"AP_REQUIRE_OPENCV_FFMPEG_OFF": "1"}):
             result = verify_opencv_build(mock, "darwin")
