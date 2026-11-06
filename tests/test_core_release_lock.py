@@ -104,6 +104,37 @@ class ReleaseCoreLockTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Full corresponding source commit"):
             verify_release_lock(self.manifest, lock)
 
+    def test_unapproved_release_download_fails_before_distribution(self):
+        """Release mode must reject unapproved core locks."""
+        import json
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        from fetch_mgba_core import fetch_all
+
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lockfile = folder / "release-lock.json"
+            lockfile.write_text(json.dumps({
+                "schema_version": 1,
+                "approved_for_binary_distribution": False,
+                "targets": {},
+            }))
+            records = self.manifest["cores"]
+            def fake_fetch(name, destination):
+                return next(dict(item) for item in records if item["name"] == name)
+
+            with (
+                patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
+                patch("tools.core_release_lock.LOCK_PATH", lockfile),
+                patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+            ):
+                with self.assertRaisesRegex(ValueError, "not approved"):
+                    fetch_all(folder)
+            self.assertTrue((folder / "CORE_PROVENANCE.json").is_file())
+
     def test_duplicate_core_fails(self):
         manifest = copy.deepcopy(self.manifest)
         manifest["cores"][1]["name"] = "mgba"
