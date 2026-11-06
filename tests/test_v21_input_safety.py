@@ -1,6 +1,7 @@
 """Regression tests for concurrent UI Stop and 60 FPS emulator input."""
 import threading
 import unittest
+from unittest.mock import patch
 
 from anything_plays.libretro_input import InputBuffer, IDS
 
@@ -30,6 +31,25 @@ class InputSafetyTests(unittest.TestCase):
         buffer.disarm()
         self.assertFalse(buffer.remaining)
         self.assertFalse(buffer.pressed)
+
+    def test_n64_analog_mapping_is_bounded_per_frame(self):
+        from anything_plays.libretro_input import desired_state
+        buffer = InputBuffer()
+        buffer.system = "n64"
+        buffer.set_manual("Left", True)
+        buffer.set_manual("C Up", True)
+        with patch("anything_plays.libretro_input.desired_state",
+                   wraps=desired_state) as calculate:
+            buffer.before_frame(armed=False)
+            self.assertEqual(calculate.call_count, 1)
+            for _ in range(1000):
+                self.assertLess(buffer.state(0, 5, 0, 0), 0)
+                self.assertLess(buffer.state(0, 5, 1, 1), 0)
+            self.assertEqual(calculate.call_count, 1)
+            buffer.release_manual()
+            buffer.before_frame(armed=False)
+            self.assertEqual(calculate.call_count, 2)
+        self.assertEqual(buffer.state(0, 5, 0, 0), 0)
 
     def test_manual_input_survives_camera_stop(self):
         buffer = InputBuffer()
