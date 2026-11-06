@@ -9,10 +9,12 @@ license compliance, or reproducible pinned builds.
 """
 
 from datetime import datetime, timezone
+import ctypes as C
 import hashlib
 import io
 import json
 import platform
+import re
 from pathlib import Path
 import sys
 from urllib import request
@@ -23,6 +25,58 @@ CORE_NAMES = ("mgba", "snes9x")
 MAX_ARCHIVE_SIZE = 30 * 1024 * 1024
 MAX_BINARY_SIZE = 60 * 1024 * 1024
 CORE_FOLDER = Path(__file__).resolve().parent / "cores"
+
+SOURCE_REPOSITORIES = {
+    "mgba": "https://github.com/libretro/mgba",
+    "snes9x": "https://github.com/libretro/snes9x",
+}
+
+
+class _LibretroCoreInfo(C.Structure):
+    """The stable retro_system_info structure from the Libretro ABI."""
+
+    _fields_ = [
+        ("library_name", C.c_char_p),
+        ("library_version", C.c_char_p),
+        ("valid_extensions", C.c_char_p),
+        ("need_fullpath", C.c_bool),
+        ("block_extract", C.c_bool),
+    ]
+
+
+def reported_git_revision(version):
+    """Extract the short source revision advertised by a core, if provided."""
+    match = re.search(r"(?<![0-9a-f])([0-9a-f]{7,40})$", version.lower())
+    return match.group(1) if match else None
+
+
+def inspect_core_identity(path, name):
+    """Read a downloaded native core's identity without loading game content.
+
+    Version-embedded hashes are the core's self-report, not independent proof
+    of its build inputs. Keep exact binary hashes alongside this information.
+    """
+    if name not in SOURCE_REPOSITORIES:
+        raise ValueError(f"Unknown core: {name}")
+    library = C.CDLL(str(Path(path).resolve()))
+    describe = library.retro_get_system_info
+    describe.argtypes = [C.POINTER(_LibretroCoreInfo)]
+    describe.restype = None
+    info = _LibretroCoreInfo()
+    describe(C.byref(info))
+    library_name = (info.library_name or b"").decode("utf-8", "replace")
+    version = (info.library_version or b"").decode("utf-8", "replace")
+    if not library_name or not version:
+        raise ValueError(f"Native core {name} does not expose version metadata")
+    revision = reported_git_revision(version)
+    repository = SOURCE_REPOSITORIES[name]
+    return {
+        "libretro_library_name": library_name,
+        "libretro_library_version": version,
+        "reported_source_revision": revision,
+        "source_repository_url": repository,
+        "reported_source_commit_url": (f"{repository}/commit/{revision}" if revision else None),
+    }
 
 
 def build_target(platform_name=None, architecture=None):
@@ -97,9 +151,11 @@ def fetch_core(name, destination=CORE_FOLDER):
     target = destination / filename
     target.write_bytes(content)
     digest = hashlib.sha256(content).hexdigest()
-    print(f"{name} ready: {target} ({len(content):,} bytes)", flush=True)
+    identity = inspect_core_identity(target, name)
+    print(f"{name} ready: {target} ({len(content):,} bytes), "
+          f"reported version {identity['libretro_library_version']}", flush=True)
     return {"name": name, "file": filename, "source_url": url,
-            "sha256": digest, "size_bytes": len(content)}
+            "sha256": digest, "size_bytes": len(content), **identity}
 
 
 def fetch_all(destination=CORE_FOLDER):
