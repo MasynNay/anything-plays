@@ -61,7 +61,7 @@ class GameplayMixin:
             if self.external_input is not None:
                 self.external_input.set_manual(button, True)
                 return 'break'
-            if SYSTEMS[self.system_key.get()].backend == 'libretro':
+            if self.uses_embedded_emulator():
                 self.emu.set_manual(button, True)
                 return 'break'
 
@@ -77,7 +77,10 @@ class GameplayMixin:
         if self.armed:
             self.stop_controls()
             return
-        backend = SYSTEMS[self.system_key.get()].backend
+        backend = (
+            "libretro" if self.uses_embedded_emulator()
+            else SYSTEMS[self.system_key.get()].backend
+        )
         if backend == "dolphin" and self.external_input is None:
             messagebox.showinfo(
                 'GameCube camera input',
@@ -121,7 +124,8 @@ class GameplayMixin:
             self.external_input.release_camera()
         if hasattr(self, 'arm_button'):
             label = ('Enable object controls'
-                     if SYSTEMS[self.system_key.get()].backend in ('libretro', 'retroarch')
+                     if self.uses_embedded_emulator()
+                     or SYSTEMS[self.system_key.get()].backend == 'retroarch'
                      or self.external_input is not None
                      else 'Camera controls unavailable for Dolphin')
             self.arm_button.config(text=label)
