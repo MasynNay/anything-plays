@@ -1,0 +1,31 @@
+name: Preserve pinned upstream sources in private v2 candidate
+on:
+  push:
+    branches: [release/v2-source-snapshots]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/release/v2-source-snapshots'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate source snapshot requirements
+        run: python -m unittest discover -s tests -p test_candidate_sources.py -v
+      - name: Archive the exact upstream source commits
+        run: python -m tools.capture_candidate_sources source-snapshots
+      - name: Upload immutable source snapshots to unapproved PRIVATE draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view v2.0.0-rc.1 --json isDraft --jq '.isDraft')" = true || {
+            echo 'Cannot publish source snapshots to a non-draft release'; exit 1;
+          }
+          gh release upload v2.0.0-rc.1 source-snapshots/* --clobber
