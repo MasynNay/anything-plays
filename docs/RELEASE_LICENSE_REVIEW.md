@@ -49,11 +49,16 @@ The application's original MIT license does **not** govern Snes9x.
 - [ ] Confirm all bundled Python/native dependencies and app assets are
       redistributable with their required notices.
 - [x] Verify native GB/GBC ROM loading and frame rendering with mGBA using generated homebrew test ROMs.
-- [ ] Verify compatibility of existing GB/GBC battery-backed `.sav` files with mGBA and representative real-game behavior.
+- [x] Verify 8 KiB MBC1 battery-backed raw `.sav` restore and persistence
+      using the real mGBA core and generated GB/GBC test cartridges.
+- [ ] Review other battery-backed mapper formats and representative real-game
+      behavior as needed; the targeted MBC1 test is not blanket compatibility proof.
 - [ ] Inspect the final two-core installers on Windows, macOS and Linux,
       including license files and core checksum manifest.
 - [ ] Obtain release approval, restore a controlled publication mechanism,
       and publish signed/unsigned limitations accurately.
+
+Targeted save compatibility: [GitHub Actions run 42163546612](https://github.com/MasynNay/anything-plays/actions/runs/42163546612) verified restoration and persistence of an existing raw 8 KiB MBC1 `.sav` in native mGBA, for both GB and GBC synthetic cartridges. Other mapper formats are not covered.
 
 Latest platform package verification: [GitHub Actions run 42159955003](https://github.com/MasynNay/anything-plays/actions/runs/42159955003), which completed successfully on all four target architectures. These are automated packaging and native-core checks, not distribution authorization.
 
