@@ -53,6 +53,34 @@ class AudioBufferTests(unittest.TestCase):
         audio.callback(output, 4, None, None)
         self.assertEqual(output.tolist(), [[10, 20], [-1, -2], [0, 0], [0, 0]])
 
+    def test_single_sample_audio_uses_fixed_size_blocks(self):
+        audio = AudioSink()
+        for index in range(3000):
+            audio.sample(index % 12000, -(index % 12000))
+        # 3000 callbacks used to create 3000 arrays and flood the queue.
+        self.assertEqual(audio.chunks.qsize(), 11)
+        self.assertEqual(audio._single_count, 184)
+        audio._flush_single_samples()
+        self.assertEqual(audio.chunks.qsize(), 12)
+        self.assertEqual(audio._single_count, 0)
+        output = np.zeros((3000, 2), dtype=np.int16)
+        audio.callback(output, 3000, None, None)
+        self.assertEqual(output[0].tolist(), [0, 0])
+        self.assertEqual(output[-1].tolist(), [2999, -2999])
+
+    def test_audio_memory_is_bounded_after_many_samples(self):
+        audio = AudioSink()
+        for index in range(20000):
+            audio.sample(index % 100, -(index % 100))
+        self.assertLessEqual(audio.chunks.qsize(), 32)
+        self.assertLessEqual(audio._single_count, 256)
+        # Even after an overnight session, old samples are dropped instead of
+        # allocating an ever-growing backlog.
+        self.assertLessEqual(
+            sum(chunk.nbytes for chunk in list(audio.chunks.queue)),
+            32 * 256 * 2 * np.dtype(np.int16).itemsize,
+        )
+
     def test_native_audio_batch_copies_core_owned_buffer(self):
         audio = AudioSink()
         samples = (C.c_int16 * 4)(1, 2, 3, 4)
