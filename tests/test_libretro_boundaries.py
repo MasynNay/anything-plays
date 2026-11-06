@@ -28,6 +28,8 @@ class LibretroBoundaryTests(unittest.TestCase):
     def test_system_core_mapping_is_preserved(self):
         from anything_plays.systems import SYSTEMS
         self.assertEqual(SYSTEMS['gb'].core, SYSTEMS['gbc'].core)
+        self.assertEqual(SYSTEMS['gb'].core, 'mgba')
+        self.assertEqual(SYSTEMS['gbc'].core, 'mgba')
         self.assertEqual(SYSTEMS['gba'].core, 'mgba')
         self.assertEqual(SYSTEMS['snes'].core, 'snes9x')
 
