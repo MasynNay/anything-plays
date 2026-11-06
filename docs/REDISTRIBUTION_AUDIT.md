@@ -28,6 +28,21 @@ Libretro binary.** Inspect the exact compiled source/build options and bundled
 dependencies to establish which notices and source obligations apply. Retain
 the complete core-specific LICENSE; avoid replacing it with a short paraphrase.
 
+### Snes9x source-level component finding
+
+The [upstream Libretro source tree at `fae2fea`](https://github.com/libretro/snes9x/tree/fae2fea08f74180759ef540ee94259213f503480)
+contains `filter/snes_ntsc-license.txt` and its
+[`libretro/Makefile.common`](https://github.com/libretro/snes9x/blob/fae2fea08f74180759ef540ee94259213f503480/libretro/Makefile.common)
+lists `filter/snes_ntsc.c` among the C sources without a conditional
+feature flag. Thus the NTSC filter's LGPL 2.1 notice is relevant to builds
+using that Makefile. The complete upstream license text is now committed at
+`licenses/Snes9x-snes_ntsc-LGPL-2.1.txt`, and staged-bundle verification
+requires it. The inspected source tree did not expose JMA or xBRZ component
+directories mentioned by the general Snes9x LICENSE; this does not prove
+their absence from every published native build. Inspect exact build logs
+and source archives and review LGPL source/relinking requirements rather
+than treating a license copy as full compliance.
+
 ## Source and binary traceability
 
 The core builds in [a successful four-architecture CI run](https://github.com/MasynNay/anything-plays/actions/runs/42163068042)
