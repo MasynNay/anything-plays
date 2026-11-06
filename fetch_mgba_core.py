@@ -118,23 +118,55 @@ def _validate_binary(content, extension):
         raise ValueError(f"Downloaded file is not a valid {extension} native library")
 
 
+def _read_core_archive(url, filename):
+    """Read a Libretro ZIP from an offline release archive or the dev buildbot.
+
+    Public release builds must never fetch mutable nightly URLs. The calling
+    code separately checks the extracted native binary's approved SHA-256
+    before writing it to disk or loading it via ctypes.
+    """
+    release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
+    if release_mode not in ("0", "1"):
+        raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
+    archive_directory = os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip()
+    if release_mode == "1" and not archive_directory:
+        raise ValueError(
+            "Release builds require AP_CORE_ARCHIVE_DIR with preserved core ZIPs; "
+            "mutable nightly downloads are forbidden"
+        )
+
+    if archive_directory:
+        archive_path = Path(archive_directory).expanduser() / f"{filename}.zip"
+        if archive_path.is_symlink():
+            raise ValueError(f"Refusing symlinked core archive: {archive_path}")
+        if not archive_path.is_file():
+            raise FileNotFoundError(f"Required offline core archive missing: {archive_path}")
+        print(f"Reading preserved core ZIP: {archive_path}", flush=True)
+        with archive_path.open("rb") as handle:
+            data = handle.read(MAX_ARCHIVE_SIZE + 1)
+    else:
+        download = request.Request(
+            url, headers={"User-Agent": "AnythingPlays-build/2.0.0"}
+        )
+        with request.urlopen(download, timeout=45) as response:
+            data = response.read(MAX_ARCHIVE_SIZE + 1)
+
+    if len(data) > MAX_ARCHIVE_SIZE:
+        raise ValueError("Core archive exceeds 30 MB")
+    return data
+
+
 def fetch_core(name, destination=CORE_FOLDER):
-    """Download one core and return its name, URL, size and binary SHA-256."""
+    """Acquire one core and record its binary SHA-256 and upstream identity."""
     if name not in CORE_NAMES:
         raise ValueError(f"Unknown emulator core: {name}")
     folder, extension = build_target()
     filename = f"{name}_libretro{extension}"
     url = f"{BUILD_BOT}/{folder}/{filename}.zip"
     destination = Path(destination)
-    print(f"Fetching {name}: {url}", flush=True)
+    print(f"Preparing {name}; upstream reference: {url}", flush=True)
 
-    download = request.Request(
-        url, headers={"User-Agent": "AnythingPlays-build/2.0.0"}
-    )
-    with request.urlopen(download, timeout=45) as response:
-        archive_data = response.read(MAX_ARCHIVE_SIZE + 1)
-    if len(archive_data) > MAX_ARCHIVE_SIZE:
-        raise ValueError("Core archive exceeds 30 MB")
+    archive_data = _read_core_archive(url, filename)
 
     with zipfile.ZipFile(io.BytesIO(archive_data)) as archive:
         candidates = [
@@ -180,7 +212,11 @@ def fetch_all(destination=CORE_FOLDER):
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "build_platform": sys.platform,
         "build_architecture": platform.machine(),
-        "note": "Latest nightly downloads; source revisions are not pinned.",
+        "note": (
+            "Local preserved core ZIPs; extracted binaries must match approved hashes."
+            if os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip()
+            else "Latest nightly downloads; source revisions are not pinned."
+        ),
         "cores": binaries,
     }
     (destination / "CORE_PROVENANCE.json").write_text(
