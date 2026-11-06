@@ -9,6 +9,7 @@ import copy
 from pathlib import Path
 import sys
 import tkinter as tk
+from PIL import Image, ImageTk
 
 from anything_plays.gba_emulator import Emulator
 from anything_plays.settings_defaults import DEFAULT
@@ -150,12 +151,23 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         )
 
     def set_app_icon(self):
-        """Use the same branded icon for source and frozen applications."""
+        """Prefer corrected 2.1 artwork without mutating stable 2.0 assets."""
         base = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-        icon = base / 'assets' / 'anything_plays.png'
-        if icon.is_file():
+        artwork = base / 'assets' / 'anything_plays_v21.webp'
+        if artwork.is_file():
             try:
-                self._app_icon = tk.PhotoImage(file=str(icon))
+                with Image.open(artwork) as source:
+                    icon = source.convert('RGBA')
+                self._app_icon = ImageTk.PhotoImage(icon, master=self.root)
+                self.root.iconphoto(True, self._app_icon)
+                return
+            except (OSError, ValueError, tk.TclError):
+                # Preserve the original PNG for older Pillow/Tk setups.
+                pass
+        original = base / 'assets' / 'anything_plays.png'
+        if original.is_file():
+            try:
+                self._app_icon = tk.PhotoImage(file=str(original))
                 self.root.iconphoto(True, self._app_icon)
             except tk.TclError:
                 pass
