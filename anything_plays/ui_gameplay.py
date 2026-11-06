@@ -158,8 +158,15 @@ class GameplayMixin:
                 self.game_status.set('Emulator error: ' + self.emu.error)
                 self.stop_controls()
                 self.emu.error = None
+            elif self.emu.save_warning:
+                # Do not bury a disk/save failure beneath a continuously
+                # refreshed "Playing" status during a long session.
+                self.game_status.set(self.emu.save_warning)
+                self._save_warning_until = time.monotonic() + 20
+                self.emu.save_warning = None
             elif self.emu.running:
-                if self.current_rom:
+                if (self.current_rom and
+                        time.monotonic() >= getattr(self, "_save_warning_until", 0)):
                     self.game_status.set('Playing ' + Path(self.current_rom).stem)
         except Exception as exc:
             self.stop_controls()
