@@ -5,12 +5,6 @@ import tkinter as tk
 from tkinter import ttk
 
 from anything_plays.systems import SYSTEMS
-from anything_plays.system_profiles import DISABLED_MAPPING, BUTTONS_BY_SYSTEM
-
-ALL_BUTTONS = tuple(dict.fromkeys(
-    button for buttons in BUTTONS_BY_SYSTEM.values() for button in buttons
-))
-
 
 class LayoutMixin:
     """Tkinter behavior shared with the main application controller.
