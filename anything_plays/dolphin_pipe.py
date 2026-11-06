@@ -14,7 +14,7 @@ import time
 
 GAMECUBE_KEYS = frozenset((
     "Left", "Right", "Up", "Down", "A", "B", "X", "Y",
-    "Z", "L", "R", "Start",
+    "Z", "L", "R", "Start", "C Up", "C Down", "C Left", "C Right",
 ))
 DIGITAL_NAMES = {
     "A": "A", "B": "B", "X": "X", "Y": "Y",
@@ -57,6 +57,11 @@ def dolphin_profile(user_dir):
         "Main Stick/Left": "Axis MAIN X -",
         "Main Stick/Right": "Axis MAIN X +",
         "Main Stick/Center": "0.00 0.00",
+        "C-Stick/Up": "Axis C Y +",
+        "C-Stick/Down": "Axis C Y -",
+        "C-Stick/Left": "Axis C X -",
+        "C-Stick/Right": "Axis C X +",
+        "C-Stick/Center": "0.00 0.00",
     }
     lines = ["[GCPad1]", f"Device = Pipe/0/{PIPE_NAME}"]
     for key, name in mapping.items():
@@ -82,14 +87,19 @@ def gamecube_commands(buttons, previous):
     for button, label in DIGITAL_NAMES.items():
         if (button in desired) != (button in before):
             result.append(("PRESS " if button in desired else "RELEASE ") + label)
-    def stick_state(keys):
+    def stick_state(keys, prefix=""):
         return (
-            0.5 + 0.5 * (int("Right" in keys) - int("Left" in keys)),
-            0.5 + 0.5 * (int("Up" in keys) - int("Down" in keys)),
+            0.5 + 0.5 * (int((prefix + "Right") in keys) -
+                         int((prefix + "Left") in keys)),
+            0.5 + 0.5 * (int((prefix + "Up") in keys) -
+                         int((prefix + "Down") in keys)),
         )
     main = stick_state(desired)
     if main != stick_state(before):
         result.append(f"SET MAIN {main[0]:.2f} {main[1]:.2f}")
+    c_stick = stick_state(desired, "C ")
+    if c_stick != stick_state(before, "C "):
+        result.append(f"SET C {c_stick[0]:.2f} {c_stick[1]:.2f}")
     return result
 
 
