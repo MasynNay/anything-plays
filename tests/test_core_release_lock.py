@@ -135,6 +135,28 @@ class ReleaseCoreLockTests(unittest.TestCase):
                     fetch_all(folder)
             self.assertTrue((folder / "CORE_PROVENANCE.json").is_file())
 
+    def test_legacy_linux_x86_development_build_still_works(self):
+        """A non-release 32-bit development target must not need approval."""
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        from fetch_mgba_core import fetch_all
+
+        def fake_fetch(name, destination):
+            return next(dict(item) for item in self.manifest["cores"]
+                        if item["name"] == name)
+
+        with TemporaryDirectory() as tmp, (
+            patch("fetch_mgba_core.fetch_core", side_effect=fake_fetch),
+            patch("fetch_mgba_core.platform.machine", return_value="i686"),
+            patch.dict(os.environ, {"AP_RELEASE_BUILD": "0"}),
+        ):
+            manifest = fetch_all(Path(tmp))
+            self.assertEqual(manifest["build_architecture"], "i686")
+            self.assertTrue((Path(tmp) / "CORE_PROVENANCE.json").is_file())
+
     def test_duplicate_core_fails(self):
         manifest = copy.deepcopy(self.manifest)
         manifest["cores"][1]["name"] = "mgba"
