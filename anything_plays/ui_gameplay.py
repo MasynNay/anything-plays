@@ -58,7 +58,7 @@ class GameplayMixin:
     def manual_key_down(self, event):
         button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
         if button and self.manual_active:
-            if self.system_key.get() == "n64" and self.external_input is not None:
+            if self.external_input is not None:
                 self.external_input.set_manual(button, True)
                 return 'break'
             if SYSTEMS[self.system_key.get()].backend == 'libretro':
