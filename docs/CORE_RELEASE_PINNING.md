@@ -14,6 +14,27 @@ from Libretro's changing `latest` URLs. A version string, URL or Git hash
 alone does not prove that a downloaded binary was built from a particular
 source tree. A new nightly can replace an older one at the same URL.
 
+**Official release mode never downloads those nightlies.** It requires
+`AP_CORE_ARCHIVE_DIR` to point to a local directory containing preserved
+ZIPs for the runner's platform, such as:
+
+```text
+approved-core-zips/
+  mgba_libretro.so.zip
+  snes9x_libretro.so.zip
+```
+
+Use the `.dll.zip` filenames for Windows or `.dylib.zip` filenames for
+macOS. Windows and macOS Intel/Apple Silicon archives must be staged in
+separate architecture-specific runner directories, since the macOS filenames
+are identical across architectures. A missing ZIP stops the build without
+network fallback. The binary extracted from each ZIP must still match the
+approved lock's SHA-256, file size, and identity.
+
+`AP_RELEASE_BUILD=1 AP_CORE_ARCHIVE_DIR=/path/to/approved-core-zips`
+is the intended release environment, after redistribution approval and
+immutable inputs are actually provided.
+
 With `AP_RELEASE_BUILD=1`, `fetch_mgba_core.py` and `verify_bundle.py`
 require the approved fingerprints in [the lock](../config/v2.0-core-lock.json).
 They compare the actual download's hash, byte count, Libretro version,
