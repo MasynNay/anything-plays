@@ -86,7 +86,10 @@ jobs:
           path: release/*.deb
           if-no-files-found: error
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Safety lock: producing installers is NOT approval to redistribute them.
+    # Enable only after the bundled-core license and corresponding-source
+    # requirements have been independently reviewed and satisfied.
+    if: ${{ false }}
     needs: [windows, macos, linux]
     runs-on: ubuntu-latest
     steps:
