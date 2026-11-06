@@ -58,6 +58,30 @@ class ExternalBackendMixin:
             self.shortcuts_button.configure(state="normal")
             self.external_setup.pack_forget()
 
+    def show_external_placeholder(self):
+        """Make clear why the native game canvas has no video for 3D consoles."""
+        backend = SYSTEMS[self.system_key.get()].backend
+        if backend == "libretro":
+            return
+        canvas = self.game_canvas
+        canvas.delete("all")
+        width = max(340, canvas.winfo_width())
+        height = max(180, canvas.winfo_height())
+        label = "NINTENDO 64" if backend == "retroarch" else "NINTENDO GAMECUBE"
+        canvas.create_text(
+            width // 2, height // 2 - 20,
+            text=label, fill="#eef4ff", font=("Arial", 17, "bold"),
+            anchor="center",
+        )
+        canvas.create_text(
+            width // 2, height // 2 + 26,
+            text=("Game video uses a separate GPU window.\n"
+                  "The camera zones and keyboard controls remain in Anything Plays.\n"
+                  "Launch a cartridge below to start playing."),
+            fill="#afc6e3", font=("Arial", 12),
+            justify="center", width=max(200, width - 40),
+        )
+
     def choose_external_executable(self):
         system = self.system_key.get()
         if SYSTEMS[system].backend == "libretro":
@@ -124,6 +148,7 @@ class ExternalBackendMixin:
             self.game_status.set(str(exc))
             messagebox.showerror("External emulator setup", str(exc), parent=self.root)
             return False
+        self.show_external_placeholder()
         self.game_status.set(
             f"Launched {Path(rom).stem} in an external emulator. "
             + ("Camera/keyboard controls are available in Anything Plays; "
