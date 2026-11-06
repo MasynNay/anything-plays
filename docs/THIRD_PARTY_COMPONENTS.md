@@ -35,9 +35,13 @@ corresponding source materials and immutable versions for each platform.
 
 The frozen application includes OpenCV, NumPy, Pillow, sounddevice and
 platform-specific dependencies such as PyObjC, plus transitive native
-libraries. Review their actual versions, licenses, copyright notices and
-redistribution obligations. The source artwork and icon rights must also
-be confirmed. The complete Python dependency list is in `../requirements.txt`.
+libraries. The build scripts collect installed wheel license/notice files
+under the packaged `licenses/python-distribution-notices/` directory and
+write a version inventory to `licenses/PYTHON_DISTRIBUTIONS.json`. The
+inventory includes **build-only packages**, so it does not prove which
+libraries were actually frozen or whether native/transitive licenses are
+fully satisfied. The source artwork and icon rights must also be confirmed.
+The dependency ranges are declared in `../requirements.txt`.
 
 ## Remaining binary publication requirements
 
