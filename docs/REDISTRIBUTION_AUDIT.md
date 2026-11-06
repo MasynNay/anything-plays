@@ -78,6 +78,25 @@ public simply to retain them as CI artifacts.
   versions and artifacts are approved. Do not treat the existing version ranges
   as sufficiently pinned.
 
+### Review-only staged binary inventories
+
+The `tools/binary_inventory.py` utility inspects the actual staged app folder
+and writes SHA-256 checksums, sizes, native binary signatures (ELF, PE,
+Mach-O), and internal symlink targets for every staged file. It refuses
+symlinks that resolve outside the app folder. Unit tests cover known binary
+formats and symlink boundaries.
+
+Pull requests from `release/` branches run the four platform packaging checks
+and upload **JSON metadata only** (`evidence-windows-x86_64`,
+`evidence-macos-arm64`, `evidence-macos-x86_64`, and
+`evidence-linux-x86_64`). The `.exe`, `.dmg`, `.deb`, and native core bytes
+are **not** uploaded or approved by these jobs. Evidence JSON files support
+review of what PyInstaller actually staged; they are not a complete software
+bill of materials or verification of every linked system library. Review each
+native file and compare inventories with frozen Python notices. Final release
+binaries still require independent archival, archive-level inspection, and
+separate redistribution approval.
+
 ## Assets and distribution materials
 
 - The maintainer states that the betta illustration was commissioned, that
