@@ -1,8 +1,9 @@
 """Download the two platform-matched Libretro cores used by Anything Plays.
 
 Native cores are fetched *when building*, never when the app is running. Every
-build records the downloaded binary's SHA-256 and source URL so maintainers can
-identify exactly which nightly binaries entered a particular installer.
+build records the downloaded binary's SHA-256, source URL, reported core
+version and embedded source revision, when present, so maintainers can trace
+which nightly binaries entered a particular installer.
 
 A hash manifest is provenance, not a substitute for upstream source archives,
 license compliance, or reproducible pinned builds.
