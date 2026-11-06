@@ -9,6 +9,7 @@ import cv2
 from PIL import Image, ImageTk
 
 from anything_plays.systems import SYSTEMS
+from anything_plays.shortcuts import button_for_key
 
 
 class GameplayMixin:
@@ -17,12 +18,6 @@ class GameplayMixin:
     Callbacks use the controls built by ``LayoutMixin``; the Libretro worker
     remains solely responsible for native frame generation and sound.
     """
-
-    KEYMAP = {
-        'Up': 'Up', 'Down': 'Down', 'Left': 'Left', 'Right': 'Right',
-        'z': 'A', 'x': 'B', 'a': 'Y', 's': 'X',
-        'q': 'L', 'w': 'R', 'Return': 'Start', 'KP_Enter': 'Start',
-    }
 
     def choose_core(self):
         """Retain the manual-core hook for existing integrations.
@@ -45,26 +40,27 @@ class GameplayMixin:
 
     def activate_manual(self, event=None):
         self.manual_active = True
-        self.game_canvas.focus_set()
-        self.manual_label.set('MANUAL PLAY ACTIVE · Arrows D-pad · Z/X A/B · A/S Y/X · Q/W L/R · Enter Start')
+        canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
+        canvas.focus_set()
+        self.manual_label.set('MANUAL PLAY ACTIVE · Open Keyboard shortcuts to view or edit keys')
 
     def deactivate_manual(self, event=None):
         self.manual_active = False
         self.emu.release_manual()
-        self.manual_label.set('Click game screen · Arrows D-pad · Z/X A/B · A/S Y/X · Q/W L/R · Enter Start')
+        self.manual_label.set('Click game screen to use editable keyboard controls')
 
     def deactivate_on_outside_click(self, event):
-        if event.widget is not self.game_canvas and self.manual_active:
+        if event.widget not in (self.game_canvas, getattr(self, '_game_only_canvas', None)) and self.manual_active:
             self.deactivate_manual()
 
     def manual_key_down(self, event):
-        button = self.KEYMAP.get(event.keysym)
-        if button and self.manual_active:
+        button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
+        if button and self.manual_active and SYSTEMS[self.system_key.get()].backend == 'libretro':
             self.emu.set_manual(button, True)
             return 'break'
 
     def manual_key_up(self, event):
-        button = self.KEYMAP.get(event.keysym)
+        button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
         if button:
             self.emu.set_manual(button, False)
             return 'break'
@@ -72,6 +68,13 @@ class GameplayMixin:
     def toggle(self):
         if self.armed:
             self.stop_controls()
+            return
+        if SYSTEMS[self.system_key.get()].backend != 'libretro':
+            messagebox.showinfo(
+                'External emulator input',
+                'N64 and GameCube run in RetroArch/Dolphin. Set up controls in that emulator; '
+                '2.1 does not yet inject webcam controls into external game windows.'
+            )
             return
         if self.cap is None or not self.cap.isOpened():
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
@@ -134,8 +137,9 @@ class GameplayMixin:
         if frame is None:
             return
 
-        canvas_width = max(1, self.game_canvas.winfo_width())
-        canvas_height = max(1, self.game_canvas.winfo_height())
+        canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
+        canvas_width = max(1, canvas.winfo_width())
+        canvas_height = max(1, canvas.winfo_height())
         scale = min(canvas_width / frame.shape[1], canvas_height / frame.shape[0])
         width = max(1, int(frame.shape[1] * scale))
         height = max(1, int(frame.shape[0] * scale))
@@ -143,8 +147,8 @@ class GameplayMixin:
             (width, height), Image.Resampling.NEAREST
         )
         self.game_photo = ImageTk.PhotoImage(image)
-        self.game_canvas.delete('all')
-        self.game_canvas.create_image(
+        canvas.delete('all')
+        canvas.create_image(
             (canvas_width - width) // 2,
             (canvas_height - height) // 2,
             image=self.game_photo,
