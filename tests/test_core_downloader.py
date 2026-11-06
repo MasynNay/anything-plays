@@ -1,8 +1,17 @@
 """Core download metadata and native-header verification without network access."""
 
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 import unittest
 
-from fetch_mgba_core import _validate_binary, build_target, reported_git_revision
+from fetch_mgba_core import (
+    _read_core_archive,
+    _validate_binary,
+    build_target,
+    reported_git_revision,
+)
 
 
 class DownloaderTests(unittest.TestCase):
@@ -19,6 +28,52 @@ class DownloaderTests(unittest.TestCase):
         self.assertEqual(reported_git_revision("1.63 fae2fea"), "fae2fea")
         self.assertIsNone(reported_git_revision("1.63"))
         self.assertIsNone(reported_git_revision("unknown-version"))
+
+    def test_release_never_fetches_mutable_nightly_urls(self):
+        with (
+            patch.dict(os.environ, {
+                "AP_RELEASE_BUILD": "1", "AP_CORE_ARCHIVE_DIR": "",
+            }),
+            patch("fetch_mgba_core.request.urlopen") as network,
+        ):
+            with self.assertRaisesRegex(ValueError, "AP_CORE_ARCHIVE_DIR"):
+                _read_core_archive(
+                    "https://example.invalid/latest/mgba_libretro.so.zip",
+                    "mgba_libretro.so",
+                )
+            network.assert_not_called()
+
+    def test_release_uses_preserved_offline_archives(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "mgba_libretro.so.zip"
+            path.write_bytes(b"Preserved test ZIP input")
+            with (
+                patch.dict(os.environ, {
+                    "AP_RELEASE_BUILD": "1", "AP_CORE_ARCHIVE_DIR": directory,
+                }),
+                patch("fetch_mgba_core.request.urlopen") as network,
+            ):
+                content = _read_core_archive(
+                    "https://example.invalid/latest/mgba_libretro.so.zip",
+                    "mgba_libretro.so",
+                )
+                self.assertEqual(content, b"Preserved test ZIP input")
+                network.assert_not_called()
+
+    def test_release_missing_preserved_archive_fails(self):
+        with TemporaryDirectory() as directory:
+            with (
+                patch.dict(os.environ, {
+                    "AP_RELEASE_BUILD": "1", "AP_CORE_ARCHIVE_DIR": directory,
+                }),
+                patch("fetch_mgba_core.request.urlopen") as network,
+            ):
+                with self.assertRaises(FileNotFoundError):
+                    _read_core_archive(
+                        "https://example.invalid/latest/mgba_libretro.so.zip",
+                        "mgba_libretro.so",
+                    )
+                network.assert_not_called()
 
     def test_unsupported_platform_rejected(self):
         with self.assertRaises(ValueError):
