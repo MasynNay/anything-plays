@@ -25,6 +25,8 @@ cp THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
 
+python3 verify_bundle.py linux dist/AnythingPlays
+
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays" "$PKG/usr/bin" "$PKG/usr/share/applications"
