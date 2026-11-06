@@ -94,7 +94,16 @@ Targeted save compatibility: [GitHub Actions run 42163546612](https://github.com
 
 Latest complete four-platform *private candidate* verification: [GitHub Actions run 42173630332](https://github.com/MasynNay/anything-plays/actions/runs/42173630332), which produced all four installers, eight exact native ZIPs, four manifests, and draft-only checksums. The source snapshot job [42174478479](https://github.com/MasynNay/anything-plays/actions/runs/42174478479) added matching upstream Git tree archives. These are automated package and provenance checks, **not** third-party redistribution authorization.
 
-An unapproved `v2.0.0-rc.1` **draft release** exists with all candidate inputs.
-Do not publish a public `v2.0.0` tag or redistribute the bundled installers before
-these items are resolved. The source code being publicly available on GitHub
-does **not** mean the native installers have been cleared for redistribution.
+The latest private candidate is now [**RC5**](RC5_VERIFICATION.md), verified
+by [all eight passing workflow jobs](https://github.com/MasynNay/anything-plays/actions/runs/42255146567).
+The 31 preserved draft assets contain the four exact installers and source-built
+FFmpeg-free OpenCV wheel inputs as well as all core archives, source snapshots,
+checksums and the Windows OpenCV packaging patch; source retention is confirmed
+by [run 42256596208](https://github.com/MasynNay/anything-plays/actions/runs/42256596208).
+This removes the bundled FFmpeg/x264/x265 problem demonstrated in the earlier
+RC2/RC3 candidate, but does **not** clear every native/system library, core
+source/license, commissioned-artwork or owner approval requirement.
+
+Do not publish a public `v2.0.0` tag or redistribute bundled installers until
+these independent requirements are met. A public GitHub source repository is
+not by itself approval to redistribute all frozen third-party binary packages.
