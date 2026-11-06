@@ -1,6 +1,6 @@
 # v2.0 third-party redistribution audit
 
-**Status: incomplete — do not publish bundled native installers.**
+**Status: historical pre-release audit.** The [exact RC6-derived public v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) was subsequently published under the documented [free/noncommercial release decision](RELEASE_DISTRIBUTION_REVIEW.md). This file preserves the earlier risks and investigations; open entries are not claims that publication has never occurred.
 
 This record distinguishes verifiable licensing evidence from permission or
 compliance conclusions. It is not legal advice. It applies to release binaries,
@@ -246,4 +246,4 @@ Never silently delete linked dylibs from an installer without testing.
       workflow that requires an approved core lock; keep the publishing gate
       off until then.
 
-**No release approval has been granted by this document.**
+**Release decision:** The separately documented [v2.0.0 distribution review](RELEASE_DISTRIBUTION_REVIEW.md) approved only the exact SHA-256-checked binaries for the stated free/nonpromotional use. This historical audit is not itself a general legal opinion, reproducible-build certification, or third-party commercial license.
