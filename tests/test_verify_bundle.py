@@ -43,6 +43,11 @@ class VerifyBundleTests(unittest.TestCase):
                 "source_url": f"https://example.invalid/{filename}.zip",
                 "size_bytes": len(payload),
                 "sha256": hashlib.sha256(payload).hexdigest(),
+                "libretro_library_name": name,
+                "libretro_library_version": f"{name}-fixture",
+                "reported_source_revision": None,
+                "source_repository_url": f"https://github.com/libretro/{name}",
+                "reported_source_commit_url": None,
             })
         manifest_path = cores / "CORE_PROVENANCE.json"
         manifest_path.write_text(json.dumps({"cores": records}), encoding="utf-8")
@@ -56,9 +61,18 @@ class VerifyBundleTests(unittest.TestCase):
 
     def test_native_core_check_can_be_requested_explicitly(self):
         bundle, _, cores, _ = self.make_bundle("linux")
-        with patch("verify_bundle._validate_mgba_core") as check:
+        with patch("verify_bundle._validate_mgba_core") as check, \
+             patch("verify_bundle.inspect_core_identity") as identify:
+            identify.side_effect = lambda path, name: {
+                "libretro_library_name": name,
+                "libretro_library_version": f"{name}-fixture",
+                "reported_source_revision": None,
+                "source_repository_url": f"https://github.com/libretro/{name}",
+                "reported_source_commit_url": None,
+            }
             verify_bundle(bundle, "linux", check_native=True)
         check.assert_called_once_with(cores / "mgba_libretro.so")
+        self.assertEqual(identify.call_count, len(CORE_NAMES))
 
     def test_missing_license_document_fails(self):
         bundle, licenses, _, _ = self.make_bundle("macos")
