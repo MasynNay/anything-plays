@@ -82,6 +82,10 @@ def default_for(system, base):
         # Two cells in a three-column row belong on opposite sides.
         if columns == 3 and remainder == 2:
             final_columns = (0, 2)
+        elif columns == 5 and remainder == 2:
+            final_columns = (1, 3)
+        elif columns == 5 and remainder == 4:
+            final_columns = (0, 1, 3, 4)
         else:
             first = (columns - remainder) // 2
             final_columns = range(first, first + remainder)
