@@ -177,16 +177,20 @@ class ReleaseCoreLockTests(unittest.TestCase):
                 "approved_for_binary_distribution": False,
                 "targets": {},
             }))
+            (root / "mgba_libretro.so.zip").write_bytes(zip_bytes.getvalue())
             with (
-                patch("fetch_mgba_core.request.urlopen",
-                      return_value=io.BytesIO(zip_bytes.getvalue())),
+                patch("fetch_mgba_core.request.urlopen") as network,
                 patch("fetch_mgba_core.platform.machine", return_value="x86_64"),
                 patch("fetch_mgba_core.inspect_core_identity") as inspect,
                 patch("tools.core_release_lock.LOCK_PATH", lockfile),
-                patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}),
+                patch.dict(os.environ, {
+                    "AP_RELEASE_BUILD": "1",
+                    "AP_CORE_ARCHIVE_DIR": str(root),
+                }),
             ):
                 with self.assertRaisesRegex(ValueError, "not approved"):
                     fetch_core("mgba", root)
+                network.assert_not_called()
                 inspect.assert_not_called()
                 self.assertFalse((root / "mgba_libretro.so").exists())
 
