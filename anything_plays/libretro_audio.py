@@ -17,6 +17,9 @@ except (ImportError, OSError):
     sd = None
 
 
+SAMPLE_BLOCK_FRAMES = 256
+
+
 class AudioSink:
     """Keep the core's audio callbacks independent from the output device."""
 
@@ -25,6 +28,12 @@ class AudioSink:
         self.pending = np.empty((0, 2), dtype=np.int16)
         self.position = 0
         self.stream = None
+        # Some Libretro cores send individual samples instead of batches.
+        # Avoid creating 44,100 NumPy arrays / queue entries per second.
+        self._single_samples = np.empty(
+            (SAMPLE_BLOCK_FRAMES, 2), dtype=np.int16
+        )
+        self._single_count = 0
 
     def push(self, samples):
         if not len(samples):
@@ -42,10 +51,22 @@ class AudioSink:
             except Full:
                 pass
 
+    def _flush_single_samples(self):
+        """Move a completed fixed-size sample block to the bounded queue."""
+        if self._single_count:
+            self.push(self._single_samples[:self._single_count])
+            self._single_count = 0
+
     def sample(self, left, right):
-        self.push(np.array([[left, right]], dtype=np.int16))
+        """Buffer single-sample callbacks without per-sample allocations."""
+        self._single_samples[self._single_count] = (left, right)
+        self._single_count += 1
+        if self._single_count == SAMPLE_BLOCK_FRAMES:
+            self._flush_single_samples()
 
     def batch(self, pointer, frames):
+        # Preserve chronology if a core switches from single to batch mode.
+        self._flush_single_samples()
         if pointer and frames:
             samples = np.ctypeslib.as_array(
                 C.cast(pointer, C.POINTER(C.c_int16)), shape=(int(frames) * 2,)
@@ -88,6 +109,7 @@ class AudioSink:
             self.close()
 
     def close(self):
+        self._flush_single_samples()
         stream, self.stream = self.stream, None
         if stream is not None:
             try:
