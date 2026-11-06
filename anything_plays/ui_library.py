@@ -346,7 +346,8 @@ class LibraryMixin:
                 # Embedded N64 uses the experimental software video backend.
                 # The external launcher remains available as a user fallback.
                 self.stop_external_emulator()
-                self.emu.core_path = self.emu.find_system_core()
+                if self.system_key.get() == "n64":
+                    self.emu.core_path = self.emu.find_system_core()
                 if not self.emu.core_path:
                     raise RuntimeError(
                         'Bundled emulator core is unavailable. '
