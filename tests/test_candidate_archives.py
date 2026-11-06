@@ -9,6 +9,7 @@ import unittest
 import zipfile
 
 from tools.verify_candidate_archives import verify_candidate_archives
+from tools.prepare_candidate_inputs import prepare_candidate_inputs
 from tools.stage_candidate_assets import stage_assets
 
 
@@ -73,6 +74,33 @@ class CandidateArchiveTests(unittest.TestCase):
             (output / "linux-x86_64-mgba_libretro.so.zip").read_bytes(),
             (self.folder / "mgba_libretro.so.zip").read_bytes(),
         )
+
+    def test_restores_original_candidate_archives_before_loading(self):
+        draft_assets = self.folder / "draft"
+        draft_assets.mkdir()
+        work = self.folder / "offline"
+        target = "linux-x86_64"
+        (draft_assets / f"CORE_PROVENANCE-{target}.json").write_text(
+            json.dumps(self.manifest), encoding="utf-8"
+        )
+        for record in self.manifest["cores"]:
+            name = f"{record['file']}.zip"
+            (draft_assets / f"{target}-{name}").write_bytes(
+                (self.folder / name).read_bytes()
+            )
+        lock_path = self.folder / "locked.json"
+        lock_path.write_text(json.dumps(self.lock), encoding="utf-8")
+        report = prepare_candidate_inputs(target, draft_assets, work, lock_path)
+        self.assertEqual(len(report["cores"]), 2)
+        self.assertFalse(report["redistribution_approved"])
+        self.assertEqual(
+            (work / "snes9x_libretro.so.zip").read_bytes(),
+            (self.folder / "snes9x_libretro.so.zip").read_bytes()
+        )
+        # A changed source asset must fail before any binary can be loaded.
+        (draft_assets / "linux-x86_64-mgba_libretro.so.zip").write_bytes(b"tamper")
+        with self.assertRaisesRegex(ValueError, "Preserved ZIP differs"):
+            prepare_candidate_inputs(target, draft_assets, work, lock_path)
 
     def test_mismatched_zip_is_rejected(self):
         (self.folder / "mgba_libretro.so.zip").write_bytes(b"tampered")
