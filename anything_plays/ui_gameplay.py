@@ -142,8 +142,11 @@ class GameplayMixin:
                 if ok:
                     self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
                 else:
+                    # A temporary USB disconnect should not require someone
+                    # to restart an unattended installation manually.
+                    chosen = self.camera_name.get()
                     self.stop_camera()
-                    self.status.set('Camera disconnected. Refresh and select another.')
+                    self._queue_camera_retry(chosen)
             if self.frame is not None:
                 # A still reference image needs only periodic redraw. Without
                 # a live camera, repeatedly detecting the same pixels wastes
