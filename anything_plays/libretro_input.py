@@ -18,28 +18,42 @@ IDS = {
 }
 
 
+# Sega six-button joypad uses a different RetroPad label mapping. The libretro
+# numeric IDs follow the official Genesis Plus GX controls table.
+GENESIS_IDS = {
+    **{name: IDS[name] for name in ("Up", "Down", "Left", "Right", "B", "Start")},
+    "A": IDS["Y"], "C": IDS["A"],
+    "X": IDS["L"], "Y": IDS["X"], "Z": IDS["R"], "Mode": IDS["Select"],
+}
+
+
 class InputBuffer:
     """Combine camera pulses with manually held buttons for one emulator frame."""
 
     def __init__(self):
+        self.system = "gba"
         self.commands = Queue(maxsize=32)
         self.manual_buttons = set()
         self.manual_lock = Lock()
         self.remaining = {}
         self.pressed = set()
 
+    def id_for(self, button):
+        return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
+
     def queue_press(self, button, frames):
         """Enqueue one camera button pulse, dropping events if already saturated."""
-        if button not in IDS:
+        button_id = self.id_for(button)
+        if button_id is None:
             return
         duration = max(1, min(60, int(frames)))
         try:
-            self.commands.put_nowait((IDS[button], duration))
+            self.commands.put_nowait((button_id, duration))
         except Full:
             pass
 
     def set_manual(self, button, down):
-        if button not in IDS:
+        if self.id_for(button) is None:
             return
         with self.manual_lock:
             if down:
@@ -75,7 +89,8 @@ class InputBuffer:
             self.pressed.clear()
             self.pressed.update(self.remaining)
         with self.manual_lock:
-            self.pressed.update(IDS[name] for name in self.manual_buttons)
+            self.pressed.update(self.id_for(name) for name in self.manual_buttons
+                                if self.id_for(name) is not None)
 
     def after_frame(self):
         for button_id in tuple(self.remaining):
