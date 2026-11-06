@@ -2,7 +2,7 @@
 
 import unittest
 
-from fetch_mgba_core import _validate_binary, build_target
+from fetch_mgba_core import _validate_binary, build_target, reported_git_revision
 
 
 class DownloaderTests(unittest.TestCase):
@@ -13,6 +13,12 @@ class DownloaderTests(unittest.TestCase):
                          ("windows/x86_64/latest", ".dll"))
         self.assertEqual(build_target("linux", "x86_64"),
                          ("linux/x86_64/latest", ".so"))
+
+    def test_embedded_source_revision_detection(self):
+        self.assertEqual(reported_git_revision("0.11-212-7a12d6d"), "7a12d6d")
+        self.assertEqual(reported_git_revision("1.63 fae2fea"), "fae2fea")
+        self.assertIsNone(reported_git_revision("1.63"))
+        self.assertIsNone(reported_git_revision("unknown-version"))
 
     def test_unsupported_platform_rejected(self):
         with self.assertRaises(ValueError):
