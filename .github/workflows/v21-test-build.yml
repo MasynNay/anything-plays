@@ -1,0 +1,116 @@
+name: Anything Plays 2.1 unified TEST build
+
+on:
+  push:
+    branches: [feature/v2.1-unified-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+  AP_V21_TEST_CORES: '1'
+
+jobs:
+  source-and-gui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test desktop dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libglib2.0-0 libportaudio2 xvfb pulseaudio
+          python -m pip install -r requirements.txt
+      - name: Compile all source
+        run: python -m compileall -q app.py anything_plays tests fetch_mgba_core.py verify_bundle.py
+      - name: Run full regression tests
+        run: |
+          pulseaudio --start --exit-idle-time=-1 || true
+          python -m unittest discover -s tests -v
+      - name: Tk startup, view controls and shutdown smoke test
+        run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+
+  windows-test-installer:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build 2.1 Windows installer with four native test cores
+        shell: cmd
+        run: call build_windows.bat
+      - name: Inspect exact staged four-core test bundle
+        run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays test-evidence/windows-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-2.1.0-alpha1-Windows-x64-TEST
+          path: |
+            release/AnythingPlaysSetup-2.1.0-alpha.1.exe
+            test-evidence/windows-x86_64.json
+          if-no-files-found: error
+          retention-days: 21
+
+  macos-test-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build 2.1 macOS DMG with four native test cores
+        run: bash build_macos_dmg.sh
+      - name: Inspect staged test app
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app test-evidence/macos-${{ matrix.arch }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-2.1.0-alpha1-macOS-${{ matrix.arch }}-TEST
+          path: |
+            release/AnythingPlays.dmg
+            test-evidence/macos-${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 21
+
+  linux-test-installer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux build requirements
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
+      - name: Build 2.1 Debian package with four native test cores
+        run: bash build_linux_deb.sh
+      - name: Inspect Linux test installation
+        run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays test-evidence/linux-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
+          path: |
+            release/anything-plays_2.1.0~alpha1_amd64.deb
+            test-evidence/linux-x86_64.json
+          if-no-files-found: error
+          retention-days: 21
