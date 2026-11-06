@@ -119,8 +119,12 @@ def main():
                     app.frame = np.zeros((160, 240, 3), dtype=np.uint8)
                     app.draw_camera()
                     assert app.camera_photo is not None
+                    first_camera_image = app.camera_photo
                     for _ in range(50):
                         app.draw_camera()
+                    # One native photo buffer + one canvas item, irrespective
+                    # of how long the video preview runs.
+                    assert app.camera_photo is first_camera_image
                     assert len(app.canvas.find_all()) == 1
                     app.reference_image = False
                     app.stop_camera()
@@ -132,10 +136,12 @@ def main():
                         app.emu.frame = np.zeros((180, 240, 3), dtype=np.uint8)
                         app.emu.frame_serial += 1
                     app.draw_game()
+                    first_game_image = app.game_photo
                     for _ in range(100):
                         with app.emu.lock:
                             app.emu.frame_serial += 1
                         app.draw_game()
+                    assert app.game_photo is first_game_image
                     assert len(app.game_canvas.find_all()) == 1
                     root.after(200, app.close)
                     root.mainloop()
