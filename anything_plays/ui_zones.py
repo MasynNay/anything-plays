@@ -7,9 +7,9 @@ from tkinter import filedialog, messagebox, simpledialog
 import urllib.request
 
 from PIL import Image
-from zone_rendering import render_zone_overlay
+from anything_plays.zone_rendering import render_zone_overlay
 
-from system_profiles import DISABLED_MAPPING, fit_to_grid
+from anything_plays.system_profiles import DISABLED_MAPPING, fit_to_grid
 
 
 class ZonesMixin:

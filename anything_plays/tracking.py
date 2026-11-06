@@ -7,7 +7,7 @@ from side effects makes a dropped frame or a tracking regression testable.
 import cv2
 import numpy as np
 
-from system_profiles import DISABLED_MAPPING
+from anything_plays.system_profiles import DISABLED_MAPPING
 
 
 def locate_target(frame, rgb, tolerance, min_area):

@@ -16,16 +16,16 @@ import sys
 import threading
 import time
 
-from core_locator import find_core
-from libretro_abi import (
+from anything_plays.core_locator import find_core
+from anything_plays.libretro_abi import (
     AUDIO, AUDIO_BATCH, AVInfo, CoreInfo, ENV, GameInfo, INPUT_POLL,
     INPUT_STATE, VIDEO,
 )
-from libretro_audio import AudioSink
-from libretro_input import BUTTONS, IDS, InputBuffer
-from libretro_save import SaveRAM
-from libretro_video import SUPPORTED_FORMATS, decode_frame
-from systems import SYSTEMS
+from anything_plays.libretro_audio import AudioSink
+from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
+from anything_plays.libretro_save import SaveRAM
+from anything_plays.libretro_video import SUPPORTED_FORMATS, decode_frame
+from anything_plays.systems import SYSTEMS
 
 
 class NativeCore:

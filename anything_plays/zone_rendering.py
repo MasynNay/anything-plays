@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from system_profiles import DISABLED_MAPPING
+from anything_plays.system_profiles import DISABLED_MAPPING
 
 
 def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, artwork=None, shuffle_enabled=True):
