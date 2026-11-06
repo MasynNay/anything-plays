@@ -86,6 +86,15 @@ class UnifiedV21Tests(unittest.TestCase):
             self.assertEqual(n64_command[-1], str(n64))
             gc = command_for('gamecube', gamecube, executable=dolphin)
             self.assertEqual(gc, [str(dolphin), '--batch', '--exec=' + str(gamecube)])
+            gc_full = command_for('gamecube', gamecube, executable=dolphin,
+                                  fullscreen=True)
+            self.assertIn('--config=Dolphin.Display.Fullscreen=True', gc_full)
+            gc_borderless = command_for('gamecube', gamecube, executable=dolphin,
+                                        borderless=True)
+            self.assertIn('--config=Graphics.Settings.BorderlessFullscreen=True',
+                          gc_borderless)
+            self.assertNotIn('--config=Graphics.Settings.BorderlessFullscreen=True',
+                             gc_full)
             with patch('anything_plays.external_emulators.subprocess.Popen') as popen:
                 launch('n64', n64, executable=retro, n64_core=native)
                 self.assertEqual(popen.call_args.kwargs['shell'], False)
