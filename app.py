@@ -185,33 +185,41 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
             self.persist_system_profile()
         except (OSError, ValueError, tk.TclError):
             pass
-        self.deactivate_manual()
-        self.stop_controls()
-        if self.cap is not None:
-            self.cap.release()
-            self.cap = None
+        # Cleanup each driver separately: a USB camera can fail while
+        # releasing without blocking native emulators or Tk shutdown.
+        def cleanup(label, callback):
+            try:
+                callback()
+            except Exception as exc:
+                print(f"Shutdown {label}: {exc}", file=sys.stderr)
+
         for job_name in ('shelf_button_job', 'shelf_animation_job',
                          'shelf_momentum_job'):
             job = getattr(self, job_name, None)
             if job is not None:
-                try:
-                    self.root.after_cancel(job)
-                except tk.TclError:
-                    pass
-        self.emu.stop()
-        self.stop_external_emulator()
-        # Drop the last images and cartridge thumbnails at shutdown. Worker
-        # frames are also discarded so native/PIL buffers can be collected.
-        with self.emu.lock:
-            self.emu.frame = None
-        self.frame = None
-        self.game_photo = None
-        self.camera_photo = None
-        self._zone_art = None
-        self._zone_thumbnail_cache.clear()
-        self.library_images.clear()
-        self.root.destroy()
+                cleanup(job_name, lambda job=job: self.root.after_cancel(job))
 
+        cleanup("manual input", self.deactivate_manual)
+        cleanup("camera controls", self.stop_controls)
+        capture, self.cap = self.cap, None
+        if capture is not None:
+            cleanup("camera", capture.release)
+        cleanup("embedded emulator", self.emu.stop)
+        cleanup("external emulator", self.stop_external_emulator)
+        try:
+            with self.emu.lock:
+                self.emu.frame = None
+            self.frame = None
+            self.game_photo = None
+            self.camera_photo = None
+            self._zone_art = None
+            self._zone_thumbnail_cache.clear()
+            self.library_images.clear()
+        finally:
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                pass
 
 def main():
     """Start the Tkinter event loop when launched from source or a bundle."""
