@@ -39,9 +39,9 @@ mv dist/AnythingPlays.app dist/AnythingPlays21Test.app
 ICONSET="build/AnythingPlays.iconset"
 mkdir -p "$ICONSET"
 for SIZE in 16 32 128 256 512; do
-  sips -z "$SIZE" "$SIZE" assets/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}.png" >/dev/null
+  sips -z "$SIZE" "$SIZE" build/v21-icon/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}.png" >/dev/null
   DOUBLE=$((SIZE * 2))
-  sips -z "$DOUBLE" "$DOUBLE" assets/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
+  sips -z "$DOUBLE" "$DOUBLE" build/v21-icon/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays21Test.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays21Test.app/Contents/Info.plist
