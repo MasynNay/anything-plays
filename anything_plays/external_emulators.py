@@ -53,7 +53,7 @@ def find_external_emulator(system, override=None):
     )
 
 
-def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False):
+def command_for(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False):
     """Return a safe argument vector, never a shell string."""
     if system not in ("n64", "gamecube"):
         raise ValueError("Only external systems can use this launcher")
@@ -62,7 +62,14 @@ def command_for(system, game, *, executable=None, n64_core=None, fullscreen=Fals
         raise ExternalLaunchError("Choose an existing, compatible game file")
     exe = find_external_emulator(system, executable)
     if system == "gamecube":
-        return [str(exe), "--batch", "--exec=" + str(rom)]
+        args = [str(exe), "--batch"]
+        # Dolphin's command-line overrides affect only this launch, not saved
+        # emulator preferences. Honor fullscreen and borderless selections.
+        if fullscreen or borderless:
+            args.append("--config=Dolphin.Display.Fullscreen=True")
+        if borderless:
+            args.append("--config=Graphics.Settings.BorderlessFullscreen=True")
+        return [*args, "--exec=" + str(rom)]
     core = n64_core or find_core("n64")
     if core is None or not Path(core).expanduser().is_file():
         raise ExternalLaunchError(
@@ -76,9 +83,9 @@ def command_for(system, game, *, executable=None, n64_core=None, fullscreen=Fals
     return args
 
 
-def launch(system, game, *, executable=None, n64_core=None, fullscreen=False):
+def launch(system, game, *, executable=None, n64_core=None, fullscreen=False, borderless=False):
     command = command_for(system, game, executable=executable,
-                          n64_core=n64_core, fullscreen=fullscreen)
+                          n64_core=n64_core, fullscreen=fullscreen, borderless=borderless)
     try:
         return subprocess.Popen(command, shell=False)
     except OSError as exc:
