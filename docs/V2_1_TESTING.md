@@ -32,7 +32,7 @@ The app never provides or downloads commercial game ROMs or BIOS images.
 - F11 toggles fullscreen, F10 toggles borderless and Escape exits a
   fullscreen view and stops object controls.
 - Keyboard shortcuts can be changed **per console** in the game panel by
-  capturing keys; conflicting or reserved shortcuts are rejected. Keys stay
+  capturing keys; conflicting or reserved shortcuts are rejected, including uppercase/lowercase collisions. Keys stay
   app-local and do not inject operating-system input.
 - Bolder camera control zones: new **Bold** style, centered label option,
   border thickness 2–16 px and stronger readable button labels. Existing
