@@ -139,7 +139,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self._camera_tick_job = root.after(45, self.tick)
         self._game_tick_job = root.after(16, self.game_render_tick)
         self._updates_start_job = root.after(
-            8000, lambda: self.check_emulator_updates(automatic=True)
+            8000, self.schedule_emulator_update_checks
         )
 
     def uses_embedded_emulator(self, system=None):
@@ -168,7 +168,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         # A long-lived window may have several pending after() callbacks.
         # Cancel the periodic loops before destroying Tk widgets.
         for job_name in ("_camera_tick_job", "_game_tick_job",
-                         "_updates_start_job"):
+                         "_updates_start_job", "_updates_repeat_job"):
             job = getattr(self, job_name, None)
             if job is not None:
                 try:
