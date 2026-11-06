@@ -11,13 +11,12 @@ from pathlib import Path
 import sys
 
 
-CORE_NAMES = ("gambatte", "mgba", "snes9x")
+CORE_NAMES = ("mgba", "snes9x")
 REQUIRED_DOCUMENTS = (
     "AnythingPlays-MIT.txt",
     "CODE_OF_CONDUCT.md",
     "THIRD_PARTY_NOTICES.md",
     "THIRD_PARTY_COMPONENTS.md",
-    "Gambatte-GPL-2.0.txt",
     "mGBA-MPL-2.0.txt",
     "Snes9x-LICENSE.txt",
 )
@@ -50,7 +49,7 @@ def verify_bundle(bundle, platform_name):
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     records = manifest.get("cores")
     if not isinstance(records, list) or len(records) != len(CORE_NAMES):
-        raise ValueError("Manifest must identify all three cores")
+        raise ValueError("Manifest must identify all required cores")
     found = set()
     for record in records:
         if not isinstance(record, dict):
@@ -72,7 +71,7 @@ def verify_bundle(bundle, platform_name):
             raise ValueError(f"Size mismatch: {path}")
         if not isinstance(record.get("source_url"), str) or not record["source_url"].startswith("https://"):
             raise ValueError(f"Missing HTTPS source URL for {name}")
-    print(f"Verified {platform_name} bundle: license files and 3 core checksums")
+    print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums")
 
 
 def main():
