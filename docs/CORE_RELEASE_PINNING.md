@@ -1,0 +1,80 @@
+# v2.0 native core release lock
+
+**Status: candidate preparation only; public binary distribution is NOT approved.**
+
+The existing Anything Plays v2.0 app has been functionally tested on Windows,
+macOS and Ubuntu. The later mGBA GB/GBC transition and both core packaging paths
+also passed automated integration tests. This procedure does not require
+repeating the earlier gameplay tests for metadata-only changes.
+
+## Why this control exists
+
+The normal development build downloads the matching mGBA and Snes9x archives
+from Libretro's changing `latest` URLs. A version string, URL or Git hash
+alone does not prove that a downloaded binary was built from a particular
+source tree. A new nightly can replace an older one at the same URL.
+
+With `AP_RELEASE_BUILD=1`, `fetch_mgba_core.py` and `verify_bundle.py`
+require the approved fingerprints in [the lock](../config/v2.0-core-lock.json).
+They compare the actual download's hash, byte count, Libretro version,
+reported revision and source repository against the lock. Builds fail closed
+if a fingerprint changes, if an architecture is missing, or if
+`approved_for_binary_distribution` is not explicitly `true`.
+
+The workflow remains **disabled** regardless of the lock's state. A Git tag
+cannot bypass release review or automatically upload an installer.
+
+## Core identities observed in passing platform checks
+
+These are *reported* source revisions, independently confirmed to exist in the
+respective upstream repositories. They are **not** independently verified
+build-to-source correspondence.
+
+| Core | Reported version | Upstream commit |
+| --- | --- | --- |
+| mGBA | `0.11-212-7a12d6d` | [`7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6`](https://github.com/libretro/mgba/commit/7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6) |
+| Snes9x | `1.63 fae2fea` | [`fae2fea08f74180759ef540ee94259213f503480`](https://github.com/libretro/snes9x/commit/fae2fea08f74180759ef540ee94259213f503480) |
+
+The same reported versions appeared on Windows x64, Linux x64, macOS arm64
+and macOS x86_64 in [the passing audited package build](https://github.com/MasynNay/anything-plays/actions/runs/42163068042).
+
+## Required release procedure
+
+1. Record candidate fingerprints for all four release targets:
+   `windows-x86_64`, `linux-x86_64`, `macos-arm64`, and
+   `macos-x86_64`. Ordinary development builds emit candidate metadata
+   without approving it.
+2. **Do not ship directly from mutable nightly URLs.** Preserve exact approved
+   binary archives in an immutable, access-controlled release-build input
+   location. Verify their cryptographic hashes before use.
+3. Independently associate each approved binary with its exact upstream
+   source (including build options, patches, submodules and third-party
+   libraries). Obtain and retain corresponding source, including all
+   redistribution-required license/copyright notices.
+4. Complete the license review for the noncommercial Snes9x distribution,
+   mGBA under MPL 2.0, Python/native dependencies, and project artwork.
+   Seek qualified counsel/rights-holder clarification where needed.
+5. Populate each `targets` entry in the lock with the exact candidate
+   fields and the full, reviewed `source_commit_sha`. Never infer a full
+   commit from a short hash without verifying it upstream.
+6. After the release owner approves all required evidence, set
+   `approved_for_binary_distribution` to `true` in a reviewed PR.
+   Re-enable the release workflow in a **separate** reviewed change that
+   pins all build inputs. Do not remove the release-mode fingerprint checks.
+7. Build the final packages, verify their contents and hashes, document
+   unsigned Windows/macOS prompts and notarization limitations, then
+   publish the release and checksum manifest.
+
+## Scope and limitations
+
+- A successful lock check proves identity against *approved recorded values*,
+  not license compliance, reproducible builds, or ownership of source assets.
+- A mutable URL may stop working once its content changes; the correct
+  solution is an immutable approved binary archive, **not** weakening the lock.
+- The lock starts empty and unapproved intentionally. Neither CI nor a
+  release tag may automatically approve it.
+- `AP_RELEASE_BUILD=0` is for development and regression builds only; never
+  use those outputs to publish official installers.
+- Original GB/GBC save and video compatibility was tested separately with
+  native mGBA using generated synthetic ROMs. Other cartridge mappers require
+  their own compatibility evidence if included in release claims.
