@@ -61,8 +61,27 @@ class CustomWheelTests(unittest.TestCase):
     def test_rejects_invalid_architecture(self):
         other = self.wheel.with_name(FILENAME.replace("arm64", "x86_64"))
         self.wheel.rename(other)
-        with self.assertRaisesRegex(ValueError, "Apple Silicon"):
+        with self.assertRaisesRegex(ValueError, "does not target macos-arm64"):
             verify_custom_wheel(other, self.sha)
+
+    def test_accepts_exact_other_platform_wheel_tags(self):
+        targets = (
+            ("windows-x86_64", "win_amd64"),
+            ("linux-x86_64", "linux_x86_64"),
+            ("macos-x86_64", "macosx_15_0_x86_64"),
+        )
+        for target, tag in targets:
+            with self.subTest(target=target):
+                original = self.wheel
+                renamed = self.wheel.with_name(
+                    "opencv_python_headless-4.14.0.94-cp313-cp313-" + tag + ".whl"
+                )
+                original.rename(renamed)
+                try:
+                    report = verify_custom_wheel(renamed, self.sha, target)
+                    self.assertEqual(report["target"], target)
+                finally:
+                    renamed.rename(original)
 
     def test_rejects_symlink(self):
         link = self.wheel.with_name("linked-" + FILENAME)

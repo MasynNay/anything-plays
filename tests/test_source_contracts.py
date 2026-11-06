@@ -35,6 +35,16 @@ class SourceContracts(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue((ROOT / name).is_file())
 
+    def test_camera_only_wheel_requires_hash_check_on_all_targets(self):
+        for script_name in ("build_windows.bat", "build_macos_dmg.sh",
+                            "build_linux_deb.sh"):
+            with self.subTest(script=script_name):
+                script = (ROOT / script_name).read_text(encoding="utf-8")
+                self.assertIn("AP_CUSTOM_OPENCV_WHEEL", script)
+                self.assertIn("AP_CUSTOM_OPENCV_SHA256", script)
+                self.assertIn("verify_custom_opencv_wheel.py", script)
+                self.assertIn("AP_REQUIRE_OPENCV_FFMPEG_OFF", script)
+
     def test_platform_installers_use_reviewed_dependency_versions(self):
         frozen = (ROOT / "requirements-build.txt").read_text(encoding="utf-8")
         for required in ("opencv-python-headless==4.14.0.94", "numpy==2.5.4",

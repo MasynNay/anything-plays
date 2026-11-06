@@ -19,8 +19,20 @@ if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m pip install --upgrade pip==26.3
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.build-venv\Scripts\python.exe tools/check_opencv_build.py
 if errorlevel 1 exit /b 1
+REM Optional, hash-locked custom camera-only OpenCV wheel with FFmpeg disabled.
+if defined AP_CUSTOM_OPENCV_WHEEL (
+  if not defined AP_CUSTOM_OPENCV_SHA256 (
+    echo AP_CUSTOM_OPENCV_SHA256 must be set with the custom wheel
+    exit /b 1
+  )
+  python tools\verify_custom_opencv_wheel.py "%AP_CUSTOM_OPENCV_WHEEL%" "%AP_CUSTOM_OPENCV_SHA256%" windows-x86_64
+  if errorlevel 1 exit /b 1
+  .build-venv\Scripts\python.exe -m pip install --force-reinstall --no-deps "%AP_CUSTOM_OPENCV_WHEEL%"
+  if errorlevel 1 exit /b 1
+  set "AP_REQUIRE_OPENCV_FFMPEG_OFF=1"
+)
+.build-venv\Scripts\python.exe tools/check_opencv_build.py
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon assets\anything_plays.ico --add-data "assets\anything_plays.png;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1

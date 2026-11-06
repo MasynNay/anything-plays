@@ -19,8 +19,12 @@ rm -rf .build-venv
 # Ordinary macOS builds continue to use the pinned, upstream headless wheel.
 if [[ -n "${AP_CUSTOM_OPENCV_WHEEL:-}" ]]; then
   : "${AP_CUSTOM_OPENCV_SHA256:?Set SHA-256 for the custom OpenCV wheel}"
-  [[ "$(uname -m)" == "arm64" ]] || { echo "Custom OpenCV wheel is arm64-only"; exit 1; }
-  "$PYTHON" tools/verify_custom_opencv_wheel.py "$AP_CUSTOM_OPENCV_WHEEL" "$AP_CUSTOM_OPENCV_SHA256"
+  case "$(uname -m)" in
+    arm64) CUSTOM_TARGET=macos-arm64 ;;
+    x86_64) CUSTOM_TARGET=macos-x86_64 ;;
+    *) echo "Unsupported custom OpenCV macOS architecture"; exit 1 ;;
+  esac
+  "$PYTHON" tools/verify_custom_opencv_wheel.py "$AP_CUSTOM_OPENCV_WHEEL" "$AP_CUSTOM_OPENCV_SHA256" "$CUSTOM_TARGET"
   .build-venv/bin/python -m pip install --force-reinstall --no-deps "$AP_CUSTOM_OPENCV_WHEEL"
   export AP_REQUIRE_OPENCV_FFMPEG_OFF=1
 fi

@@ -7,6 +7,13 @@ python3 fetch_mgba_core.py
 python3 -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip==26.3
 .build-venv/bin/python -m pip install -r requirements-build.txt
+# Optional, hash-locked camera-only OpenCV replacement for audited builds.
+if [[ -n "${AP_CUSTOM_OPENCV_WHEEL:-}" ]]; then
+  : "${AP_CUSTOM_OPENCV_SHA256:?Set custom wheel SHA-256}"
+  python3 tools/verify_custom_opencv_wheel.py "$AP_CUSTOM_OPENCV_WHEEL" "$AP_CUSTOM_OPENCV_SHA256" linux-x86_64
+  .build-venv/bin/python -m pip install --force-reinstall --no-deps "$AP_CUSTOM_OPENCV_WHEEL"
+  export AP_REQUIRE_OPENCV_FFMPEG_OFF=1
+fi
 .build-venv/bin/python tools/check_opencv_build.py
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" app.py
 # All emulator cores are required and shipped inside the installed application.
