@@ -68,6 +68,8 @@ class CameraMixin:
             return
         self.stop_camera()
         self.reference_image = False
+        self.frame = None
+        self._static_preview_next_draw = 0
         index = self.camera_options[name]
         self.cap = cv2.VideoCapture(
             index, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY
@@ -79,10 +81,18 @@ class CameraMixin:
         self.status.set(f'Camera ready: {name}. Click Pick color from video, then click your target.')
 
     def stop_camera(self):
+        """Release capture and live frame buffers, retaining chosen reference art."""
         self.stop_controls()
         if self.cap is not None:
             self.cap.release()
             self.cap = None
+        if not self.reference_image:
+            # Without a live camera, do not repeatedly process a stale frame.
+            self.frame = None
+            self.camera_photo = None
+            if hasattr(self, "canvas"):
+                self.canvas.delete("all")
+            self._camera_canvas_item = None
         self.status.set('Camera stopped')
 
     def pick_color(self):
@@ -103,6 +113,7 @@ class CameraMixin:
         self.stop_camera()
         self.frame = frame
         self.reference_image = True
+        self._static_preview_next_draw = 0
         self.pick_mode = True
         self.status.set('Click the target color in the reference image. Start the webcam afterward.')
 
@@ -193,6 +204,17 @@ class CameraMixin:
         if geom:
             x, y, dw, dh, _, _ = geom
             rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)), cv2.COLOR_BGR2RGB)
-            self.camera_photo = ImageTk.PhotoImage(Image.fromarray(rgb))
-            self.canvas.delete('all')
-            self.canvas.create_image(x, y, anchor='nw', image=self.camera_photo)
+            photo = ImageTk.PhotoImage(Image.fromarray(rgb))
+            item = getattr(self, "_camera_canvas_item", None)
+            # Reuse one Tk canvas item rather than allocating and deleting
+            # ~20 canvas objects a second for days at a time.
+            if item is None or not self.canvas.type(item):
+                self.canvas.delete("all")
+                item = self.canvas.create_image(
+                    x, y, anchor="nw", image=photo
+                )
+                self._camera_canvas_item = item
+            else:
+                self.canvas.coords(item, x, y)
+                self.canvas.itemconfigure(item, image=photo)
+            self.camera_photo = photo
