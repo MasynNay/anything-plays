@@ -21,8 +21,8 @@ cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
 mkdir -p dist/AnythingPlays/licenses
 cp LICENSE dist/AnythingPlays/licenses/AnythingPlays-MIT.txt
 cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
-cp THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
-cp THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
+cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
+cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
 
 python3 verify_bundle.py linux dist/AnythingPlays
