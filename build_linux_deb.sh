@@ -64,4 +64,11 @@ mkdir -p release
 chmod g-s "$PKG/DEBIAN"
 chmod 0755 "$PKG/DEBIAN"
 dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays_${VERSION}_${ARCH}.deb"
+# Verify the exact DEB payload, not only the staging folder.
+AUDIT_DIR="$(mktemp -d)"
+trap 'rm -rf "$AUDIT_DIR"' EXIT
+dpkg-deb -x "release/anything-plays_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
+python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"
+rm -rf "$AUDIT_DIR"
+trap - EXIT
 echo "Created release/anything-plays_${VERSION}_${ARCH}.deb"
