@@ -25,7 +25,7 @@ cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
 
-python3 verify_bundle.py linux dist/AnythingPlays
+python3 verify_bundle.py --check-native linux dist/AnythingPlays
 
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"
