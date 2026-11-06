@@ -50,7 +50,7 @@ cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-21-test/"
 mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
 cp assets/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-test.png"
 cat > "$PKG/DEBIAN/control" <<CONTROL
-Package: anything-plays-21-test
+Package: anything-plays-test
 Version: $VERSION
 Section: games
 Priority: optional
