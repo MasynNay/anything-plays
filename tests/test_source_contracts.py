@@ -51,7 +51,7 @@ class SourceContracts(unittest.TestCase):
         script = (ROOT / "build_macos_dmg.sh").read_text(encoding="utf-8")
         self.assertNotIn("codesign --force --deep --sign", script)
         signing = script.index("codesign --force --sign -")
-        verification = script.rindex("verify_bundle.py --check-native macos")
+        verification = script.index("verify_bundle.py --check-native macos", signing)
         dmg = script.index("hdiutil create")
         self.assertLess(signing, verification)
         self.assertLess(verification, dmg)
