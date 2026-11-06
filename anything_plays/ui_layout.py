@@ -53,6 +53,16 @@ class LayoutMixin:
         self.system_combo.bind('<<ComboboxSelected>>', self.switch_system)
         self.system_description = ttk.Label(system_row, text=SYSTEMS[self.system_key.get()].title)
         self.system_description.pack(side='left', padx=8)
+        # A software-rendering N64 core can run in the existing game canvas.
+        # Keep a clearly labeled RetroArch fallback for experimental hardware.
+        self.n64_mode_row = ttk.Frame(game)
+        self.n64_mode_toggle = ttk.Checkbutton(
+            self.n64_mode_row,
+            text='Play N64 in the app (experimental software graphics)',
+            variable=self.n64_embedded,
+            command=self.switch_n64_backend,
+        )
+        self.n64_mode_toggle.pack(side='left')
         self.external_setup = ttk.Frame(game)
         self.external_setup_label = ttk.Label(self.external_setup, text='', wraplength=430)
         self.external_setup_label.pack(fill='x', pady=(2, 4))
