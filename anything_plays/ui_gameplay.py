@@ -94,8 +94,10 @@ class GameplayMixin:
         if backend in ("retroarch", "dolphin"):
             process = self.external_process
             if self.external_input is None or process is None or process.poll() is not None:
-                messagebox.showinfo('N64 emulator required',
-                                    'Launch an N64 ROM through Anything Plays first.')
+                title = 'N64 emulator required' if backend == 'retroarch' else 'GameCube emulator required'
+                messagebox.showinfo(
+                    title, 'Launch a game for this console through Anything Plays first.'
+                )
                 return
         try:
             self.read_settings()
