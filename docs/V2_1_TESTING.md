@@ -42,6 +42,11 @@ The app never provides or downloads commercial game ROMs or BIOS images.
   saved positions, and the default layouts remain horizontally symmetric.
 - Legacy 2.0 profiles, separate ROM shelves, live camera color tracking,
   fit-to-grid controls, manual keyboard play, themes and saves remain.
+- **Corrected 2.1 fish artwork:** The handheld now shows its plain back,
+  without the front-face buttons. The reviewable source image is
+  `assets/anything_plays_v21.webp`; `tools/render_v21_icon.py` produces
+  Windows ICO, macOS iconset source PNG and Linux app PNG inside `build/`.
+  Stable 2.0 PNG/ICO files are never overwritten.
 
 ### Embedded native cores
 
