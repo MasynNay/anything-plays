@@ -6,6 +6,7 @@ folder so CI and developer smoke tests never alter real console profiles.
 
 from pathlib import Path
 import tempfile
+import time
 import tkinter as tk
 from unittest.mock import patch
 
@@ -59,6 +60,24 @@ def main():
                     assert app.mapping_vars["C"].get() == "C"
                     assert not app.arm_button.instate(("disabled",))
                     assert not app.shortcuts_button.instate(("disabled",))
+
+                    # Selecting the wrong ROM directory must not block Tk.
+                    roms = Path(temp_home) / "roms"
+                    roms.mkdir()
+                    (roms / "Demo.gen").write_bytes(b"test fixture")
+                    app.rom_directory = str(roms)
+                    app.rom_directories["genesis"] = str(roms)
+                    app.populate_inline_library()
+                    assert "Scanning" in app.library_summary.get()
+                    deadline = time.monotonic() + 3
+                    while not app.library_images and time.monotonic() < deadline:
+                        root.update()
+                        time.sleep(0.02)
+                    assert len(app.library_images) == 1
+                    app.clear_rom_directory()
+                    assert app.rom_directory == ""
+                    assert app.rom_directories["genesis"] == ""
+                    assert "Choose a ROM folder" in app.library_summary.get()
 
                     # Rendering a camera frame is independent from live hardware.
                     app.frame = np.zeros((160, 240, 3), dtype=np.uint8)
