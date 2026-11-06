@@ -80,7 +80,7 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
     # manifest must still match final bytes, otherwise codesign or a packaging
     # step silently changed the emulator libraries after verification.
     by_path = {entry["path"]: entry for entry in files}
-    prefix = "Contents/MacOS/" if target.startswith("macos-") else ""
+    prefix = "Contents/Resources/" if target.startswith("macos-") else ""
     core_manifest = prefix + "cores/CORE_PROVENANCE.json"
     verified_cores = []
     if core_manifest in by_path:
