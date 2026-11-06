@@ -170,7 +170,11 @@ class GameplayMixin:
             elif self.emu.running:
                 if (self.current_rom and
                         time.monotonic() >= getattr(self, "_save_warning_until", 0)):
-                    self.game_status.set('Playing ' + Path(self.current_rom).stem)
+                    playing = 'Playing ' + Path(self.current_rom).stem
+                    # Tk variable traces and widget relayouts are unnecessary
+                    # if the status is unchanged across thousands of frames.
+                    if self.game_status.get() != playing:
+                        self.game_status.set(playing)
         except Exception as exc:
             self.stop_controls()
             # A capture or image-processing failure must not cause the same
