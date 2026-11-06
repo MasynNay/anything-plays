@@ -46,6 +46,10 @@ class ProfilesMixin:
         prefs['system'] = self.system_key.get()
         prefs['rom_directories'] = dict(self.rom_directories)
         prefs['rom_directory'] = self.rom_directories.get('gba', '')  # legacy compatibility
+        prefs['key_bindings'] = dict(self._shortcut_bindings)
+        prefs['external_emulators'] = dict(self.external_emulators)
+        prefs['n64_core_path'] = self.n64_core_override
+        prefs['view_mode'] = self.view_mode.get()
         if core_path:
             paths = prefs.get('core_paths', {})
             paths = paths if isinstance(paths, dict) else {}
@@ -97,10 +101,12 @@ class ProfilesMixin:
         self.refresh_system_buttons()
         self._active_profile_system = key
         self.emu.stop()
+        self.stop_external_emulator()
         self.emu.system = key
         self.emu.core_path = self.emu.find_system_core()
         self.rom_directory = self.rom_directories.get(key, '')
         self.system_description.configure(text=SYSTEMS[key].title)
+        self.update_external_setup()
         self.current_rom = None
         self.game_canvas.delete('all')
         self.game_status.set('Load your own ' + SYSTEMS[key].title + ' ROM')
