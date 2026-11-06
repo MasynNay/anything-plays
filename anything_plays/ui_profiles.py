@@ -49,6 +49,7 @@ class ProfilesMixin:
         prefs['key_bindings'] = dict(self._shortcut_bindings)
         prefs['external_emulators'] = dict(self.external_emulators)
         prefs['n64_core_path'] = self.n64_core_override
+        prefs['n64_embedded'] = bool(self.n64_embedded.get())
         prefs['view_mode'] = self.view_mode.get()
         if core_path:
             paths = prefs.get('core_paths', {})
@@ -90,7 +91,7 @@ class ProfilesMixin:
             return
         self.stop_controls()
         # External games have their own window. Close any blank game-only overlay.
-        if SYSTEMS[key].backend != "libretro" and self.view_mode.get() == "Game only":
+        if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
             self.set_view_mode("Windowed")
         # The combobox has already changed, so save the previous system explicitly.
         previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
