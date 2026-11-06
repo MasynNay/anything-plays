@@ -31,7 +31,7 @@ The app never provides or downloads commercial game ROMs or BIOS images.
 - Windowed, borderless, fullscreen and game-only fullscreen modes.
 - F11 toggles fullscreen, F10 toggles borderless and Escape exits a
   fullscreen view and stops object controls.
-- Keyboard shortcuts can be changed **per console** in the game panel by
+- Keyboard shortcuts can be changed **per embedded console** in the game panel by
   capturing keys; conflicting or reserved shortcuts are rejected, including uppercase/lowercase collisions. Keys stay
   app-local and do not inject operating-system input.
 - Bolder camera control zones: new **Bold** style, centered label option,
@@ -70,7 +70,10 @@ silently downloaded or executed. **Camera-zone input and the embedded
 game-only canvas cannot control games launched in a separate RetroArch or
 Dolphin process yet.** Use the controller/keyboard options inside those
 emulators. N64 analog-stick and Dolphin webcam-controller bridging is future
-work, not represented as complete in this alpha.
+work, not represented as complete in this alpha. The camera and in-app
+keyboard shortcut buttons are disabled for external backends; configure them
+in RetroArch or Dolphin. Dolphin accepts fullscreen and borderless display
+settings when starting a game. Game-only view is limited to embedded cores.
 
 ## Testing priorities
 
