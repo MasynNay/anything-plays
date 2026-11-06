@@ -164,7 +164,7 @@ def fetch_core(name, destination=CORE_FOLDER):
     filename = f"{name}_libretro{extension}"
     url = f"{BUILD_BOT}/{folder}/{filename}.zip"
     destination = Path(destination)
-    print(f"Fetching {name}: {url}", flush=True)
+    print(f"Preparing {name}; upstream reference: {url}", flush=True)
 
     archive_data = _read_core_archive(url, filename)
 
