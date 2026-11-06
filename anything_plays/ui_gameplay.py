@@ -97,7 +97,10 @@ class GameplayMixin:
         self.armed = False
         self.emu.disarm()
         if hasattr(self, 'arm_button'):
-            self.arm_button.config(text='Enable object controls')
+            label = ('Enable object controls'
+                     if SYSTEMS[self.system_key.get()].backend == 'libretro'
+                     else 'Camera controls unavailable for external emulator')
+            self.arm_button.config(text=label)
         if hasattr(self, 'action'):
             self.action.set('PREVIEW ONLY — no keyboard events are sent')
 
