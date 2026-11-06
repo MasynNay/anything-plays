@@ -10,7 +10,8 @@ its contributors have the rights to grant it.
 
 - Upstream: https://github.com/libretro/mgba
 - License: Mozilla Public License 2.0
-- Bundled license text: `../licenses/mGBA-MPL-2.0.txt`
+- License text: `licenses/mGBA-MPL-2.0.txt` in the source repository,
+  `mGBA-MPL-2.0.txt` beside this notice in an installed package
 - Documentation: https://docs.libretro.com/library/mgba/
 
 ### Snes9x — Super Nintendo Entertainment System
@@ -18,8 +19,9 @@ its contributors have the rights to grant it.
 - Libretro port: https://github.com/libretro/snes9x
 - Upstream: https://github.com/snes9xgit/snes9x
 - License: custom noncommercial terms
-- Bundled license text, including contributor copyright notices:
-  `../licenses/Snes9x-LICENSE.txt`
+- License text, including contributor copyright notices:
+  `licenses/Snes9x-LICENSE.txt` in the repository, or
+  `Snes9x-LICENSE.txt` beside this notice in an installed package
 
 Snes9x's permission to distribute applies only subject to its terms, including
 its noncommercial restrictions and required copyright notices. Snes9x is **not**
