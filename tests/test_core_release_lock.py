@@ -168,7 +168,7 @@ class ReleaseCoreLockTests(unittest.TestCase):
 
         zip_bytes = io.BytesIO()
         with zipfile.ZipFile(zip_bytes, "w") as archive:
-            archive.writestr("mgba_libretro.so", b"\\x7fELF" + b"X" * 11000)
+            archive.writestr("mgba_libretro.so", b"\x7fELF" + b"X" * 11000)
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             lockfile = root / "lock.json"
