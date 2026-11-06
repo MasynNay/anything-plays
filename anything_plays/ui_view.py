@@ -17,12 +17,11 @@ class ViewMixin:
             mode = "Windowed"
         # An external emulator renders in its own GPU window. A fullscreen
         # Tk canvas here would cover that window with a blank game display.
-        if (mode == "Game only"
-                and SYSTEMS[self.system_key.get()].backend != "libretro"):
+        if mode == "Game only" and not self.uses_embedded_emulator():
             self.view_mode.set(getattr(self, "_current_view_mode", "Windowed"))
             self.game_status.set(
-                "Game only works with embedded consoles. Nintendo 64 and "
-                "GameCube render in RetroArch or Dolphin."
+                "Game only requires built-in video. Enable experimental "
+                "N64 software graphics, or use an embedded 2D console."
             )
             return
         if getattr(self, "_view_transition", False):
