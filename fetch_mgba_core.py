@@ -24,6 +24,17 @@ import zipfile
 
 BUILD_BOT = "https://buildbot.libretro.com/nightly"
 CORE_NAMES = ("mgba", "snes9x")
+# Only on the 2.1 testing branch; never silently add cores to the
+# already approved v2.0.0 release lock.
+OPTIONAL_V21_CORES = ("fceumm", "genesis_plus_gx")
+
+
+def core_names_for_build():
+    if os.environ.get("AP_V21_TEST_CORES", "") == "1":
+        if os.environ.get("AP_RELEASE_BUILD") == "1":
+            raise ValueError("Unapproved 2.1 test cores cannot enter the v2.0 release path")
+        return (*CORE_NAMES, *OPTIONAL_V21_CORES)
+    return CORE_NAMES
 MAX_ARCHIVE_SIZE = 30 * 1024 * 1024
 MAX_BINARY_SIZE = 60 * 1024 * 1024
 CORE_FOLDER = Path(__file__).resolve().parent / "cores"
@@ -31,6 +42,8 @@ CORE_FOLDER = Path(__file__).resolve().parent / "cores"
 SOURCE_REPOSITORIES = {
     "mgba": "https://github.com/libretro/mgba",
     "snes9x": "https://github.com/libretro/snes9x",
+    "fceumm": "https://github.com/libretro/libretro-fceumm",
+    "genesis_plus_gx": "https://github.com/libretro/Genesis-Plus-GX",
 }
 
 
@@ -158,8 +171,8 @@ def _read_core_archive(url, filename):
 
 def fetch_core(name, destination=CORE_FOLDER):
     """Acquire one core and record its binary SHA-256 and upstream identity."""
-    if name not in CORE_NAMES:
-        raise ValueError(f"Unknown emulator core: {name}")
+    if name not in core_names_for_build():
+        raise ValueError(f"Unapproved emulator core for this build: {name}")
     folder, extension = build_target()
     filename = f"{name}_libretro{extension}"
     url = f"{BUILD_BOT}/{folder}/{filename}.zip"
@@ -224,7 +237,7 @@ def fetch_core(name, destination=CORE_FOLDER):
 def fetch_all(destination=CORE_FOLDER):
     """Retrieve every required core and write a per-build provenance manifest."""
     destination = Path(destination)
-    binaries = [fetch_core(name, destination) for name in CORE_NAMES]
+    binaries = [fetch_core(name, destination) for name in core_names_for_build()]
     manifest = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "build_platform": sys.platform,
@@ -246,7 +259,7 @@ def fetch_all(destination=CORE_FOLDER):
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
     if release_mode == "1":
-        # Only the four approved release architectures are allowed here.
+        # Only the four approved v2.0 release architectures are allowed here.
         lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
         target = verify_release_lock(manifest, lock)
         print(f"Release core lock verified for {target}", flush=True)
