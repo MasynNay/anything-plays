@@ -13,8 +13,8 @@ fi
 "$PYTHON" fetch_mgba_core.py
 rm -rf .build-venv
 "$PYTHON" -m venv .build-venv
-.build-venv/bin/python -m pip install --upgrade pip
-.build-venv/bin/python -m pip install -r requirements.txt pyinstaller
+.build-venv/bin/python -m pip install --upgrade pip==26.3
+.build-venv/bin/python -m pip install -r requirements-build.txt
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" app.py
 # Generate a native macOS icon from the branded PNG.
 ICONSET="build/AnythingPlays.iconset"

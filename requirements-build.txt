@@ -1,0 +1,25 @@
+# Exact Python distributions observed in the validated four-platform v2 candidate.
+# Evidence: GitHub Actions run 42172205627, staged frozen-package inventories.
+# This file is for Python 3.13 packaging, not general-purpose source development.
+# All pinned versions appeared in platform-specific build reports. This is a
+# version lock, not a wheel-hash-locked reproducible environment or license SBOM.
+altgraph==0.17.5
+cffi==2.1.1
+macholib==1.16.4; sys_platform == "darwin"
+numpy==2.5.4
+opencv-python==4.14.0.94
+packaging==26.3
+pefile==2024.8.26; sys_platform == "win32"
+Pillow==12.3.0
+pycparser==3.12
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9
+pyobjc-core==13.0; sys_platform == "darwin"
+pyobjc-framework-AVFoundation==13.0; sys_platform == "darwin"
+pyobjc-framework-Cocoa==13.0; sys_platform == "darwin"
+pyobjc-framework-CoreAudio==13.0; sys_platform == "darwin"
+pyobjc-framework-CoreMedia==13.0; sys_platform == "darwin"
+pyobjc-framework-Quartz==13.0; sys_platform == "darwin"
+pywin32-ctypes==0.2.3; sys_platform == "win32"
+setuptools==84.2.1
+sounddevice==0.5.6
