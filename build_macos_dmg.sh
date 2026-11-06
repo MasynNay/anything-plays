@@ -26,14 +26,14 @@ for SIZE in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o dist/AnythingPlays.app/Contents/Resources/AnythingPlays.icns
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays.app/Contents/Info.plist
-mkdir -p dist/AnythingPlays.app/Contents/MacOS/cores
+mkdir -p dist/AnythingPlays.app/Contents/Resources/cores
 for name in mgba snes9x; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
-  cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
+  cp "$core" dist/AnythingPlays.app/Contents/Resources/cores/
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
-cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/MacOS/cores/
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/Resources/cores/
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
