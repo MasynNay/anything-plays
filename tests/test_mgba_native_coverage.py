@@ -49,6 +49,9 @@ class RealMGBASupport(unittest.TestCase):
                     # A 32 KiB ROM-only image with a valid cartridge header.
                     # Entry at 0100h jumps to a two-byte idle loop at 0150h.
                     payload[0x100:0x104] = b"\x00\xc3\x50\x01"
+                    # mGBA identifies GB cartridges using the first four
+                    # identifier bytes. No full proprietary logo or ROM is used.
+                    payload[0x104:0x108] = bytes((0xCE, 0xED, 0x66, 0x66))
                     # Standard Game Boy cartridge compatibility header data.
                     # No commercial game program, artwork, or firmware is included.
                     logo = bytes.fromhex(
