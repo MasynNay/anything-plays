@@ -47,7 +47,7 @@ The official [FFmpeg licensing checklist](https://ffmpeg.org/legal.html)
 explains that FFmpeg is generally LGPL but may become GPL when GPL
 components are enabled; it explicitly names libx264 as an item to review.
 The [x264 licensor](https://x264.org/licensing/) offers GPLv2 and separate
-commercial licensing, while [VideoLAN's x265 page](https://www.videolan.org/developers/x265.html)
+commercial licensing, while [VideoLAN's x265 page](https://github.com/videolan/x265)
 lists GPLv2 and commercial licensing.
 
 The `otool` data establishes **linkage**, not whether the distributor holds
