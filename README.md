@@ -222,19 +222,35 @@ ROMs, `.sav` files, and settings before replacing an installed build.
 - [Security reporting](SECURITY.md)
 - [Third-party components and licensing](THIRD_PARTY_COMPONENTS.md)
 
-## Free, independent, and not yet licensed for redistribution
+## Free and open source
 
-Anything Plays is intended to be **free of charge and non-commercial**, with no
-advertisements, donations, or paid functionality. That describes the project's
-intent; it does **not** automatically license the original source for reuse.
-No license grant has yet been added for the project's original code.
+Anything Plays is intended to remain **completely free of charge**,
+with no advertisements, donations, subscriptions, or paid functionality.
 
-The Gambatte, mGBA, and Snes9x cores carry their **own** licenses and
-redistribution conditions. Snes9x is restricted to non-commercial use; other
-cores may require notices and corresponding source availability. The effect of
-integrating GPL-covered components with this application also requires review.
-See [THIRD_PARTY_COMPONENTS.md](THIRD_PARTY_COMPONENTS.md). These obligations
-must be resolved **before publicly distributing bundled installers**.
+Original Anything Plays source code is made available under the
+[MIT License](LICENSE), to the extent its contributors have the
+right to license it.
+
+The MIT License permits commercial reuse of MIT-covered code.
+This does not change the project's commitment to providing
+official releases free of charge.
+
+### Third-party emulator licenses
+
+Anything Plays uses independently developed emulator cores:
+
+- **Gambatte:** GNU General Public License v2
+- **mGBA:** Mozilla Public License 2.0
+- **Snes9x:** Custom noncommercial license
+
+These components are not covered by the Anything Plays MIT License.
+
+See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for attribution,
+license information, and outstanding redistribution requirements.
+
+**Bundled installers are not approved for public release until
+third-party licensing and source distribution obligations have
+been resolved.**
 
 Anything Plays is an independent project and is not affiliated with or endorsed
 by Nintendo, Pokémon, Libretro, Gambatte, mGBA, or Snes9x.

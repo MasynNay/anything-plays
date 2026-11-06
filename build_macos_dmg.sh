@@ -38,6 +38,16 @@ cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/MacOS/cores/
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Anything Plays uses the camera to track moving objects for game controls." "$PLIST"
+# Include project and third-party licensing documentation.
+LICENSE_DIR="dist/AnythingPlays.app/Contents/Resources/licenses"
+mkdir -p "$LICENSE_DIR"
+
+cp LICENSE "$LICENSE_DIR/AnythingPlays-MIT.txt"
+cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
+cp THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
+cp THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
+cp licenses/*.txt "$LICENSE_DIR/"
+
 codesign --force --deep --sign - dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg

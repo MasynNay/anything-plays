@@ -47,6 +47,9 @@ build may resolve newer patch versions than a previous build.
 - [ ] Review Python dependencies, images, icons and any other bundled assets.
 - [ ] Verify final packages, test on target OSes, and approve publication.
 
-Anything Plays is intended to be free and non-commercial. This does not make
-unlicensed original source automatically open source. No project-level license
-grant has yet been selected.
+Anything Plays is intended to remain free of charge and non-commercial in
+its official distribution. Original project code is offered under the MIT
+License where contributors have the rights to grant that license.
+Third-party components retain their separate licensing requirements.
+Bundled installers must not be published until the outstanding compliance
+requirements above have been resolved.

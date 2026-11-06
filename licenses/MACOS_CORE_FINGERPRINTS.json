@@ -1,0 +1,25 @@
+{
+  "description": "Existing tested macOS build fingerprints",
+  "source_revision_verified": false,
+  "redistribution_approved": false,
+  "cores": [
+    {
+      "name": "gambatte",
+      "filename": "gambatte_libretro.dylib",
+      "size_bytes": 3893584,
+      "sha256": "eff9b8c75b58b053996d8ffa2cf0b01081a5668eac325e761f6b875fcd8d163b"
+    },
+    {
+      "name": "mgba",
+      "filename": "mgba_libretro.dylib",
+      "size_bytes": 2813296,
+      "sha256": "92140af5a3f2a655d7acdd37f256bcd67755e87093b7d836a097f45e4eaba7ba"
+    },
+    {
+      "name": "snes9x",
+      "filename": "snes9x_libretro.dylib",
+      "size_bytes": 2898352,
+      "sha256": "9870f3bdaa19a79dee7c9228845dd0cd1db1fc5660997cb20928148ff6b9a5f6"
+    }
+  ]
+}

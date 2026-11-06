@@ -16,6 +16,15 @@ for name in gambatte mgba snes9x; do
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
+
+# Include project and third-party licensing documentation.
+mkdir -p dist/AnythingPlays/licenses
+cp LICENSE dist/AnythingPlays/licenses/AnythingPlays-MIT.txt
+cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
+cp THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
+cp THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
+cp licenses/*.txt dist/AnythingPlays/licenses/
+
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays" "$PKG/usr/bin" "$PKG/usr/share/applications"
