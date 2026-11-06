@@ -15,8 +15,42 @@ from anything_plays.systems import SYSTEMS
 
 
 class ExternalBackendMixin:
+    """GPU launchers and an explicit, experimental N64 software fallback."""
+
+    def switch_n64_backend(self):
+        """Switch the N64 video backend without changing global emulator state."""
+        if self.system_key.get() != "n64":
+            return
+        self.stop_controls()
+        self.unload_rom()
+        if not self.uses_embedded_emulator() and self.view_mode.get() == "Game only":
+            self.set_view_mode("Windowed")
+        self.save_preferences()
+        self.update_external_setup()
+        self.game_canvas.delete("all")
+        self.show_external_placeholder()
+        self.game_status.set(
+            "N64 software graphics selected. Choose a ROM to test in this window."
+            if self.uses_embedded_emulator() else
+            "External N64 fallback selected. RetroArch must be installed."
+        )
+
     def update_external_setup(self):
         backend = SYSTEMS[self.system_key.get()].backend
+        if self.system_key.get() == "n64":
+            self.n64_mode_row.pack(fill="x", pady=(0, 6))
+            self.system_description.configure(
+                text="Nintendo 64 · Built-in test"
+                if self.uses_embedded_emulator() else
+                "Nintendo 64 · RetroArch fallback"
+            )
+        else:
+            self.n64_mode_row.pack_forget()
+        if self.uses_embedded_emulator():
+            self.arm_button.configure(state="normal", text="Enable object controls")
+            self.shortcuts_button.configure(state="normal")
+            self.external_setup.pack_forget()
+            return
         if backend != "libretro":
             # N64 uses Remote RetroPad; Dolphin uses an isolated named pipe.
             # Dolphin's pipe backend is only supported on Unix-like systems.
@@ -61,7 +95,7 @@ class ExternalBackendMixin:
     def show_external_placeholder(self):
         """Make clear why the native game canvas has no video for 3D consoles."""
         backend = SYSTEMS[self.system_key.get()].backend
-        if backend == "libretro":
+        if self.uses_embedded_emulator():
             return
         canvas = self.game_canvas
         canvas.delete("all")
