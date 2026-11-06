@@ -214,6 +214,7 @@ class LibraryMixin:
         self.playing_info.pack(fill='x')
 
     def unload_rom(self):
+        self.stop_external_emulator()
         self.deactivate_manual()
         self.stop_controls()
         self.emu.stop()
@@ -229,9 +230,15 @@ class LibraryMixin:
         self.deactivate_manual()
         self.stop_controls()
         try:
-            self.emu.start(str(path))
+            if SYSTEMS[self.system_key.get()].backend != 'libretro':
+                if not self.start_external_rom(str(path)):
+                    return
+            else:
+                self.stop_external_emulator()
+                self.emu.start(str(path))
             self.current_rom = str(path)
-            self.game_status.set('Playing ' + Path(path).stem)
+            if SYSTEMS[self.system_key.get()].backend == 'libretro':
+                self.game_status.set('Playing ' + Path(path).stem)
             self.show_playing_info()
         except Exception as exc:
             messagebox.showerror('ROM', f'Could not start game: {exc}')
