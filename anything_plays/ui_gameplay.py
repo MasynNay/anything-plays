@@ -107,8 +107,8 @@ class GameplayMixin:
         self.last_action = time.monotonic()
         self.arm_button.config(text='Pause object controls')
         self.action.set(
-            'ACTIVE — local RetroPad camera input for N64'
-            if backend == 'retroarch' else
+            'ACTIVE — external camera controller bridge'
+            if backend != 'libretro' else
             'ACTIVE — object controls embedded emulator only'
         )
 
