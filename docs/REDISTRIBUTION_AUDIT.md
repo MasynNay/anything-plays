@@ -37,11 +37,16 @@ lists `filter/snes_ntsc.c` among the C sources without a conditional
 feature flag. Thus the NTSC filter's LGPL 2.1 notice is relevant to builds
 using that Makefile. The complete upstream license text is now committed at
 `licenses/Snes9x-snes_ntsc-LGPL-2.1.txt`, and staged-bundle verification
-requires it. The inspected source tree did not expose JMA or xBRZ component
-directories mentioned by the general Snes9x LICENSE; this does not prove
-their absence from every published native build. Inspect exact build logs
-and source archives and review LGPL source/relinking requirements rather
-than treating a license copy as full compliance.
+requires it. The exact pinned [Libretro Snes9x source tree](https://github.com/libretro/snes9x/tree/fae2fea08f74180759ef540ee94259213f503480)
+contains 204 entries (GitHub tree API returned `truncated=false`). Its
+`libretro/Makefile.common` lists the `snes_ntsc.c` filter but does **not**
+list JMA or xBRZ objects; neither JMA nor xBRZ source files occur anywhere
+in that Git tree. Thus those additional GPL components are not evidenced in
+the pinned Libretro source, rather than being assumed present merely because
+the general Snes9x LICENSE mentions optional components. The exact nightly
+binary still needs independent source-build correspondence checks. Retain
+the LGPL NTSC notice and review its source/relinking requirements; a license
+copy alone is not full compliance.
 
 ## Source and binary traceability
 
