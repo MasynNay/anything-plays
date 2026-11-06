@@ -11,9 +11,8 @@ The generated files live under build/v21-icon/, which is already temporary
 build output. No files in assets/ or stable v2.0 are overwritten.
 """
 from pathlib import Path
-import sys
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "anything_plays_v21.webp"
