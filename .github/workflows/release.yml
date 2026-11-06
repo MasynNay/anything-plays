@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write
 # Release mode forces exact approved core fingerprints at download AND staging.
+# A future approved workflow must stage immutable core ZIPs on each runner and
+# set AP_CORE_ARCHIVE_DIR. Missing archives fail closed; no nightly fallback.
 # Keep the publication and source-checks jobs disabled pending legal review.
 env:
   AP_RELEASE_BUILD: '1'
