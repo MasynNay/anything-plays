@@ -5,6 +5,7 @@ third-party redistribution and corresponding-source obligations are satisfied.
 """
 
 import argparse
+import ctypes as C
 import hashlib
 import json
 from pathlib import Path
@@ -23,7 +24,33 @@ REQUIRED_DOCUMENTS = (
 EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
 
 
-def verify_bundle(bundle, platform_name):
+class _LibretroCoreInfo(C.Structure):
+    """Fields defined by libretro's retro_system_info ABI."""
+
+    _fields_ = [
+        ("library_name", C.c_char_p),
+        ("library_version", C.c_char_p),
+        ("valid_extensions", C.c_char_p),
+        ("need_fullpath", C.c_bool),
+        ("block_extract", C.c_bool),
+    ]
+
+
+def _validate_mgba_core(path):
+    """Confirm the actual platform binary supports each advertised Game Boy system."""
+    library = C.CDLL(str(path))
+    describe = library.retro_get_system_info
+    describe.argtypes = [C.POINTER(_LibretroCoreInfo)]
+    describe.restype = None
+    info = _LibretroCoreInfo()
+    describe(C.byref(info))
+    reported = (info.valid_extensions or b"").decode("utf-8", "replace")
+    extensions = {item.strip(". ").lower() for item in reported.replace(";", "|").split("|")}
+    if not {"gb", "gbc", "gba"} <= extensions:
+        raise ValueError(f"mGBA binary lacks required GB/GBC/GBA support: {reported}")
+
+
+def verify_bundle(bundle, platform_name, check_native=False):
     """Raise ValueError on missing documentation or mismatched core binaries."""
     bundle = Path(bundle)
     if platform_name not in EXTENSIONS:
@@ -71,16 +98,21 @@ def verify_bundle(bundle, platform_name):
             raise ValueError(f"Size mismatch: {path}")
         if not isinstance(record.get("source_url"), str) or not record["source_url"].startswith("https://"):
             raise ValueError(f"Missing HTTPS source URL for {name}")
-    print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums")
+    if check_native:
+        _validate_mgba_core(cores / f"mgba_libretro{EXTENSIONS[platform_name]}")
+    print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums"
+          + (" and native GB/GBC/GBA coverage" if check_native else ""))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("platform", choices=tuple(EXTENSIONS))
     parser.add_argument("bundle", type=Path, help="Staged .app or application directory")
+    parser.add_argument("--check-native", action="store_true",
+                        help="Load the mGBA core and verify supported Game Boy formats")
     args = parser.parse_args()
     try:
-        verify_bundle(args.bundle, args.platform)
+        verify_bundle(args.bundle, args.platform, check_native=args.check_native)
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         print(f"Bundle verification FAILED: {exc}", file=sys.stderr)
         return 1
