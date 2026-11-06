@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/anything_plays.png" alt="Anything Plays logo" width="136">
+  <img src="assets/anything_plays_v21.webp" alt="Anything Plays 2.1 corrected fish logo" width="136">
 
   # Anything Plays
 
