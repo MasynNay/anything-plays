@@ -56,7 +56,10 @@ def verify_custom_wheel(wheel, expected_sha256):
         if len(metadata_paths) != 1:
             raise ValueError("Missing or ambiguous OpenCV wheel metadata")
         metadata = Parser().parsestr(archive.read(metadata_paths[0]).decode("utf-8"))
-        if metadata["Name"] != NAME or metadata["Version"] != VERSION:
+        # PEP 503 treats hyphens, dots and underscores as equivalent in
+        # distribution names. Upstream's source-built wheel uses underscores.
+        canonical_name = re.sub(r"[-_.]+", "-", (metadata["Name"] or "").strip()).lower()
+        if canonical_name != NAME or metadata["Version"] != VERSION:
             raise ValueError("Custom OpenCV wheel metadata differs from pinned package")
     return {
         "file": wheel.name, "sha256": actual,
