@@ -27,13 +27,13 @@ button inside an embedded emulator—**not a system-wide keyboard event**.
 Prefer a conventional controller? Click the game display and play using the
 keyboard. A webcam is optional for manual play.
 
-> **Version 2.0 status:** The source is merged into `main`. The maintainer
-> validated the original v2.0 application on Windows, macOS and Ubuntu; later
-> automated checks verified the mGBA GB/GBC transition and builds on all four
-> release architectures. A [fully verified four-platform RC5 private candidate](docs/RC5_VERIFICATION.md)
-> now preserves exact emulator archives, source snapshots, all four FFmpeg-free
-> OpenCV build inputs and corresponding checksums. Public v2.0 installers remain
-> withheld pending the [third-party redistribution review](docs/RELEASE_LICENSE_REVIEW.md).
+> **Version 2.0 is released!** Download the verified
+> [Windows, Mac, or Linux installer](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)
+> from the official GitHub release. All four OS builds and their emulator core
+> hashes passed release validation, with
+> [exact RC6 checksums](docs/RC6_VERIFICATION.md) and
+> [source/license notices](docs/RELEASE_SOURCE_ACCESS.md) available.
+> The app includes no game ROMs or BIOS files.
 
 ## Supported consoles
 
