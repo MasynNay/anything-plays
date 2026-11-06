@@ -27,10 +27,11 @@ button inside an embedded emulator—**not a system-wide keyboard event**.
 Prefer a conventional controller? Click the game display and play using the
 keyboard. A webcam is optional for manual play.
 
-> **Version 2.0 status:** The maintainer has completed functional testing of
-> Windows EXE, macOS DMG, and Ubuntu/Debian DEB builds. The source is ready for
-> integration into `main`, but public v2.0 installers remain withheld until
-> third-party redistribution and corresponding-source requirements are resolved.
+> **Version 2.0 status:** The source is merged into `main`. The maintainer
+> validated the original v2.0 application on Windows, macOS and Ubuntu; later
+> automated checks verified the mGBA GB/GBC transition and builds on all four
+> release architectures. Public v2.0 installers are withheld pending the
+> [third-party redistribution review](docs/RELEASE_LICENSE_REVIEW.md).
 
 ## Supported consoles
 
@@ -43,8 +44,8 @@ keyboard. A webcam is optional for manual play.
 
 The console selector chooses the matching emulator automatically. GB, GBC and GBA
 share the mGBA core while retaining independent game libraries and controls.
-Native cores
-are downloaded and bundled **at build time** for packaged applications.
+Native cores are downloaded and bundled **at build time** for packaged
+applications.
 **No commercial game ROMs or BIOS files are distributed.** You supply your own
 legally usable game files.
 
