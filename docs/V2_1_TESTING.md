@@ -60,6 +60,38 @@ Plus GX noncommercial license notices are included in the test packages.
 New core binaries are **not yet approved for a public release** and require
 pinned source and independent native gameplay verification first.
 
+### Experimental Nintendo 64 built-in software video
+
+2.1's testing branch now includes a user-selectable **Play N64 in the app**
+mode, using the **bundled ParaLLEl-N64 software renderer (Angrylion)** instead
+of an external RetroArch GPU window. This is the default in the alpha UI.
+It uses the same game canvas, keyboard mapping, audio and camera input path as
+the other Libretro consoles. Press **Game only** for a fullscreen game view.
+
+**Important:** This option has passed source and UI smoke tests, but real
+N64 ROM compatibility, native macOS Apple Silicon startup, frame rate, saves
+and audio still require validation on physical hardware. The software path
+can be significantly slower than an accelerated renderer. Uncheck the option
+to use the existing RetroArch fallback if the bundled core is unsuitable.
+
+The GameCube backend still requires Dolphin and still opens a separate GPU
+window. **GameCube does not yet meet the one-installer, one-window goal.**
+Bundling an externally launched Dolphin without in-panel rendering is not an
+acceptable substitute for the release goal.
+
+### Emulator update checks
+
+The app runs a read-only source check in a background thread on startup,
+then at most once every 24 hours. Users can click **Check emulator updates**
+in the game panel. Installed Libretro native libraries are SHA-256 checked
+against the bundled `CORE_PROVENANCE.json`; upstream GitHub source revisions
+are reported without asserting that a newer compatible binary is available.
+
+Native binaries are never overwritten inside a running app. Updated cores
+must be reviewed for compatibility and licensing, built as part of a complete
+signed installer, smoke-tested, and then distributed with an app update.
+The check does not install any other applications or game images.
+
 ### External hardware-rendered emulators
 
 | Console | Required separate installation | Behavior |
