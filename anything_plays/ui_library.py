@@ -1,6 +1,8 @@
 """Browse user-supplied ROMs and manage the interactive cartridge shelf."""
 
 from pathlib import Path
+from queue import Empty, Queue
+from threading import Event, Thread
 import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -9,6 +11,10 @@ from PIL import Image, ImageTk
 from anything_plays.systems import SYSTEMS
 from anything_plays.cartridge_art import cartridge_image, cartridge_font
 from anything_plays.rom_library import scan_rom_directory, find_cover_art
+
+
+MAX_VISIBLE_CARTRIDGES = 300
+CARTRIDGES_PER_BATCH = 12
 
 
 class LibraryMixin:
@@ -30,6 +36,20 @@ class LibraryMixin:
             title='Choose your ' + SYSTEMS[self.system_key.get()].title + ' ROM folder',
             initialdir=initial)
         if not directory:
+            return
+        # Choosing the entire home directory or filesystem by accident used
+        # to freeze the Tk interface while scanning thousands of files.
+        broad_roots = {Path.home().resolve(), Path("/"),
+                       Path.home().parent.resolve(), Path("/Volumes")}
+        if Path(directory).resolve() in broad_roots:
+            if not messagebox.askyesno(
+                    "Very large ROM folder",
+                    "This is a very broad folder and may contain thousands of "
+                    "unrelated files. Choose a dedicated ROM folder instead? "
+                    "Select Yes to browse again, or No to use this folder.",
+                    parent=self.root):
+                return
+            self.root.after_idle(self.set_rom_directory)
             return
         self.rom_directory = directory
         self.rom_directories[self.system_key.get()] = directory
@@ -173,37 +193,126 @@ class LibraryMixin:
         self.shelf_velocity *= .88
         self.shelf_momentum_job = self.root.after(16, self.shelf_coast)
 
+    def clear_rom_directory(self):
+        """Recover from an oversized or incorrect directory without editing JSON."""
+        self.rom_directory = ""
+        self.rom_directories[self.system_key.get()] = ""
+        self.save_preferences()
+        self.populate_inline_library()
+
     def populate_inline_library(self):
+        """Scan on a worker; never block the Tk thread on a large directory."""
+        previous = getattr(self, "_rom_scan_cancel", None)
+        if previous is not None:
+            previous.set()
+        generation = getattr(self, "_rom_scan_generation", 0) + 1
+        self._rom_scan_generation = generation
+
         for widget in self.library_grid.winfo_children():
             widget.destroy()
         self.cancel_shelf_momentum()
         self.cancel_shelf_animation()
         self.shelf_drag = None
         self.library_images.clear()
-        games = self.scan_roms()
-        if not self.rom_directory or not Path(self.rom_directory).is_dir():
-            self.library_summary.set('ROM LIBRARY · Choose a ROM folder above')
-        else:
-            self.library_summary.set(f'ROM LIBRARY · {len(games)} game(s) · Drag or use Previous / Next')
+
+        folder = self.rom_directory
+        if not folder or not Path(folder).is_dir():
+            self.library_summary.set("ROM LIBRARY · Choose a ROM folder above")
+            ttk.Label(
+                self.library_grid,
+                text="No ROM folder selected. Browse to a dedicated game folder.",
+            ).pack(padx=8, pady=40)
+            return
+
+        system = self.system_key.get()
+        extensions = SYSTEMS[system].extensions
+        cancel = Event()
+        self._rom_scan_cancel = cancel
+        result = Queue(maxsize=1)
+        self.library_summary.set(
+            "ROM LIBRARY · Scanning in background. Change or clear the folder any time."
+        )
+
+        def scan_worker():
+            try:
+                games = scan_rom_directory(folder, extensions, cancelled=cancel.is_set)
+                result.put((games, None))
+            except OSError as exc:
+                result.put(([], str(exc)))
+
+        Thread(target=scan_worker, daemon=True, name="rom-library-scan").start()
+        self.root.after(60, lambda: self._poll_rom_scan(generation, result))
+
+    def _poll_rom_scan(self, generation, result):
+        if generation != self._rom_scan_generation or self._closing:
+            return
+        try:
+            games, error = result.get_nowait()
+        except Empty:
+            self.root.after(90, lambda: self._poll_rom_scan(generation, result))
+            return
+
+        if error:
+            self.library_summary.set(f"ROM LIBRARY · Could not scan folder: {error}")
+            return
         if not games:
-            ttk.Label(self.library_grid, text='No compatible games yet. Choose a folder to browse cartridges.').pack(padx=8, pady=40)
-        for rom in games:
+            self.library_summary.set("ROM LIBRARY · No compatible games found")
+            ttk.Label(
+                self.library_grid,
+                text="No compatible ROMs. Choose a different folder above.",
+            ).pack(padx=8, pady=40)
+            return
+
+        visible = games[:MAX_VISIBLE_CARTRIDGES]
+        if len(games) > len(visible):
+            suffix = (
+                f" · Showing first {len(visible)}; choose a smaller ROM folder"
+            )
+        else:
+            suffix = ""
+        self.library_summary.set(
+            f"ROM LIBRARY · {len(games)} game(s){suffix} · Drag or use Previous / Next"
+        )
+        self._render_rom_batch(visible, 0, generation)
+
+    def _render_rom_batch(self, games, index, generation):
+        """Create a small number of thumbnails per UI tick to retain responsiveness."""
+        if generation != self._rom_scan_generation or self._closing:
+            return
+        for rom in games[index:index + CARTRIDGES_PER_BATCH]:
             tile = ttk.Frame(self.library_grid, padding=(5, 0))
-            tile.pack(side='left', anchor='n')
+            tile.pack(side="left", anchor="n")
             art_path = find_cover_art(rom)
-            art = self.cartridge_image(rom.stem, self.system_key.get(), art_path).resize((176, 133), Image.Resampling.LANCZOS)
+            art = self.cartridge_image(
+                rom.stem, self.system_key.get(), art_path
+            ).resize((176, 133), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(art)
             self.library_images.append(photo)
-            cartridge = tk.Label(tile, image=photo, bg=self.THEMES.get(self.theme_name.get(), self.THEMES['Dark'])[1],
-                                 cursor='hand2', bd=0, highlightthickness=0)
+            cartridge = tk.Label(
+                tile, image=photo,
+                bg=self.THEMES.get(self.theme_name.get(), self.THEMES["Dark"])[1],
+                cursor="hand2", bd=0, highlightthickness=0,
+            )
             cartridge.is_cartridge_tile = True
             cartridge.pack()
-            caption = ttk.Label(tile, text=rom.stem, width=24, anchor='center', cursor='hand2')
+            caption = ttk.Label(
+                tile, text=rom.stem, width=24, anchor="center", cursor="hand2",
+            )
             caption.pack()
             for widget in (cartridge, caption, tile):
-                widget.bind('<ButtonPress-1>', lambda e, p=rom: self.shelf_press(e, p))
-        self.library_canvas.configure(scrollregion=self.library_canvas.bbox('all'))
-        self.library_canvas.xview_moveto(0)
+                widget.bind(
+                    "<ButtonPress-1>", lambda e, p=rom: self.shelf_press(e, p)
+                )
+        next_index = index + CARTRIDGES_PER_BATCH
+        if next_index < len(games):
+            self.root.after(
+                10, lambda: self._render_rom_batch(games, next_index, generation)
+            )
+        else:
+            self.library_canvas.configure(
+                scrollregion=self.library_canvas.bbox("all")
+            )
+            self.library_canvas.xview_moveto(0)
 
     def show_library(self):
         self.playing_info.pack_forget()
