@@ -55,6 +55,8 @@ class SourceContracts(unittest.TestCase):
         dmg = script.index("hdiutil create")
         self.assertLess(signing, verification)
         self.assertLess(verification, dmg)
+        self.assertIn("Contents/Resources/cores", script)
+        self.assertNotIn("Contents/MacOS/cores", script)
         self.assertIn("hdiutil attach -readonly", script)
         self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"', script)
 
