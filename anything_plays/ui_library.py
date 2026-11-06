@@ -339,15 +339,23 @@ class LibraryMixin:
         self.deactivate_manual()
         self.stop_controls()
         try:
-            if SYSTEMS[self.system_key.get()].backend != 'libretro':
+            if not self.uses_embedded_emulator():
                 if not self.start_external_rom(str(path)):
                     return
             else:
+                # Embedded N64 uses the experimental software video backend.
+                # The external launcher remains available as a user fallback.
                 self.stop_external_emulator()
+                self.emu.core_path = self.emu.find_system_core()
+                if not self.emu.core_path:
+                    raise RuntimeError(
+                        'Bundled emulator core is unavailable. '
+                        'Reinstall the 2.1 test build or select the external fallback.'
+                    )
                 self.emu.start(str(path))
             self.current_rom = str(path)
-            if SYSTEMS[self.system_key.get()].backend == 'libretro':
-                self.game_status.set('Playing ' + Path(path).stem)
+            if self.uses_embedded_emulator():
+                self.game_status.set('Starting ' + Path(path).stem)
             self.show_playing_info()
         except Exception as exc:
             messagebox.showerror('ROM', f'Could not start game: {exc}')
