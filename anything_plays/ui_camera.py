@@ -4,6 +4,7 @@ import os
 from queue import Empty, Queue
 import threading
 import time
+import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox
 
 import cv2
@@ -65,33 +66,104 @@ class CameraMixin:
             self.camera_name.set('')
             self.status.set('No usable cameras found.' + (f' {error}' if error else ' Check permissions or click Refresh cameras.'))
 
-    def start_camera(self):
+    def cancel_camera_reconnect(self):
+        """Cancel any pending retry when the user chooses Stop or another camera."""
+        job = getattr(self, "_camera_reconnect_job", None)
+        self._camera_reconnect_job = None
+        self._camera_reconnect_name = None
+        self._camera_reconnect_attempts = 0
+        if job is not None:
+            try:
+                self.root.after_cancel(job)
+            except tk.TclError:
+                pass
+
+    def _queue_camera_retry(self, name):
+        """Recover temporary webcam disconnects without spawning extra timers."""
+        if self._closing or name not in self.camera_options:
+            return
+        if getattr(self, "_camera_reconnect_job", None) is not None:
+            return
+        attempt = getattr(self, "_camera_reconnect_attempts", 0) + 1
+        self._camera_reconnect_attempts = attempt
+        delay_seconds = min(30, 2 ** min(attempt, 5))
+        self._camera_reconnect_name = name
+        self.status.set(
+            f'Camera disconnected. Retrying {name} in {delay_seconds}s; '
+            'object controls remain paused.'
+        )
+        self._camera_reconnect_job = self.root.after(
+            delay_seconds * 1000, lambda: self._retry_camera(name)
+        )
+
+    def _retry_camera(self, name):
+        """Reconnect only the previously chosen webcam, never a new device."""
+        self._camera_reconnect_job = None
+        if (self._closing or
+                getattr(self, "_camera_reconnect_name", None) != name or
+                self.camera_name.get() != name):
+            return
+        try:
+            self.start_camera(reconnecting=True)
+        except Exception as exc:
+            # Device drivers can briefly throw while reattaching. No modal
+            # dialog, thread growth, or automatic rearming of game controls.
+            self._queue_camera_retry(name)
+
+    def start_camera(self, *, reconnecting=False):
+        """Open the selected device, with silent bounded retries on hot-unplug."""
         name = self.camera_name.get()
         if name not in self.camera_options:
-            messagebox.showinfo('Camera', 'Select an available webcam first.')
+            if not reconnecting:
+                messagebox.showinfo('Camera', 'Select an available webcam first.')
             return
-        self.stop_camera()
+        self.stop_camera(keep_reconnect=reconnecting)
         self.reference_image = False
         self.frame = None
         self._static_preview_next_draw = 0
         index = self.camera_options[name]
-        self.cap = cv2.VideoCapture(
-            index, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY
-        )
-        if not self.cap.isOpened():
-            self.stop_camera()
-            messagebox.showerror('Camera', 'Unable to open this webcam. Close other apps using it, or refresh the list.')
+        try:
+            self.cap = cv2.VideoCapture(
+                index, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY
+            )
+            opened = self.cap is not None and self.cap.isOpened()
+        except (cv2.error, OSError) as exc:
+            opened = False
+        if not opened:
+            self.stop_camera(keep_reconnect=reconnecting)
+            if reconnecting:
+                self._queue_camera_retry(name)
+            else:
+                messagebox.showerror(
+                    'Camera', 'Unable to open this webcam. Close other apps '
+                    'using it, or refresh the list.'
+                )
             return
-        self.status.set(f'Camera ready: {name}. Click Pick color from video, then click your target.')
+        if reconnecting:
+            self._camera_reconnect_job = None
+            self._camera_reconnect_name = None
+            self._camera_reconnect_attempts = 0
+            self.status.set(
+                f'Camera reconnected: {name}. Object controls are paused; '
+                'enable them again when ready.'
+            )
+        else:
+            self.status.set(
+                f'Camera ready: {name}. Click Pick color from video, '
+                'then click your target.'
+            )
 
-    def stop_camera(self):
-        """Release capture and live frame buffers, retaining chosen reference art."""
+    def stop_camera(self, *, keep_reconnect=False):
+        """Release camera, stale frames, and pending reconnect when requested."""
+        if not keep_reconnect:
+            self.cancel_camera_reconnect()
         self.stop_controls()
         if self.cap is not None:
-            self.cap.release()
-            self.cap = None
+            try:
+                self.cap.release()
+            finally:
+                self.cap = None
         if not self.reference_image:
-            # Without a live camera, do not repeatedly process a stale frame.
             self.frame = None
             self.camera_photo = None
             if hasattr(self, "canvas"):
