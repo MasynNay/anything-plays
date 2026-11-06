@@ -65,17 +65,14 @@ replacement and linking conditions are met.
 
 Earlier RC2/RC3 used the stock `opencv-python-headless` wheel, eliminating
 Qt GUI binaries but **not** its bundled FFmpeg codec dependencies.
-The [verified private RC5](RC5_VERIFICATION.md) uses separate, SHA-256-locked
+The [publicly distributed RC6-derived v2.0.0](RC6_VERIFICATION.md) uses separate, SHA-256-locked
 source-built wheels for all four platforms, configured with FFmpeg disabled.
 The staged Windows, Linux, and both Mac inventories now contain no FFmpeg,
 x264 or x265 binary filenames; build-time camera backends and tracking image
 operations passed. The exact OpenCV source, its Windows packaging patch, and
-four wheel files are preserved with the private candidate. This is not proof
+four wheel files and the corresponding source/patch evidence are preserved in the reviewed private RC6 draft; public source and notices accompany the release. This is not proof
 that unrelated native dependencies or all source/license obligations are met.
 
 ## Redistribution status
 
-**Not yet approved for public binary distribution.** The following remain:
-corresponding source and source-version verification for bundled cores,
-dependency/license and asset-rights review, and inspection of final platform
-installers. See [the release review](RELEASE_LICENSE_REVIEW.md).
+**Published for the project's stated free/noncommercial use only.** The [v2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) includes exact source snapshots and all four installer hashes. This does not confer commercial reuse rights for Snes9x or the commissioned artwork or establish independent reproducible upstream core builds. See [the scoped review](RELEASE_DISTRIBUTION_REVIEW.md) and [source access instructions](RELEASE_SOURCE_ACCESS.md).
