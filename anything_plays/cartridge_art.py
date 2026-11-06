@@ -16,7 +16,7 @@ def cartridge_image(filename, system='gba', artwork_path=None):
     w, h = 300, 226
     image = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(image)
-    system = system if system in ('gb', 'gbc', 'gba', 'snes') else 'gba'
+    system = system if system in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis', 'n64', 'gamecube') else 'gba'
     if system == 'gb':
         # Original Game Boy: tall, light gray cartridge with a corner notch.
         shell = [(80, 8), (219, 8), (229, 18), (229, 209), (72, 209), (72, 17)]
@@ -71,6 +71,29 @@ def cartridge_image(filename, system='gba', artwork_path=None):
         # Bottom molded seam and central locking notch.
         d.line((45, 187, 255, 187), fill='#9695a0', width=3)
         d.rounded_rectangle((123, 194, 177, 205), radius=3, fill='#aaa9b4', outline='#777683', width=2)
+    elif system in ('nes', 'genesis', 'n64', 'gamecube'):
+        # Locally drawn generic console media with no trademarked cover art.
+        palettes = {
+            'nes': ('#b6b9b9', '#646666', '#29323b', 'NES'),
+            'genesis': ('#20262c', '#bd3042', '#edf0f2', 'SEGA GENESIS'),
+            'n64': ('#444a50', '#7469ab', '#f8f4ff', 'NINTENDO 64'),
+            'gamecube': ('#282943', '#6861b2', '#f6f5ff', 'GAMECUBE'),
+        }
+        shell_color, accent, ink, title = palettes[system]
+        if system == 'gamecube':
+            d.ellipse((70, 6, 230, 212), fill=shell_color, outline=accent, width=8)
+            d.ellipse((126, 61, 174, 109), fill='#ffffff', outline=accent, width=4)
+            d.arc((92, 28, 208, 190), 45, 315, fill='#b4b0ec', width=5)
+            label_box = (100, 118, 200, 174)
+        else:
+            d.rounded_rectangle((20, 24, 280, 205), radius=14, fill=shell_color, outline=accent, width=6)
+            d.rounded_rectangle((37, 56, 263, 182), radius=6, fill=accent, outline=ink, width=2)
+            label_box = (51, 94, 249, 171)
+        d.text((150, 43 if system != 'gamecube' else 118), title,
+               anchor='mm', fill=ink, font=cartridge_font(11, True))
+        if system == 'gamecube':
+            label_box = (92, 145, 208, 188)
+        ink = '#ffffff'
     else:
         # Compact Game Boy Advance cartridge, with alpha outside the shell.
         d.rounded_rectangle((10, 14, 290, 212), radius=17, fill='#333a46', outline='#657080', width=3)
