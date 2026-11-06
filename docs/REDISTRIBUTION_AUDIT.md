@@ -188,6 +188,29 @@ Qt and codec license notice and corresponding-source obligations. Distinguish
 actual bundled components from optional system-provided libraries; source
 snapshots for the two emulators do not cover this multimedia dependency stack.
 
+### Native macOS Apple Silicon codec licensing finding
+
+The [headless OpenCV four-target inventory run](https://github.com/MasynNay/anything-plays/actions/runs/42234440839)
+still contains `libx264.164.dylib` and `libx265.215.dylib` in the
+macOS arm64 application under `Contents/Frameworks/cv2/__dot__dylibs/`,
+even though no Qt 5/6 GUI libraries are present. The other inspected
+headless targets do not list those two codec filenames. They are real
+transitive binaries, not hypothetical optional dependencies.
+
+The [x264 licensor](https://x264.org/licensing/) describes its GPLv2 grant,
+and the [x265 authors](https://github.com/videolan/x265/blob/master/doc/reST/introduction.rst)
+describe GPLv2 and commercial licensing choices. This does not establish
+which precise build/license options the OpenCV wheel used; it **does** mean
+it is unsafe to classify the entire macOS arm64 media stack as LGPL solely
+because opencv-python's overview calls FFmpeg LGPL.
+
+Before a public arm64 DMG is published: establish the linked codecs' exact
+licenses, retain corresponding source/build options, and review any
+applicable GPL/LGPL distribution obligations. If the encoder binaries are
+not needed for camera capture, consider excluding them **only after
+validating import, AVFoundation capture, and archive dependencies**.
+Never silently delete linked dylibs from an installer without testing.
+
 ## Assets and distribution materials
 
 - The maintainer states that the betta illustration was commissioned, that
