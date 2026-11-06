@@ -50,7 +50,13 @@ cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays.app
-codesign --force --deep --sign - dist/AnythingPlays.app
+# Sign the outer application only. --deep would mutate nested Libretro dylibs
+# after their SHA-256 values were recorded in CORE_PROVENANCE.json.
+codesign --force --sign - dist/AnythingPlays.app
+# Verify again after signing; reject even a successfully signed but modified
+# bundle instead of shipping a DMG with invalid core provenance.
+"$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays.app
+codesign --verify --verbose=2 dist/AnythingPlays.app
 mkdir -p release
 hdiutil create -volname 'Anything Plays' -srcfolder dist/AnythingPlays.app -ov -format UDZO release/AnythingPlays.dmg
 echo 'Created release/AnythingPlays.dmg (unsigned; notarization required for normal public distribution)'
