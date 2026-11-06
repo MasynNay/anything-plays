@@ -30,10 +30,16 @@ class SaveRAM:
         if pointer and size and self.path.is_file():
             data = self.path.read_bytes()
             C.memmove(pointer, data, min(size, len(data)))
-            restored = C.string_at(pointer, size)
-            self._last_saved_digest = hashlib.blake2b(
-                restored, digest_size=16
-            ).digest()
+            # An incomplete or oversized legacy .sav must be normalized on
+            # the next safe persist, rather than mistaken for a valid full
+            # snapshot and skipped forever.
+            if len(data) == size:
+                restored = C.string_at(pointer, size)
+                self._last_saved_digest = hashlib.blake2b(
+                    restored, digest_size=16
+                ).digest()
+            else:
+                self._last_saved_digest = None
 
     def persist(self):
         """Write only changed SRAM, replacing a complete snapshot atomically.
