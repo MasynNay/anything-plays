@@ -51,6 +51,9 @@ class InputBuffer:
         self.state_lock = Lock()
         self.remaining = {}
         self.pressed = set()
+        # Libretro may request dozens of N64 states per emulated frame.
+        # Cache the complete analogue/digital snapshot once per frame.
+        self._n64_state = {}
 
     def id_for(self, button):
         if self.system == "n64":
@@ -87,6 +90,7 @@ class InputBuffer:
         with self.state_lock:
             self.remaining.clear()
             self.pressed.clear()
+            self._n64_state.clear()
             while True:
                 try:
                     self.commands.get_nowait()
@@ -112,6 +116,14 @@ class InputBuffer:
             manual = {self.id_for(name) for name in self.manual_buttons}
         with self.state_lock:
             self.pressed.update(item for item in manual if item is not None)
+            if self.system == "n64":
+                active = (
+                    button for button, identity in N64_INPUT.items()
+                    if identity in self.pressed
+                )
+                self._n64_state = desired_state(active)
+            else:
+                self._n64_state.clear()
 
     def after_frame(self):
         with self.state_lock:
@@ -127,8 +139,4 @@ class InputBuffer:
         with self.state_lock:
             if self.system != "n64":
                 return int(device == 1 and button_id in self.pressed)
-            active = {
-                button for button, identity in N64_INPUT.items()
-                if identity in self.pressed
-            }
-        return desired_state(active).get((device, index, button_id), 0)
+            return self._n64_state.get((device, index, button_id), 0)
