@@ -118,6 +118,25 @@ class VerifyBundleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing bundled license"):
             verify_bundle(bundle, "macos")
 
+    def test_opencv_requires_separate_native_third_party_notice(self):
+        bundle, licenses, _, _ = self.make_bundle("linux")
+        inventory_path = licenses / "PYTHON_DISTRIBUTIONS.json"
+        data = json.loads(inventory_path.read_text(encoding="utf-8"))
+        data["distributions"].append({
+            "name": "opencv-python", "version": "4.14.0.94",
+            "license_files": [{"original_path": "LICENSE.txt",
+                               "bundled_path": "python-distribution-notices/example/LICENSE.txt"}],
+        })
+        inventory_path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "OpenCV third-party"):
+            verify_bundle(bundle, "linux")
+        data["distributions"][-1]["license_files"].append({
+            "original_path": "LICENSE-3RD-PARTY.txt",
+            "bundled_path": "python-distribution-notices/example/LICENSE.txt",
+        })
+        inventory_path.write_text(json.dumps(data), encoding="utf-8")
+        verify_bundle(bundle, "linux")
+
     def test_missing_snes_ntsc_lgpl_notice_fails(self):
         bundle, licenses, _, _ = self.make_bundle("linux")
         (licenses / "Snes9x-snes_ntsc-LGPL-2.1.txt").unlink()
