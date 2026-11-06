@@ -127,6 +127,17 @@ class LayoutMixin:
         self.shortcuts_button = ttk.Button(view_row, text='Keyboard shortcuts',
                                            command=self.configure_shortcuts)
         self.shortcuts_button.pack(side='right')
+        update_row = ttk.Frame(game)
+        update_row.pack(fill='x', pady=(7, 0))
+        ttk.Button(
+            update_row, text='Check emulator updates',
+            command=self.check_emulator_updates,
+            style='Compact.TButton',
+        ).pack(side='left')
+        ttk.Label(
+            update_row, textvariable=self._emulator_update_status,
+            wraplength=290,
+        ).pack(side='left', padx=(9, 0), fill='x', expand=True)
         # Embedded emulators use the existing on-canvas software-video renderer.
         self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)
