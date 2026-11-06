@@ -95,8 +95,11 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
                 raise ValueError(f"Post-packaging core integrity mismatch: {relative}")
             verified_cores.append({"name": record["name"], "path": relative,
                                    "sha256": observed["sha256"]})
-        if {entry["name"] for entry in verified_cores} != {"mgba", "snes9x"}:
-            raise ValueError("Expected exactly mGBA and Snes9x in core manifest")
+        expected = {"mgba", "snes9x"}
+        if os.environ.get("AP_V21_TEST_CORES") == "1":
+            expected |= {"fceumm", "genesis_plus_gx"}
+        if {entry["name"] for entry in verified_cores} != expected:
+            raise ValueError(f"Unexpected core manifest: expected {sorted(expected)}")
 
     # Record precise versions from the actual frozen build environment.
     # This inventory includes build-only Python packages: it is not an SBOM.
