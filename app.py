@@ -140,6 +140,9 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         if self._closing:
             return
         self._closing = True
+        pending_rom_scan = getattr(self, "_rom_scan_cancel", None)
+        if pending_rom_scan is not None:
+            pending_rom_scan.set()
         try:
             self.persist_system_profile()
         except (OSError, ValueError, tk.TclError):
