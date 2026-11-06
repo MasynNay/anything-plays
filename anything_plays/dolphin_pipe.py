@@ -67,15 +67,19 @@ def dolphin_profile(user_dir):
     for key, name in mapping.items():
         value = name if key.endswith("/Center") else "`" + name + "`"
         lines.append(f"{key} = {value}")
-    (config / "GCPadNew.ini").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+    # Only seed initial test settings. Do not clobber a user's subsequent
+    # adjustments, memory card settings, or profiles in the alpha directory.
+    pad_config = config / "GCPadNew.ini"
+    if not pad_config.exists():
+        pad_config.write_text("\n".join(lines) + "\n", encoding="utf-8")
     # Standard GameCube controller at port 1; allow background pipe input.
-    (config / "Dolphin.ini").write_text(
-        "[Core]\nSIDevice0 = 6\n\n"
-        "[Input]\nBackgroundInput = True\n",
-        encoding="utf-8",
-    )
+    dolphin_config = config / "Dolphin.ini"
+    if not dolphin_config.exists():
+        dolphin_config.write_text(
+            "[Core]\nSIDevice0 = 6\n\n"
+            "[Input]\nBackgroundInput = True\n",
+            encoding="utf-8",
+        )
     return named_pipe
 
 
