@@ -5,8 +5,11 @@ import tkinter as tk
 from tkinter import ttk
 
 from anything_plays.systems import SYSTEMS
-from anything_plays.system_profiles import DISABLED_MAPPING
-from anything_plays.gba_emulator import BUTTONS as ACTIVE_BUTTONS
+from anything_plays.system_profiles import DISABLED_MAPPING, BUTTONS_BY_SYSTEM
+
+ALL_BUTTONS = tuple(dict.fromkeys(
+    button for buttons in BUTTONS_BY_SYSTEM.values() for button in buttons
+))
 
 
 class LayoutMixin:
@@ -26,7 +29,7 @@ class LayoutMixin:
         ttk.Combobox(theme_row, textvariable=self.theme_name, state='readonly',
                      values=list(self.THEMES), width=17).pack(side='left')
         self.theme_name.trace_add('write', self.select_theme)
-        ttk.Label(main, text='A little world where movement becomes play  •  Camera tracking  •  Four classic consoles', style='Subtitle.TLabel').pack(anchor='w', pady=(2, 16))
+        ttk.Label(main, text='A little world where movement becomes play  •  Camera tracking  •  Classic consoles and 3D launcher', style='Subtitle.TLabel').pack(anchor='w', pady=(2, 16))
         body = ttk.Panedwindow(main, orient='horizontal')
         body.pack(fill='both', expand=True)
         # Each pane scrolls independently. Large controls never get clipped by
@@ -88,6 +91,18 @@ class LayoutMixin:
         self.system_combo.bind('<<ComboboxSelected>>', self.switch_system)
         self.system_description = ttk.Label(system_row, text=SYSTEMS[self.system_key.get()].title)
         self.system_description.pack(side='left', padx=8)
+        self.external_setup = ttk.Frame(game)
+        self.external_setup_label = ttk.Label(self.external_setup, text='', wraplength=430)
+        self.external_setup_label.pack(fill='x', pady=(2, 4))
+        external_actions = ttk.Frame(self.external_setup)
+        external_actions.pack(fill='x')
+        self.external_executable_button = ttk.Button(
+            external_actions, text='Locate emulator executable',
+            command=self.choose_external_executable)
+        self.external_executable_button.pack(side='left', fill='x', expand=True)
+        self.external_core_button = ttk.Button(
+            external_actions, text='Locate N64 graphics core',
+            command=self.choose_external_core)
         # Separate, permanently visible actions. Rescan must never replace Browse.
         rom_actions = ttk.Frame(game)
         rom_actions.pack(fill='x', pady=(0, 5))
@@ -98,7 +113,17 @@ class LayoutMixin:
         ttk.Button(rom_actions, text='Refresh ROM Library', command=self.populate_inline_library).grid(
             row=0, column=1, sticky='ew', padx=(4, 0))
         ttk.Button(game, text='Open game ROM', command=self.load_rom).pack(fill='x', pady=(5, 0))
-        # Emulator cores are bundled; no manual core selection required.
+        view_row = ttk.Frame(game)
+        view_row.pack(fill='x', pady=(7, 0))
+        ttk.Label(view_row, text='View mode:').pack(side='left', padx=(0, 6))
+        view_combo = ttk.Combobox(view_row, textvariable=self.view_mode, state='readonly',
+                                  values=['Windowed', 'Borderless', 'Fullscreen', 'Game only'],
+                                  width=15)
+        view_combo.pack(side='left', padx=(0, 8))
+        view_combo.bind('<<ComboboxSelected>>', lambda _: self.set_view_mode())
+        ttk.Button(view_row, text='Keyboard shortcuts',
+                   command=self.configure_shortcuts).pack(side='right')
+        # Embedded emulators use the existing on-canvas software-video renderer.
         self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)
         self.game_canvas.configure(takefocus=1, highlightthickness=2, highlightbackground='#23456f', highlightcolor='#5aa9ff')
@@ -107,7 +132,7 @@ class LayoutMixin:
         self.game_canvas.bind('<KeyRelease>', self.manual_key_up)
         self.game_canvas.bind('<FocusOut>', self.deactivate_manual)
         self.root.bind_all('<Button-1>', self.deactivate_on_outside_click, add='+')
-        self.manual_label = tk.StringVar(value='Click the game screen to play manually · Arrows = D-pad · Z = A · X = B · Enter = Start')
+        self.manual_label = tk.StringVar(value='Click game screen for manual controls · Open Keyboard shortcuts to customize')
         self.below_game = ttk.Frame(game)
         self.below_game.pack(fill='x', pady=(0, 6))
         self.library_strip = ttk.Frame(self.below_game)
@@ -186,9 +211,19 @@ class LayoutMixin:
         ttk.Label(appearance, text='Overlay tint strength (75 subtle → 100 bold)').pack(anchor='w')
         ttk.Scale(appearance, from_=75, to=100, variable=self.zone_opacity,
                   orient='horizontal').pack(fill='x')
-        ttk.Label(appearance, text='High contrast: tinted zones + labels; Outline: clear video + borders; Minimal: labels only.', wraplength=360).pack(anchor='w', pady=(4, 2))
+        ttk.Label(appearance, text='Bold: bright thick borders + centered labels. High contrast: tinted zones. Outline: clear camera. Minimal: labels only.', wraplength=380).pack(anchor='w', pady=(4, 2))
         ttk.Combobox(appearance, textvariable=self.zone_style, state='readonly',
-                     values=['High contrast', 'Outline', 'Minimal'], width=18).pack(fill='x', pady=4)
+                     values=['Bold', 'High contrast', 'Outline', 'Minimal'], width=18).pack(fill='x', pady=4)
+        ttk.Label(appearance, text='Border thickness (2–16 px)').pack(anchor='w', pady=(3, 0))
+        border_row = ttk.Frame(appearance)
+        border_row.pack(fill='x')
+        ttk.Scale(border_row, from_=2, to=16, variable=self.zone_border_width,
+                  orient='horizontal').pack(side='left', fill='x', expand=True)
+        ttk.Spinbox(border_row, from_=2, to=16, increment=1, width=5,
+                    textvariable=self.zone_border_width).pack(side='right', padx=(8, 0))
+        ttk.Label(appearance, text='Zone label position').pack(anchor='w', pady=(4, 0))
+        ttk.Combobox(appearance, textvariable=self.zone_label_position, state='readonly',
+                     values=['Center', 'Top-left'], width=17).pack(fill='x')
         art_row = ttk.Frame(appearance)
         art_row.pack(fill='x', pady=3)
         ttk.Button(art_row, text='Upload PNG', command=self.choose_zone_art,
@@ -213,17 +248,17 @@ class LayoutMixin:
         ttk.Checkbutton(fish, text='Enable custom zone drawing', variable=self.custom_draw_enabled,
                         command=self.toggle_custom_draw).pack(anchor='w', pady=(7, 0))
         ttk.Label(fish, text='Zone to redraw (only when custom drawing is enabled):').pack(anchor='w')
-        self.zone_combo = ttk.Combobox(fish, textvariable=self.zone_name, values=list(ACTIVE_BUTTONS) + ['Shuffle'], state='readonly')
+        self.zone_combo = ttk.Combobox(fish, textvariable=self.zone_name, values=list(ALL_BUTTONS) + ['Shuffle'], state='readonly')
         self.zone_combo.pack(fill='x')
         mapping = ttk.Frame(fish)
         self.mapping_widgets = {}
         mapping.pack(fill='x', pady=5)
-        for i, name in enumerate(ACTIVE_BUTTONS):
+        for i, name in enumerate(ALL_BUTTONS):
             label = ttk.Label(mapping, text=name)
             label.grid(row=i // 2, column=(i % 2) * 2, sticky='w', padx=(0, 4), pady=2)
             var = tk.StringVar()
             self.mapping_vars[name] = var
-            combo = ttk.Combobox(mapping, textvariable=var, values=[DISABLED_MAPPING, *ACTIVE_BUTTONS], state='readonly', width=9)
+            combo = ttk.Combobox(mapping, textvariable=var, values=[DISABLED_MAPPING, *ALL_BUTTONS], state='readonly', width=9)
             combo.grid(row=i // 2, column=(i % 2) * 2 + 1, sticky='w', padx=(0, 12))
             self.mapping_widgets[name] = (label, combo)
             combo.bind('<<ComboboxSelected>>', lambda _event, n=name: self.update_button_mapping(n))
@@ -236,7 +271,7 @@ class LayoutMixin:
         self.arm_button = ttk.Button(controls, text='Enable object controls', command=self.toggle, style='Accent.TButton')
         self.arm_button.pack(fill='x')
         ttk.Button(controls, text='STOP ALL OBJECT CONTROLS  (Esc)', command=self.stop_controls, style='Danger.TButton').pack(fill='x', pady=5)
-        ttk.Label(controls, text='Ctrl+Alt+F11 toggle / Ctrl+Alt+F12 stop (when this window has focus). The Stop button always works. No global keyboard injection.', wraplength=315).pack(anchor='w')
+        ttk.Label(controls, text='F11 fullscreen · F10 borderless · Esc exit fullscreen and stop controls · Ctrl+Alt+F11 start/stop camera controls. No global keyboard injection.', wraplength=315).pack(anchor='w')
         profiles = ttk.Frame(right)
         profiles.pack(fill='x', padx=(12, 0))
         ttk.Button(profiles, text='Save profile', command=self.save_profile).pack(side='left')
