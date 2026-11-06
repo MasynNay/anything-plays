@@ -27,6 +27,9 @@ REQUIRED_DOCUMENTS = (
     "Snes9x-snes_ntsc-LGPL-2.1.txt",
 )
 EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
+# Reviewed v2.1 icon. This SHA belongs to its corrected 512px artwork,
+# not the stable 2.0 PNG or ICO, which are deliberately not replaced.
+V21_ICON_SHA256 = "a2ef1f7415ea9806c0bff5cec5b5b3d1ad0d1b0ca3a87b0cbf0a5b331bbeb380"
 
 # Distribution policy: Anything Plays never ships game images or BIOS ROMs.
 # This catches recognizable console/cart and firmware image filenames;
@@ -36,6 +39,21 @@ DISALLOWED_GAME_EXTENSIONS = frozenset({
     ".nes", ".unf", ".unif", ".n64", ".z64", ".v64", ".rom", ".bios",
     ".smd", ".gen", ".gcm", ".rvz", ".gcz", ".ciso", ".iso",
 })
+
+
+def verify_v21_artwork(bundle):
+    """Require the reviewed icon inside every test installer, unchanged."""
+    files = [
+        path for path in Path(bundle).rglob("anything_plays_v21.webp")
+        if path.is_file()
+    ]
+    if not files:
+        raise ValueError("Missing corrected 2.1 fish icon from app bundle")
+    if not any(
+        hashlib.sha256(path.read_bytes()).hexdigest() == V21_ICON_SHA256
+        for path in files
+    ):
+        raise ValueError("Corrected 2.1 fish icon has a checksum mismatch")
 
 
 def verify_no_bundled_game_files(bundle):
@@ -87,6 +105,8 @@ def verify_bundle(bundle, platform_name, check_native=False):
         cores = bundle / "cores"
 
     expected_cores = core_names_for_build()
+    if len(expected_cores) > len(CORE_NAMES):
+        verify_v21_artwork(bundle)
     required_notices = (
         REQUIRED_DOCUMENTS + OPTIONAL_V21_LICENSES
         if len(expected_cores) > len(CORE_NAMES) else REQUIRED_DOCUMENTS
