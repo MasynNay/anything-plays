@@ -100,6 +100,18 @@ class VerifyBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not approved"):
                 verify_bundle(bundle, "linux")
 
+    def test_rejects_undisclosed_game_rom_or_bios_in_staged_app(self):
+        for extension in (".gb", ".GBC", ".gba", ".sfc", ".smc", ".rom", ".bios"):
+            with self.subTest(extension=extension):
+                bundle, _, _, _ = self.make_bundle("linux")
+                folder = bundle / "accidental-games"
+                folder.mkdir(exist_ok=True)
+                stray = folder / ("game" + extension)
+                stray.write_bytes(b"not for distribution")
+                with self.assertRaisesRegex(ValueError, "Game ROM or BIOS"):
+                    verify_bundle(bundle, "linux")
+                stray.unlink()
+
     def test_missing_license_document_fails(self):
         bundle, licenses, _, _ = self.make_bundle("macos")
         (licenses / "Snes9x-LICENSE.txt").unlink()
