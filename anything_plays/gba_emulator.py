@@ -167,17 +167,6 @@ class CoreSession:
         game = self._game_info(bool(info.need_fullpath))
         accepted = bool(self.native.load(C.byref(game)))
 
-        # Some Gambatte builds disagree with their advertised loading mode.
-        # A single alternate-mode attempt preserves previously working ROMs.
-        if not accepted and self.system in ("gb", "gbc"):
-            mode = "path" if info.need_fullpath else "memory"
-            print(
-                f"[AnythingPlays] Gambatte rejected {self.rom.name} via {mode}; "
-                "retrying alternate mode.", file=sys.stderr, flush=True,
-            )
-            alternate = self._game_info(not bool(info.need_fullpath))
-            accepted = bool(self.native.load(C.byref(alternate)))
-
         if not accepted:
             library = (info.library_name or b"unknown").decode(errors="replace")
             raise RuntimeError(
