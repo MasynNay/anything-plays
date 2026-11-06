@@ -1,0 +1,64 @@
+name: Experiment - Windows FFmpeg-free OpenCV patched source build
+
+on:
+  push:
+    branches: [experiment/opencv-camera-only-windows-fix]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-source-wheel:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CMAKE_ARGS: "-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DWITH_DSHOW=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF"
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
+      ENABLE_HEADLESS: "1"
+      AP_REQUIRE_OPENCV_FFMPEG_OFF: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install source wheel build requirements
+        run: python -m pip install --upgrade pip==26.3 numpy==2.5.4
+      - name: Obtain pristine pinned PyPI source distribution
+        shell: bash
+        run: |
+          mkdir -p source-tarballs
+          python -m pip download --no-deps --no-binary=opencv-python-headless --dest source-tarballs opencv-python-headless==4.14.0.94
+      - name: Apply documented source-packaging correction
+        shell: bash
+        run: |
+          python -m tools.patch_windows_opencv_source source-tarballs/*.tar.gz patched-source
+      - name: Build the Windows camera-only OpenCV wheel from patched source
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          SOURCE_DIR="$(dirname "$(find patched-source -mindepth 2 -maxdepth 2 -name setup.py -print -quit)")"
+          test -n "$SOURCE_DIR"
+          python -m pip wheel --no-deps "$SOURCE_DIR" --wheel-dir wheelhouse -v
+      - name: Install and smoke test exact built camera-only wheel
+        shell: bash
+        run: |
+          python -m pip install --no-deps wheelhouse/opencv_python_headless-*.whl
+          python -m tools.probe_camera_only_wheel wheelhouse/opencv_python_headless-*.whl evidence/camera-only-windows-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-camera-only-wheel-verified
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-camera-only-source-and-evidence
+          path: |
+            evidence/camera-only-windows-x86_64.json
+            patched-source/WINDOWS_OPENCV_SETUP_PATCH.diff
+            patched-source/WINDOWS_OPENCV_PATCH_PROVENANCE.json
+            source-tarballs/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
