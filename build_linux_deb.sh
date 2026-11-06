@@ -16,6 +16,9 @@ if [[ -n "${AP_CUSTOM_OPENCV_WHEEL:-}" ]]; then
 fi
 .build-venv/bin/python tools/check_opencv_build.py
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" app.py
+# The DEB depends on OS libportaudio2. Do not redistribute frozen copies of
+# PortAudio, JACK, ALSA, Berkeley DB, or the unused GPL Readline extension.
+python3 tools/prune_linux_system_libs.py dist/AnythingPlays
 # All emulator cores are required and shipped inside the installed application.
 mkdir -p dist/AnythingPlays/cores
 for name in mgba snes9x; do
@@ -77,6 +80,15 @@ AUDIT_DIR="$(mktemp -d)"
 trap 'rm -rf "$AUDIT_DIR"' EXIT
 dpkg-deb -x "release/anything-plays_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
 python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"
+python3 - "$AUDIT_DIR/opt/anything-plays" <<'PY'
+import sys
+from pathlib import Path
+from tools.prune_linux_system_libs import EXCLUDED_RELATIVE_FILES
+root=Path(sys.argv[1])
+assert all(not (root/p).exists() for p in EXCLUDED_RELATIVE_FILES)
+assert not list(root.glob("_internal/python3.13/lib-dynload/readline*.so"))
+print("Validated clean Linux installed payload without redundant audio system libraries")
+PY
 rm -rf "$AUDIT_DIR"
 trap - EXIT
 echo "Created release/anything-plays_${VERSION}_${ARCH}.deb"
