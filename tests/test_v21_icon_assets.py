@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from PIL import Image
+from verify_bundle import verify_v21_artwork
 
 from tools.render_v21_icon import render, SOURCE, ROOT
 
@@ -40,6 +41,21 @@ class CorrectedIconTests(unittest.TestCase):
                 self.assertIn((256, 256), image.info["sizes"])
         self.assertEqual(stable_png.stat().st_size, original_png)
         self.assertEqual(stable_ico.stat().st_size, original_ico)
+
+    def test_bundle_icon_checksum_is_enforced(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            assets = root / "assets"
+            assets.mkdir()
+            destination = assets / SOURCE.name
+            destination.write_bytes(SOURCE.read_bytes())
+            verify_v21_artwork(root)
+            destination.write_bytes(b"corrupted icon")
+            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+                verify_v21_artwork(root)
+            destination.unlink()
+            with self.assertRaisesRegex(ValueError, "Missing corrected"):
+                verify_v21_artwork(root)
 
     def test_all_alpha_installers_use_corrected_asset(self):
         windows = (ROOT / "build_windows.bat").read_text()
