@@ -72,10 +72,11 @@ or completed installers. Therefore the earlier successful builds cannot be
 used as a preserved, audited binary release input. Do not claim the eight
 candidate SHA-256 values are re-obtainable merely because they were recorded.
 
-The next release candidate must explicitly retain immutable core archives,
-corresponding source snapshots, build dependency inventories, and the exact
-final installers in a controlled location. Do not make unapproved installers
-public simply to retain them as CI artifacts.
+This was a historical limitation of those **early** CI runs. The later
+[verified private RC3](RC3_VERIFICATION.md) now retains eight immutable ZIP
+inputs, both source snapshots, all four final installers, and SHA-256
+checksums in a GitHub draft. This does **not** mean binary distribution is
+approved.
 
 ## Frozen Python and native libraries
 
@@ -89,9 +90,9 @@ public simply to retain them as CI artifacts.
 - Before publication, identify the actual shipped versions and native
   libraries from the PyInstaller output, check their license obligations and
   collect any missing notices, licenses, and corresponding source as required.
-- Create target-specific lock files for Python dependencies once the exact
-  versions and artifacts are approved. Do not treat the existing version ranges
-  as sufficiently pinned.
+- The exact reviewed Python packaging versions are now pinned in
+  `requirements-build.txt`; wheel hashes and all linked system libraries are
+  not yet locked. Source development continues to use version ranges.
 
 ### Review-only staged binary inventories
 
@@ -112,7 +113,7 @@ native file and compare inventories with frozen Python notices. Final release
 binaries still require independent archival, archive-level inspection, and
 separate redistribution approval.
 
-### Headless OpenCV candidate (pending new installer checks)
+### Verified headless OpenCV packaging
 
 Anything Plays uses Tkinter for its interface and relies on OpenCV for
 camera capture, frame processing and drawing, not for `cv2.imshow` or
@@ -120,21 +121,20 @@ other OpenCV-owned windows. The upstream
 [opencv-python wheel instructions](https://github.com/opencv/opencv-python)
 recommend `opencv-python-headless` when a separate GUI toolkit is used.
 The pinned build and source requirements now use that headless variant at
-4.14.0.94. Its wheels exclude Qt/HighGUI libraries, eliminating the previously
-observed bundled Linux Qt 5 GUI stack if platform verification confirms it.
-**The FFmpeg and other native library obligations still require review.**
-The release candidate currently stored in the private GitHub draft was
-assembled before this change; it is not replaced or publicly distributed
-merely by merging the dependency change. Validate four fresh platform
-inventories, video capture backends, and packaged installers before promoting
-a new candidate.
+4.14.0.94. The [seven-check platform run](https://github.com/MasynNay/anything-plays/actions/runs/42234440839)
+confirmed the headless camera backends, all four installer builds, and absence
+of bundled Qt GUI libraries. The Linux native binary count fell from 177 to
+145. The [private RC3](RC3_VERIFICATION.md) includes this change, with all
+eight candidate jobs passing. **FFmpeg and codec licensing obligations remain
+open**; no public distribution has been approved.
 
 ### Pinned v2 Python build dependencies
 
 The four reviewed CI inventories from
 [run 42172205627](https://github.com/MasynNay/anything-plays/actions/runs/42172205627)
 recorded identical versions for the shared Python runtime packages, including
-NumPy 2.5.4, OpenCV headless 4.14.0.94, Pillow 12.3.0, sounddevice 0.5.6,
+NumPy 2.5.4, OpenCV 4.14.0.94 (subsequently changed to the verified headless
+wheel at the same version), Pillow 12.3.0, sounddevice 0.5.6,
 PyInstaller 6.22.3 and pyinstaller-hooks-contrib 2026.9. Platform-specific
 PyObjC, macholib, pefile and Windows compatibility packages were also
 recorded. Those exact versions are now pinned in
