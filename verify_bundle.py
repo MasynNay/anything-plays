@@ -27,6 +27,23 @@ REQUIRED_DOCUMENTS = (
 )
 EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
 
+# Distribution policy: Anything Plays never ships game images or BIOS ROMs.
+# This catches recognizable console/cart and firmware image filenames;
+# as with any extension-based check, manual artifact inspection remains needed.
+DISALLOWED_GAME_EXTENSIONS = frozenset({
+    ".gb", ".gbc", ".gba", ".sfc", ".smc",
+    ".nes", ".n64", ".z64", ".v64", ".rom", ".bios",
+})
+
+
+def verify_no_bundled_game_files(bundle):
+    """Reject recognized game cartridges and BIOS images in staged packages."""
+    for file in Path(bundle).rglob("*"):
+        if file.is_file() and file.suffix.casefold() in DISALLOWED_GAME_EXTENSIONS:
+            relative = file.relative_to(bundle).as_posix()
+            raise ValueError(f"Game ROM or BIOS file must not ship: {relative}")
+
+
 
 class _LibretroCoreInfo(C.Structure):
     """Fields defined by libretro's retro_system_info ABI."""
@@ -59,6 +76,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
     bundle = Path(bundle)
     if platform_name not in EXTENSIONS:
         raise ValueError(f"Unsupported platform: {platform_name}")
+    verify_no_bundled_game_files(bundle)
     if platform_name == "macos":
         licenses = bundle / "Contents" / "Resources" / "licenses"
         cores = bundle / "Contents" / "Resources" / "cores"
@@ -83,7 +101,17 @@ def verify_bundle(bundle, platform_name, check_native=False):
         raise ValueError("Empty Python dependency inventory")
     python_notices = 0
     for distribution in distributions:
-        for notice in distribution.get("license_files", []):
+        listed_notice_files = distribution.get("license_files", [])
+        # OpenCV wheels include FFmpeg on all platforms and Qt on non-headless
+        # Linux wheels. Their distinct third-party terms must not be omitted.
+        if (distribution.get("name", "").casefold() == "opencv-python"
+                and not any(
+                    Path(record.get("original_path", "")).name.casefold()
+                    == "license-3rd-party.txt"
+                    for record in listed_notice_files
+                )):
+            raise ValueError("Missing OpenCV third-party dependency license notice")
+        for notice in listed_notice_files:
             relative = Path(notice.get("bundled_path", ""))
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("Unsafe Python dependency notice path")
