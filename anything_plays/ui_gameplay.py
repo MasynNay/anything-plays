@@ -120,6 +120,7 @@ class GameplayMixin:
         if hasattr(self, 'arm_button'):
             label = ('Enable object controls'
                      if SYSTEMS[self.system_key.get()].backend in ('libretro', 'retroarch')
+                     or self.external_input is not None
                      else 'Camera controls unavailable for Dolphin')
             self.arm_button.config(text=label)
         if hasattr(self, 'action'):
