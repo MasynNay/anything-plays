@@ -47,6 +47,8 @@ class GameplayMixin:
     def deactivate_manual(self, event=None):
         self.manual_active = False
         self.emu.release_manual()
+        if self.external_input is not None:
+            self.external_input.release_manual()
         self.manual_label.set('Click game screen to use editable keyboard controls')
 
     def deactivate_on_outside_click(self, event):
@@ -55,51 +57,70 @@ class GameplayMixin:
 
     def manual_key_down(self, event):
         button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
-        if button and self.manual_active and SYSTEMS[self.system_key.get()].backend == 'libretro':
-            self.emu.set_manual(button, True)
-            return 'break'
+        if button and self.manual_active:
+            if self.system_key.get() == "n64" and self.external_input is not None:
+                self.external_input.set_manual(button, True)
+                return 'break'
+            if SYSTEMS[self.system_key.get()].backend == 'libretro':
+                self.emu.set_manual(button, True)
+                return 'break'
 
     def manual_key_up(self, event):
         button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
         if button:
             self.emu.set_manual(button, False)
+            if self.external_input is not None:
+                self.external_input.set_manual(button, False)
             return 'break'
 
     def toggle(self):
         if self.armed:
             self.stop_controls()
             return
-        if SYSTEMS[self.system_key.get()].backend != 'libretro':
+        backend = SYSTEMS[self.system_key.get()].backend
+        if backend == "dolphin":
             messagebox.showinfo(
-                'External emulator input',
-                'N64 and GameCube run in RetroArch/Dolphin. Set up controls in that emulator; '
-                '2.1 does not yet inject webcam controls into external game windows.'
+                'GameCube camera input',
+                'Dolphin is still using its own controller settings. '
+                'The N64 local bridge does not support Dolphin.'
             )
             return
         if self.cap is None or not self.cap.isOpened():
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
             return
-        if not self.emu.running:
+        if backend == "libretro" and not self.emu.running:
             messagebox.showinfo('Emulator required', 'Open a compatible ROM first. No system-wide keyboard fallback is available.')
             return
+        if backend == "retroarch":
+            process = self.external_process
+            if self.external_input is None or process is None or process.poll() is not None:
+                messagebox.showinfo('N64 emulator required',
+                                    'Launch an N64 ROM through Anything Plays first.')
+                return
         try:
             self.read_settings()
         except (ValueError, tk.TclError):
             messagebox.showerror('Settings', 'Please correct the numeric settings.')
             return
         self.armed = True
-        self.emu.armed = True
+        self.emu.armed = backend == "libretro"
         self.last_action = time.monotonic()
         self.arm_button.config(text='Pause object controls')
-        self.action.set('ACTIVE — object controls embedded emulator only')
+        self.action.set(
+            'ACTIVE — local RetroPad camera input for N64'
+            if backend == 'retroarch' else
+            'ACTIVE — object controls embedded emulator only'
+        )
 
     def stop_controls(self):
         self.armed = False
         self.emu.disarm()
+        if self.external_input is not None:
+            self.external_input.release_camera()
         if hasattr(self, 'arm_button'):
             label = ('Enable object controls'
-                     if SYSTEMS[self.system_key.get()].backend == 'libretro'
-                     else 'Camera controls unavailable for external emulator')
+                     if SYSTEMS[self.system_key.get()].backend in ('libretro', 'retroarch')
+                     else 'Camera controls unavailable for Dolphin')
             self.arm_button.config(text=label)
         if hasattr(self, 'action'):
             self.action.set('PREVIEW ONLY — no keyboard events are sent')
