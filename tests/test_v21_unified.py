@@ -18,7 +18,7 @@ from anything_plays.shortcuts import (
 )
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM, default_for
 from anything_plays.systems import SYSTEMS
-from anything_plays.zone_rendering import render_zone_overlay
+from anything_plays.zone_rendering import cached_zone_font, render_zone_overlay
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES, core_names_for_build
 
 
@@ -110,6 +110,13 @@ class UnifiedV21Tests(unittest.TestCase):
         with patch.dict(os.environ, {'AP_V21_TEST_CORES': '1', 'AP_RELEASE_BUILD': '1'}):
             with self.assertRaisesRegex(ValueError, 'Unapproved 2.1'):
                 core_names_for_build()
+
+    def test_camera_overlay_font_is_reused_between_frames(self):
+        cached_zone_font.cache_clear()
+        first = cached_zone_font(46)
+        second = cached_zone_font(46)
+        self.assertIs(first, second)
+        self.assertEqual(cached_zone_font.cache_info().hits, 1)
 
     def test_bolder_centered_overlay_does_not_affect_camera_pixels(self):
         frame = np.zeros((160, 240, 3), dtype=np.uint8)
