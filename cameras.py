@@ -1,8 +1,11 @@
-"""Discover OpenCV cameras and provide OS-specific display names when available."""
+"""Discover OpenCV cameras and resolve platform-specific device labels.
+
+Camera probing is deliberately conservative: each capture is released even
+when a frame cannot be read, and macOS probing respects AVFoundation counts.
+"""
 
 import os
 import platform
-import subprocess
 import time
 
 import cv2

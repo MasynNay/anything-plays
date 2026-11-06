@@ -15,6 +15,7 @@ for name in gambatte mgba snes9x; do
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays/cores/
 done
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
 PKG="build/deb/anything-plays_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays" "$PKG/usr/bin" "$PKG/usr/share/applications"
@@ -28,7 +29,7 @@ Section: games
 Priority: optional
 Architecture: $ARCH
 Maintainer: Anything Plays Project <noreply@example.invalid>
-Depends: libc6, libgl1, libglib2.0-0
+Depends: libc6, libgl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
  Embedded GB, GBC, GBA and SNES gameplay and configurable camera object tracking.
 CONTROL

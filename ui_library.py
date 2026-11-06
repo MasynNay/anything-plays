@@ -1,0 +1,244 @@
+"""Browse user-supplied ROMs and manage the interactive cartridge shelf."""
+
+from pathlib import Path
+import time
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+
+from PIL import Image, ImageTk
+from systems import SYSTEMS
+from cartridge_art import cartridge_image, cartridge_font
+from rom_library import scan_rom_directory, find_cover_art
+
+
+class LibraryMixin:
+    """Tkinter behavior shared with the main application controller.
+
+    These methods use widgets and state initialized by ``App.__init__``
+    and ``LayoutMixin.build``. They are not standalone widgets.
+    """
+
+    def read_rom_directory(self):
+        return self.read_rom_directories().get('gba', '')
+
+    def set_rom_directory(self):
+        initial = self.rom_directory
+        if not initial or not Path(initial).is_dir():
+            initial = str(Path.home())
+        directory = filedialog.askdirectory(
+            parent=self.root,
+            title='Choose your ' + SYSTEMS[self.system_key.get()].title + ' ROM folder',
+            initialdir=initial)
+        if not directory:
+            return
+        self.rom_directory = directory
+        self.rom_directories[self.system_key.get()] = directory
+        self.save_preferences()
+        self.populate_inline_library()
+
+    def scan_roms(self):
+        """List files supported by the currently selected console."""
+        extensions = SYSTEMS[self.system_key.get()].extensions
+        return scan_rom_directory(self.rom_directory, extensions)
+
+    # Keep the original public helpers for extensions and existing callers.
+    cartridge_image = staticmethod(cartridge_image)
+    cartridge_font = staticmethod(cartridge_font)
+
+    def choose_or_rescan_library(self):
+        # If no directory exists, ask for one; otherwise refresh without a popup.
+        if not self.rom_directory or not Path(self.rom_directory).is_dir():
+            self.set_rom_directory()
+        else:
+            self.populate_inline_library()
+
+    def cancel_shelf_animation(self):
+        if self.shelf_animation_job is not None:
+            self.root.after_cancel(self.shelf_animation_job)
+            self.shelf_animation_job = None
+        self.shelf_animation_target = None
+
+    def shelf_button_press(self, direction):
+        """Click advances a page; holding continues moving the shelf."""
+        self.shelf_button_release()
+        self.cancel_shelf_momentum()
+        self.cancel_shelf_animation()
+        self.shelf_button_direction = direction
+        self.scroll_cartridges(direction, pages=0.85)
+        self.shelf_button_job = self.root.after(360, self.shelf_button_repeat)
+        return 'break'
+
+    def shelf_button_repeat(self):
+        self.shelf_button_job = None
+        if not self.shelf_button_direction:
+            return
+        self.scroll_cartridges(self.shelf_button_direction, pages=0.65)
+        self.shelf_button_job = self.root.after(190, self.shelf_button_repeat)
+
+    def shelf_button_release(self, event=None):
+        self.shelf_button_direction = 0
+        if self.shelf_button_job is not None:
+            self.root.after_cancel(self.shelf_button_job)
+            self.shelf_button_job = None
+        return 'break'
+
+    def scroll_cartridges(self, direction, pages=0.85):
+        """Smoothly advance by a fraction of the visible shelf, not tiny Tk units."""
+        self.cancel_shelf_momentum()
+        total = max(1, self.library_grid.winfo_width())
+        viewport = self.library_canvas.winfo_width()
+        if total <= viewport:
+            return
+        left, right = self.library_canvas.xview()
+        current = self.shelf_animation_target if self.shelf_animation_target is not None else left
+        max_left = max(0.0, 1.0 - viewport / total)
+        target = max(0.0, min(max_left, current + direction * viewport * pages / total))
+        self.shelf_animation_target = target
+        if self.shelf_animation_job is None:
+            self.animate_shelf()
+
+    def animate_shelf(self):
+        target = self.shelf_animation_target
+        if target is None:
+            self.shelf_animation_job = None
+            return
+        current = self.library_canvas.xview()[0]
+        delta = target - current
+        if abs(delta) < 0.0005:
+            self.library_canvas.xview_moveto(target)
+            self.shelf_animation_job = None
+            self.shelf_animation_target = None
+            return
+        self.library_canvas.xview_moveto(current + delta * 0.28)
+        self.shelf_animation_job = self.root.after(16, self.animate_shelf)
+
+    def on_library_wheel(self, event):
+        self.scroll_cartridges(-1 if event.delta > 0 else 1)
+        return 'break'
+
+    def cancel_shelf_momentum(self):
+        if self.shelf_momentum_job is not None:
+            self.root.after_cancel(self.shelf_momentum_job)
+            self.shelf_momentum_job = None
+
+    def shelf_press(self, event, rom):
+        """Begin a gesture on a cartridge; do not launch until mouse release."""
+        self.cancel_shelf_momentum()
+        self.cancel_shelf_animation()
+        self.shelf_drag = {'start': event.x_root, 'last': event.x_root,
+                           'last_time': time.monotonic(), 'distance': 0,
+                           'rom': rom, 'velocity': 0.0}
+
+    def shelf_motion(self, event):
+        drag = self.shelf_drag
+        if drag is None:
+            return
+        now = time.monotonic()
+        dx = event.x_root - drag['last']
+        drag['distance'] = max(drag['distance'], abs(event.x_root - drag['start']))
+        dt = max(0.008, now - drag['last_time'])
+        if drag['distance'] >= 7:
+            width = max(1, self.library_grid.winfo_width())
+            self.library_canvas.xview_moveto(self.library_canvas.xview()[0] - dx / width)
+            drag['velocity'] = max(-32.0, min(32.0, dx / dt / 60.0))
+        drag['last'] = event.x_root
+        drag['last_time'] = now
+
+    def shelf_release(self, event):
+        drag = self.shelf_drag
+        if drag is None:
+            return
+        self.shelf_drag = None
+        if drag['distance'] < 7 and abs(event.x_root - drag['start']) < 7:
+            # A release outside the shelf must not launch a game.
+            left = self.library_canvas.winfo_rootx()
+            top = self.library_canvas.winfo_rooty()
+            if (left <= event.x_root < left + self.library_canvas.winfo_width()
+                    and top <= event.y_root < top + self.library_canvas.winfo_height()):
+                self.start_rom(drag['rom'])
+        elif time.monotonic() - drag['last_time'] < .12:
+            self.shelf_velocity = drag['velocity']
+            self.shelf_coast()
+
+    def shelf_coast(self):
+        if abs(self.shelf_velocity) < 0.35 or not self.library_strip.winfo_ismapped():
+            self.shelf_momentum_job = None
+            return
+        width = max(1, self.library_grid.winfo_width())
+        before = self.library_canvas.xview()[0]
+        self.library_canvas.xview_moveto(before - self.shelf_velocity / width)
+        if abs(self.library_canvas.xview()[0] - before) < 0.000001:
+            self.shelf_momentum_job = None
+            return
+        self.shelf_velocity *= .88
+        self.shelf_momentum_job = self.root.after(16, self.shelf_coast)
+
+    def populate_inline_library(self):
+        for widget in self.library_grid.winfo_children():
+            widget.destroy()
+        self.cancel_shelf_momentum()
+        self.cancel_shelf_animation()
+        self.shelf_drag = None
+        self.library_images.clear()
+        games = self.scan_roms()
+        if not self.rom_directory or not Path(self.rom_directory).is_dir():
+            self.library_summary.set('ROM LIBRARY · Choose a ROM folder above')
+        else:
+            self.library_summary.set(f'ROM LIBRARY · {len(games)} game(s) · Drag or use Previous / Next')
+        if not games:
+            ttk.Label(self.library_grid, text='No compatible games yet. Choose a folder to browse cartridges.').pack(padx=8, pady=40)
+        for rom in games:
+            tile = ttk.Frame(self.library_grid, padding=(5, 0))
+            tile.pack(side='left', anchor='n')
+            art_path = find_cover_art(rom)
+            art = self.cartridge_image(rom.stem, self.system_key.get(), art_path).resize((176, 133), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(art)
+            self.library_images.append(photo)
+            cartridge = tk.Label(tile, image=photo, bg=self.THEMES.get(self.theme_name.get(), self.THEMES['Dark'])[1],
+                                 cursor='hand2', bd=0, highlightthickness=0)
+            cartridge.is_cartridge_tile = True
+            cartridge.pack()
+            caption = ttk.Label(tile, text=rom.stem, width=24, anchor='center', cursor='hand2')
+            caption.pack()
+            for widget in (cartridge, caption, tile):
+                widget.bind('<ButtonPress-1>', lambda e, p=rom: self.shelf_press(e, p))
+        self.library_canvas.configure(scrollregion=self.library_canvas.bbox('all'))
+        self.library_canvas.xview_moveto(0)
+
+    def show_library(self):
+        self.playing_info.pack_forget()
+        self.library_strip.pack(fill='x')
+
+    def show_playing_info(self):
+        self.library_strip.pack_forget()
+        self.playing_info.pack(fill='x')
+
+    def unload_rom(self):
+        self.deactivate_manual()
+        self.stop_controls()
+        self.emu.stop()
+        with self.emu.lock:
+            self.emu.frame = None
+        self.current_rom = None
+        self.game_photo = None
+        self.game_canvas.delete('all')
+        self.game_status.set('No ROM loaded')
+        self.show_library()
+
+    def start_rom(self, path):
+        self.deactivate_manual()
+        self.stop_controls()
+        try:
+            self.emu.start(str(path))
+            self.current_rom = str(path)
+            self.game_status.set('Playing ' + Path(path).stem)
+            self.show_playing_info()
+        except Exception as exc:
+            messagebox.showerror('ROM', f'Could not start game: {exc}')
+
+    def load_rom(self):
+        system = SYSTEMS[self.system_key.get()]
+        path = filedialog.askopenfilename(filetypes=[(system.title + ' ROMs', ' '.join('*' + ext for ext in system.extensions))])
+        if not path:
+            return
+        self.start_rom(path)

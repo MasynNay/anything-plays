@@ -1,113 +1,167 @@
-"""Persistent per-console camera-zone profiles (no ROM or emulator state)."""
+"""Validate, migrate, and persist independent camera-control profiles.
+
+Coordinates are normalized to the range [0, 1], so saved layouts remain
+independent of camera resolution. The public API is intentionally small:
+``default_for``, ``normalize``, ``fit_to_grid``, and ``ProfileStore``.
+"""
+
 import copy
 import json
+import math
 from pathlib import Path
 
+
 BUTTONS_BY_SYSTEM = {
-    'gb': ('Left', 'Up', 'Right', 'A', 'Start', 'B', 'Down', 'Select'),
-    'gbc': ('Left', 'Up', 'Right', 'A', 'Start', 'B', 'Down', 'Select'),
-    'gba': ('Left', 'Up', 'Right', 'A', 'Start', 'B', 'Down', 'Select', 'L', 'R'),
-    'snes': ('Left', 'Up', 'Right', 'A', 'Start', 'B', 'Down', 'Select', 'X', 'Y', 'L', 'R'),
+    "gb": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "gbc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "gba": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "L", "R"),
+    "snes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y", "L", "R"),
 }
 
-DISABLED_MAPPING = '(None)'
+DISABLED_MAPPING = "(None)"
+
 
 def enabled_zones(profile, system):
-    """Only enabled console zones are eligible for drawing and input."""
-    mappings = profile.get('mapping', {})
-    return [name for name in BUTTONS_BY_SYSTEM[system]
-            if mappings.get(name, name) != DISABLED_MAPPING]
+    """Return the console buttons that are currently mapped to an input."""
+    mapping = profile.get("mapping", {})
+    return [
+        button for button in BUTTONS_BY_SYSTEM[system]
+        if mapping.get(button, button) != DISABLED_MAPPING
+    ]
+
 
 def fit_to_grid(profile, system):
-    """Arrange enabled buttons in equal cells, with centered final row.
+    """Fit enabled buttons into equal cells, centering an incomplete last row.
 
-    Existing rectangles for disabled buttons are preserved so they can be
-    re-enabled later. Shuffle is a separate optional zone, not a button.
+    Disabled buttons retain their saved rectangles so re-enabling them does
+    not discard the user's previous layout. Shuffle is handled separately.
     """
-    import math
-    names = enabled_zones(profile, system)
-    if not names:
+    buttons = enabled_zones(profile, system)
+    if not buttons:
         return profile
-    cols = math.ceil(math.sqrt(len(names)))
-    rows = math.ceil(len(names) / cols)
-    zones = profile.setdefault('zones', {})
-    for index, name in enumerate(names):
-        row, col = divmod(index, cols)
-        row_count = min(cols, len(names) - row * cols)
-        # Center a partially populated row without distorting cell dimensions.
-        offset = (cols - row_count) / 2
-        x = (col + offset) / cols
-        zones[name] = [x, row / rows, (col + offset + 1) / cols, (row + 1) / rows]
+
+    columns = math.ceil(math.sqrt(len(buttons)))
+    rows = math.ceil(len(buttons) / columns)
+    zones = profile.setdefault("zones", {})
+
+    for index, button in enumerate(buttons):
+        row, column = divmod(index, columns)
+        buttons_in_row = min(columns, len(buttons) - row * columns)
+        offset = (columns - buttons_in_row) / 2
+        left = (column + offset) / columns
+        zones[button] = [
+            left, row / rows, left + 1 / columns, (row + 1) / rows
+        ]
     return profile
+
 
 def default_for(system, base):
-    """Generate independent layouts; never mutate the supplied base profile."""
+    """Build an independent, horizontally balanced layout for one console."""
     profile = copy.deepcopy(base)
-    names = BUTTONS_BY_SYSTEM[system]
-    # Fill equal-size grid cells, keeping the occupied pattern horizontally
-    # symmetrical. A missing cell is left empty rather than stretching a zone.
-    count = len(names) + 1  # Optional Shuffle zone also has a grid cell.
-    cols, rows = (3, 3) if count == 9 else ((3, 4) if count == 11 else (5, 3))
-    profile['zones'] = {}
-    positions = []
-    full_rows, remainder = divmod(count, cols)
-    for row in range(full_rows):
-        positions.extend((col, row) for col in range(cols))
+    buttons = BUTTONS_BY_SYSTEM[system]
+    cell_count = len(buttons) + 1  # Reserve a separate cell for Shuffle.
+    columns, rows = (
+        (3, 3) if cell_count == 9
+        else (3, 4) if cell_count == 11
+        else (5, 3)
+    )
+
+    full_rows, remainder = divmod(cell_count, columns)
+    positions = [
+        (column, row)
+        for row in range(full_rows)
+        for column in range(columns)
+    ]
     if remainder:
-        # Center the final row. With two cells in a 3-column row, leave
-        # the middle empty so the left/right occupancy remains symmetrical.
-        if cols == 3 and remainder == 2:
-            last_cols = (0, 2)
+        # Two cells in a three-column row belong on opposite sides.
+        if columns == 3 and remainder == 2:
+            final_columns = (0, 2)
         else:
-            start = (cols - remainder) // 2
-            last_cols = range(start, start + remainder)
-        positions.extend((col, full_rows) for col in last_cols)
-    for name, (col, row) in zip((*names, 'Shuffle'), positions):
-        profile['zones'][name] = [col / cols, row / rows, (col + 1) / cols, (row + 1) / rows]
-    profile['mapping'] = {name: name for name in names}
+            first = (columns - remainder) // 2
+            final_columns = range(first, first + remainder)
+        positions.extend((column, full_rows) for column in final_columns)
+
+    profile["zones"] = {
+        button: [column / columns, row / rows,
+                 (column + 1) / columns, (row + 1) / rows]
+        for button, (column, row) in zip((*buttons, "Shuffle"), positions)
+    }
+    profile["mapping"] = {button: button for button in buttons}
     return profile
 
+
+def _valid_rectangle(rectangle):
+    """Reject malformed or out-of-bounds rectangles from saved JSON."""
+    return (
+        isinstance(rectangle, (list, tuple))
+        and len(rectangle) == 4
+        and all(
+            isinstance(value, (float, int)) and not isinstance(value, bool)
+            for value in rectangle
+        )
+        and 0 <= rectangle[0] < rectangle[2] <= 1
+        and 0 <= rectangle[1] < rectangle[3] <= 1
+    )
+
+
 def normalize(system, profile, base):
-    """Upgrade old profiles while retaining existing zone sizes and positions."""
-    default = default_for(system, base)
+    """Merge valid legacy settings into defaults without changing the input."""
+    result = default_for(system, base)
     if not isinstance(profile, dict):
-        return default
+        return result
+
+    # Unknown top-level settings may belong to an older or newer UI version.
     for key, value in profile.items():
-        if key not in ('zones', 'mapping'):
-            default[key] = copy.deepcopy(value)
-    zones = profile.get('zones', {})
-    mapping = profile.get('mapping', {})
+        if key not in ("zones", "mapping"):
+            result[key] = copy.deepcopy(value)
+
+    zones = profile.get("zones", {})
     if isinstance(zones, dict):
-        for name in default['zones']:
-            rect = zones.get(name)
-            if (isinstance(rect, (list, tuple)) and len(rect) == 4
-                    and all(isinstance(v, (float, int)) and not isinstance(v, bool) for v in rect)
-                    and 0 <= rect[0] < rect[2] <= 1 and 0 <= rect[1] < rect[3] <= 1):
-                default['zones'][name] = list(rect)
+        for button in result["zones"]:
+            rectangle = zones.get(button)
+            if _valid_rectangle(rectangle):
+                result["zones"][button] = list(rectangle)
+
+    mapping = profile.get("mapping", {})
     if isinstance(mapping, dict):
-        for name in default['mapping']:
-            if mapping.get(name) in (*BUTTONS_BY_SYSTEM[system], DISABLED_MAPPING):
-                default['mapping'][name] = mapping[name]
-    return default
+        allowed = (*BUTTONS_BY_SYSTEM[system], DISABLED_MAPPING)
+        for button in result["mapping"]:
+            if mapping.get(button) in allowed:
+                result["mapping"][button] = mapping[button]
+    return result
+
 
 class ProfileStore:
+    """Store per-console profiles as JSON using an atomic file replacement."""
+
     def __init__(self, path, base):
         self.path = Path(path)
         self.base = base
         self.profiles = {}
         try:
-            data = json.loads(self.path.read_text(encoding='utf-8'))
+            data = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                self.profiles = {k: normalize(k, v, base) for k, v in data.items() if k in BUTTONS_BY_SYSTEM}
+                self.profiles = {
+                    key: normalize(key, value, base)
+                    for key, value in data.items()
+                    if key in BUTTONS_BY_SYSTEM
+                }
         except (OSError, ValueError, TypeError):
+            # A missing or corrupt file must not prevent the UI from starting.
             pass
 
     def get(self, system):
-        return copy.deepcopy(self.profiles.get(system, default_for(system, self.base)))
+        """Return a copy so callers cannot mutate the stored profile."""
+        return copy.deepcopy(
+            self.profiles.get(system, default_for(system, self.base))
+        )
 
     def put(self, system, profile):
+        """Validate and persist a console profile without partial JSON writes."""
         self.profiles[system] = normalize(system, profile, self.base)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(self.profiles, indent=2), encoding='utf-8')
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(self.profiles, indent=2), encoding="utf-8"
+        )
         temporary.replace(self.path)

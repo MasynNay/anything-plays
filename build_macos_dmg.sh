@@ -32,6 +32,8 @@ for name in gambatte mgba snes9x; do
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays.app/Contents/MacOS/cores/
 done
+# Include a hash manifest identifying the exact nightly cores in this build.
+cp cores/CORE_PROVENANCE.json dist/AnythingPlays.app/Contents/MacOS/cores/
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true

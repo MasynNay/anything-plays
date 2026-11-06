@@ -23,6 +23,8 @@ for %%C in (gambatte mgba snes9x) do (
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
   if errorlevel 1 exit /b 1
 )
+copy /Y "cores\CORE_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
+if errorlevel 1 exit /b 1
 if not exist release mkdir release
 set "ISCC="
 for %%P in ("%ProgramFiles%\Inno Setup 7\ISCC.exe" "%ProgramFiles(x86)%\Inno Setup 7\ISCC.exe" "%LOCALAPPDATA%\Programs\Inno Setup 7\ISCC.exe" "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%ProgramFiles%\Inno Setup 6\ISCC.exe" "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe") do if exist "%%~P" set "ISCC=%%~P"

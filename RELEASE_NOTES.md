@@ -1,17 +1,46 @@
-# Anything Plays v1.5.0
+# Anything Plays v2.0.0 · release candidate
 
-Camera-controlled Game Boy Advance gameplay for Windows, macOS, and Linux.
+Anything Plays turns real-world movement into game controls. Version 2.0 expands
+from its original Game Boy Advance experience to four classic consoles and adds
+independent layouts, a more expressive ROM shelf, and improved desktop builds.
 
 ## Highlights
-- Live camera tracking and configurable movement-to-button control zones
-- Embedded mGBA libretro gameplay and keyboard controls
-- ROM browsing, saved profiles, shuffle, and customizable overlays
-- Cross-platform desktop builds
 
-## Downloads
-- **Windows:** `AnythingPlaysSetup-1.5.0.exe`
-- **macOS Apple Silicon:** `AnythingPlays-1.5.0-macos-arm64.dmg`
-- **macOS Intel:** `AnythingPlays-1.5.0-macos-x86_64.dmg`
-- **Ubuntu/Debian x64:** `anything-plays_1.5.0_amd64.deb`
+- Game Boy, Game Boy Color, Game Boy Advance, and Super Nintendo support
+- Gambatte, mGBA, and Snes9x core selection based on the chosen system
+- Independent profiles, button mappings, and ROM folders per console
+- Even control grids, optional button disabling, custom drawing, and Shuffle
+- Sixteen application themes and console-specific cartridge artwork
+- Camera tracking, manual keyboard play, game audio, and battery-backed saves
+- Refactored application architecture and expanded automated regression coverage
+- Per-build SHA-256 provenance manifest for downloaded Libretro cores
 
-**macOS:** These builds use ad hoc signing, not Apple Developer ID notarization. macOS Gatekeeper may require manual approval. **Windows:** Unsigned installer may trigger SmartScreen. No ROMs or BIOS files are included. Downloaded mGBA core is provided by Libretro; review third-party licenses before redistribution.
+## Planned downloads
+
+| Platform | Planned installer |
+| :-- | :-- |
+| Windows x64 | `AnythingPlaysSetup-2.0.0.exe` |
+| macOS Apple Silicon | `AnythingPlays-2.0.0-macos-arm64.dmg` |
+| macOS Intel | `AnythingPlays-2.0.0-macos-x86_64.dmg` |
+| Ubuntu/Debian x64 | `anything-plays_2.0.0_amd64.deb` |
+
+All files and their final names must be verified before public release. These
+names are **not a claim that new installers have already been published**.
+
+## Installation and usage
+
+Windows installers are unsigned and may trigger SmartScreen. macOS builds use
+ad-hoc signing rather than Apple Developer ID notarization; Gatekeeper may
+require explicit approval. No commercial ROMs or BIOS files are included.
+
+Anything Plays is intended to be distributed completely free, without ads,
+donations or other monetization. Third-party cores retain their independent
+licenses and conditions, including Snes9x's non-commercial restrictions.
+
+## Before publishing
+
+Complete the real-device and installer testing in `QA_CHECKLIST.md`, verify the
+new refactor on each supported platform, and resolve the exact third-party
+copyright, license, and corresponding-source obligations in
+`THIRD_PARTY_COMPONENTS.md`. **The source package is not yet an authorized
+public v2.0 installer release.**
