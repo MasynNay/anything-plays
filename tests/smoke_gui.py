@@ -49,8 +49,8 @@ def main():
                     app.system_key.set("n64")
                     app.switch_system()
                     assert app.external_setup.winfo_manager()
-                    assert app.arm_button.instate(("disabled",))
-                    assert app.shortcuts_button.instate(("disabled",))
+                    assert not app.arm_button.instate(("disabled",))
+                    assert not app.shortcuts_button.instate(("disabled",))
                     app.set_view_mode("Game only", persist=False)
                     assert app.view_mode.get() == "Windowed"
                     assert app._game_only_canvas is None
