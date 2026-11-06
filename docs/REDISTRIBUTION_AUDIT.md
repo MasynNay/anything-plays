@@ -131,6 +131,46 @@ also includes build-only distributions, so the native-file inventory still
 requires attribution and source/access review. Do not claim complete
 reproducibility or distribution clearance from these pins alone.
 
+### Actual candidate inventory findings (2026-11-06)
+
+I inspected the four preserved, review-only binary inventories from the
+[verified v2 packaging CI](https://github.com/MasynNay/anything-plays/actions/runs/42172205627).
+Each inventory includes the exact SHA-256 of its staged native files. Reported
+counts are **staged** files, not distinct third-party projects:
+
+| Candidate target | Staged files | Native signatures | Recorded Python distributions |
+| --- | ---: | ---: | ---: |
+| Windows x64 | 1365 | 107 | 14 |
+| Linux x64 | 831 | 177 | 12 |
+| macOS Apple Silicon | 552 | 210 | 19 |
+| macOS Intel | 465 | 123 | 19 |
+
+- Core integrity: both mGBA and Snes9x matched their per-platform hashes in
+  all four checked inventories, including the relocated macOS resources.
+- The OpenCV wheel contributes **FFmpeg** and related libraries on all
+  platforms; the Linux inventory also contains Qt 5 platform libraries,
+  and the macOS ARM inventory contains additional media codec libraries such
+  as `libx264`, `libx265`, `libavcodec` and `libavformat`.
+  These are not covered solely by the top-level OpenCV Apache license.
+  The upstream [OpenCV Python package licensing notes](https://github.com/opencv/opencv-python#licensing)
+  identify FFmpeg as LGPL 2.1 and Qt 5 on non-headless Linux as LGPL 3.0.
+- The OpenCV 4.14.0.94 wheel's `LICENSE-3RD-PARTY.txt` and `LICENSE.txt`
+  files are already present in all four staged license directories, as are
+  installed-distribution notices for NumPy, Pillow, sounddevice and other
+  Python packages. This establishes notice *presence*, not that every
+  corresponding-source, codec-license and linking/replacement obligation has
+  been fulfilled.
+- Every candidate inventory was checked for recognizable cartridge file
+  extensions (`.gb`, `.gbc`, `.gba`, `.sfc`, `.smc`) and firmware formats
+  (`.rom`, `.bios`), and none appeared. A new bundle guard now rejects
+  those extensions in future installer builds. Extension checks cannot prove
+  that arbitrary disguised files are licensed.
+
+**Distribution review still needed:** establish per-platform OpenCV/FFmpeg/
+Qt and codec license notice and corresponding-source obligations. Distinguish
+actual bundled components from optional system-provided libraries; source
+snapshots for the two emulators do not cover this multimedia dependency stack.
+
 ## Assets and distribution materials
 
 - The maintainer states that the betta illustration was commissioned, that
