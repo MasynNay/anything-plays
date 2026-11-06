@@ -15,6 +15,15 @@ rm -rf .build-venv
 "$PYTHON" -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip==26.3
 .build-venv/bin/python -m pip install -r requirements-build.txt
+# Optional, exact-hash-verified Apple Silicon OpenCV build with FFmpeg disabled.
+# Ordinary macOS builds continue to use the pinned, upstream headless wheel.
+if [[ -n "${AP_CUSTOM_OPENCV_WHEEL:-}" ]]; then
+  : "${AP_CUSTOM_OPENCV_SHA256:?Set SHA-256 for the custom OpenCV wheel}"
+  [[ "$(uname -m)" == "arm64" ]] || { echo "Custom OpenCV wheel is arm64-only"; exit 1; }
+  "$PYTHON" tools/verify_custom_opencv_wheel.py "$AP_CUSTOM_OPENCV_WHEEL" "$AP_CUSTOM_OPENCV_SHA256"
+  .build-venv/bin/python -m pip install --force-reinstall --no-deps "$AP_CUSTOM_OPENCV_WHEEL"
+  export AP_REQUIRE_OPENCV_FFMPEG_OFF=1
+fi
 .build-venv/bin/python tools/check_opencv_build.py
 .build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" app.py
 # Generate a native macOS icon from the branded PNG.

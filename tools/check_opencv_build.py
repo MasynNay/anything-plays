@@ -5,6 +5,7 @@ avoids packaging extra Qt/X11 components, but must not remove video capture.
 This checks compile-time backend availability; it cannot test real cameras in CI.
 """
 
+import os
 import re
 import sys
 
@@ -22,6 +23,20 @@ def verify_opencv_build(cv2_module=None, platform=None):
     if detected_gui not in allowed_gui:
         raise RuntimeError(f"OpenCV must be built without bundled Qt/GUI extras "
                            f"(observed: {detected_gui})")
+    ffmpeg = re.search(r"^\s*FFMPEG:\s*(YES|NO)", info, flags=re.MULTILINE)
+    ffmpeg_status = ffmpeg.group(1) if ffmpeg else "UNKNOWN"
+    if os.environ.get("AP_REQUIRE_OPENCV_FFMPEG_OFF") == "1":
+        # A source build that disables FFmpeg may omit its build-info line
+        # altogether; reject YES and also check the actual videoio backend.
+        ffmpeg_backend = getattr(cv2_module, "CAP_FFMPEG", None)
+        active_ffmpeg = (ffmpeg_backend is not None
+                         and cv2_module.videoio_registry.hasBackend(ffmpeg_backend))
+        if ffmpeg_status == "YES" or ffmpeg_backend is None or active_ffmpeg:
+            raise RuntimeError(
+                f"Camera-only OpenCV requires FFMPEG: NO or absent and "
+                f"no FFmpeg backend; build-info={ffmpeg_status} "
+                f"backend_active={active_ffmpeg}"
+            )
     backend_by_platform = {
         "win32": ("DirectShow", "CAP_DSHOW"),
         "darwin": ("AVFoundation", "CAP_AVFOUNDATION"),
@@ -32,6 +47,7 @@ def verify_opencv_build(cv2_module=None, platform=None):
         raise RuntimeError(f"Headless OpenCV does not support required {name} capture backend")
     result = {"opencv_version": cv2_module.__version__, "gui": detected_gui,
               "capture_backend": name, "backend_id": backend_id,
+              "ffmpeg_enabled": ffmpeg_status,
               "camera_hardware_tested": False}
     print(f"OpenCV {result['opencv_version']} headless: {name} capture backend available; "
           "camera hardware untested")

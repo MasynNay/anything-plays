@@ -1,5 +1,6 @@
 """Headless OpenCV's capture backend must survive on each build target."""
 from types import SimpleNamespace
+from unittest.mock import patch
 import unittest
 
 from tools.check_opencv_build import verify_opencv_build
@@ -30,6 +31,24 @@ class HeadlessCaptureTests(unittest.TestCase):
                 result = verify_opencv_build(self.stub(), platform)
                 self.assertEqual(result["capture_backend"], backend)
                 self.assertFalse(result["camera_hardware_tested"])
+
+    def test_ffmpeg_rejected_for_verified_camera_only_wheel(self):
+        mock = self.stub(gui="COCOA")
+        mock.CAP_FFMPEG = 1900
+        mock.getBuildInformation = lambda: "  GUI: COCOA\n  FFMPEG: YES\n"
+        mock.videoio_registry.hasBackend = lambda backend: backend == mock.CAP_AVFOUNDATION
+        with patch.dict("os.environ", {"AP_REQUIRE_OPENCV_FFMPEG_OFF": "1"}):
+            with self.assertRaisesRegex(RuntimeError, "requires FFMPEG: NO"):
+                verify_opencv_build(mock, "darwin")
+
+    def test_absent_ffmpeg_line_accepted_as_not_compiled(self):
+        mock = self.stub(gui="COCOA")
+        mock.CAP_FFMPEG = 1900
+        mock.getBuildInformation = lambda: "  GUI: COCOA\n  AVFoundation: YES\n"
+        mock.videoio_registry.hasBackend = lambda backend: backend == mock.CAP_AVFOUNDATION
+        with patch.dict("os.environ", {"AP_REQUIRE_OPENCV_FFMPEG_OFF": "1"}):
+            result = verify_opencv_build(mock, "darwin")
+            self.assertEqual(result["ffmpeg_enabled"], "UNKNOWN")
 
     def test_gui_enabled_cv2_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "without bundled Qt/GUI"):
