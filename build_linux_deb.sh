@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION="${VERSION:-2.0.0}"
+VERSION="${VERSION:-2.1.0~alpha1}"
 ARCH="$(dpkg --print-architecture)"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -21,7 +21,11 @@ fi
 python3 tools/prune_linux_system_libs.py dist/AnythingPlays
 # All emulator cores are required and shipped inside the installed application.
 mkdir -p dist/AnythingPlays/cores
-for name in mgba snes9x; do
+CORE_LIST=(mgba snes9x)
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  CORE_LIST+=(fceumm genesis_plus_gx)
+fi
+for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.so"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays/cores/
@@ -54,7 +58,7 @@ Architecture: $ARCH
 Maintainer: Anything Plays Project <noreply@example.invalid>
 Depends: libc6, libgl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
- Embedded GB, GBC, GBA and SNES gameplay and configurable camera object tracking.
+ Embedded GB/GBC/GBA, SNES, NES and Genesis cores; external N64/GameCube launch.
 CONTROL
 cat > "$PKG/usr/bin/anything-plays" <<'LAUNCH'
 #!/bin/sh
