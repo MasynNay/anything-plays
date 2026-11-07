@@ -494,3 +494,102 @@ especially embedded Dolphin gameplay, device camera/controls, speaker audio,
 game-only display and 30+ minute runtime, without marking unmet public
 release gates complete. Inspect run `42391351246` first if another chat
 stream is lost.
+
+
+## November 7, 2026 — 3.0 quality-of-life update / optional multi-color input
+
+**User-tested baseline:** User successfully loaded GameCube and Nintendo 64
+emulation from 3.0 preview and requested a game-panel volume rocker,
+multi-fish same-color input, optional Color 2, and local Player 2 controls.
+User then clarified **multiple fish per color MUST be optional and OFF by
+default**. All changes are committed on
+`feature/v3.0-unified-test`; stable 2.0 and `main` untouched.
+
+**Implemented:**
+
+- `anything_plays/libretro_audio.py` supports bounded, callback-applied
+  per-application PCM gain and immediate silent output while draining existing
+  queued samples. Native core PCM is untouched. Startup defaults to 35%.
+- `anything_plays/ui_volume.py` isolates volume initialization, mute and
+  previous unmuted-level persistence from the otherwise compact `app.py`.
+  The primary game panel and **Game only** view expose a 0–100% slider,
+  mute/unmute, and Ctrl+Shift+M shortcut, without OS volume changes.
+- `anything_plays/tracking.py` provides `locate_targets` to track up to
+  16 detached same-hue contours; the legacy largest-contour API is retained.
+  Profile `multi_fish_enabled` default **False** and UI checkbutton
+  **Enable multiple fish per color (multi-input)** control whether the
+  tracker considers one or all separated matching fish. This setting is
+  per-console and legacy profiles migrate with it OFF.
+- Color 2 remains OFF by default, with separate in-video picker, RGB choice,
+  Color 2 preview marker and Player 1 / Player 2 selector. Both colors can
+  work simultaneously, even when each tracks only one fish.
+- Camera input now has **Held while visible** and **Pulse (classic)** modes.
+  Per-frame input snapshots permit multiple simultaneous buttons on the
+  same controller, independently for two local Libretro ports. STOP clears
+  both ports immediately and preserves manual keyboard controls.
+- Native controller P2 is attached through
+  `retro_set_controller_port_device(1, RETRO_DEVICE_JOYPAD)` after core ROM
+  load on systems that support two controller ports. N64/GameCube P2 digital
+  and analogue states are generated independently of P1; unsupported
+  platforms/optional external bridge show a warning rather than faking P2.
+- Preview displays two colors' tracking marker outlines, number of visible
+  fish and currently held P1/P2 buttons. Multiple occupied zones highlight.
+- All options are profile-persistent and documented step-by-step at
+  `docs/V3_AUDIO_MULTIFISH_CONTROLS.md`.
+
+**Regression repairs, all explicitly verified without relaxing tests:**
+
+- Existing `tests/test_source_contracts.py` limits `app.py` to fewer
+  than 250 lines. Adding direct volume init raised it over the limit;
+  refactored into `VolumeMixin`; `app.py` now **249 lines**.
+- GameCube's original controller test assumed only port 0 existed. New
+  `tests/test_v21_gamecube_software.py` explicitly requires BOTH
+  `call(0,1)` and `call(1,1)` after ROM load.
+- Original installer lab contract forbade ALL full-build artifact uploads.
+  `tests/test_v30_offline_installer_lab.py` now requires clearly labeled,
+  14-day owner-only FULL-TEST-ONLY GitHub Actions artifacts, and still forbids
+  promoting them to a public GitHub release.
+- Added `tests/test_v30_multi_fish_qol.py` (12 checks) and expanded GUI smoke
+  test with opt-in default, persistence, mute, restored previous volume and
+  settings reset. The focused tests passed on Apple Silicon, Windows, Linux
+  in full offline installer jobs (Intel pending when recorded).
+- The first Linux full-build failed *only* at the new GUI smoke invocation
+  because direct execution from tests/ did not add project root to
+  `PYTHONPATH`; `9af1afe` explicitly sets `PYTHONPATH=.` before Xvfb.
+  Re-run **PASSED** the Linux full offline packaging.
+- Application workflow
+  [42394490773](https://github.com/MasynNay/anything-plays/actions/runs/42394490773)
+  passed **all six jobs**, including full source/unit/GUI regression suite,
+  30-second redraw soak and all four starter installer builds at code
+  `5805447ea9b9a0a1d31fec070b28654410e708b6`.
+
+**Updated full offline 18-profile preview built from identical application
+source** (workflow YAML fix only at `9af1afe`), run
+[42394706785](https://github.com/MasynNay/anything-plays/actions/runs/42394706785):
+
+- Apple Silicon:
+  [artifact 13583470513](https://github.com/MasynNay/anything-plays/actions/runs/42394706785/artifacts/13583470513)
+  — passed native package verification, all 12 audio/multi-fish regressions.
+- Windows x64:
+  [artifact 13582767985](https://github.com/MasynNay/anything-plays/actions/runs/42394706785/artifacts/13582767985)
+  — passed package verification and new QoL regressions.
+- Linux x64:
+  [artifact 13582509228](https://github.com/MasynNay/anything-plays/actions/runs/42394706785/artifacts/13582509228)
+  — passed package verification, new QoL regressions **and actual Xvfb GUI
+  smoke** after PYTHONPATH fix.
+- Intel macOS job still compiling when this checkpoint was appended; check
+  run `42394706785` for final job status and latest artifact ID. Earlier
+  code-identical first full run had passed Intel macOS packaging.
+
+**Important distinctions:** New 3.0 test builds are NOT a certified stable
+release; GameCube real hardware/long-run acceptance, monochrome NGP audio
+and broad 18-console commercial gameplay still require verification. Native
+Libretro local P2 support is wired and tested synthetically; a real game's
+two-player mode with actual aquarium tracking still needs user feedback.
+No netplay/online multiplayer is implemented. GitHub Actions artifacts
+expire after 14 days and may require sign-in; don't invent sandbox links.
+
+**Next action after any interruption:** Fetch latest branch HEAD, workflow
+run `42394706785`, report status and artifact refs for all four systems.
+Do not repeat already completed changes or run new code modifications
+unless a test or real-device failure warrants them.
