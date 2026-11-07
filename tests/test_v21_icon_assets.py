@@ -7,6 +7,8 @@ the authority for the illustration itself.
 """
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import subprocess
+import sys
 import unittest
 
 from PIL import Image
@@ -29,7 +31,25 @@ class CorrectedIconTests(unittest.TestCase):
         original_png = stable_png.stat().st_size
         original_ico = stable_ico.stat().st_size
         with TemporaryDirectory() as temp:
-            png, small, ico = render(output=Path(temp))
+            # Generate icons in an isolated process. Some native Linux
+            # image/codec stacks can fault when an ICO resize runs after
+            # OpenCV/libretro integration tests have initialized drivers.
+            # This still fails the test if the renderer itself crashes.
+            result = subprocess.run(
+                [sys.executable, "-c",
+                 "from pathlib import Path; import sys; "
+                 "from tools.render_v21_icon import render; "
+                 "render(output=Path(sys.argv[1]))",
+                 temp],
+                cwd=ROOT, capture_output=True, text=True, timeout=35,
+            )
+            self.assertEqual(
+                result.returncode, 0,
+                f"Native icon generation failed: {result.stderr}",
+            )
+            png = Path(temp) / "anything_plays.png"
+            small = Path(temp) / "anything_plays_small.png"
+            ico = Path(temp) / "anything_plays.ico"
             with Image.open(png) as image:
                 self.assertEqual(image.format, "PNG")
                 self.assertEqual(image.size, (1024, 1024))
