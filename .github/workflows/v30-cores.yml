@@ -159,8 +159,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        system: [ws, wsc]
-    runs-on: ubuntu-24.04
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ws}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: wsc}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ws}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: wsc}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ws}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: wsc}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ws}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: wsc}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 16
     env:
       AP_V30_TEST_CORES: '1'
@@ -169,20 +177,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install native graphics and audio libraries
+      - name: Install Linux native graphics and audio libraries
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install Python test requirements
+        run: python -m pip install -r requirements.txt
       - name: Fetch native Mednafen WonderSwan core for temporary CI
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_wswan')"
       - name: Test original WonderSwan tile-video and wavetable PCM
         run: |
-          python tools/probe_wswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.so --seconds 8 --report test-evidence/${{ matrix.system }}-original-screen-psg.json
+          python tools/probe_wswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-screen-psg.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-${{ matrix.system }}-video-audio
+          name: AnythingPlays-3.0-original-${{ matrix.system }}-AV-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
