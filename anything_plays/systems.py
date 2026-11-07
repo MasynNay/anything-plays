@@ -26,7 +26,13 @@ SYSTEMS = {
     "nes": System("nes", "Nintendo Entertainment System", "fceumm", (".nes", ".unf", ".unif")),
     "genesis": System("genesis", "Sega Genesis / Mega Drive", "genesis_plus_gx", (".md", ".gen", ".smd", ".bin")),
     "n64": System("n64", "Nintendo 64 (RetroArch)", "mupen64plus_next", (".n64", ".z64", ".v64"), "retroarch"),
-    "gamecube": System("gamecube", "Nintendo GameCube (Dolphin)", "dolphin", (".iso", ".gcm", ".rvz", ".gcz", ".ciso"), "dolphin"),
+    "gamecube": System(
+        "gamecube", "Nintendo GameCube", "dolphin",
+        # Dolphin Libretro also supports homebrew .dol/.elf, TGC, WIA and
+        # multi-disc playlists; include them in the same in-app ROM shelf.
+        (".iso", ".gcm", ".rvz", ".gcz", ".ciso", ".dol", ".elf",
+         ".tgc", ".wia", ".m3u"), "dolphin",
+    ),
 }
 
 # Retain GBA as the default for users upgrading from the original application.
