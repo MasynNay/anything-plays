@@ -306,6 +306,90 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  gamecube-opengl-experiment:
+    # Research-only Linux frontend: hidden EGL core GL context + FBO readback.
+    # Tests the already bundled *unmodified* Dolphin Libretro core. Never
+    # silently toggles real player settings or publishes experimental cores.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(gl)') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AP_V21_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      MESA_GL_VERSION_OVERRIDE: '4.5'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated EGL/GL test prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libxi6 libxrandr2 libportaudio2
+          python -m pip install -r requirements.txt
+          mkdir -p test-evidence
+      - name: Smoke-test real offscreen OpenGL context and owned framebuffer
+        run: |
+          PYTHONPATH=. xvfb-run -a python -X faulthandler tools/smoke_gamecube_opengl.py
+      - name: Retrieve bundled Dolphin and its Sys files (CI only)
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores > test-evidence/gc-opengl-sys-source.json
+      - name: Probe accelerated Dolphin homebrew with default JIT
+        id: accelerated_jit
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --seconds 20 \
+            --report test-evidence/gamecube-opengl-jit.json
+      - name: Probe accelerated Dolphin with cached interpreter (diagnostic)
+        id: accelerated_interpreter
+        if: always() && steps.accelerated_jit.outcome != 'cancelled'
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 20 \
+            --report test-evidence/gamecube-opengl-cached.json
+      - name: Require real nonblank playable-speed GameCube frames
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          reports = [
+              Path("test-evidence/gamecube-opengl-jit.json"),
+              Path("test-evidence/gamecube-opengl-cached.json"),
+          ]
+          for report in reports:
+              if not report.is_file():
+                  print("Missing experimental evidence:", report)
+                  continue
+              data = json.loads(report.read_text())
+              print(report, "passed=", data.get("passed"),
+                    "details=", data.get("details"))
+          if not any(
+              json.loads(path.read_text()).get("passed") is True
+              for path in reports if path.is_file()
+          ):
+              raise SystemExit("OpenGL GameCube rendering remains unverified")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-GameCube-offscreen-OpenGL-experiment
+          path: |
+            test-evidence/gamecube-opengl-jit.json
+            test-evidence/gamecube-opengl-cached.json
+            test-evidence/gamecube-opengl-frame.png
+            test-evidence/gc-opengl-sys-source.json
+          if-no-files-found: warn
+          retention-days: 14
+
   gamecube-patched-native-experiment:
     # Compile from GPL source only when a native(dolphin) change is submitted.
     # This is a developer test; it does not add unaudited modified binaries
