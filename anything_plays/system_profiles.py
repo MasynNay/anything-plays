@@ -10,6 +10,8 @@ import json
 import math
 from pathlib import Path
 
+from anything_plays.atomic_storage import write_json_atomically
+
 
 BUTTONS_BY_SYSTEM = {
     "gb": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
@@ -173,9 +175,4 @@ class ProfileStore:
     def put(self, system, profile):
         """Validate and persist a console profile without partial JSON writes."""
         self.profiles[system] = normalize(system, profile, self.base)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(self.profiles, indent=2), encoding="utf-8"
-        )
-        temporary.replace(self.path)
+        write_json_atomically(self.path, self.profiles)
