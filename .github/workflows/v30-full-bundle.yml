@@ -24,6 +24,7 @@ on:
       - 'anything_plays/gamecube_preview.py'
       - 'anything_plays/gamecube_gpu.py'
       - 'anything_plays/gamecube_sys.py'
+      - 'tools/smoke_installed_linux.py'
       - 'anything_plays/gamecube_software.py'
       - 'tests/test_v30_gamecube_linux_writable_sys.py'
       - 'anything_plays/ui_layout.py'
@@ -127,6 +128,23 @@ jobs:
         # A directly executed tests/smoke_gui.py lives under tests/, so
         # explicitly put the checked-out project root on Python's import path.
         run: PYTHONPATH=. xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
+      - name: Real installed Linux desktop launches as an unprivileged user
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends x11-utils
+          sudo DEBIAN_FRONTEND=noninteractive dpkg -i release/anything-plays-preview_3.0.0~alpha1_amd64.deb
+          smoke_home="$(mktemp -d)"
+          trap 'sudo rm -rf "$smoke_home"' EXIT
+          cp tools/smoke_installed_linux.py "$smoke_home/verify.py"
+          sudo chown -R nobody:nogroup "$smoke_home"
+          sudo chmod 0700 "$smoke_home"
+          sudo -u nobody env HOME="$smoke_home" XDG_STATE_HOME="$smoke_home/.local/state" \
+            xvfb-run -a python3 "$smoke_home/verify.py" \
+              --executable /usr/bin/anything-plays-30-preview \
+              --report "$smoke_home/installed-boot.json"
+          mkdir -p test-evidence
+          cp "$smoke_home/installed-boot.json" test-evidence/linux-installed-gui-boot.json
       - name: Real GameCube playback from a read-only extracted Linux DEB
         if: runner.os == 'Linux'
         shell: bash
