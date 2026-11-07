@@ -32,6 +32,29 @@ def main():
                         "gb", "gbc", "gba", "snes", "nes", "genesis", "n64", "gamecube"
                     }
                     assert app.zone_border_width.get() >= 2
+                    # Newly installed profiles remain single-fish by default.
+                    # Enabling multi-input is a conscious per-console choice.
+                    assert app.multi_fish_enabled.get() is False
+                    assert app.color2_enabled.get() is False
+                    assert app.volume_slider.winfo_exists()
+                    app.volume_percent.set(19)
+                    app.set_game_volume(save=False)
+                    assert abs(app.emu.volume - .19) < .001
+                    app.toggle_game_mute()
+                    assert app.volume_percent.get() == 0
+                    assert app.emu.volume == 0
+                    app.toggle_game_mute()
+                    assert app.volume_percent.get() == 19
+                    app.color2_enabled.set(True)
+                    app.color2_player.set('Player 1')
+                    app.multi_fish_enabled.set(True)
+                    app.update_tracking_preferences()
+                    assert app.cfg['multi_fish_enabled'] is True
+                    assert app.cfg['color2_enabled'] is True
+                    assert app.cfg['color2_player'] == 'Player 1'
+                    app.reset_profile()
+                    assert app.multi_fish_enabled.get() is False
+                    assert app.color2_enabled.get() is False
                     assert app.view_mode.get() == "Windowed"
                     app.set_view_mode("Borderless", persist=False)
                     assert app.view_mode.get() == "Borderless"
