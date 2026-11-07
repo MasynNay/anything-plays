@@ -162,11 +162,26 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
             "upstream_revision": None,
         })
 
+    # A verified per-user core pack takes precedence over the bundled binary.
+    # Import lazily to avoid the core_packs -> emulator_updates import cycle.
+    from anything_plays.core_packs import managed_core_path, managed_core_release
+    for item in items:
+        name = item["key"]
+        if name == "dolphin":
+            continue  # Dolphin must be updated with matching Sys assets.
+        if managed_core_path(name):
+            item["installed_from"] = "approved-core-pack"
+            item["installed_version"] = managed_core_release(name) or "approved core pack"
+            item["integrity"] = "verified"
+            item["status"] = "managed-release"
+
     if online:
         def fetch(item):
             try:
                 sha = github_head(UPSTREAM_REPOS[item["key"]], opener=opener)
                 item["upstream_revision"] = sha
+                if item["status"] == "managed-release":
+                    return item
                 if item["integrity"] == "verified":
                     item["status"] = _version_status(
                         item["key"], known[item["key"]][0],
@@ -199,6 +214,7 @@ def summary_text(report):
     """Explain updater results without promising updates that are not verified."""
     names = {
         "current-source": "Matches the reported upstream source commit",
+        "managed-release": "Verified approved core pack installed",
         "review-upstream": "Upstream changed; requires tested app rebuild",
         "unknown-version": "Source revision unavailable; check during next build",
         "verified": "Bundled and hash verified",
