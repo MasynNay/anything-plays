@@ -84,9 +84,9 @@ class NeoGeoPocketCIContracts(unittest.TestCase):
 
     def test_workflow_uses_native_core_both_video_and_audio_not_library_import(self):
         root = Path(__file__).resolve().parents[1]
-        yaml = (root / ".github/workflows/v30-cores.yml").read_text("utf-8")
+        yaml = (root / ".github/workflows/v30-ngp.yml").read_text("utf-8")
         script = (root / "tools/probe_ngp_mit_homebrew.py").read_text("utf-8")
-        self.assertIn("ngp-mit-homebrew-video-audio", yaml)
+        self.assertIn("ngp-original-native-av", yaml)
         self.assertIn("mednafen_ngp", yaml)
         self.assertIn("native_nonzero_pcm_values", script)
         self.assertIn("video_gate_passed", script)
