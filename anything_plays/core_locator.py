@@ -71,7 +71,12 @@ def find_core(system="gba"):
             if candidate.is_file():
                 if core == "dolphin":
                     codehandler = folder / "dolphin-emu" / "Sys" / "codehandler.bin"
-                    if not codehandler.is_file() or not codehandler.stat().st_size:
+                    try:
+                        if not codehandler.is_file() or not codehandler.stat().st_size:
+                            continue
+                    except OSError:
+                        # Bad directory modes on root-owned package contents
+                        # must never prevent the main UI from starting.
                         continue
                 return str(candidate)
     return None
