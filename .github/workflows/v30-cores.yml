@@ -155,8 +155,10 @@ jobs:
   ngp-mit-homebrew-video-audio:
     # Third-party MIT homebrew, immutable commit and blob-integrity pinned.
     # Downloaded only inside disposable CI and never shipped in app installs.
-    # Strict RGB/PCM requirements prevent loaded-core false positives.
-    continue-on-error: true
+    # A native NGP/NGPC job failure is a real emulator-verification failure:
+    # require RGB, PCM, manual A and camera B; do not hide red jobs behind
+    # a successful core-download or 'continue-on-error' workflow badge.
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
