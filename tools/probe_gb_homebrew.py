@@ -84,7 +84,8 @@ def _child(system, core, rom, report, seconds):
     data={
         "system":system, "source": (
             "original ARM7TDMI GBA ROM" if system == "gba"
-            else "original LR35902 GB/GBC ROM"
+            else ("original HuC6280 PC Engine HuCard" if system == "pce"
+                  else "original LR35902 GB/GBC ROM")
         ),
         "native_video_frames":frames, "observed_fps":round(frames/elapsed,2),
         "sampled_nonblank_frames":nonblank,

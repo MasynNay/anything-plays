@@ -116,43 +116,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  pce-original-hucard-vdc-psg:
-    # Original HuC6280 code, VDC/VCE graphics and native PSG tone.
-    # No CD firmware, commercial game or diagnostic ROM shipped in the app.
-    continue-on-error: true
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      AP_V30_TEST_CORES: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install native libraries for Libretro frontend
-        run: |
-          sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
-      - name: Retrieve pinned Mednafen PCE FAST HuCard core for test
-        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_pce_fast')"
-      - name: Require original PC Engine VDC color and nonzero HuC6280 PSG
-        run: |
-          python tools/probe_pce_homebrew.py --core cores/mednafen_pce_fast_libretro.so --seconds 8 --report test-evidence/pce-original-hucard-av.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: AnythingPlays-3.0-original-PCE-HuCard-AV
-          path: test-evidence/
-          if-no-files-found: warn
-          retention-days: 14
-
   pce-original-vdc-vce-psg-av:
     # Native Mednafen PCE Fast executes an original HuC6280 HuCard.
     # No CD firmware or commercial ROMs. Enforce real VDC/VCE output and
     # nonzero core PSG PCM; no fake frontend image or audio.
     continue-on-error: true
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
       AP_V30_TEST_CORES: '1'
@@ -161,20 +138,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install headless native and Python test requirements
+      - name: Install headless Linux native requirements
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install Python test requirements
+        run: python -m pip install -r requirements.txt
       - name: Fetch PCE Fast Libretro candidate for CI only
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_pce_fast')"
       - name: Demand original HuC6280 changing RGB frames and PSG PCM
         run: |
-          python tools/probe_pce_homebrew.py --core cores/mednafen_pce_fast_libretro.so --seconds 8 --report test-evidence/pce-original-vdc-vce-psg.json
+          python tools/probe_pce_homebrew.py --core cores/mednafen_pce_fast_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/pce-original-${{ matrix.target }}-vdc-vce-psg.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-PCE-HuC6280-video-audio
+          name: AnythingPlays-3.0-original-PCE-HuC6280-AV-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
