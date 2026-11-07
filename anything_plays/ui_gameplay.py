@@ -38,6 +38,27 @@ class GameplayMixin:
             self.save_preferences(core_path=path)
             self.game_status.set('Core selected: ' + Path(path).name)
 
+    def set_game_volume(self, _value=None, *, save=False):
+        """Update current Libretro PCM gain without altering system volume."""
+        volume = max(0, min(100, int(self.volume_percent.get())))
+        self.volume_label.set(f"{volume}%")
+        self.mute_button_text.set("Unmute" if volume == 0 else "Mute")
+        if volume:
+            self._volume_before_mute = volume
+        self.emu.set_volume(volume / 100.0)
+        if save:
+            self.save_preferences()
+
+    def toggle_game_mute(self, event=None):
+        """Instant mute/unmute, restoring the previous listening level."""
+        if self.volume_percent.get():
+            self._volume_before_mute = self.volume_percent.get()
+            self.volume_percent.set(0)
+        else:
+            self.volume_percent.set(max(1, self._volume_before_mute))
+        self.set_game_volume(save=True)
+        return "break"
+
     def activate_manual(self, event=None):
         self.manual_active = True
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
