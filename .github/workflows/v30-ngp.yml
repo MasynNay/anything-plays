@@ -48,7 +48,7 @@ jobs:
       - name: Verify NeoPop native input mappings, flash paths and restart contracts
         run: |
           python -m unittest discover -s tests -p 'test_v30_ngp*.py' -v
-          python -m unittest tests.test_v30_gamecube_save_locations -v
+          python -m unittest discover -s tests -p 'test_v30_gamecube_save_locations.py' -v
 
   ngp-original-native-av:
     # Each job requires authentic changing RGB, native nonzero PCM,
