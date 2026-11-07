@@ -1,4 +1,4 @@
-"""Nonblocking core updates for the 2.1 test application.
+"""Nonblocking core updates for the 3.0 preview application.
 
 An ordinary upstream commit is NOT an approved binary update. The check UI
 lists installed provenance, then separately looks for vetted core-pack assets

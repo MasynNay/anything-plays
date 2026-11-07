@@ -31,7 +31,7 @@ class CorePackBuilderTests(unittest.TestCase):
                            "sha256": hashlib.sha256(binary).hexdigest()}]
             }))
             output = root / "candidates"
-            tag = "v2.1.0-alpha.2"
+            tag = "v3.0.0-alpha.2-cores"
             packages = create_candidate_packs(
                 cores, output, tag, selected=[name]
             )
@@ -76,7 +76,7 @@ class CorePackBuilderTests(unittest.TestCase):
             }))
             with self.assertRaisesRegex(ValueError, "checksum mismatch"):
                 create_candidate_packs(
-                    folder, folder / "output", "v2.1.0-alpha.3",
+                    folder, folder / "output", "v3.0.0-alpha.3-cores",
                     selected=[name], license_reviewed=True, runtime_tested=True,
                 )
 

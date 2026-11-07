@@ -1,13 +1,13 @@
-"""Vetted, in-app Libretro core packs for Anything Plays 2.1.
+"""Vetted, in-app Libretro core packs for Anything Plays 3.0.
 
-Only assets published by MasynNay/anything-plays in a 2.1 release are allowed.
+Only assets published by MasynNay/anything-plays in a 3.0 core-catalog release are allowed.
 GitHub's release-asset SHA-256 digest is independently checked against the
 downloaded ZIP, then the ZIP manifest and the native library are hash checked.
 Libraries are staged outside the signed application and activated by an atomic
 manifest change between game sessions. Never modify the application bundle,
 download random buildbot executables or overwrite an already loaded library.
 
-The first 2.1 release won't necessarily have separate approved core packs.
+The first 3.0 release won't necessarily have separate approved core packs.
 In that case the updater must report that none are published, not invent an
 update. Public releases still require normal platform signing/QA.
 """
@@ -32,13 +32,13 @@ from anything_plays.update_check import version_key
 
 RELEASES_API = "https://api.github.com/repos/MasynNay/anything-plays/releases?per_page=30"
 RELEASE_PREFIX = "https://github.com/MasynNay/anything-plays/releases/download/"
-PACK_PREFIX = "AnythingPlays21-Core-"
+PACK_PREFIX = "AnythingPlays3-Core-"
 MAX_API_BYTES = 1_000_000
 MAX_PACK_BYTES = 80 * 1024 * 1024
 MAX_BINARY_BYTES = 65 * 1024 * 1024
 MAX_STATE_BYTES = 150_000
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-RELEASE_TAG_RE = re.compile(r"^v?2\.1\.\d+(?:-(?:alpha|beta|rc)[.-]\d+)?$", re.I)
+RELEASE_TAG_RE = re.compile(r"^v?3\.0\.\d+(?:-(?:alpha|beta|rc)[.-]\d+)?-cores$", re.I)
 
 
 def target_identity(platform_name=None, machine=None):
@@ -58,10 +58,10 @@ def target_identity(platform_name=None, machine=None):
 def managed_core_root():
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
-        return base / "AnythingPlays" / "2.1" / "cores"
+        return base / "AnythingPlays" / "3.0" / "cores"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "AnythingPlays" / "2.1" / "cores"
-    return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "anything-plays" / "2.1" / "cores"
+        return Path.home() / "Library" / "Application Support" / "AnythingPlays" / "3.0" / "cores"
+    return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "anything-plays" / "3.0" / "cores"
 
 
 def _no_symlinks(path, parent):
@@ -174,7 +174,7 @@ def discover_core_packs(*, opener=None, target=None):
     if target not in valid_targets:
         raise ValueError("Unknown core-pack target")
     req = Request(RELEASES_API, headers={
-        "User-Agent": "AnythingPlays-2.1-CoreUpdater",
+        "User-Agent": "AnythingPlays-3.0-CoreUpdater",
         "Accept": "application/vnd.github+json",
     })
     fetch = opener or urlopen
@@ -192,7 +192,9 @@ def discover_core_packs(*, opener=None, target=None):
         tag = release.get("tag_name")
         if not isinstance(tag, str) or not RELEASE_TAG_RE.fullmatch(tag):
             continue
-        version = version_key(tag)
+        version = version_key(tag.removesuffix("-cores"))
+        if version is None:
+            continue
         assets = release.get("assets")
         if not isinstance(assets, list):
             continue
@@ -244,7 +246,7 @@ def _validate_asset_metadata(item):
 
 
 def _download(item, fetch):
-    req = Request(item["url"], headers={"User-Agent": "AnythingPlays-2.1-CoreUpdater"})
+    req = Request(item["url"], headers={"User-Agent": "AnythingPlays-3.0-CoreUpdater"})
     with fetch(req, timeout=45) as response:
         data = response.read(MAX_PACK_BYTES + 1)
     if len(data) > MAX_PACK_BYTES or len(data) != item["size"]:

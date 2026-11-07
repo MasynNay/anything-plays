@@ -1,4 +1,4 @@
-"""Prove a 2.1 optional emulator pack can install and run entirely in-app.
+"""Prove a 3.0 optional emulator pack can install and run entirely in-app.
 
 CI-only: independently downloads a core, prepares a synthetic official-release
 request around its *exact* ZIP bytes, then installs using the same verified
@@ -34,7 +34,7 @@ RUNNABLE_TESTS = {
     "fceumm": "tools/probe_nes_homebrew.py",
     "stella2014": "tools/probe_atari_homebrew.py",
 }
-TAG = "v2.1.0-alpha.2"
+TAG = "v3.0.0-alpha.2-cores"
 
 
 class LocalAssetResponse:

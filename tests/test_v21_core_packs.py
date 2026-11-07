@@ -25,7 +25,7 @@ class DummyResponse:
         return self.data[:limit]
 
 
-def synthetic_pack(name="mgba", *, content=None, tag="v2.1.0-alpha.2"):
+def synthetic_pack(name="mgba", *, content=None, tag="v3.0.0-alpha.2-cores"):
     target, ext = packs.target_identity()
     binary = content if content is not None else (
         {".so": b"\x7fELF", ".dll": b"MZaa", ".dylib": b"\xcf\xfa\xed\xfe"}[ext]
@@ -72,14 +72,14 @@ class ApprovedCorePackTests(unittest.TestCase):
         name = packs._release_asset("mgba", target)
         releases = [
             {
-                "tag_name": "v2.1.0-alpha.2", "draft": False,
+                "tag_name": "v3.0.0-alpha.2-cores", "draft": False,
                 "assets": [{
                     "name": name, "digest": "sha256:" + asset["sha256"],
                     "size": len(data), "browser_download_url": asset["url"],
                 }],
             },
             {
-                "tag_name": "v2.1.0-alpha.3", "draft": True,
+                "tag_name": "v3.0.0-alpha.3-cores", "draft": True,
                 "assets": [{
                     "name": name, "digest": "sha256:" + asset["sha256"],
                     "size": len(data), "browser_download_url": asset["url"],
@@ -115,7 +115,7 @@ class ApprovedCorePackTests(unittest.TestCase):
             magic = {".so": b"\x7fELF", ".dll": b"MZaa",
                      ".dylib": b"\xcf\xfa\xed\xfe"}[extension]
             second, data2 = synthetic_pack(
-                content=magic + b"\x02" * 15000, tag="v2.1.0-alpha.3"
+                content=magic + b"\x02" * 15000, tag="v3.0.0-alpha.3-cores"
             )
             path2 = Path(install(second, data2))
             self.assertNotEqual(path1, path2)

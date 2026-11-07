@@ -3,7 +3,7 @@
 This tool is for maintainers / CI only. It does not publish unreviewed
 nightly libraries or approve them for user installation. After each
 platform's gameplay/controls/save/signature audit, explicitly upload the
-candidate ZIPs to an official 2.1 GitHub release. GitHub's release API then
+candidate ZIPs to an official 3.0 core-catalog GitHub release. GitHub's release API then
 provides the asset SHA-256 digest used by the in-app updater.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ def create_candidate_packs(cores_dir: Path, output_dir: Path, tag: str,
                            *, selected=None, target=None, license_reviewed=False,
                            runtime_tested=False):
     if not RELEASE_TAG_RE.fullmatch(tag):
-        raise ValueError("Refusing non-2.1 release identity")
+        raise ValueError("Refusing non-3.0 core-catalog release identity")
     cores_dir, output_dir = Path(cores_dir), Path(output_dir)
     target = target or target_identity()[0]
     ext = {

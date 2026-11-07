@@ -1,9 +1,9 @@
-"""Fail-closed release gate for Anything Plays 2.1.
+"""Fail-closed release gate for Anything Plays 3.0.
 
 A green alpha build verifies that source compiles and an installer packages;
 it does not prove every console can be downloaded, installed and played with sound.
 
-This gate must pass before tagging/publishing a public 2.1 release. Use
+This gate must pass before tagging/publishing a public 3.0 release. Use
 --report-only in the alpha CI workflow to report blockers without preventing
 ongoing engineering builds. Do not automatically set acceptance flags based
 on unit tests: real games, packaged installs and sustained camera play need
@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from anything_plays.systems import SYSTEMS  # noqa: E402
 
-ACCEPTANCE_FILE = ROOT / "config" / "v2.1-release-acceptance.json"
+ACCEPTANCE_FILE = ROOT / "config" / "v3.0-release-acceptance.json"
 # Playback and audio must work regardless of whether the core is included or
 # delivered as a separate approved in-app download.
 SYSTEM_FLAGS = ("in_app_video", "camera_controls", "real_game_verified", "audio_verified")
@@ -41,7 +41,7 @@ def release_blockers(policy, systems=None):
     blockers = []
 
     if not isinstance(policy, dict) or policy.get("schema_version") != 1:
-        return ["Missing or invalid 2.1 release acceptance schema"]
+        return ["Missing or invalid 3.0 release acceptance schema"]
 
     entries = policy.get("systems")
     if not isinstance(entries, dict):
@@ -103,28 +103,28 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--report-only", action="store_true",
-        help="Show what blocks 2.1 without failing development/test builds",
+        help="Show what blocks 3.0 without failing development/test builds",
     )
     parser.add_argument(
         "--manifest", type=Path, default=ACCEPTANCE_FILE,
-        help="Read the explicitly reviewed 2.1 release acceptance record",
+        help="Read the explicitly reviewed 3.0 release acceptance record",
     )
     args = parser.parse_args(argv)
     try:
         policy = json.loads(args.manifest.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError) as exc:
-        print(f"2.1 RELEASE BLOCKED: Cannot read acceptance record: {exc}")
+        print(f"3.0 RELEASE BLOCKED: Cannot read acceptance record: {exc}")
         return 0 if args.report_only else 1
 
     blockers = release_blockers(policy)
     if not blockers:
-        print("2.1 release acceptance passed. Review signed artifact evidence.")
+        print("3.0 release acceptance passed. Review signed artifact evidence.")
         return 0
 
-    print(f"2.1 RELEASE BLOCKED: {len(blockers)} unresolved requirements")
+    print(f"3.0 RELEASE BLOCKED: {len(blockers)} unresolved requirements")
     for blocker in blockers:
         print("  - " + blocker)
-    print("Test installers may still be built; no public 2.1 release is approved.")
+    print("Test installers may still be built; no public 3.0 release is approved.")
     return 0 if args.report_only else 1
 
 

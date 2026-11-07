@@ -1,10 +1,10 @@
-"""A green installer build is NOT a completed all-console 2.1 release."""
+"""A green installer build is NOT a completed all-console 3.0 release."""
 import copy
 import json
 from pathlib import Path
 import unittest
 
-from tools.check_v21_release import (
+from tools.check_v30_release import (
     ACCEPTANCE_FILE, PLATFORM_FLAGS, RELEASE_FLAGS, SYSTEM_FLAGS,
     PLATFORMS, release_blockers, main,
 )

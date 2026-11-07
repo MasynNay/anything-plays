@@ -37,19 +37,19 @@ OPTIONAL_V21_CORES = (
 def core_names_for_build():
     # Optional downloadable cores are packaged separately. Never fetch
     # Dolphin here: it depends on system assets and failed gameplay QA.
-    if os.environ.get("AP_V21_CORE_PACK_BUILD", "") == "1":
+    if any(os.environ.get(flag, "") == "1" for flag in ("AP_V30_CORE_PACK_BUILD", "AP_V21_CORE_PACK_BUILD")):
         if os.environ.get("AP_RELEASE_BUILD") == "1":
             raise ValueError("Unreviewed optional packs cannot enter v2.0 release")
         return ("snes9x", *(name for name in OPTIONAL_V21_CORES if name != "dolphin"))
     # On 2.1 only, the starter installer ships mGBA for GB/GBC/GBA.
     # Unset: stable v2.0's two-core build remains unchanged.
-    if os.environ.get("AP_V21_MINIMAL_CORE_BUILD", "") == "1":
+    if any(os.environ.get(flag, "") == "1" for flag in ("AP_V30_MINIMAL_CORE_BUILD", "AP_V21_MINIMAL_CORE_BUILD")):
         if os.environ.get("AP_RELEASE_BUILD") == "1":
             raise ValueError("2.1 minimal build is not an approved v2.0 release")
         return ("mgba",)
-    if os.environ.get("AP_V21_TEST_CORES", "") == "1":
+    if any(os.environ.get(flag, "") == "1" for flag in ("AP_V30_TEST_CORES", "AP_V21_TEST_CORES")):
         if os.environ.get("AP_RELEASE_BUILD") == "1":
-            raise ValueError("Unapproved 2.1 test cores cannot enter the v2.0 release path")
+            raise ValueError("Unapproved 3.0 test cores cannot enter the v2.0 release path")
         return (*CORE_NAMES, *OPTIONAL_V21_CORES)
     return CORE_NAMES
 MAX_ARCHIVE_SIZE = 30 * 1024 * 1024
