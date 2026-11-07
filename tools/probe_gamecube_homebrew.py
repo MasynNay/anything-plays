@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -28,7 +29,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.gamecube_homebrew_fixture import verified_homebrew
 
-MAX_LOG_CHARS = 8000
+MAX_LOG_CHARS = 24000
 
 
 class SilentProbeAudio:
@@ -191,7 +192,7 @@ def _child(rom, core, seconds, report_path):
     return 0 if result["playback_probe_passed"] else 1
 
 
-def _parent(core, seconds, report):
+def _parent(core, seconds, report, debugger=False):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
@@ -200,6 +201,7 @@ def _parent(core, seconds, report):
         "packaged_core": str(core),
         "seconds_requested": seconds,
         "probe_passed": False,
+        "debugger": "gdb" if debugger else None,
         "timed_out": False,
         "child_returncode": None,
         "details": None,
@@ -222,6 +224,18 @@ def _parent(core, seconds, report):
                 "--child", "--core", str(core), "--rom", str(homebrew),
                 "--seconds", str(seconds), "--report", str(child_report),
             ]
+            if debugger:
+                gdb = shutil.which("gdb")
+                if gdb is None:
+                    raise RuntimeError("GNU debugger is required for native crash traces")
+                command = [
+                    gdb, "--batch", "--quiet",
+                    "-ex", "set pagination off",
+                    "-ex", "set print thread-events off",
+                    "-ex", "run",
+                    "-ex", "thread apply all bt 24",
+                    "--args", *command,
+                ]
             try:
                 completed = subprocess.run(
                     command, env=env, stdout=subprocess.PIPE,
@@ -264,6 +278,8 @@ def main(argv=None):
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--seconds", type=int, default=25)
     parser.add_argument("--child", action="store_true")
+    parser.add_argument("--debugger", action="store_true",
+                        help="Run the native child under gdb and capture C++ backtraces")
     parser.add_argument("--rom", type=Path)
     args = parser.parse_args(argv)
     if not 1 <= args.seconds <= 90:
@@ -274,7 +290,7 @@ def main(argv=None):
         if args.rom is None:
             parser.error("--rom is required for a child process")
         return _child(args.rom.resolve(), core, args.seconds, report)
-    return _parent(core, args.seconds, report)
+    return _parent(core, args.seconds, report, debugger=args.debugger)
 
 
 if __name__ == "__main__":

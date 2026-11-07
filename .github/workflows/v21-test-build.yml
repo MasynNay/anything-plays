@@ -188,3 +188,42 @@ jobs:
             test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: error
           retention-days: 21
+
+  gamecube-runtime-diagnostics:
+    # Separate fast native test: unlike installer packaging, this fails when
+    # a REAL open-source GameCube game crashes or never produces video.
+    # A release with eight embedded consoles cannot ignore this red job.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V21_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Dolphin native debug dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            gdb xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Prepare exact test cores and Dolphin Sys data
+        run: python fetch_mgba_core.py
+      - name: Boot licensed GameCube homebrew inside Dolphin and capture native backtrace
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core cores/dolphin_libretro.so --seconds 12 \
+            --debugger --report test-evidence/gamecube-homebrew-gdb.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-GameCube-native-debug-evidence
+          path: |
+            test-evidence/gamecube-homebrew-gdb.json
+            test-evidence/gamecube-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 21
