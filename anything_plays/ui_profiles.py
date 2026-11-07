@@ -51,6 +51,7 @@ class ProfilesMixin:
         prefs['external_emulators'] = dict(self.external_emulators)
         prefs['n64_core_path'] = self.n64_core_override
         prefs['n64_embedded'] = bool(self.n64_embedded.get())
+        prefs['gamecube_embedded'] = bool(self.gamecube_embedded.get())
         prefs['view_mode'] = self.view_mode.get()
         if core_path:
             paths = prefs.get('core_paths', {})
