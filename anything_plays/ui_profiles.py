@@ -103,6 +103,12 @@ class ProfilesMixin:
             self.set_view_mode("Windowed")
         # The combobox has already changed, so save the previous system explicitly.
         previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
+        # Flush any pending size change against the previous console before
+        # switching profiles; the combobox already contains the new key.
+        pending = getattr(self, '_zone_label_save_job', None)
+        if pending is not None:
+            self.root.after_cancel(pending)
+            self._zone_label_save_job = None
         try:
             self.read_settings()
             self.profile_store.put(previous, self.cfg)
