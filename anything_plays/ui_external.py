@@ -15,11 +15,11 @@ from anything_plays.systems import SYSTEMS
 
 
 class ExternalBackendMixin:
-    """GPU launchers and an explicit, experimental N64 software fallback."""
+    """3D software-video modes with optional developer GPU fallbacks."""
 
-    def switch_n64_backend(self):
-        """Switch the N64 video backend without changing global emulator state."""
-        if self.system_key.get() != "n64":
+    def _switch_3d_backend(self, system):
+        """Select a 3D renderer without disturbing other console settings."""
+        if self.system_key.get() != system:
             return
         self.stop_controls()
         self.unload_rom()
@@ -29,11 +29,24 @@ class ExternalBackendMixin:
         self.update_external_setup()
         self.game_canvas.delete("all")
         self.show_external_placeholder()
-        self.game_status.set(
-            "N64 software graphics selected. Choose a ROM to test in this window."
-            if self.uses_embedded_emulator() else
-            "External N64 fallback selected. RetroArch must be installed."
-        )
+        name = "GameCube" if system == "gamecube" else "N64"
+        if self.uses_embedded_emulator():
+            self.game_status.set(
+                f"{name} software graphics selected. Choose a ROM "
+                "to try it inside the game panel."
+            )
+        else:
+            program = "Dolphin" if system == "gamecube" else "RetroArch"
+            self.game_status.set(
+                f"{name} external developer fallback selected; "
+                f"{program} must be installed separately."
+            )
+
+    def switch_n64_backend(self):
+        self._switch_3d_backend("n64")
+
+    def switch_gamecube_backend(self):
+        self._switch_3d_backend("gamecube")
 
     def update_external_setup(self):
         backend = SYSTEMS[self.system_key.get()].backend
@@ -46,6 +59,15 @@ class ExternalBackendMixin:
             )
         else:
             self.n64_mode_row.pack_forget()
+        if self.system_key.get() == "gamecube":
+            self.gamecube_mode_row.pack(fill="x", pady=(0, 6))
+            self.system_description.configure(
+                text="Nintendo GameCube · Built-in software test"
+                if self.uses_embedded_emulator() else
+                "Nintendo GameCube · Dolphin fallback"
+            )
+        else:
+            self.gamecube_mode_row.pack_forget()
         if self.uses_embedded_emulator():
             self.arm_button.configure(state="normal", text="Enable object controls")
             self.shortcuts_button.configure(state="normal")
