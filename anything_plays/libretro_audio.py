@@ -41,6 +41,9 @@ class AudioSink:
         self.output_active = False
         self.source_sample_rate = None
         self.output_sample_rate = None
+        # UI gain applies only to Anything Plays' own stereo PortAudio
+        # callback. Start at a comfortable 35%, never modify system volume.
+        self._volume = 0.35
         self._resample_step = None
         self._resample_next = 0.0
         self._resample_consumed = 0
@@ -155,6 +158,16 @@ class AudioSink:
             self.push(samples.reshape(-1, 2))
         return count
 
+    def set_volume(self, level):
+        """Bounded output gain, read atomically by the audio callback."""
+        try:
+            gain = float(level)
+        except (TypeError, ValueError, OverflowError):
+            gain = 0.35
+        if not np.isfinite(gain):
+            gain = 0.35
+        self._volume = max(0.0, min(1.0, gain))
+
     def callback(self, outdata, frames, time_info, status):
         """Fill every output frame, including silence during underruns."""
         outdata.fill(0)
@@ -167,9 +180,20 @@ class AudioSink:
                     break
                 self.position = 0
             count = min(frames - written, len(self.pending) - self.position)
-            outdata[written:written + count] = self.pending[
-                self.position:self.position + count
-            ]
+            gain = self._volume
+            if gain >= 1.0:
+                outdata[written:written + count] = self.pending[
+                    self.position:self.position + count
+                ]
+            elif gain > 0.0:
+                # Scale only the current bounded block; never resample again
+                # or risk uint/int16 overflow when applying the gain.
+                output = self.pending[self.position:self.position + count]
+                outdata[written:written + count] = np.rint(
+                    output.astype(np.float32) * gain
+                ).astype(np.int16)
+            # Mute leaves the already-zeroed output untouched, but the
+            # queue is still consumed so unmuting never replays old audio.
             written += count
             self.position += count
 
