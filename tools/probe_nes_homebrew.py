@@ -88,7 +88,11 @@ def _child(rom, core, seconds, report):
         if emu.frame_serial == before:
             return
         frames += 1
-        if frames % 10 != 1:
+        # The original ROM intentionally alternates palette colors every
+        # frame. Sampling only every 10th frame is an even-period alias and
+        # always sees the same phase, falsely reporting a frozen screen.
+        # Inspect every startup frame, then use an odd stride.
+        if frames > 48 and frames % 11 != 1:
             return
         with emu.lock:
             frame = emu.frame
