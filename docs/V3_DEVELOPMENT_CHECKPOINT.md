@@ -161,3 +161,56 @@ experimental CPU-only GameCube renderer.
    simply to mark 3.0 ready.
 4. Stable `main` / public 2.0 remain untouched; do not ask the user to test
    until all intended console profiles and full package requirements are met.
+
+
+## Continuation log — November 7, 2026: native NGP controls and cartridge saves
+
+**Starting revision:** `77d33419f1cd6efd6f7a454e7b96d36396d74ca3`.
+The emulator-verification workflow `42385104431` had **80 completed
+successful jobs and eight queued Neo Geo Pocket / Color jobs** before a
+new push caused GitHub Actions concurrency cancellation. The eight jobs
+had **no success evidence**. Do not count them as passed; new runs must
+be inspected by job ID, even if `continue-on-error` makes the overall
+workflow green.
+
+**Engineering changes on this same 3.0 branch:**
+
+- `3040b5c`: the NeoPop native playback probe now actuates a manually
+  held A button with camera controls disarmed, then camera-pulses B with
+  camera controls armed, repeatedly. It measures *nonzero input values
+  actually queried by the native Libretro core* and gates RGB+PCM success
+  on both paths. A thread-local native serialize/unserialize/serialize
+  roundtrip is separately reported, limited to 64 MiB. This diagnostic
+  does **not** certify any commercial game's in-game saves.
+- `3cf3b3f`: regression tests cover native input gate presence and
+  serialize/unserialize diagnostic behavior.
+- **Important upstream discovery:** Beetle NeoPop returns `NULL` and
+  zero for `RETRO_MEMORY_SAVE_RAM` (only `RETRO_MEMORY_SYSTEM_RAM`
+  is exposed). Actual cartridge saves use `<rom-stem>.flash` under
+  `RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY`, written by the core itself.
+  See pinned upstream behavior:
+  [libretro.c](https://github.com/libretro/beetle-ngp-libretro/blob/master/libretro.c)
+  and [system.c](https://github.com/libretro/beetle-ngp-libretro/blob/master/mednafen/ngp/system.c).
+  Existing generic `SaveRAM` alone cannot preserve this flash.
+- `49dac30` and `4b9a63c`: added a writable, user-owned, per-ROM
+  Neo Geo Pocket flash directory with a collision-resistant path hash
+  and passed its actual directory pointer to Libretro
+  `GET_SAVE_DIRECTORY`. Two identically named games from different
+  folders no longer point to the same `.flash` file. GameCube and other
+  platforms retain their prior save-directory routing.
+- `ef7abac`: tested distinct save directories and native Libretro
+  environment pointer routing for both NGP and NGPC. The source tests
+  do not establish a real cartridge committing and reloading flash.
+
+**Next verified action:** inspect the *latest* workflow head and all eight
+Neo Geo Pocket native jobs after the final documentation change; review
+their actual video, nonzero PCM, manual A and camera B values. If any fail,
+read the job log and make a specific code correction. Then add a legally
+distributable homebrew fixture that **writes flash and reads it after a
+full core unload/reload**. Save-state roundtrip and path-unit tests alone
+do not meet that persistent-flash release gate.
+
+**Unchanged blockers:** GameCube Intel Mac performance, real Windows GPU,
+real commercial-game compatibility, clean-install physical input/audio,
+extended real-hardware soak, legal/source review, signing and installed
+package acceptance. The original 2.0 release and `main` remain untouched.
