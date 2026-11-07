@@ -17,6 +17,10 @@ import threading
 import time
 
 from anything_plays.core_locator import find_core
+from anything_plays.gamecube_software import (
+    DolphinSoftwareOptions, find_dolphin_core,
+    packaged_dolphin_system_directory,
+)
 from anything_plays.libretro_abi import (
     AUDIO, AUDIO_BATCH, AVInfo, CoreInfo, ENV, GameInfo, INPUT_POLL,
     INPUT_STATE, VIDEO,
@@ -25,7 +29,7 @@ from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
 from anything_plays.libretro_save import SaveRAM
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
-from anything_plays.libretro_video import SUPPORTED_FORMATS, decode_frame
+from anything_plays.libretro_video import SUPPORTED_FORMATS, XRGB8888, decode_frame
 from anything_plays.systems import SYSTEMS
 
 
@@ -110,16 +114,34 @@ class CoreSession:
         self.core_path = core_path
         self.native = None
         self.audio = AudioSink()
-        self.pixel_format = 0  # Libretro defaults to RGB1555.
-        self._software_options = SoftwareN64Options() if system == "n64" else None
+        # Dolphin's SWGfx emits four-byte pixels but does not explicitly
+        # request Libretro pixel format; default to XRGB8888 for that core.
+        # Other consoles retain the Libretro RGB1555 default.
+        self.pixel_format = XRGB8888 if system == "gamecube" else 0
+        self._software_options = (
+            SoftwareN64Options() if system == "n64" else
+            DolphinSoftwareOptions() if system == "gamecube" else None
+        )
         self.save_ram = None
         self._rom_buffers = []
         self._rom_path_bytes = os.fsencode(str(self.rom))
         self._system_dir_buffer = self._make_system_directory()
+        # Save files are separate from the bundled, read-only Dolphin Sys
+        # assets. The alpha never writes into its installed emulator folder.
+        save_folder = (Path.home() / ".config" / "anything-plays-21-test" /
+                       "gamecube-saves")
+        if system == "gamecube":
+            save_folder.mkdir(parents=True, exist_ok=True)
+        self._save_dir_buffer = C.create_string_buffer(
+            os.fsencode(str(save_folder))
+        )
 
-    @staticmethod
-    def _make_system_directory():
-        if sys.platform == "darwin":
+    def _make_system_directory(self):
+        if self.system == "gamecube":
+            # Abort before loading a core if the one-click installer omitted
+            # Dolphin's mandatory game-compatibility system files.
+            folder = packaged_dolphin_system_directory(self.core_path)
+        elif sys.platform == "darwin":
             folder = Path.home() / "Library" / "Application Support" / "AnythingPlays"
         else:
             folder = Path.home() / ".config" / "anything-plays"
@@ -139,8 +161,10 @@ class CoreSession:
             self.pixel_format = requested
             return True
         if command in (9, 31) and data:  # GET_SYSTEM_DIRECTORY / GET_SAVE_DIRECTORY
+            folder = (self._save_dir_buffer if self.system == "gamecube"
+                      and command == 31 else self._system_dir_buffer)
             C.cast(data, C.POINTER(C.c_char_p))[0] = C.cast(
-                self._system_dir_buffer, C.c_char_p
+                folder, C.c_char_p
             )
             return True
         if command == 3 and data:  # GET_CAN_DUPE: repeat the previous frame.
@@ -300,6 +324,8 @@ class Emulator:
         # the experimental in-panel software renderer requires ParaLLEl-N64.
         if self.system == "n64":
             return find_parallel_n64_core()
+        if self.system == "gamecube":
+            return find_dolphin_core()
         return find_core(self.system)
 
     def start(self, rom):
