@@ -120,7 +120,15 @@ jobs:
     # Generated 65816 LoROM and SPC IPL test tone, no copied game content.
     # Must produce nonblank changing pixels AND native Snes9x DSP samples.
     continue-on-error: true
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 14
     env:
       AP_V30_TEST_CORES: '1'
@@ -129,20 +137,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install native graphics and PCM test requirements
+      - name: Install Linux native graphics and audio requirements
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install test Python requirements
+        run: python -m pip install -r requirements.txt
       - name: Retrieve Snes9x Libretro candidate for test, not installed game
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('snes9x')"
       - name: Require original SNES mode-0 RGB and nonzero SPC DSP PCM
         run: |
-          python tools/probe_snes_homebrew.py --core cores/snes9x_libretro.so --seconds 8 --report test-evidence/snes-original-ppu-spc.json
+          python tools/probe_snes_homebrew.py --core cores/snes9x_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/snes-original-ppu-spc-${{ matrix.target }}.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-SNES-native-PPU-SPC-evidence
+          name: AnythingPlays-3.0-original-SNES-native-PPU-SPC-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
