@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "policy": "Do not release or request broad end-user testing until all eight consoles work inside one packaged app with no other emulator installation.",
+  "systems": {
+    "gb": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "gbc": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "gba": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "snes": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "nes": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "genesis": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false
+    },
+    "n64": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "notes": "Experimental bundled software renderer exists; real in-panel gameplay not verified."
+    },
+    "gamecube": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "Dolphin remains external. A controller pipe alone does not meet the requirement."
+    }
+  },
+  "platform_validation": {
+    "windows-x64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false
+    },
+    "macos-arm64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false
+    },
+    "macos-x86_64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false
+    },
+    "linux-x64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false
+    }
+  },
+  "required_release_evidence": {
+    "third_party_license_audit_complete": false,
+    "no_external_emulator_setup_required": false,
+    "packaged_binary_integrity_verified": true
+  }
+}
