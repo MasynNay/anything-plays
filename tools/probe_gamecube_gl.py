@@ -161,7 +161,11 @@ class GLCoreSession(GameCubeHardwareSession):
             # CoreSession.run closes/unloads the native core while this EGL
             # context is still current; only then is its FBO destroyed.
             try:
-                super().run()
+                # The diagnostic owns its EGL context and GPU probe hooks.
+                # Call only the neutral Libretro loop here: invoking the
+                # production GameCubeHardwareSession.run() would accidentally
+                # allocate a *second* EGL context and break FBO ownership.
+                CoreSession.run(self)
             finally:
                 self.hardware = None
 
