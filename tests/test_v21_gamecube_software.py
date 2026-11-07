@@ -1,6 +1,8 @@
 """GameCube integrated software renderer tests; no ROM or GPU required."""
 import ctypes as C
 import gc
+import os
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch, call
@@ -144,7 +146,21 @@ class DolphinInPanelTests(unittest.TestCase):
             save_path = C.c_char_p()
             self.assertTrue(session.environment(9, C.addressof(system_path)))
             self.assertTrue(session.environment(31, C.addressof(save_path)))
-            self.assertEqual(Path(system_path.value.decode()), core.parent)
+            system_root = Path(system_path.value.decode())
+            if sys.platform.startswith("linux"):
+                # Installed Linux /opt cores are immutable: Dolphin gets a
+                # private writable Sys copy, never the bundled directory.
+                self.assertNotEqual(system_root, core.parent)
+                self.assertEqual(
+                    (system_root / "dolphin-emu/Sys/codehandler.bin").read_bytes(),
+                    b"synthetic",
+                )
+                self.assertTrue(os.access(
+                    system_root / "dolphin-emu/Sys/codehandler.bin", os.W_OK))
+                self.assertEqual((sysdir / "codehandler.bin").read_bytes(),
+                                 b"synthetic")
+            else:
+                self.assertEqual(system_root, core.parent)
             self.assertNotEqual(system_path.value, save_path.value)
             self.assertTrue(Path(save_path.value.decode()).is_dir())
 
