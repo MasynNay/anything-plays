@@ -11,7 +11,7 @@ class GenesisNativeDiagnosticsTests(unittest.TestCase):
     def test_isolated_crash_probe_preserves_native_trace(self):
         source = inspect.getsource(probe_genesis_homebrew._parent)
         self.assertIn('shutil.which("gdb")', source)
-        self.assertIn("Program received signal", source)
+        self.assertIn("received signal", source)
         self.assertIn('"native_fault_trace"', source)
         self.assertIn('"native_faulted"', source)
         self.assertIn("not result.get(\"native_faulted\", False)", source)

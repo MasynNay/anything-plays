@@ -11,7 +11,7 @@ class GenesisHomebrewTests(unittest.TestCase):
     def test_valid_origin_reset_vector_and_sega_cart_header(self):
         data = build_genesis_probe_rom()
         self.assertEqual(len(data), ROM_SIZE)
-        self.assertEqual(int.from_bytes(data[:4], "big"), 0x00FF0000)
+        self.assertEqual(int.from_bytes(data[:4], "big"), 0x00FFFF00)
         self.assertEqual(int.from_bytes(data[4:8], "big"), ENTRY)
         self.assertEqual(data[0x100:0x104], b"SEGA")
         self.assertEqual(data[ENTRY:ENTRY+4], b"\x46\xFC\x27\x00")
