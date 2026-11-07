@@ -139,7 +139,13 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.mute_button_text = tk.StringVar(
             value="Unmute" if int(saved_volume) == 0 else "Mute"
         )
-        self._volume_before_mute = max(1, int(saved_volume))
+        previous_audible = preferences.get("last_nonzero_volume", 35)
+        if (type(previous_audible) not in (int, float)
+                or not 1 <= previous_audible <= 100):
+            previous_audible = 35
+        self._volume_before_mute = (
+            int(saved_volume) if saved_volume > 0 else int(previous_audible)
+        )
         self.emu.set_volume(int(saved_volume) / 100.0)
         self.mapping_vars = {}
         self.zone_font_size = tk.IntVar(value=44)
