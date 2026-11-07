@@ -74,7 +74,40 @@ Description: Anything Plays camera-controlled multi-system gaming studio
 CONTROL
 cat > "$PKG/usr/bin/anything-plays-30-preview" <<'LAUNCH'
 #!/bin/sh
-exec /opt/anything-plays-30-preview/AnythingPlays "$@"
+# Linux desktop launchers otherwise swallow Python/native startup tracebacks.
+# Preserve a private, bounded log and show a visible error when the app exits
+# before creating a window. No sudo, user-file deletion, or /opt modification.
+umask 077
+state_base="${XDG_STATE_HOME:-${HOME:-}/.local/state}"
+case "$state_base" in /*) ;; *) state_base="${HOME:-/tmp}/.local/state" ;; esac
+state_dir="$state_base/anything-plays-preview"
+if ! mkdir -p "$state_dir" 2>/dev/null; then
+  echo "Anything Plays cannot create diagnostic directory: $state_dir" >&2
+  exec /opt/anything-plays-30-preview/AnythingPlays "$@"
+fi
+log="$state_dir/startup.log"
+if [ -f "$log" ] && [ "$(wc -c < "$log")" -gt 262144 ]; then
+  tail -c 131072 "$log" > "$log.trimmed" 2>/dev/null && mv -f "$log.trimmed" "$log"
+fi
+printf '\n== Preview launch %s ==\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "$log"
+/opt/anything-plays-30-preview/AnythingPlays "$@" >> "$log" 2>&1
+status=$?
+if [ "$status" -ne 0 ]; then
+  error="Anything Plays 3.0 could not open (exit $status).
+The startup log was saved to:
+$log
+
+Your settings, saved games and ROMs were not deleted."
+  printf '%s\n' "$error" >&2
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --error --title="Anything Plays startup error" --text="$error" 2>/dev/null || :
+  elif command -v kdialog >/dev/null 2>&1; then
+    kdialog --error "$error" --title "Anything Plays startup error" 2>/dev/null || :
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send "Anything Plays startup failed" "See $log" 2>/dev/null || :
+  fi
+fi
+exit "$status"
 LAUNCH
 chmod +x "$PKG/usr/bin/anything-plays-30-preview"
 cat > "$PKG/usr/share/applications/anything-plays-preview.desktop" <<'DESKTOP'
