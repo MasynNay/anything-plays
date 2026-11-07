@@ -29,7 +29,9 @@ from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
 from anything_plays.libretro_save import SaveRAM
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
-from anything_plays.libretro_video import SUPPORTED_FORMATS, XRGB8888, decode_frame
+from anything_plays.libretro_video import (
+    SUPPORTED_FORMATS, SOFTWARE_RGBA8888, decode_frame,
+)
 from anything_plays.systems import SYSTEMS
 
 
@@ -114,10 +116,10 @@ class CoreSession:
         self.core_path = core_path
         self.native = None
         self.audio = AudioSink()
-        # Dolphin's SWGfx emits four-byte pixels but does not explicitly
-        # request Libretro pixel format; default to XRGB8888 for that core.
-        # Other consoles retain the Libretro RGB1555 default.
-        self.pixel_format = XRGB8888 if system == "gamecube" else 0
+        # Dolphin SWGfx hands us the CPU-owned RGBA8 texture directly:
+        # unlike standard Libretro XRGB8888, the byte order is R,G,B,A.
+        # Other consoles retain Libretro's RGB1555 default.
+        self.pixel_format = SOFTWARE_RGBA8888 if system == "gamecube" else 0
         self._software_options = (
             SoftwareN64Options() if system == "n64" else
             DolphinSoftwareOptions() if system == "gamecube" else None
