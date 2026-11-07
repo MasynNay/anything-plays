@@ -37,10 +37,12 @@ keyboard. A webcam is optional for manual play.
 
 > **2.1 testing branch:** The test installer adds bolder camera zones,
 > configurable display modes, custom shortcuts and bundled NES/Genesis cores.
-> **Nintendo 64 now has an experimental in-panel software renderer** using
-> the bundled ParaLLEl-N64 test core and Angrylion; the external RetroArch
-> backend remains available as a fallback. GameCube is **not yet bundled or
-> embedded**, and currently requires Dolphin. Read the
+> **Nintendo 64 and GameCube have experimental in-panel software rendering.**
+> ParaLLEl-N64/Angrylion and Dolphin Libretro (plus its required Sys data)
+> are bundled into 2.1 test installers at build time, not downloaded by users.
+> The old external launchers remain developer-only fallbacks. Neither 3D
+> backend has completed real-game speed, save, camera or stability validation.
+> Read the
 > [2.1 testing guide](docs/V2_1_TESTING.md) for what works and what still
 > needs hardware validation. This branch is not a 2.1 public release;
 > the published 2.0 build remains unchanged.
@@ -65,7 +67,7 @@ keyboard. A webcam is optional for manual play.
 | Nintendo Entertainment System | `.nes`, `.unf`, `.unif` | FCEUmm (native test core) |
 | Sega Genesis / Mega Drive | `.md`, `.gen`, `.smd`, `.bin` | Genesis Plus GX (native test core) |
 | Nintendo 64 | `.n64`, `.z64`, `.v64` | Bundled ParaLLEl-N64 Angrylion (experimental in-panel); optional external RetroArch fallback |
-| Nintendo GameCube | `.iso`, `.gcm`, `.rvz`, `.gcz`, `.ciso` | Installed Dolphin (external) |
+| Nintendo GameCube | `.iso`, `.gcm`, `.rvz`, `.gcz`, `.ciso` | Bundled Dolphin Libretro (experimental software-rendered in-panel); optional external developer fallback |
 
 The console selector chooses the matching emulator automatically. GB, GBC and GBA
 share the mGBA core while retaining independent game libraries and controls.
