@@ -556,7 +556,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V21_CORE_PACK_BUILD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

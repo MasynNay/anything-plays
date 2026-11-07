@@ -34,6 +34,12 @@ OPTIONAL_V21_CORES = (
 
 
 def core_names_for_build():
+    # Optional downloadable cores are packaged separately. Never fetch
+    # Dolphin here: it depends on system assets and failed gameplay QA.
+    if os.environ.get("AP_V21_CORE_PACK_BUILD", "") == "1":
+        if os.environ.get("AP_RELEASE_BUILD") == "1":
+            raise ValueError("Unreviewed optional packs cannot enter v2.0 release")
+        return ("snes9x", *(name for name in OPTIONAL_V21_CORES if name != "dolphin"))
     # On 2.1 only, the starter installer ships mGBA for GB/GBC/GBA.
     # Unset: stable v2.0's two-core build remains unchanged.
     if os.environ.get("AP_V21_MINIMAL_CORE_BUILD", "") == "1":

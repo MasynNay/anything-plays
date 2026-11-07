@@ -126,6 +126,18 @@ class UnifiedV21Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'not an approved v2.0'):
                 core_names_for_build()
 
+    def test_candidate_pack_build_omits_bundled_mgba_and_unverified_dolphin(self):
+        with patch.dict(os.environ, {
+            'AP_V21_TEST_CORES': '1',
+            'AP_V21_CORE_PACK_BUILD': '1',
+            'AP_RELEASE_BUILD': '0',
+        }):
+            cores = core_names_for_build()
+        self.assertNotIn('mgba', cores)
+        self.assertNotIn('dolphin', cores)
+        self.assertIn('snes9x', cores)
+        self.assertEqual(len(cores), 9)
+
     def test_camera_overlay_font_is_reused_between_frames(self):
         cached_zone_font.cache_clear()
         first = cached_zone_font(46)

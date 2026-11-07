@@ -21,10 +21,12 @@ fi
 # The DEB depends on OS libportaudio2. Do not redistribute frozen copies of
 # PortAudio, JACK, ALSA, Berkeley DB, or the unused GPL Readline extension.
 python3 tools/prune_linux_system_libs.py dist/AnythingPlays
-# All emulator cores are required and shipped inside the installed application.
+# A 2.1 starter installer ships only mGBA; other cores are approved in-app downloads.
 mkdir -p dist/AnythingPlays/cores
 CORE_LIST=(mgba snes9x)
-if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V21_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
+  CORE_LIST=(mgba)
+elif [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
 for name in "${CORE_LIST[@]}"; do
