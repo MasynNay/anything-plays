@@ -59,7 +59,7 @@ def _flash_entries(folder):
     return result
 
 
-def child(phase, core, rom, report, timeout):
+def child(phase, core, rom, report, timeout, mode="flash"):
     import faulthandler
     faulthandler.enable(all_threads=True)
     from anything_plays.gba_emulator import CoreSession, Emulator
@@ -71,13 +71,29 @@ def child(phase, core, rom, report, timeout):
     session = CoreSession(emulator, "ngpc", rom, str(core))
     # Prove raw cartridge flash without allowing the new last-session
     # recovery layer to conceal a native core flash-load failure.
-    session.enable_state_resume = False
+    if mode == "flash":
+        session.enable_state_resume = False
     session.audio.close()
     session.audio = ObservedAudio()
 
     # A fresh session and a real cartridge are mandatory. Do not synthesize
     # any images, state, or battery backup data for this experiment.
-    sequence = COMMON_SEQUENCE + (MODIFY_SEQUENCE if phase == "modified" else ())
+    if mode == "state":
+        # State experiment: stop while Options is still visible, never exit
+        # the menu to flush cartridge flash. The following fresh process
+        # must recover the changed screen from an actual native save-state.
+        sequence = (
+            COMMON_SEQUENCE + ((230, "Right"),)
+            if phase == "modified" else ()
+        )
+        snapshot_after = 255 if phase == "modified" else 25
+        stop_after = 285 if phase == "modified" else 100
+    else:
+        sequence = COMMON_SEQUENCE + (
+            MODIFY_SEQUENCE if phase == "modified" else ()
+        )
+        snapshot_after = SNAPSHOT_FRAME
+        stop_after = STOP_FRAME
     input_actions = {
         number: (button, True) for number, button in sequence
     }
@@ -111,7 +127,7 @@ def child(phase, core, rom, report, timeout):
             emulator.set_manual(*action)
         # Camera is deliberately disarmed, manual input must still function.
         original_before(False)
-        if count >= STOP_FRAME:
+        if count >= stop_after:
             emulator.stop_event.set()
 
     def observe_video(pointer, width, height, pitch):
@@ -121,7 +137,7 @@ def child(phase, core, rom, report, timeout):
         if emulator.frame_serial == previous:
             return
         frames += 1
-        if count >= SNAPSHOT_FRAME and snapshot is None:
+        if count >= snapshot_after and snapshot is None:
             with emulator.lock:
                 picture = emulator.frame
                 if picture is None:
@@ -154,7 +170,8 @@ def child(phase, core, rom, report, timeout):
     save_dir = Path(os.fsdecode(session._save_dir_buffer.value))
     data = {
         "phase": phase,
-        "success": error is None and count >= STOP_FRAME and snapshot is not None,
+        "mode": mode,
+        "success": error is None and count >= stop_after and snapshot is not None,
         "elapsed_seconds": round(time.monotonic() - elapsed_start, 2),
         "emulated_frames": count,
         "actual_video_callbacks": frames,
@@ -165,6 +182,11 @@ def child(phase, core, rom, report, timeout):
         "native_nonzero_input_polls": nonzero_poll_count,
         "real_pcm_nonzero_values": session.audio.nonzero,
         "flash_files_after_unload": _flash_entries(save_dir),
+        "native_state_resume_applied": bool(emulator.resume_info),
+        "checkpoint_file_created": bool(
+            session.recovery_state is not None
+            and session.recovery_state.path.is_file()
+        ),
         "error": error,
     }
     report.parent.mkdir(parents=True, exist_ok=True)
@@ -173,9 +195,12 @@ def child(phase, core, rom, report, timeout):
     return 0 if data["success"] else 1
 
 
-def parent(core, report, timeout):
+def parent(core, report, timeout, mode="flash"):
     outcome = {
-        "passed": False, "experiment": "actual StarGunner cartridge flash",
+        "passed": False, "experiment": (
+            "actual StarGunner native-state cold-resume"
+            if mode == "state" else "actual StarGunner cartridge flash"
+        ),
         "source": "immutable MIT-licensed CI-only homebrew",
         "phases": {}, "fixture": None, "error": None,
         "physical_device_save_tested": False,
@@ -200,11 +225,15 @@ def parent(core, report, timeout):
                 "XDG_DATA_HOME": str(root / "user-data"),
             })
             (root / "home").mkdir()
-            for phase in ("baseline", "modified", "restored"):
+            phases = (
+                ("modified", "restored") if mode == "state"
+                else ("baseline", "modified", "restored")
+            )
+            for phase in phases:
                 phase_report = root / (phase + ".json")
                 command = [
                     sys.executable, str(Path(__file__).resolve()),
-                    "--child", "--phase", phase,
+                    "--child", "--phase", phase, "--mode", mode,
                     "--core", str(core), "--rom", str(rom),
                     "--report", str(phase_report),
                     "--seconds", str(timeout),
@@ -228,31 +257,55 @@ def parent(core, report, timeout):
                     "log_tail": output,
                 }
                 if exit_code != 0 or not details or not details["success"]:
-                    raise RuntimeError(f"Native flash phase {phase} failed")
+                    raise RuntimeError(f"Native {mode} phase {phase} failed")
 
-            baseline = outcome["phases"]["baseline"]["details"]
             changed = outcome["phases"]["modified"]["details"]
             restored = outcome["phases"]["restored"]["details"]
-            # Nonzero input and a modified number must be real pixel evidence.
-            visual_change = (
+            if mode == "state":
+                # A new Libretro process must receive the previous in-game
+                # state: raw flash is deliberately never written here.
+                outcome["actual_state_resume_applied"] = (
+                    restored["native_state_resume_applied"]
+                    and changed["checkpoint_file_created"]
+                    and restored["checkpoint_file_created"]
+                )
+                outcome["native_options_number_restored"] = (
+                    changed["number_roi_sha256"]
+                    == restored["number_roi_sha256"]
+                )
+                outcome["flash_was_not_used_to_restore"] = (
+                    not changed["flash_files_after_unload"]
+                    and not restored["flash_files_after_unload"]
+                )
+                outcome["passed"] = (
+                    outcome["actual_state_resume_applied"]
+                    and outcome["native_options_number_restored"]
+                    and outcome["flash_was_not_used_to_restore"]
+                    and changed["native_nonzero_input_polls"] > 0
+                    and restored["native_input_polls"] > 100
+                )
+            else:
+                baseline = outcome["phases"]["baseline"]["details"]
+                # Nonzero input and a modified number must be real pixel evidence.
+                visual_change = (
                 baseline["number_roi_sha256"] != changed["number_roi_sha256"]
                 and changed["number_roi_sha256"] == restored["number_roi_sha256"]
             )
-            prior_flash = changed["flash_files_after_unload"]
-            restored_flash = restored["flash_files_after_unload"]
-            flash_exists = (
-                bool(prior_flash)
-                and any(x["bytes"] > 0 and x["sha256"] is not None
-                        for x in prior_flash)
-                and prior_flash == restored_flash
-            )
-            outcome["actual_options_pixel_change_verified"] = visual_change
-            outcome["actual_flash_file_survives_relaunch"] = flash_exists
-            outcome["passed"] = (
-                visual_change and flash_exists
-                and changed["native_nonzero_input_polls"] > 0
-                and restored["native_input_polls"] > 100
-            )
+                prior_flash = changed["flash_files_after_unload"]
+                restored_flash = restored["flash_files_after_unload"]
+                flash_exists = (
+                    bool(prior_flash)
+                    and any(x["bytes"] > 0 and x["sha256"] is not None
+                            for x in prior_flash)
+                    and prior_flash == restored_flash
+                )
+                outcome["actual_options_pixel_change_verified"] = visual_change
+                outcome["actual_flash_file_survives_relaunch"] = flash_exists
+                outcome["passed"] = (
+                    visual_change and flash_exists
+                    and changed["native_nonzero_input_polls"] > 0
+                    and restored["native_input_polls"] > 100
+                )
     except Exception as exc:
         outcome["error"] = f"{type(exc).__name__}: {exc}"
     finally:
@@ -269,6 +322,7 @@ def main():
     parser.add_argument("--seconds", type=int, default=12)
     parser.add_argument("--rom", type=Path)
     parser.add_argument("--phase", choices=("baseline", "modified", "restored"))
+    parser.add_argument("--mode", choices=("flash", "state"), default="flash")
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args()
     if not 8 <= args.seconds <= 35:
@@ -277,8 +331,9 @@ def main():
         if args.rom is None or args.phase is None:
             parser.error("Child requires --rom and --phase")
         return child(args.phase, args.core.resolve(), args.rom.resolve(),
-                     args.report.resolve(), args.seconds)
-    return parent(args.core.resolve(), args.report.resolve(), args.seconds)
+                     args.report.resolve(), args.seconds, mode=args.mode)
+    return parent(args.core.resolve(), args.report.resolve(), args.seconds,
+                  mode=args.mode)
 
 
 if __name__ == "__main__":
