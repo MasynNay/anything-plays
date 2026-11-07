@@ -71,14 +71,24 @@ class ThemeMixin:
         self.root.configure(bg=outer)
         style = ttk.Style(self.root)
         style.theme_use('clam')
-        style.configure('.', background=surface, foreground=text, font=('DejaVu Sans', 10))
+        style.configure('.', background=surface, foreground=text, font=('DejaVu Sans', 11))
         style.configure('TFrame', background=surface)
         style.configure('TLabel', background=surface, foreground=text)
+        # Intentional typographic hierarchy: section titles, readable values
+        # and short helpers instead of dozens of indistinguishable labels.
+        style.configure('Value.TLabel', background=surface, foreground=text,
+                        font=('DejaVu Sans', 11, 'bold'))
+        style.configure('Helper.TLabel', background=surface, foreground=text,
+                        font=('DejaVu Sans', 10))
+        style.configure('Primary.TCheckbutton', background=surface,
+                        foreground=text, font=('DejaVu Sans', 11, 'bold'),
+                        padding=(2, 5))
+        style.map('Primary.TCheckbutton', background=[('active', surface)])
         style.configure('Title.TLabel', background=surface, foreground=text, font=('DejaVu Sans', 22, 'bold'))
         style.configure('Subtitle.TLabel', background=surface, foreground=text)
         style.configure('TLabelframe', background=surface, bordercolor=accent, relief='solid')
         style.configure('TLabelframe.Label', background=surface, foreground=accent, font=('DejaVu Sans', 11, 'bold'))
-        for key, padding, font_size in [('TButton', (12, 9), 10), ('Compact.TButton', (7, 6), 9)]:
+        for key, padding, font_size in [('TButton', (12, 9), 11), ('Compact.TButton', (9, 7), 10)]:
             style.configure(key, background=button, foreground=text, borderwidth=0, padding=padding,
                             font=('DejaVu Sans', font_size, 'bold'))
             style.map(key, background=[('active', accent)], foreground=[('disabled', text)])
