@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.ngp_mit_fixtures import fetch_test_fixture
+from anything_plays.neopop_flash import inspect_neopop_flash, InvalidNeoPopFlash
 
 # Frame-indexed *physical* NGPC buttons using the production InputBuffer.
 # Screen shows CONTINUES (two digits) at x=15 tiles, y=6 tiles, 8x8 each.
@@ -48,14 +49,25 @@ def _flash_entries(folder):
         if item.is_symlink() or not item.is_file():
             continue
         size = item.stat().st_size
-        result.append({
+        entry = {
             "name": item.name,
             "bytes": size,
             "sha256": (
                 hashlib.sha256(item.read_bytes()).hexdigest()
                 if 0 < size <= 8 * 1024 * 1024 else None
             ),
-        })
+            "format": None,
+            "format_error": None,
+        }
+        try:
+            # The known 272-byte StarGunner output may represent just ONE
+            # 256-byte flash block, while the game uses 512-byte records.
+            # Measure addresses and byte lengths instead of guessing why
+            # a valid-looking flash file failed to restore its setting.
+            entry["format"] = inspect_neopop_flash(item)
+        except InvalidNeoPopFlash as exc:
+            entry["format_error"] = str(exc)
+        result.append(entry)
     return result
 
 
