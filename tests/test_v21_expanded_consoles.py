@@ -34,6 +34,20 @@ class ExpandedConsoleInventory(unittest.TestCase):
                 self.assertEqual(item.backend, "libretro")
             self.assertTrue(item.extensions)
 
+    def test_normal_app_never_requires_external_retroarch_core_folders(self):
+        from unittest.mock import patch
+        from anything_plays.core_locator import _search_directories
+        with patch.dict("os.environ", {"AP_V21_DEVELOPER_EXTERNAL": "0"}):
+            paths = [str(path) for path in _search_directories()]
+            self.assertFalse(any("RetroArch" in path or "retroarch" in path
+                                 for path in paths))
+            self.assertFalse(any(path.startswith("/usr/lib/libretro") or
+                                 path.startswith("/usr/local/lib/libretro")
+                                 for path in paths))
+        with patch.dict("os.environ", {"AP_V21_DEVELOPER_EXTERNAL": "1"}):
+            paths = [str(path) for path in _search_directories()]
+            self.assertTrue(any("retroarch" in path.lower() for path in paths))
+
     def test_sega_reuses_same_core_without_separate_download(self):
         self.assertEqual(SYSTEMS["mastersystem"].extensions, (".sms", ".bms"))
         self.assertEqual(SYSTEMS["gamegear"].extensions, (".gg",))

@@ -188,9 +188,12 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
                         sha, item["integrity"]
                     )
             except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError):
-                item["status"] = (
-                    "offline" if item["integrity"] == "verified" else item["integrity"]
-                )
+                # Offline source checking must never make an already installed
+                # and verified core pack appear to have disappeared.
+                if item["status"] != "managed-release":
+                    item["status"] = (
+                        "offline" if item["integrity"] == "verified" else item["integrity"]
+                    )
             return item
 
         with ThreadPoolExecutor(max_workers=4) as pool:

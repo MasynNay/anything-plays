@@ -7,7 +7,7 @@
 
   Turn everyday movement into a controller for classic video games.
 
-  **Camera-powered play · Eight console families · Windows, macOS & Linux**
+  **Camera-powered play · 18 consoles in 2.1 alpha · Windows, macOS & Linux**
 
   [Releases](https://github.com/MasynNay/anything-plays/releases) ·
   [Get started](#get-started) ·
@@ -36,8 +36,13 @@ keyboard. A webcam is optional for manual play.
 > The app includes no game ROMs or BIOS files.
 
 > **2.1 testing branch:** The test installer adds bolder camera zones,
-> configurable display modes, custom shortcuts and bundled NES/Genesis cores.
-> **Nintendo 64 and GameCube have experimental in-panel software rendering.**
+> configurable display modes, custom shortcuts and **18 self-contained console
+> libraries powered by 11 bundled Libretro cores**. New additions include
+> Master System, Game Gear, SG-1000, Atari 2600/7800, TurboGrafx-16, Neo Geo
+> Pocket/Color and WonderSwan/Color. The 2.1 alpha also offers an in-app
+> **Check / Install approved emulator updates / Restore bundled** workflow,
+> without asking users to install or download another emulator.
+> **Nintendo 64 and GameCube retain experimental in-panel rendering.**
 > ParaLLEl-N64/Angrylion and Dolphin Libretro (plus its required Sys data)
 > are bundled into 2.1 test installers at build time, not downloaded by users.
 > The old external launchers remain developer-only fallbacks. Neither 3D
@@ -48,7 +53,7 @@ keyboard. A webcam is optional for manual play.
 > the published 2.0 build remains unchanged.
 
 > **2.1 release requirement:** No additional user downloads, emulator setup,
-> or separate game windows. All eight supported consoles must play within
+> or separate game windows. All 18 listed consoles must play within
 > Anything Plays using emulator components included in the installer. No public
 > release or broad user testing is requested until this is verified with actual
 > gameplay, webcam input, and clean installations on supported platforms.
@@ -58,23 +63,57 @@ keyboard. A webcam is optional for manual play.
 
 ## Supported consoles
 
-| Console | Accepted ROMs | Libretro core |
+The public 2.0 release remains unchanged. The **2.1 test branch** offers the
+following 18 in-app console libraries with native emulator binaries staged
+by its Windows, macOS and Linux installer builders. **Library availability
+is not the same as verified game compatibility.**
+
+| Console | Accepted ROMs | Bundled Libretro core |
 | :-- | :-- | :-- |
 | Game Boy | `.gb` | mGBA |
 | Game Boy Color | `.gbc` | mGBA |
 | Game Boy Advance | `.gba` | mGBA |
 | Super Nintendo | `.sfc`, `.smc` | Snes9x |
-| Nintendo Entertainment System | `.nes`, `.unf`, `.unif` | FCEUmm (native test core) |
-| Sega Genesis / Mega Drive | `.md`, `.gen`, `.smd`, `.bin` | Genesis Plus GX (native test core) |
-| Nintendo 64 | `.n64`, `.z64`, `.v64` | Bundled ParaLLEl-N64 Angrylion (experimental in-panel); optional external RetroArch fallback |
-| Nintendo GameCube | `.iso`, `.gcm`, `.rvz`, `.gcz`, `.ciso` | Bundled Dolphin Libretro (experimental software-rendered in-panel); optional external developer fallback |
+| Nintendo Entertainment System | `.nes`, `.unf`, `.unif` | FCEUmm |
+| Sega Genesis / Mega Drive | `.md`, `.gen`, `.smd`, `.mdx`, `.bin` | Genesis Plus GX |
+| Sega Master System | `.sms`, `.bms` | Genesis Plus GX |
+| Sega Game Gear | `.gg` | Genesis Plus GX |
+| Sega SG-1000 | `.sg` | Genesis Plus GX |
+| Atari 2600 | `.a26`, `.bin` | Stella 2014 |
+| Atari 7800 | `.a78` | ProSystem |
+| TurboGrafx-16 / PC Engine (HuCard) | `.pce` | Beetle PCE Fast |
+| Neo Geo Pocket | `.ngp`, `.npc` | Beetle NeoPop |
+| Neo Geo Pocket Color | `.ngc`, `.ngpc` | Beetle NeoPop |
+| WonderSwan | `.ws` | Beetle WonderSwan |
+| WonderSwan Color | `.wsc` | Beetle WonderSwan |
+| Nintendo 64 | `.n64`, `.z64`, `.v64` | ParaLLEl-N64 / Angrylion (experimental in-panel) |
+| Nintendo GameCube | `.iso`, `.gcm`, `.rvz`, `.gcz`, `.ciso`, `.dol`, `.elf`, `.tgc`, `.wia`, `.m3u` | Dolphin Libretro (experimental, **gameplay not ready**) |
 
 The console selector chooses the matching emulator automatically. GB, GBC and GBA
 share the mGBA core while retaining independent game libraries and controls.
 Native cores are downloaded and bundled **at build time** for packaged
 applications.
 **No commercial game ROMs or BIOS files are distributed.** You supply your own
-legally usable game files.
+legally usable game files. Platforms requiring optional licensed BIOS media
+(such as CD systems) are not presented as ready-to-play without it.
+
+### In-app emulator updates (2.1 alpha)
+
+**Check emulator updates** shows installed versions for the 11 *unique*
+native cores and checks upstream sources. **Install approved updates**
+downloads only reviewed, hash-verified core packs from official Anything
+Plays 2.1 releases, then activates them on your next game launch without
+closing the app. **Restore bundled** rolls back safely. No emulator is
+downloaded during normal application setup. There are **no approved
+independent update packs published yet**, so the install button will
+correctly show none available until release and platform review.
+
+Dolphin also requires matching `dolphin-emu/Sys` data. Its separate
+core-only updates are intentionally blocked: GameCube must receive a
+matched, vetted full application update until this dependency is solved.
+See [the updater design](docs/V2_1_CORE_UPDATES.md) and
+[18-console expansion](docs/V2_1_EXPANDED_CONSOLES.md).
+
 
 ## Features
 

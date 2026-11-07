@@ -141,6 +141,25 @@ class EmulatorUpdaterTests(unittest.TestCase):
             self.assertEqual(current["status"], "managed-release")
             self.assertEqual(current["installed_version"], "v2.1.0-alpha.2")
             self.assertEqual(current["upstream_revision"], SHA)
+            # Offline source checks cannot erase the fact that the active
+            # installed core is approved and hash verified.
+            def offline(*_args, **_kwargs):
+                raise OSError("Network unavailable")
+
+            with patch("anything_plays.core_packs.managed_core_path",
+                       return_value="/vetted/mgba_libretro.so"), patch(
+                "anything_plays.core_packs.managed_core_release",
+                return_value="v2.1.0-alpha.2"
+            ):
+                offline_report = check_emulator_updates(
+                    [tmp], opener=offline, online=True
+                )
+            offline_core = next(
+                item for item in offline_report["cores"]
+                if item["key"] == "mgba"
+            )
+            self.assertEqual(offline_core["status"], "managed-release")
+            self.assertEqual(offline_core["installed_version"], "v2.1.0-alpha.2")
 
     def test_tampered_bundle_is_reported_not_overwritten(self):
         with TemporaryDirectory() as tmp:

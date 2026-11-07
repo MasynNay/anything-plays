@@ -1,7 +1,7 @@
 # Anything Plays 2.1 — unified testing build
 
 This branch combines the requested features **in one engineering test version**.
-Do not request end-user testing or publish 2.1 until all eight consoles are
+Do not request end-user testing or publish 2.1 until all 18 listed consoles are
 playable inside the bundled application without third-party downloads.
 It does not modify the public [2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
 
@@ -97,6 +97,20 @@ startup, audio/video performance, camera latency, save and multi-hour runtime
 tests on the supported OSes. CPU rendering may be too slow; if so, a native
 in-panel GPU surface will be required. CI build success alone does not
 satisfy the release acceptance checklist.
+
+### Expanded 18-console libraries (2.1 alpha)
+
+The integrated selector now includes ten additional systems in their own
+ROM shelves: Master System, Game Gear, SG-1000, Atari 2600/7800,
+TurboGrafx-16 HuCard, Neo Geo Pocket/Color, and WonderSwan/Color.
+Genesis, Master System, Game Gear and SG-1000 share the already-bundled
+Genesis Plus GX library. In total, 18 console libraries map to 11 native
+cores. Separate external emulator installations are not required.
+
+See [expanded console notes](V2_1_EXPANDED_CONSOLES.md) and the strict
+[18-system acceptance gate](../config/v2.1-release-acceptance.json).
+These additional systems are **not** approved for public release until
+real-game/video/input/audio/save/platform checks pass.
 
 ### Emulator update checks
 

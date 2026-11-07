@@ -1,11 +1,12 @@
-"""Locate a native Libretro core for the user's OS and selected console.
+"""Locate verified updated or bundled Libretro cores for each console.
 
-Prefer bundled cores and explicitly installed RetroArch locations. Do not
-silently download a replacement at runtime: installed applications should work
-offline and never execute an unreviewed native binary from the network.
+Normal Anything Plays installations require NO external emulator or RetroArch
+core directories. External locations remain explicitly developer-only and
+can never be a hidden dependency of a release installer.
 """
 
 from pathlib import Path
+import os
 import sys
 
 from anything_plays.systems import SYSTEMS
@@ -28,19 +29,24 @@ def _search_directories():
         source / "cores",
         executable / "cores",
         frozen / "cores",
-        Path.home() / ".config" / "retroarch" / "cores",
-        Path("/usr/lib/libretro"),
-        Path("/usr/lib/x86_64-linux-gnu/libretro"),
-        Path("/usr/local/lib/libretro"),
     ]
     if sys.platform == "darwin":
         # Keep camera/Libretro payloads under Contents/Resources, where macOS
         # signing seals the files as resources without rewriting dylib hashes.
         folders.insert(0, executable.parent / "Resources" / "cores")
+    if os.environ.get("AP_V21_DEVELOPER_EXTERNAL") == "1":
+        # Explicit diagnostic opt-in only, never a user-facing prerequisite.
         folders.extend([
-            Path.home() / "Library/Application Support/RetroArch/cores",
-            Path("/Applications/RetroArch.app/Contents/Resources/cores"),
+            Path.home() / ".config" / "retroarch" / "cores",
+            Path("/usr/lib/libretro"),
+            Path("/usr/lib/x86_64-linux-gnu/libretro"),
+            Path("/usr/local/lib/libretro"),
         ])
+        if sys.platform == "darwin":
+            folders.extend([
+                Path.home() / "Library/Application Support/RetroArch/cores",
+                Path("/Applications/RetroArch.app/Contents/Resources/cores"),
+            ])
     return folders
 
 
