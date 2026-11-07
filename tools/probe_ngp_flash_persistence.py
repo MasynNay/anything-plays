@@ -288,9 +288,9 @@ def parent(core, report, timeout, mode="flash"):
                 baseline = outcome["phases"]["baseline"]["details"]
                 # Nonzero input and a modified number must be real pixel evidence.
                 visual_change = (
-                baseline["number_roi_sha256"] != changed["number_roi_sha256"]
-                and changed["number_roi_sha256"] == restored["number_roi_sha256"]
-            )
+                    baseline["number_roi_sha256"] != changed["number_roi_sha256"]
+                    and changed["number_roi_sha256"] == restored["number_roi_sha256"]
+                )
                 prior_flash = changed["flash_files_after_unload"]
                 restored_flash = restored["flash_files_after_unload"]
                 flash_exists = (
