@@ -360,14 +360,14 @@ jobs:
       - name: Install native Libretro dependencies
         run: |
           sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends gdb libgl1 libegl1 libglib2.0-0 libportaudio2
           python -m pip install -r requirements.txt
       - name: Retrieve actual Genesis Plus GX core for testing
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
       - name: Probe generated Genesis VDP frames and actual PSG PCM
         run: |
           mkdir -p test-evidence
-          python tools/probe_genesis_homebrew.py --core cores/genesis_plus_gx_libretro.so --report test-evidence/genesis-original-audio-video.json --seconds 8
+          python tools/probe_genesis_homebrew.py --debugger --core cores/genesis_plus_gx_libretro.so --report test-evidence/genesis-original-audio-video.json --seconds 8
       - uses: actions/upload-artifact@v4
         if: always()
         with:

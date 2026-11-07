@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -86,7 +87,7 @@ def _child(core, rom, seconds, report):
     return 0 if passed else 1
 
 
-def _parent(core, report, seconds):
+def _parent(core, report, seconds, *, debugger=False):
     result = {"system": "genesis", "passed": False, "timed_out": False,
               "native_exit_code": None, "details": None, "error": None}
     try:
@@ -105,6 +106,18 @@ def _parent(core, report, seconds):
                 "--core", str(core), "--rom", str(rom),
                 "--seconds", str(seconds), "--report", str(report_child)
             ]
+            if debugger:
+                gdb = shutil.which("gdb")
+                if gdb is None:
+                    raise RuntimeError("GNU debugger required for native Genesis crash diagnosis")
+                command = [
+                    gdb, "--batch", "--quiet",
+                    "-ex", "set pagination off",
+                    "-ex", "run",
+                    "-ex", "bt 24",
+                    "-ex", "info registers pc sp",
+                    "--args", *command,
+                ]
             try:
                 completed = subprocess.run(
                     command, stdout=subprocess.PIPE,
@@ -113,6 +126,14 @@ def _parent(core, report, seconds):
                 )
                 result["native_exit_code"] = completed.returncode
                 result["console_tail"] = completed.stdout[-14000:]
+                if debugger:
+                    # Preserve initial signal and native crashing thread even
+                    # when later debugger output exceeds the log tail.
+                    marker = completed.stdout.find("Program received signal")
+                    result["native_fault_trace"] = (
+                        completed.stdout[marker:marker + 9500]
+                        if marker >= 0 else completed.stdout[-9500:]
+                    )
             except subprocess.TimeoutExpired as exc:
                 result["timed_out"] = True
                 raw = exc.stdout or b""
@@ -147,13 +168,16 @@ def main():
     p.add_argument("--rom", type=Path)
     p.add_argument("--seconds", type=int, default=8)
     p.add_argument("--child", action="store_true")
+    p.add_argument("--debugger", action="store_true",
+                   help="Capture the native Genesis Plus GX SIGSEGV stack with gdb")
     args = p.parse_args()
     if args.child:
         if args.rom is None:
             p.error("--child requires --rom")
         return _child(args.core.resolve(), args.rom.resolve(), args.seconds,
                       args.report.resolve())
-    return _parent(args.core.resolve(), args.report.resolve(), args.seconds)
+    return _parent(args.core.resolve(), args.report.resolve(), args.seconds,
+                   debugger=args.debugger)
 
 
 if __name__ == "__main__":
