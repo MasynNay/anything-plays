@@ -12,7 +12,9 @@ class MultiSystemContracts(unittest.TestCase):
         sys.path.insert(0, str(ROOT))
         from anything_plays.systems import SYSTEMS
         self.assertEqual(set(SYSTEMS), {
-            'gb', 'gbc', 'gba', 'snes', 'nes', 'genesis', 'n64', 'gamecube'
+            'gb', 'gbc', 'gba', 'snes', 'nes', 'genesis', 'n64', 'gamecube',
+            'mastersystem', 'gamegear', 'sg1000', 'atari2600', 'atari7800',
+            'pce', 'ngp', 'ngpc', 'ws', 'wsc'
         })
         self.assertEqual(SYSTEMS['nes'].core, 'fceumm')
         self.assertEqual(SYSTEMS['genesis'].core, 'genesis_plus_gx')

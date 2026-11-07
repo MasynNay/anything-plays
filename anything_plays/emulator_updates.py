@@ -25,6 +25,11 @@ UPSTREAM_REPOS = {
     "parallel_n64": "libretro/parallel-n64",
     # The distributed core is the Libretro Dolphin fork, not Dolphin Qt.
     "dolphin": "libretro/dolphin",
+    "stella2014": "libretro/stella2014-libretro",
+    "prosystem": "libretro/prosystem-libretro",
+    "mednafen_pce_fast": "libretro/beetle-pce-fast-libretro",
+    "mednafen_ngp": "libretro/beetle-ngp-libretro",
+    "mednafen_wswan": "libretro/beetle-wswan-libretro",
 }
 DISPLAY_NAMES = {
     "mgba": "Game Boy / GBC / GBA · mGBA",
@@ -33,6 +38,11 @@ DISPLAY_NAMES = {
     "genesis_plus_gx": "Genesis · Genesis Plus GX",
     "parallel_n64": "Nintendo 64 · ParaLLEl-N64 (test core)",
     "dolphin": "GameCube · Dolphin Libretro (experimental)",
+    "stella2014": "Atari 2600 · Stella 2014",
+    "prosystem": "Atari 7800 · ProSystem",
+    "mednafen_pce_fast": "TurboGrafx-16 / PC Engine · Beetle PCE Fast",
+    "mednafen_ngp": "Neo Geo Pocket / Color · Beetle NeoPop",
+    "mednafen_wswan": "WonderSwan / Color · Beetle WonderSwan",
 }
 MAX_MANIFEST_BYTES = 250_000
 MAX_API_BYTES = 150_000

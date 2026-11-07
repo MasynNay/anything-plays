@@ -26,7 +26,11 @@ BUILD_BOT = "https://buildbot.libretro.com/nightly"
 CORE_NAMES = ("mgba", "snes9x")
 # Only on the 2.1 testing branch; never silently add cores to the
 # already approved v2.0.0 release lock.
-OPTIONAL_V21_CORES = ("fceumm", "genesis_plus_gx", "parallel_n64", "dolphin")
+OPTIONAL_V21_CORES = (
+    "fceumm", "genesis_plus_gx", "parallel_n64", "dolphin",
+    "stella2014", "prosystem", "mednafen_pce_fast",
+    "mednafen_ngp", "mednafen_wswan",
+)
 
 
 def core_names_for_build():
@@ -46,6 +50,11 @@ SOURCE_REPOSITORIES = {
     "genesis_plus_gx": "https://github.com/libretro/Genesis-Plus-GX",
     "parallel_n64": "https://github.com/libretro/parallel-n64",
     "dolphin": "https://github.com/libretro/dolphin",
+    "stella2014": "https://github.com/libretro/stella2014-libretro",
+    "prosystem": "https://github.com/libretro/prosystem-libretro",
+    "mednafen_pce_fast": "https://github.com/libretro/beetle-pce-fast-libretro",
+    "mednafen_ngp": "https://github.com/libretro/beetle-ngp-libretro",
+    "mednafen_wswan": "https://github.com/libretro/beetle-wswan-libretro",
 }
 
 

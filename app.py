@@ -11,6 +11,7 @@ import sys
 import tkinter as tk
 
 from anything_plays.gba_emulator import Emulator
+from anything_plays.systems import SYSTEMS
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.test_preferences import prepare_test_preferences
 from anything_plays.system_profiles import ProfileStore
@@ -156,7 +157,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
     def uses_embedded_emulator(self, system=None):
         """Choose in-panel video for each console; keep GPU fallback explicit."""
         key = self.system_key.get() if system is None else system
-        if key in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis'):
+        if key in SYSTEMS and key not in ('n64', 'gamecube'):
             return True
         if key == 'n64':
             return self.n64_embedded.get()

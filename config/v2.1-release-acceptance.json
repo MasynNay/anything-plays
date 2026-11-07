@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "Do not release or request broad end-user testing until all eight consoles work inside one packaged app with no other emulator installation.",
+  "policy": "Do not publish or request broad user testing until every console has working in-app play, bundled cores, and verified input, audio, saves, and acceptable performance on each supported platform.",
   "systems": {
     "gb": {
       "bundled": true,
@@ -53,6 +53,76 @@
       "real_game_verified": false,
       "notes": "Dolphin core and Sys data are now staged in test installers; actual gameplay speed and save compatibility have not been validated.",
       "primary_runtime": "embedded-libretro-software"
+    },
+    "mastersystem": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "gamegear": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "sg1000": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "atari2600": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "atari7800": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "pce": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "ngp": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "ngpc": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "ws": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+    },
+    "wsc": {
+      "bundled": false,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
     }
   },
   "platform_validation": {

@@ -24,7 +24,7 @@ from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES, core_names_for_build
 
 class UnifiedV21Tests(unittest.TestCase):
     def test_eight_console_libraries_and_external_modes(self):
-        self.assertEqual(len(SYSTEMS), 8)
+        self.assertEqual(len(SYSTEMS), 18)
         self.assertEqual([SYSTEMS[s].backend for s in ('nes', 'genesis')],
                          ['libretro', 'libretro'])
         self.assertEqual([SYSTEMS[s].backend for s in ('n64', 'gamecube')],

@@ -48,7 +48,7 @@ class LayoutMixin:
         system_row.pack(fill='x', pady=(0, 6))
         ttk.Label(system_row, text='Choose emulator:').pack(side='left', padx=(0, 6))
         self.system_combo = ttk.Combobox(system_row, textvariable=self.system_key, state='readonly',
-                                         values=list(SYSTEMS), width=12)
+                                         values=list(SYSTEMS), width=17)
         self.system_combo.pack(side='left')
         self.system_combo.bind('<<ComboboxSelected>>', self.switch_system)
         self.system_description = ttk.Label(system_row, text=SYSTEMS[self.system_key.get()].title)

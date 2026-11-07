@@ -20,6 +20,16 @@ BUTTONS_BY_SYSTEM = {
     "snes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y", "L", "R"),
     "nes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
     "genesis": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "Mode", "C"),
+    "mastersystem": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "gamegear": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "sg1000": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "atari2600": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "atari7800": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "pce": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ngp": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ngpc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ws": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y"),
+    "wsc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y"),
     # N64 and GameCube use camera-to-controller bridges while their 3D
     # video is still rendered in an external GPU window.
     "n64": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Z", "L", "R", "C Up", "C Down", "C Left", "C Right"),

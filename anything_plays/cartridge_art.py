@@ -16,7 +16,8 @@ def cartridge_image(filename, system='gba', artwork_path=None):
     w, h = 300, 226
     image = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(image)
-    system = system if system in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis', 'n64', 'gamecube') else 'gba'
+    from anything_plays.systems import SYSTEMS
+    system = system if system in SYSTEMS else 'gba'
     if system == 'gb':
         # Original Game Boy: tall, light gray cartridge with a corner notch.
         shell = [(80, 8), (219, 8), (229, 18), (229, 209), (72, 209), (72, 17)]
@@ -71,11 +72,24 @@ def cartridge_image(filename, system='gba', artwork_path=None):
         # Bottom molded seam and central locking notch.
         d.line((45, 187, 255, 187), fill='#9695a0', width=3)
         d.rounded_rectangle((123, 194, 177, 205), radius=3, fill='#aaa9b4', outline='#777683', width=2)
-    elif system in ('nes', 'genesis', 'n64', 'gamecube'):
+    elif system in (
+        'nes', 'genesis', 'n64', 'gamecube', 'mastersystem', 'gamegear',
+        'sg1000', 'atari2600', 'atari7800', 'pce', 'ngp', 'ngpc', 'ws', 'wsc',
+    ):
         # Locally drawn generic console media with no trademarked cover art.
         palettes = {
             'nes': ('#b6b9b9', '#646666', '#29323b', 'NES'),
             'genesis': ('#20262c', '#bd3042', '#edf0f2', 'SEGA GENESIS'),
+            'mastersystem': ('#20232b', '#d34a4a', '#f4f4f4', 'MASTER SYSTEM'),
+            'gamegear': ('#23272b', '#2ba7b6', '#f4ffff', 'GAME GEAR'),
+            'sg1000': ('#34343c', '#e45f64', '#ffffff', 'SG-1000'),
+            'atari2600': ('#352920', '#e69c3d', '#faf5e2', 'ATARI 2600'),
+            'atari7800': ('#303540', '#ce5353', '#ffffff', 'ATARI 7800'),
+            'pce': ('#f0e9d9', '#cb4c34', '#282828', 'TURBOGRAFX-16'),
+            'ngp': ('#c8cad1', '#395b85', '#17283a', 'NEO GEO POCKET'),
+            'ngpc': ('#b1bfdb', '#5656b1', '#181f35', 'NEO GEO COLOR'),
+            'ws': ('#c4c7d0', '#778fa0', '#253947', 'WONDERSWAN'),
+            'wsc': ('#5668ad', '#b0a4de', '#ffffff', 'WONDERSWAN COLOR'),
             'n64': ('#444a50', '#7469ab', '#f8f4ff', 'NINTENDO 64'),
             'gamecube': ('#282943', '#6861b2', '#f6f5ff', 'GAMECUBE'),
         }
