@@ -367,6 +367,7 @@ class CoreSession:
                         + str(exc)[:140]
                     )
             self.emulator.running = True
+            self.emulator.launching = False
 
             frame_number = 0
             next_frame = time.monotonic()
@@ -405,6 +406,8 @@ class Emulator:
         self.stop_event = threading.Event()
         self.thread = None
         self.running = False
+        self.launching = False
+        self.last_error = None
         self.armed = False
         self.error = None
         self.save_warning = None
@@ -435,6 +438,9 @@ class Emulator:
         if self.thread is not None and self.thread.is_alive():
             raise RuntimeError("The previous emulator is still shutting down")
         self.rom = str(rom)
+        self.running = False
+        self.launching = True
+        self.last_error = None
         self.error = None
         self.save_warning = None
         self.audio_warning = None
@@ -491,6 +497,7 @@ class Emulator:
         if worker is None or not worker.is_alive():
             self.thread = None
             self.running = False
+            self.launching = False
             self.inputs.disarm()
 
     def _run(self):
@@ -504,9 +511,14 @@ class Emulator:
             else:
                 CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
-            self.error = f"{type(exc).__name__}: {exc}"
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            self.error = self.last_error
         finally:
+            # All session paths, including errors BEFORE running=True,
+            # must allow a new ROM attempt without restarting Anything Plays.
+            self.launching = False
             self.armed = False
             self.running = False
+            self.inputs.disarm()
             self.inputs.release_manual()
             # Do not race Tk's UI thread by clearing the video frame here.
