@@ -908,3 +908,35 @@ single-boot assumption. Do NOT re-enable macOS `dlclose`. A user test
 should repeat N64 ROM A → Unload → ROM B → Unload → ROM A with sound and
 manual/camera controls. Record any error display or hangs and then improve
 only the failing path.
+
+
+## November 7, 2026 — Public roadmap and Windows physical QA handoff
+
+User asked for professional public GitHub roadmap to document authentic development
+activity, maintenance, productive ideas and evidence for future contributors and
+hiring reviews. Published `ROADMAP.md` on BOTH main (public stable landing page)
+and 3.0 development branch, with explicit completed work, active/queued QA,
+proposals, blockers and clear rules separating CI evidence from physical testing.
+Linked roadmap in both branch README files; updated stale 3.0 development
+README to accurately distinguish full offline 18-profile developer installer
+vs optional starter and to document N64 multi-ROM fix and pending GameCube
+performance. No stable 2.0 application source or published release was changed.
+
+Created focused public issues:
+- [#25 Linux clean-install and real-device QA](https://github.com/MasynNay/anything-plays/issues/25) (queued after Windows)
+- [#26 Windows clean-install and real-device QA](https://github.com/MasynNay/anything-plays/issues/26) (**in progress**, user says Windows machine is ready; no Windows real-device results yet)
+- [#27 GameCube GPU smoothness and endurance](https://github.com/MasynNay/anything-plays/issues/27)
+- [#28 License, code signing, provenance and distribution readiness](https://github.com/MasynNay/anything-plays/issues/28)
+- Existing [#24 overall 3.0 compatibility tracker](https://github.com/MasynNay/anything-plays/issues/24) remains.
+
+**Windows handoff package:** [Full Windows x64 developer preview artifact
+13590164796](https://github.com/MasynNay/anything-plays/actions/runs/42415284318/artifacts/13590164796)
+in successful [run 42415284318](https://github.com/MasynNay/anything-plays/actions/runs/42415284318),
+source SHA `bbdcdfc9fd971f9a414003eb317746535a909f7e`. GitHub
+artifact confirmed not expired. Download artifact ZIP, extract Windows EXE,
+install and test ROM switching N64 A→B→A, other available consoles, game
+volume, manual buttons, save/reload and GameCube real GPU. Record physical
+results in #26; do NOT claim pass before user reports it.
+
+**Important:** roadmap's forward-looking ideas are proposals, not committed
+release features. Review statuses only after verified engineering work.
