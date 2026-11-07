@@ -59,6 +59,16 @@ class ExternalBackendMixin:
         self._switch_3d_backend("gamecube")
 
     def update_external_setup(self):
+        # Keep the GPU preview tradeoff visible only while GameCube is the
+        # active embedded console. Other emulators retain their own display
+        # timing and settings.
+        preview_row = getattr(self, "gamecube_preview_row", None)
+        if preview_row is not None:
+            if (self.system_key.get() == "gamecube"
+                    and self.uses_embedded_emulator()):
+                preview_row.pack(fill="x", pady=(11, 0))
+            else:
+                preview_row.pack_forget()
         backend = SYSTEMS[self.system_key.get()].backend
         if (self.system_key.get() == "n64" and
                 getattr(self, "external_fallback_enabled", False)):
