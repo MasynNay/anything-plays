@@ -188,11 +188,11 @@ class AppVolumeTests(unittest.TestCase):
         self.assertEqual(sink._volume, 0.0)
 
     def test_interface_has_visible_opt_in_and_slider(self):
-        panel = (ROOT / "anything_plays/ui_panels.py").read_text("utf-8")
+        panel = (ROOT / "anything_plays/ui_tracking_panel.py").read_text("utf-8")
         camera = (ROOT / "anything_plays/ui_camera.py").read_text("utf-8")
         layout = (ROOT / "anything_plays/ui_layout.py").read_text("utf-8")
-        assert "Enable multiple fish per color (multi-input)" in panel
-        assert "variable=self.multi_fish_enabled" in panel
+        assert "Enable multiple objects per color" in panel
+        assert "variable=app.multi_fish_enabled" in panel
         assert "limit = 16 if self.multi_fish_enabled.get() else 1" in camera
         assert "variable=self.volume_percent" in layout
         assert "command=self.toggle_game_mute" in layout
