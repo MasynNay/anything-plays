@@ -142,7 +142,7 @@ class Simulator:
                     self.snes_buttons(0), ["A"])
         self.verify("player two idle by default", self.snes_buttons(1), [])
         self.verify("preview correctly reports one object",
-                    "Tracking Color 1: 1 fish" in app.action.get(), True)
+                    "Primary objects: 1" in app.action.get(), True)
         self.finish_frame()
 
         # Explicitly enable multi-target tracking, now A+B are simultaneous.
@@ -152,7 +152,7 @@ class Simulator:
         self.verify("multi-input two pink fish press A+B at same time",
                     self.snes_buttons(0), ["A", "B"])
         self.verify("two pink shapes reported",
-                    "Tracking Color 1: 2 fish" in app.action.get(), True)
+                    "Primary objects: 2" in app.action.get(), True)
         self.finish_frame()
         self.camera_tick(pink_left)
         self.verify("fish leaving right zone releases B", self.snes_buttons(0),
