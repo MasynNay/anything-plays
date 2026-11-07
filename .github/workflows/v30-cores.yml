@@ -152,6 +152,52 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  ngp-mit-homebrew-video-audio:
+    # Third-party MIT homebrew, immutable commit and blob-integrity pinned.
+    # Downloaded only inside disposable CI and never shipped in app installs.
+    # Strict RGB/PCM requirements prevent loaded-core false positives.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngp}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngpc}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ngp}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ngpc}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngp}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngpc}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngp}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngpc}
+    runs-on: \${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux Libretro runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Obtain embedded Mednafen NeoPop test core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      - name: Require pinned MIT homebrew native LCD and PCM
+        run: |
+          python tools/probe_ngp_mit_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_ngp_libretro.${{ matrix.ext }} --seconds 12 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-mit-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-MIT-homebrew-${{ matrix.system }}-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   wswan-original-screen-psg:
     # Original V30MZ cartridges, no downloaded game assets, source-generated
     # only during CI. Must show animated WonderSwan LCD and native PCM.
