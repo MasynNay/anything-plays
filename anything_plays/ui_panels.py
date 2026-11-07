@@ -43,6 +43,23 @@ class AuxiliaryPanelsMixin:
         self.canvas.pack(fill='both', expand=True, pady=(8, 4))
         self.canvas.bind('<Button-1>', self.on_click)
         self.canvas.bind('<ButtonRelease-1>', self.on_release)
+        # Frequently used label sizing belongs beside the preview, not inside
+        # the collapsed advanced appearance controls on the opposite pane.
+        label_row = ttk.Frame(left)
+        label_row.pack(fill='x', pady=(4, 2))
+        ttk.Label(label_row, text='Control label size').pack(side='left', padx=(0, 8))
+        self.quick_label_size = ttk.Scale(
+            label_row, from_=8, to=160, variable=self.zone_font_size,
+            orient='horizontal', command=self.schedule_zone_label_size_save,
+        )
+        self.quick_label_size.pack(side='left', fill='x', expand=True)
+        ttk.Label(label_row, textvariable=self.zone_font_size, width=4).pack(
+            side='left', padx=(8, 2)
+        )
+        ttk.Button(
+            label_row, text='Reset', command=lambda: self.set_zone_label_size(28),
+            style='Compact.TButton',
+        ).pack(side='left', padx=(5, 0))
         self.shuffle_enabled.trace_add('write', lambda *_: self.update_shuffle_visibility())
         # Keep the manual Shuffle action visible even when the right-hand
         # advanced appearance panel is collapsed. This moves existing zones
