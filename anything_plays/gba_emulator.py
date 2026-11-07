@@ -27,7 +27,7 @@ from anything_plays.libretro_abi import (
 )
 from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
-from anything_plays.libretro_save import SaveRAM
+from anything_plays.libretro_save import SaveRAM, native_core_save_directory
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
 from anything_plays.libretro_video import (
     SUPPORTED_FORMATS, SOFTWARE_RGBA8888, decode_frame,
@@ -137,11 +137,18 @@ class CoreSession:
         self._rom_buffers = []
         self._rom_path_bytes = os.fsencode(str(self.rom))
         self._system_dir_buffer = self._make_system_directory()
-        # Save files are separate from the bundled, read-only Dolphin Sys
-        # assets. The alpha never writes into its installed emulator folder.
-        save_folder = (Path.home() / ".config" / "anything-plays-30-preview" /
-                       "gamecube-saves")
-        if system == "gamecube":
+        # These native cores write their own save files, independently
+        # of RETRO_MEMORY_SAVE_RAM. NGP/NGPC cartridge flash is persisted by
+        # Beetle NeoPop at unload as <ROM-stem>.flash in GET_SAVE_DIRECTORY.
+        # Every ROM needs a unique user-writable directory or two different
+        # games with the same filename can silently overwrite progress.
+        # Dolphin keeps its independent user save directory and Sys files.
+        if system in ("ngp", "ngpc"):
+            save_folder = native_core_save_directory(self.rom, system)
+        else:
+            save_folder = (Path.home() / ".config" / "anything-plays-30-preview" /
+                           "gamecube-saves")
+        if system in ("gamecube", "ngp", "ngpc"):
             save_folder.mkdir(parents=True, exist_ok=True)
         self._save_dir_buffer = C.create_string_buffer(
             os.fsencode(str(save_folder))
@@ -179,8 +186,9 @@ class CoreSession:
                 self.pixel_format = requested
             return True
         if command in (9, 31) and data:  # GET_SYSTEM_DIRECTORY / GET_SAVE_DIRECTORY
-            folder = (self._save_dir_buffer if self.system == "gamecube"
-                      and command == 31 else self._system_dir_buffer)
+            folder = (self._save_dir_buffer if self.system in
+                      ("gamecube", "ngp", "ngpc") and command == 31
+                      else self._system_dir_buffer)
             C.cast(data, C.POINTER(C.c_char_p))[0] = C.cast(
                 folder, C.c_char_p
             )
