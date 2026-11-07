@@ -26,7 +26,9 @@ from anything_plays.libretro_abi import (
     INPUT_STATE, VIDEO,
 )
 from anything_plays.libretro_audio import AudioSink
-from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
+from anything_plays.libretro_input import (
+    BUTTONS, IDS, InputBuffer, TWO_PLAYER_SYSTEMS,
+)
 from anything_plays.libretro_save import SaveRAM, native_core_save_directory
 from anything_plays.libretro_state import LibretroRecoveryState
 from anything_plays.neopop_flash import check_cartridge_flash, InvalidNeoPopFlash
@@ -274,15 +276,20 @@ class CoreSession:
                 "Check the Terminal for details."
             )
         self.native.loaded = True
-        if self.system == "gamecube":
-            # Initialize only after Dolphin has accepted game content and
-            # created its input/serial-interface subsystems. Without this,
-            # a test can advance hundreds of emulated frames while every
-            # camera and manual controller button is disconnected.
+        if self.system in TWO_PLAYER_SYSTEMS:
+            # Only configure controller ports *after* retro_load_game, when
+            # Dolphin's serial interface and other core-specific input
+            # devices are ready. Player 2 must be registered or the second
+            # fish can produce callbacks that the game never sees.
             select_device = getattr(self.native, "set_controller_device", None)
             if select_device is None:
-                raise RuntimeError("Dolphin Libretro core has no controller-port API")
-            select_device(0, 1)  # Player 1: RETRO_DEVICE_JOYPAD
+                if self.system == "gamecube":
+                    raise RuntimeError(
+                        "Dolphin Libretro core has no controller-port API"
+                    )
+            else:
+                select_device(0, 1)
+                select_device(1, 1)  # Player 2: RETRO_DEVICE_JOYPAD
 
     def persist_game_progress(self):
         """Persist battery SRAM AND safe NGP recovery without killing gameplay."""
