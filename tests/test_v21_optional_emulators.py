@@ -54,18 +54,34 @@ class OptionalEmulatorDownloads(unittest.TestCase):
             text="Emulator installed", state="disabled"
         )
 
-    def test_unverified_gamecube_does_not_download_dolphin_alone(self):
+    def test_gamecube_only_offers_verified_full_sys_pack_if_published(self):
         panel = self.panel("gamecube")
-        panel.refresh_selected_emulator_state()
+        panel._available_core_packs = []
+        with patch("anything_plays.core_locator.find_core", return_value=None):
+            panel.refresh_selected_emulator_state()
         panel.download_emulator_button.configure.assert_called_with(
-            text="GameCube in development", state="disabled"
+            text="Download emulator", state="normal"
         )
-        with patch("anything_plays.ui_updates.discover_core_packs") as fetch, patch(
-            "anything_plays.ui_updates.messagebox.showinfo"
-        ) as info:
+        # A user may request GameCube but the official catalog currently
+        # publishes no approved paired Dolphin + Sys ZIP. It must explain
+        # the unavailability instead of downloading a bare DLL/nightly.
+        def immediate_thread(*, target, **kwargs):
+            return Mock(start=target)
+        with patch("anything_plays.core_locator.find_core", return_value=None), \
+             patch("anything_plays.ui_updates.messagebox.askyesno",
+                   return_value=True), \
+             patch("anything_plays.ui_updates.discover_core_packs",
+                   return_value=[]), \
+             patch("anything_plays.ui_updates.install_core_pack") as installer, \
+             patch("anything_plays.ui_updates.Thread",
+                   side_effect=immediate_thread), \
+             patch("anything_plays.ui_updates.messagebox.showwarning") as warning:
             panel.download_selected_emulator()
-            fetch.assert_not_called()
-            info.assert_called_once()
+            callback = panel.root.after.call_args.args[1]
+            callback()
+            installer.assert_not_called()
+            warning.assert_called_once()
+            self.assertIn("No approved", warning.call_args.args[1])
 
     def test_successful_download_reuses_app_window_and_core_locator(self):
         panel = self.panel("snes")
