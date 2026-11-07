@@ -78,11 +78,10 @@ class CorrectedIconTests(unittest.TestCase):
                 verify_v21_artwork(root)
 
     def test_all_alpha_installers_use_corrected_asset(self):
-        windows = (ROOT / "build_windows.bat").read_text()
-        mac = (ROOT / "build_macos_dmg.sh").read_text()
-        linux = (ROOT / "build_linux_deb.sh").read_text()
-        inno = (ROOT / "installer.iss").read_text()
-        spec = (ROOT / "AnythingPlays.spec").read_text()
+        windows = (ROOT / "packaging/build_windows.bat").read_text()
+        mac = (ROOT / "packaging/build_macos_dmg.sh").read_text()
+        linux = (ROOT / "packaging/build_linux_deb.sh").read_text()
+        inno = (ROOT / "packaging/installer.iss").read_text()
         for name, script in (
             ("Windows", windows), ("macOS", mac), ("Linux", linux)
         ):
@@ -93,7 +92,8 @@ class CorrectedIconTests(unittest.TestCase):
         self.assertIn("build/v21-icon/anything_plays.png", mac)
         self.assertIn("build/v21-icon/anything_plays_small.png", linux)
         self.assertIn("build\\v21-icon\\anything_plays.ico", inno)
-        self.assertIn("anything_plays_v21.webp", spec)
+        # PyInstaller creates .spec as generated output; do not commit it.
+        self.assertIn("*.spec", (ROOT / ".gitignore").read_text())
 
 
 if __name__ == "__main__":

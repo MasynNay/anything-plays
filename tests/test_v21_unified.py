@@ -108,7 +108,7 @@ class UnifiedV21Tests(unittest.TestCase):
         with patch.dict(os.environ, {'AP_V21_TEST_CORES': '1', 'AP_RELEASE_BUILD': '0'}):
             self.assertEqual(core_names_for_build(), (*CORE_NAMES, *OPTIONAL_V21_CORES))
         with patch.dict(os.environ, {'AP_V21_TEST_CORES': '1', 'AP_RELEASE_BUILD': '1'}):
-            with self.assertRaisesRegex(ValueError, 'Unapproved 2.1'):
+            with self.assertRaisesRegex(ValueError, 'Unapproved 3.0'):
                 core_names_for_build()
 
     def test_small_21_starter_build_does_not_touch_v20_release_lock(self):

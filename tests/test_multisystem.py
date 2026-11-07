@@ -35,8 +35,8 @@ class MultiSystemContracts(unittest.TestCase):
             self.assertIn(name, BUTTONS)
             self.assertIn(name, IDS)
 
-    def test_every_platform_bundles_all_cores(self):
-        for filename in ('build_windows.bat', 'build_macos_dmg.sh', 'build_linux_deb.sh'):
+    def test_every_platform_starter_exposes_mgba_and_optional_core_mode(self):
+        for filename in ('packaging/build_windows.bat', 'packaging/build_macos_dmg.sh', 'packaging/build_linux_deb.sh'):
             script = (ROOT / filename).read_text()
             for name in ('mgba', 'snes9x'):
                 with self.subTest(script=filename, core=name):

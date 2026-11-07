@@ -70,7 +70,7 @@ fi
 PLIST="dist/AnythingPlays30Preview.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Anything Plays uses the camera to track moving objects for game controls." "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.test21" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
 /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.0 Preview" "$PLIST" || true
 # Include project and third-party licensing documentation.
 LICENSE_DIR="dist/AnythingPlays30Preview.app/Contents/Resources/licenses"
