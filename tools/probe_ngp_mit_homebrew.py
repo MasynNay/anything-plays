@@ -7,6 +7,7 @@ synthesize frames or audio to satisfy the gate.
 """
 from __future__ import annotations
 import argparse
+import ctypes as C
 import hashlib
 import json
 import os
@@ -25,6 +26,63 @@ from tools.ngp_mit_fixtures import FIXTURES, fetch_test_fixture
 from tools.probe_nes_homebrew import ObservedAudio
 
 
+def _native_save_state_roundtrip(native):
+    """Exercise core serialize/unserialize on its own emulation thread.
+
+    This is a diagnostic for the CI homebrew, not evidence that the app's
+    cartridge SRAM persistence or a retail game's saves are verified.
+    """
+    evidence = {
+        "supported": False, "serialized": False,
+        "restored": False, "matching_roundtrip": False,
+        "bytes": 0, "error": None,
+    }
+    try:
+        library = native.library
+        size_function = getattr(library, "retro_serialize_size", None)
+        serialize = getattr(library, "retro_serialize", None)
+        unserialize = getattr(library, "retro_unserialize", None)
+        if any(function is None for function in
+               (size_function, serialize, unserialize)):
+            evidence["error"] = "Libretro save-state API not exported"
+            return evidence
+        size_function.argtypes = []
+        size_function.restype = C.c_size_t
+        serialize.argtypes = [C.c_void_p, C.c_size_t]
+        serialize.restype = C.c_bool
+        unserialize.argtypes = [C.c_void_p, C.c_size_t]
+        unserialize.restype = C.c_bool
+        count = int(size_function())
+        evidence["bytes"] = count
+        # A compromised core must not allocate an unbounded save-state buffer.
+        if not 0 < count <= 64 * 1024 * 1024:
+            evidence["error"] = "No save-state support or oversized native state"
+            return evidence
+        evidence["supported"] = True
+        original = C.create_string_buffer(count)
+        if not serialize(original, count):
+            evidence["error"] = "Core rejected initial save-state snapshot"
+            return evidence
+        evidence["serialized"] = True
+        if not unserialize(original, count):
+            evidence["error"] = "Core rejected restore of its own snapshot"
+            return evidence
+        evidence["restored"] = True
+        restored = C.create_string_buffer(count)
+        if not serialize(restored, count):
+            evidence["error"] = "Core rejected save-state snapshot after restore"
+            return evidence
+        evidence["matching_roundtrip"] = (
+            hashlib.sha256(original.raw).digest()
+            == hashlib.sha256(restored.raw).digest()
+        )
+        if not evidence["matching_roundtrip"]:
+            evidence["error"] = "Serialized state changed after immediate restore"
+    except Exception as exc:
+        evidence["error"] = f"{type(exc).__name__}: {exc}"
+    return evidence
+
+
 def _child(system, core, rom, seconds, report):
     import faulthandler
     faulthandler.enable(all_threads=True)
@@ -36,6 +94,72 @@ def _child(system, core, rom, seconds, report):
     session = CoreSession(emulator, system, rom, str(core))
     session.audio.close()
     session.audio = ObservedAudio()
+
+    # Real input evidence must originate in the native core's Libretro
+    # input_state callback, not merely from queued GUI button presses.
+    native_input = {
+        "queries": 0, "manual_a_positive": 0, "camera_b_positive": 0,
+    }
+    stimulus_phase = "idle"
+    original_input = emulator.inputs.state
+
+    def observe_input(port, device, index, identity):
+        value = original_input(port, device, index, identity)
+        if port == 0 and device == 1 and index == 0:
+            native_input["queries"] += 1
+            if stimulus_phase == "manual" and identity == 8 and value:
+                native_input["manual_a_positive"] += 1
+            if stimulus_phase == "camera" and identity == 0 and value:
+                native_input["camera_b_positive"] += 1
+        return value
+
+    emulator.inputs.state = observe_input
+
+    # Test Libretro save-state ABI only from the emulator thread, between
+    # retro_run calls. This cannot establish actual SRAM persistence.
+    save_state = {"attempted": False, "result": None}
+    original_before_frame = emulator.inputs.before_frame
+    session_started = time.monotonic()
+
+    def before_frame(armed):
+        original_before_frame(armed)
+        if not save_state["attempted"] and time.monotonic() - session_started > 2:
+            save_state["attempted"] = True
+            save_state["result"] = _native_save_state_roundtrip(session.native)
+
+    emulator.inputs.before_frame = before_frame
+
+    def exercise_controls():
+        nonlocal stimulus_phase
+        # A is held manually while camera control is disarmed. B is then
+        # triggered as a finite camera pulse while armed, repeatedly.
+        # The emulated core must actually poll both nonzero buttons.
+        deadline = time.monotonic() + seconds - 0.25
+        while not emulator.running and not emulator.stop_event.is_set():
+            if time.monotonic() >= deadline:
+                return
+            emulator.stop_event.wait(0.01)
+        try:
+            while not emulator.stop_event.is_set() and time.monotonic() < deadline:
+                emulator.armed = False
+                stimulus_phase = "manual"
+                emulator.set_manual("A", True)
+                if emulator.stop_event.wait(0.16):
+                    break
+                emulator.set_manual("A", False)
+                emulator.armed = True
+                stimulus_phase = "camera"
+                emulator.press("B", frames=14)
+                if emulator.stop_event.wait(0.16):
+                    break
+        finally:
+            stimulus_phase = "idle"
+            emulator.release_manual()
+            emulator.armed = False
+
+    stimulus = threading.Thread(
+        target=exercise_controls, daemon=True, name="ngp-ci-input"
+    )
 
     original_video = session.video
     callbacks = nonblank = 0
@@ -76,6 +200,7 @@ def _child(system, core, rom, seconds, report):
     start = time.monotonic()
     exception = None
     try:
+        stimulus.start()
         session.run()
     except Exception as exc:
         exception = f"{type(exc).__name__}: {exc}"
@@ -83,6 +208,7 @@ def _child(system, core, rom, seconds, report):
     finally:
         emulator.stop_event.set()
         timer.cancel()
+        stimulus.join(timeout=1)
     elapsed = max(0.001, time.monotonic() - start)
     pcm = session.audio
     video_ok = (
@@ -93,7 +219,12 @@ def _child(system, core, rom, seconds, report):
         pcm.samples > 1000 and pcm.nonzero > 100 and pcm.peak > 0
         and 8000 <= (pcm.sample_rate or 0) <= 192000
     )
-    passed = exception is None and video_ok and audio_ok
+    input_ok = (
+        native_input["queries"] >= 30
+        and native_input["manual_a_positive"] > 0
+        and native_input["camera_b_positive"] > 0
+    )
+    passed = exception is None and video_ok and audio_ok and input_ok
     evidence = {
         "system": system,
         "source": "pinned MIT homebrew, no proprietary game",
@@ -110,6 +241,12 @@ def _child(system, core, rom, seconds, report):
         "sample_rate": pcm.sample_rate,
         "video_gate_passed": video_ok,
         "audio_gate_passed": audio_ok,
+        "native_input_callback_queries": native_input["queries"],
+        "manual_a_native_positive_samples": native_input["manual_a_positive"],
+        "camera_b_native_positive_samples": native_input["camera_b_positive"],
+        "input_gate_passed": input_ok,
+        "save_state_roundtrip": save_state["result"],
+        "cartridge_sram_persistence_verified": False,
         "physical_speakers_verified": False,
         "real_user_game_compatibility_verified": False,
         "passed": passed, "error": exception,
