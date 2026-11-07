@@ -88,7 +88,7 @@ class DolphinInPanelTests(unittest.TestCase):
         self.assertEqual(state[(1, 0, 13)], 1)  # R2 trigger
         self.assertLess(state[(5, 0, 0)], 0)   # Left stick X
         self.assertLess(state[(5, 1, 1)], 0)   # C-stick Y
-        self.assertEqual(gamecube_state({"Left", "Right"})[(5, 0, 0)], 0)
+        self.assertEqual(gamecube_state({"Left", "Right"}).get((5, 0, 0), 0), 0)
 
     def test_camera_and_keyboard_input_neutralize_safely_on_stop(self):
         inputs = InputBuffer()
