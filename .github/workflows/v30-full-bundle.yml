@@ -91,7 +91,9 @@ jobs:
           fi
       - name: Smoke-test visible preview settings in a real Tk UI
         if: runner.os == 'Linux'
-        run: xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
+        # A directly executed tests/smoke_gui.py lives under tests/, so
+        # explicitly put the checked-out project root on Python's import path.
+        run: PYTHONPATH=. xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
       - name: Verify every console has its native core in the installed payload
         env:
           TARGET: ${{ matrix.target }}
