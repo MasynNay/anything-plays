@@ -1,5 +1,6 @@
 """GameCube integrated software renderer tests; no ROM or GPU required."""
 import ctypes as C
+import gc
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -14,6 +15,12 @@ from anything_plays.libretro_input import InputBuffer
 
 
 class DolphinInPanelTests(unittest.TestCase):
+    def tearDown(self):
+        # If a native ctypes ABI test has corrupted a pointer, force GC
+        # directly after that exact case rather than failing much later in
+        # an unrelated Pillow or N64 test. Keep faulthandler enabled in CI.
+        gc.collect()
+
     def test_core_option_explicitly_chooses_cpu_video(self):
         options = DolphinSoftwareOptions()
         variable = RetroVariable()
