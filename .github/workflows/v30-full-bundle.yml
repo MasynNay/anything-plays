@@ -1,0 +1,89 @@
+name: Anything Plays 3.0 | Complete offline installer lab
+
+# Test only: creates actual four-platform all-core installers, checks payloads,
+# then discards binaries. Native distribution and public release are blocked
+# separately until the 3.0 release evidence and licenses are approved.
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-full-bundle.yml'
+      - 'packaging/**'
+      - 'fetch_mgba_core.py'
+      - 'verify_bundle.py'
+      - 'anything_plays/core_locator.py'
+      - 'anything_plays/systems.py'
+      - 'tools/check_v30_release.py'
+      - 'config/v3.0-release-acceptance.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+  AP_V30_TEST_CORES: '1'
+
+jobs:
+  complete-installer-lab:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, target: windows-x64}
+          - {runner: macos-15, target: macos-arm64}
+          - {runner: macos-15-intel, target: macos-x64}
+          - {runner: ubuntu-24.04, target: linux-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Compile complete Windows installer (test only)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Compile complete macOS DMG (test only)
+        if: runner.os == 'macOS'
+        run: bash packaging/build_macos_dmg.sh
+      - name: Compile complete Linux DEB (test only)
+        if: runner.os == 'Linux'
+        run: bash packaging/build_linux_deb.sh
+      - name: Verify every console has its native core in the installed payload
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from anything_plays.systems import SYSTEMS
+          from fetch_mgba_core import core_names_for_build
+          target = os.environ["TARGET"]
+          root = (Path("dist/AnythingPlays30Preview.app/Contents/Resources/cores")
+                  if target.startswith("macos") else Path("dist/AnythingPlays/cores"))
+          ext = ".dll" if target.startswith("windows") else ".dylib" if target.startswith("macos") else ".so"
+          expected = set(core_names_for_build())
+          missing = sorted(name for name in expected if not (root / f"{name}_libretro{ext}").is_file())
+          assert len(SYSTEMS) == 18, f"Unexpected system count: {len(SYSTEMS)}"
+          assert len(expected) == 11, f"Unexpected native core count: {len(expected)}"
+          assert not missing, f"Offline installer is missing native cores: {missing}"
+          assert (root / "dolphin-emu/Sys/codehandler.bin").is_file(), "Missing GameCube Sys data"
+          print(f"{target}: {len(SYSTEMS)} consoles, {len(expected)} native cores, GameCube Sys included")
+          PY
+      - name: Record unmet public-release gates without approving binaries
+        run: python tools/check_v30_release.py --report-only
+      # Intentionally do not upload installers or native core artifacts.
+      # A green lab is packaging evidence, not legal or gameplay approval.

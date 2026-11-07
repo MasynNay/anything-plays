@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "A small mGBA-only starter installer plus separately approved in-app downloads; release requires each core to install without external applications, display and sound playback, controls, save behavior, stability and complete platform testing.",
+  "policy": "All 18 listed consoles must play offline from a single installer containing their native emulators and required assets. No downloads of emulator applications, cores, or firmware after installation; separately approved in-app core updates remain optional. Require real video, sound, input, saves and long-run testing on each platform before release.",
   "systems": {
     "gb": {
       "bundled": true,
@@ -28,27 +28,21 @@
       "in_app_video": true,
       "camera_controls": true,
       "real_game_verified": false,
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "nes": {
       "bundled": false,
       "in_app_video": true,
       "camera_controls": true,
       "real_game_verified": false,
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "genesis": {
       "bundled": false,
       "in_app_video": true,
       "camera_controls": true,
       "real_game_verified": false,
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "n64": {
       "bundled": false,
@@ -57,20 +51,16 @@
       "real_game_verified": false,
       "notes": "Experimental built for internal CI software renderer exists; real in-panel gameplay not verified.",
       "primary_runtime": "embedded-libretro-software",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "gamecube": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "Dolphin core and Sys data are now evaluated in diagnostic builds; actual gameplay speed and save compatibility have not been validated.",
-      "primary_runtime": "embedded-libretro-software",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "notes": "Accelerated embedded Dolphin core plus verified Sys assets are required in the installer. Original 3D/audio homebrew CI is not sufficient evidence of complete game compatibility, saves, physical audio and longevity.",
+      "primary_runtime": "embedded-libretro-hardware",
+      "audio_verified": false
     },
     "mastersystem": {
       "bundled": false,
@@ -78,9 +68,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "gamegear": {
       "bundled": false,
@@ -88,9 +76,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "sg1000": {
       "bundled": false,
@@ -98,9 +84,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "atari2600": {
       "bundled": false,
@@ -108,9 +92,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "atari7800": {
       "bundled": false,
@@ -118,9 +100,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "pce": {
       "bundled": false,
@@ -128,9 +108,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "ngp": {
       "bundled": false,
@@ -138,9 +116,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "ngpc": {
       "bundled": false,
@@ -148,9 +124,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "ws": {
       "bundled": false,
@@ -158,9 +132,7 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     },
     "wsc": {
       "bundled": false,
@@ -168,36 +140,39 @@
       "camera_controls": false,
       "real_game_verified": false,
       "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
-      "audio_verified": false,
-      "downloadable": false,
-      "in_app_installation_verified": false
+      "audio_verified": false
     }
   },
   "platform_validation": {
     "windows-x64": {
       "clean_install": false,
       "all_consoles_verified": false,
-      "long_run_verified": false
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": false
     },
     "macos-arm64": {
       "clean_install": false,
       "all_consoles_verified": false,
-      "long_run_verified": false
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": false
     },
     "macos-x86_64": {
       "clean_install": false,
       "all_consoles_verified": false,
-      "long_run_verified": false
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": false
     },
     "linux-x64": {
       "clean_install": false,
       "all_consoles_verified": false,
-      "long_run_verified": false
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": false
     }
   },
   "required_release_evidence": {
     "third_party_license_audit_complete": false,
     "no_external_emulator_setup_required": false,
-    "packaged_binary_integrity_verified": true
+    "packaged_binary_integrity_verified": true,
+    "no_runtime_emulator_download_required": false
   }
 }

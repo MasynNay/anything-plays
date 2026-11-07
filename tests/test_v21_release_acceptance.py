@@ -15,9 +15,9 @@ class ReleaseAcceptanceTests(unittest.TestCase):
     def setUpClass(cls):
         cls.policy = json.loads(ACCEPTANCE_FILE.read_text(encoding="utf-8"))
 
-    def test_alpha_is_blocked_until_all_eight_consoles_work_in_one_window(self):
+    def test_alpha_is_blocked_until_all_eighteen_consoles_ship_offline_and_play(self):
         errors = release_blockers(self.policy)
-        self.assertTrue(any("gamecube: downloadable" in error for error in errors))
+        self.assertTrue(any("gamecube: bundled" in error for error in errors))
         self.assertTrue(any("gamecube: audio_verified" in error for error in errors))
         self.assertTrue(any("gamecube: in_app_video" in error for error in errors))
         self.assertTrue(any("n64: real_game_verified" in error for error in errors))
@@ -53,11 +53,7 @@ class ReleaseAcceptanceTests(unittest.TestCase):
         for key, row in policy["systems"].items():
             for name in SYSTEM_FLAGS:
                 row[name] = True
-            if key in ("gb", "gbc", "gba"):
-                row["bundled"] = True
-            else:
-                row["downloadable"] = True
-                row["in_app_installation_verified"] = True
+            row["bundled"] = True
         for row in policy["platform_validation"].values():
             for name in PLATFORM_FLAGS:
                 row[name] = True
@@ -68,14 +64,41 @@ class ReleaseAcceptanceTests(unittest.TestCase):
         policy["systems"]["gamecube"]["primary_runtime"] = "external-dolphin"
         errors = release_blockers(policy)
         self.assertEqual(
-            errors, ["gamecube: in-app Libretro runtime not selected/verified"]
+            errors, ["gamecube: accelerated in-app Libretro runtime not selected/verified"]
         )
         # With a correct in-app runtime and reviewed evidence, the gate
         # can in principle pass; the real alpha policy remains false.
         policy["systems"]["gamecube"]["primary_runtime"] = (
-            "embedded-libretro-software"
+            "embedded-libretro-hardware"
         )
         self.assertEqual(release_blockers(policy), [])
+
+    def test_downloadable_does_not_replace_offline_bundled(self):
+        policy = copy.deepcopy(self.policy)
+        for key, row in policy["systems"].items():
+            for field in SYSTEM_FLAGS:
+                row[field] = True
+            row["bundled"] = True
+        for row in policy["platform_validation"].values():
+            for field in PLATFORM_FLAGS:
+                row[field] = True
+        for field in RELEASE_FLAGS:
+            policy["required_release_evidence"][field] = True
+        policy["systems"]["gamecube"]["bundled"] = False
+        policy["systems"]["gamecube"]["downloadable"] = True
+        policy["systems"]["gamecube"]["in_app_installation_verified"] = True
+        errors = release_blockers(policy)
+        self.assertIn("gamecube: bundled not verified", errors)
+        self.assertNotIn("gamecube: downloadable not verified", errors)
+
+    def test_gamecube_software_renderer_cannot_satisfy_accelerated_gate(self):
+        policy = copy.deepcopy(self.policy)
+        policy["systems"]["gamecube"]["primary_runtime"] = "embedded-libretro-software"
+        errors = release_blockers(policy)
+        self.assertIn(
+            "gamecube: accelerated in-app Libretro runtime not selected/verified",
+            errors,
+        )
 
 
 if __name__ == "__main__":

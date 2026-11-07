@@ -22,14 +22,14 @@ sys.path.insert(0, str(ROOT))
 from anything_plays.systems import SYSTEMS  # noqa: E402
 
 ACCEPTANCE_FILE = ROOT / "config" / "v3.0-release-acceptance.json"
-# Playback and audio must work regardless of whether the core is included or
-# delivered as a separate approved in-app download.
+# Each supported system must boot offline from the single installer. Optional
+# in-app emulator *updates* cannot substitute for its initial native core.
 SYSTEM_FLAGS = ("in_app_video", "camera_controls", "real_game_verified", "audio_verified")
-STARTER_CONSOLES = frozenset(("gb", "gbc", "gba"))
-PLATFORM_FLAGS = ("clean_install", "all_consoles_verified", "long_run_verified")
+PLATFORM_FLAGS = ("clean_install", "all_consoles_bundled_offline", "all_consoles_verified", "long_run_verified")
 RELEASE_FLAGS = (
     "third_party_license_audit_complete",
     "no_external_emulator_setup_required",
+    "no_runtime_emulator_download_required",
     "packaged_binary_integrity_verified",
 )
 PLATFORMS = ("windows-x64", "macos-arm64", "macos-x86_64", "linux-x64")
@@ -58,26 +58,26 @@ def release_blockers(policy, systems=None):
         if not isinstance(row, dict):
             blockers.append(f"{key}: no evidence record")
             continue
-        if key in STARTER_CONSOLES:
-            if row.get("bundled") is not True:
-                blockers.append(f"{key}: bundled not verified")
-        else:
-            if row.get("downloadable") is not True:
-                blockers.append(f"{key}: downloadable not verified")
-            if row.get("in_app_installation_verified") is not True:
-                blockers.append(f"{key}: in_app_installation_verified not verified")
+        # All 18 consoles are installed at build time, not the user's first
+        # game launch. A separately downloadable core can remain a safe update
+        # mechanism, but it does not satisfy this initial offline requirement.
+        if row.get("bundled") is not True:
+            blockers.append(f"{key}: bundled not verified")
         for field in SYSTEM_FLAGS:
             if row.get(field) is not True:
                 blockers.append(f"{key}: {field} not verified")
-        # The metadata 'backend' field identifies the optional launcher;
-        # the actual default runtime is the embedded Libretro software
-        # frontend, selected by App.uses_embedded_emulator(). Keep that
-        # explicit in acceptance evidence. Switching back to an external
-        # required runtime must fail even if all boolean flags are signed.
-        if (key in ("n64", "gamecube") and
+        # N64 uses the in-panel Libretro frontend. Dolphin must use the
+        # accelerated *hardware* framebuffer: its software fallback is not
+        # a supported gameplay backend. External launchers never pass.
+        if (key == "n64" and
                 row.get("primary_runtime") != "embedded-libretro-software"):
             blockers.append(
                 f"{key}: in-app Libretro runtime not selected/verified"
+            )
+        if (key == "gamecube" and
+                row.get("primary_runtime") != "embedded-libretro-hardware"):
+            blockers.append(
+                "gamecube: accelerated in-app Libretro runtime not selected/verified"
             )
 
     platforms = policy.get("platform_validation")
