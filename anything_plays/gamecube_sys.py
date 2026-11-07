@@ -12,7 +12,6 @@ external Dolphin executable, downloads, or writes to ROM directories.
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 from pathlib import Path
@@ -106,6 +105,7 @@ def writable_dolphin_system_directory(core_path):
     packaged = packaged_dolphin_system_directory(core_path)
     if not sys.platform.startswith("linux"):
         return packaged
+    import fcntl  # Linux-only: unavailable on Windows, which uses bundled Sys.
     source = packaged / "dolphin-emu" / "Sys"
     identity, expected = _inventory(source)
     # Keep Dolphin runtime files separate from its user memory cards/saves.
