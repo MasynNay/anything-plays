@@ -15,6 +15,7 @@ on:
       - 'anything_plays/libretro_input.py'
       - 'anything_plays/libretro_save.py'
       - 'anything_plays/libretro_state.py'
+      - 'anything_plays/neopop_flash.py'
       - 'anything_plays/libretro_video.py'
       - 'anything_plays/libretro_audio.py'
       - 'anything_plays/gba_emulator.py'
