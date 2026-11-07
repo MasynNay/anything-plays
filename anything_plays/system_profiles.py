@@ -164,7 +164,7 @@ def normalize(system, profile, base):
     else:
         result["rgb2"] = list(base.get("rgb2", [255, 30, 180]))
     for key, default in (("color2_enabled", False),
-                         ("multi_fish_enabled", True)):
+                         ("multi_fish_enabled", False)):
         value = profile.get(key, default)
         result[key] = value if type(value) is bool else default
     player = profile.get("color2_player", "Player 2")
