@@ -29,6 +29,7 @@ from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
 from anything_plays.libretro_save import SaveRAM, native_core_save_directory
 from anything_plays.libretro_state import LibretroRecoveryState
+from anything_plays.neopop_flash import check_cartridge_flash, InvalidNeoPopFlash
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
 from anything_plays.libretro_video import (
     SUPPORTED_FORMATS, SOFTWARE_RGBA8888, decode_frame,
@@ -243,6 +244,21 @@ class CoreSession:
     def _load_game(self):
         if not self.rom.is_file():
             raise FileNotFoundError(f"ROM not found: {self.rom}")
+        if self.system in ("ngp", "ngpc"):
+            # Upstream NeoPop's C flash loader trusts unbounded lengths and
+            # block counts from the file. Reject corrupt saves before calling
+            # retro_load_game(), preserving the original for manual recovery.
+            try:
+                check_cartridge_flash(
+                    self.rom, os.fsdecode(self._save_dir_buffer.value)
+                )
+            except InvalidNeoPopFlash as exc:
+                raise RuntimeError(
+                    "Unsafe Neo Geo Pocket cartridge save. The original "
+                    "file was preserved, not deleted. Move it out of the "
+                    "game's save folder before starting without that save. "
+                    + str(exc)
+                ) from exc
 
         info = CoreInfo()
         self.native.system_info(C.byref(info))
