@@ -18,6 +18,9 @@ except (ImportError, OSError):
 
 
 SAMPLE_BLOCK_FRAMES = 256
+# Reject nonsensical batch lengths before reading native pointers. A core
+# callback must not be able to request a multi-gigabyte NumPy view.
+MAX_AUDIO_BATCH_FRAMES = 192_000
 
 
 class AudioSink:
@@ -67,12 +70,17 @@ class AudioSink:
     def batch(self, pointer, frames):
         # Preserve chronology if a core switches from single to batch mode.
         self._flush_single_samples()
-        if pointer and frames:
+        count = int(frames)
+        if count < 0 or count > MAX_AUDIO_BATCH_FRAMES:
+            # A malformed native length must not allocate a huge buffer or
+            # read beyond the memory owned by the core.
+            return 0
+        if pointer and count:
             samples = np.ctypeslib.as_array(
-                C.cast(pointer, C.POINTER(C.c_int16)), shape=(int(frames) * 2,)
+                C.cast(pointer, C.POINTER(C.c_int16)), shape=(count * 2,)
             )
             self.push(samples.reshape(-1, 2))
-        return frames
+        return count
 
     def callback(self, outdata, frames, time_info, status):
         """Fill every output frame, including silence during underruns."""
