@@ -45,6 +45,15 @@ keyboard. A webcam is optional for manual play.
 > needs hardware validation. This branch is not a 2.1 public release;
 > the published 2.0 build remains unchanged.
 
+> **2.1 release requirement:** No additional user downloads, emulator setup,
+> or separate game windows. All eight supported consoles must play within
+> Anything Plays using emulator components included in the installer. No public
+> release or broad user testing is requested until this is verified with actual
+> gameplay, webcam input, and clean installations on supported platforms.
+> The [release acceptance gate](config/v2.1-release-acceptance.json) and
+> [release checklist](docs/EMBEDDED_3D_ARCHITECTURE.md) track the unfinished work;
+> passing GitHub Actions packaging tests alone does not mean 2.1 is ready.
+
 ## Supported consoles
 
 | Console | Accepted ROMs | Libretro core |
