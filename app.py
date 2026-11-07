@@ -77,6 +77,11 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         # The 2.1 alpha can try bundled ParaLLEl-N64 software video in the
         # actual Tk game panel. This is experimental and user-selectable.
         self.n64_embedded = tk.BooleanVar(value=preferences.get('n64_embedded', True) is True)
+        # GameCube also has a CPU video mode. Keep it independent of N64
+        # so a 3D console can be safely switched without affecting others.
+        self.gamecube_embedded = tk.BooleanVar(
+            value=preferences.get('gamecube_embedded', True) is True
+        )
         self.external_process = None
         self.external_input = None  # Local camera/keyboard bridge for N64
         self._game_only_window = None
@@ -144,11 +149,15 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         )
 
     def uses_embedded_emulator(self, system=None):
-        """Distinguish the experimental in-panel N64 core from GPU launchers."""
+        """Choose in-panel video for each console; keep GPU fallback explicit."""
         key = self.system_key.get() if system is None else system
-        return key in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis') or (
-            key == 'n64' and self.n64_embedded.get()
-        )
+        if key in ('gb', 'gbc', 'gba', 'snes', 'nes', 'genesis'):
+            return True
+        if key == 'n64':
+            return self.n64_embedded.get()
+        if key == 'gamecube':
+            return self.gamecube_embedded.get()
+        return False
 
     def set_app_icon(self):
         """Prefer corrected 2.1 artwork without mutating stable 2.0 assets."""
