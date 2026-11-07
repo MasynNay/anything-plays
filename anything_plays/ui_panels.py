@@ -58,6 +58,60 @@ class AuxiliaryPanelsMixin:
         ttk.Button(buttons, text='Pick from image', command=self.pick_image).pack(side='left', padx=4)
         ttk.Button(buttons, text='Choose color', command=self.choose_color).pack(side='left')
         ttk.Label(fish, textvariable=self.color_text).pack(anchor='w', pady=4)
+        # One color now tracks every distinct matching fish (up to 16)
+        # instead of choosing only the largest contour. Both colors may
+        # occupy different control zones at the same time.
+        ttk.Checkbutton(
+            fish, text='Track multiple fish of the same color',
+            variable=self.multi_fish_enabled,
+            command=self.update_tracking_preferences,
+        ).pack(anchor='w', pady=(4, 3))
+        dual = ttk.LabelFrame(fish, text='Color 2 · Optional second tracker', padding=7)
+        dual.pack(fill='x', pady=(5, 5))
+        ttk.Checkbutton(
+            dual, text='Enable Color 2', variable=self.color2_enabled,
+            command=self.update_tracking_preferences,
+        ).pack(anchor='w')
+        dual_buttons = ttk.Frame(dual)
+        dual_buttons.pack(fill='x', pady=(3, 3))
+        ttk.Button(
+            dual_buttons, text='Pick Color 2 from video',
+            command=self.pick_second_color,
+            style='Compact.TButton',
+        ).pack(side='left', padx=(0, 4))
+        ttk.Button(
+            dual_buttons, text='Choose Color 2',
+            command=self.choose_second_color,
+            style='Compact.TButton',
+        ).pack(side='left')
+        ttk.Label(dual, textvariable=self.color2_text).pack(anchor='w')
+        player_row = ttk.Frame(dual)
+        player_row.pack(fill='x', pady=(5, 0))
+        ttk.Label(player_row, text='Color 2 controls:').pack(side='left', padx=(0, 8))
+        self.color2_port_combo = ttk.Combobox(
+            player_row, textvariable=self.color2_player, state='readonly',
+            values=['Player 1', 'Player 2'], width=13,
+        )
+        self.color2_port_combo.pack(side='left')
+        self.color2_port_combo.bind(
+            '<<ComboboxSelected>>', self.update_tracking_preferences
+        )
+        ttk.Label(
+            dual, text='Player 2 requires a game with two-controller support. '
+                       'Only the selected colors are tracked.',
+            wraplength=410,
+        ).pack(anchor='w', pady=(4, 1))
+        mode_row = ttk.Frame(fish)
+        mode_row.pack(fill='x', pady=(6, 3))
+        ttk.Label(mode_row, text='When a fish enters a zone:').pack(
+            side='left', padx=(0, 8)
+        )
+        mode = ttk.Combobox(
+            mode_row, textvariable=self.camera_input_mode, state='readonly',
+            values=['Held while visible', 'Pulse (classic)'], width=20,
+        )
+        mode.pack(side='left')
+        mode.bind('<<ComboboxSelected>>', self.update_tracking_preferences)
         self.tolerance = tk.IntVar()
         self.min_area = tk.IntVar()
         self.hold_frames = tk.IntVar()
