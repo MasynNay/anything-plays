@@ -9,6 +9,7 @@
 
   **Camera-powered play · Four consoles · Windows, macOS & Linux**
 
+  [Website](https://anythingplays.masynnay.com/) ·
   [Releases](https://github.com/MasynNay/anything-plays/releases) ·
   [Get started](#get-started) ·
   [Roadmap](ROADMAP.md) ·
