@@ -116,6 +116,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  wonderswan-original-native-av:
+    # Two original NEC V30MZ 8086-compatible ROMs, real monochrome/color
+    # background tile graphics and hardware wavetable channel audio PCM.
+    # The generated ROMs are CI-only and not part of the player installer.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [ws, wsc]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native audio and graphics dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Fetch the pinned Mednafen WonderSwan core in CI only
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_wswan')"
+      - name: Demand original WonderSwan video and wavetable PCM
+        run: |
+          python tools/probe_wonderswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.so --seconds 8 --report test-evidence/${{ matrix.system }}-original-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-${{ matrix.system }}-native-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   pce-original-vdc-vce-psg-av:
     # Native Mednafen PCE Fast executes an original HuC6280 HuCard.
     # No CD firmware or commercial ROMs. Enforce real VDC/VCE output and
