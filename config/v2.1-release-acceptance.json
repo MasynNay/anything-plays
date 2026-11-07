@@ -43,14 +43,16 @@
       "in_app_video": false,
       "camera_controls": true,
       "real_game_verified": false,
-      "notes": "Experimental bundled software renderer exists; real in-panel gameplay not verified."
+      "notes": "Experimental bundled software renderer exists; real in-panel gameplay not verified.",
+      "primary_runtime": "embedded-libretro-software"
     },
     "gamecube": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "Dolphin remains external. A controller pipe alone does not meet the requirement."
+      "notes": "Dolphin core and Sys data are now staged in test installers; actual gameplay speed and save compatibility have not been validated.",
+      "primary_runtime": "embedded-libretro-software"
     }
   },
   "platform_validation": {
