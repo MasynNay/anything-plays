@@ -30,6 +30,17 @@ GENESIS_IDS = {
 }
 
 
+# Beetle NeoPop labels physical Pocket button A as RetroPad B (ID 0), and
+# physical Pocket button B as RetroPad A (ID 8). Unlike the generic
+# Game Boy layout, keeping the default IDs would swap both buttons in
+# manual keyboard controls AND the camera-driven fish commands.
+NEO_GEO_POCKET_IDS = {
+    **{name: IDS[name] for name in ("Up", "Down", "Left", "Right", "Start")},
+    "A": IDS["B"],
+    "B": IDS["A"],
+}
+
+
 # Name -> stable identity, so the existing frame-pulse buffer can hold
 # both N64 digital buttons and analog stick directions without changing
 # other consoles' controller IDs.
@@ -61,6 +72,8 @@ class InputBuffer:
             return N64_INPUT.get(button)
         if self.system == "gamecube":
             return GAMECUBE_INPUT.get(button)
+        if self.system in ("ngp", "ngpc"):
+            return NEO_GEO_POCKET_IDS.get(button)
         return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
 
     def queue_press(self, button, frames):
