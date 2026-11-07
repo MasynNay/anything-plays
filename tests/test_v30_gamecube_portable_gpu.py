@@ -55,6 +55,16 @@ class PortableGameCubeHostTests(TestCase):
         self.assertEqual(host.core_reset, 123)
         self.assertTrue(req.get_current_framebuffer)
 
+    def test_windows_missing_gpu_driver_reports_actionable_error(self):
+        with patch("anything_plays.libretro_gpu_portable.sys.platform",
+                   "win32"):
+            def absent_driver(**kwargs):
+                raise Exception("wglCreateContextAttribsARB not found")
+            with self.assertRaisesRegex(RuntimeError, "graphics driver") as caught:
+                PortableGLFrameHost(backend=absent_driver)
+            self.assertIn("OpenGL 3.3", str(caught.exception))
+            self.assertIn("restart Anything Plays", str(caught.exception))
+
     def test_no_context_procs_return_none_without_native_crash(self):
         host = PortableGLFrameHost.__new__(PortableGLFrameHost)
         host.context = None

@@ -52,7 +52,22 @@ class PortableGLFrameHost(EGLFrameHost):
         if sys.platform == "win32":
             opts["glversion"] = 330
         try:
-            self.context = backend(**opts)
+            try:
+                self.context = backend(**opts)
+            except Exception as exc:
+                # Hosted Windows CI commonly exposes only Microsoft's old
+                # software OpenGL 1.1 driver, with no WGL 3.3 extension.
+                # Explain the actual hardware/driver requirement instead
+                # of surfacing an opaque "wglCreateContextAttribsARB" crash.
+                if (sys.platform == "win32" and
+                        "wglcreatecontextattribsarb" in str(exc).lower()):
+                    raise RuntimeError(
+                        "GameCube needs a graphics driver supporting OpenGL "
+                        "3.3 or newer. Windows could not create an accelerated "
+                        "context (WGL unavailable). Install your GPU vendor's "
+                        "driver and restart Anything Plays."
+                    ) from exc
+                raise
             self.context.__enter__()
             self._entered = True
             get_string = self._gl("glGetString", C.c_char_p, [C.c_uint])
