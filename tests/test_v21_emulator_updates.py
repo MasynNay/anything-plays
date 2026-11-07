@@ -90,6 +90,29 @@ class EmulatorUpdaterTests(unittest.TestCase):
             self.assertEqual(mgba["status"], "review-upstream")
             self.assertIn("requires tested app rebuild", summary_text(report))
 
+    def test_bundled_gamecube_core_is_verified_and_update_checked(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._bundle(root)
+            path = root / "dolphin_libretro.so"
+            path.write_bytes(b"synthetic Dolphin core")
+            manifest_path = root / "CORE_PROVENANCE.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["cores"].append({
+                "name": "dolphin",
+                "file": path.name,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "libretro_library_version": "test",
+                "reported_source_revision": "bbbbbbbb",
+            })
+            manifest_path.write_text(json.dumps(manifest))
+            report = check_emulator_updates([root], opener=fake_opener)
+            dolphin = next(x for x in report["cores"] if x["key"] == "dolphin")
+            self.assertEqual(dolphin["integrity"], "verified")
+            self.assertEqual(dolphin["status"], "current-source")
+            self.assertIn("libretro/dolphin", dolphin["repository"])
+            self.assertFalse(report["updates_install_automatically"])
+
     def test_tampered_bundle_is_reported_not_overwritten(self):
         with TemporaryDirectory() as tmp:
             core = self._bundle(tmp, checksum_override="a" * 64)
