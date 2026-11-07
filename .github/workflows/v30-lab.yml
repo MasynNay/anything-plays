@@ -670,7 +670,7 @@ jobs:
           python tools/probe_gamecube_app.py \
             --core cores/dolphin_libretro.dylib \
             --rom original-gx3d/anythingplays-gc-gx-gamecube.dol \
-            --require-animated --seconds 12 \
+            --require-animated --require-audio --seconds 12 \
             --report test-evidence/gamecube-original-gx3d-${{ matrix.target }}.json
       - uses: actions/upload-artifact@v4
         if: always()
