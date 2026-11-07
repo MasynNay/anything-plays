@@ -26,6 +26,7 @@ from anything_plays.libretro_abi import (
     INPUT_STATE, VIDEO,
 )
 from anything_plays.libretro_audio import AudioSink
+from anything_plays.libretro_native_loader import release_inactive_core_library
 from anything_plays.libretro_input import (
     BUTTONS, IDS, InputBuffer, TWO_PLAYER_SYSTEMS,
 )
@@ -83,6 +84,7 @@ class NativeCore:
         self.callbacks = []
         self.initialized = False
         self.loaded = False
+        self.release_library_on_close = False
 
     def _function(self, name, result, arguments):
         function = getattr(self.library, name)
@@ -117,6 +119,8 @@ class NativeCore:
                 self.callbacks.clear()
                 self.loaded = False
                 self.initialized = False
+                if self.release_library_on_close:
+                    release_inactive_core_library(self)
 
 
 class CoreSession:
@@ -318,6 +322,10 @@ class CoreSession:
             )
         self.emulator.inputs.system = self.system
         self.native = NativeCore(self.core_path)
+        # ParaLLEl-N64's global graphics state is not reset by retro_deinit
+        # alone. Remapping the same CDLL after unload results in a blank
+        # second game. Release its module only once all callbacks are gone.
+        self.native.release_library_on_close = self.system == "n64"
         try:
             self.native.configure(
                 self.environment, self.video, self.audio, self.emulator.inputs
