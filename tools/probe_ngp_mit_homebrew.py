@@ -88,6 +88,7 @@ def _child(system, core, rom, seconds, report):
     faulthandler.enable(all_threads=True)
     from PIL import Image
     from anything_plays.gba_emulator import Emulator, CoreSession
+    from anything_plays.libretro_input import IDS
     emulator = Emulator()
     emulator.system = emulator.inputs.system = system
     emulator.core_path = str(core)
@@ -107,9 +108,11 @@ def _child(system, core, rom, seconds, report):
         value = original_input(port, device, index, identity)
         if port == 0 and device == 1 and index == 0:
             native_input["queries"] += 1
-            if stimulus_phase == "manual" and identity == 8 and value:
+            # Physical NeoPop A maps to RetroPad B; physical B maps to
+            # RetroPad A. Verify the actual native callback identifiers.
+            if stimulus_phase == "manual" and identity == IDS["B"] and value:
                 native_input["manual_a_positive"] += 1
-            if stimulus_phase == "camera" and identity == 0 and value:
+            if stimulus_phase == "camera" and identity == IDS["A"] and value:
                 native_input["camera_b_positive"] += 1
         return value
 
