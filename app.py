@@ -17,6 +17,7 @@ from anything_plays.test_preferences import prepare_test_preferences
 from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
 from anything_plays.ui_gameplay import GameplayMixin
+from anything_plays.ui_volume import VolumeMixin
 from anything_plays.ui_layout import LayoutMixin
 from anything_plays.ui_panels import AuxiliaryPanelsMixin
 from anything_plays.ui_library import LibraryMixin
@@ -31,7 +32,7 @@ from anything_plays.ui_icon import IconMixin
 
 
 class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
-          ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
+          VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
           ShortcutsMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
 
@@ -128,25 +129,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.multi_fish_enabled = tk.BooleanVar(value=False)
         self.camera_input_mode = tk.StringVar(value="Held while visible")
         self._last_camera_pulses = {}
-        # Saved independently from every ROM, with safe defaults on invalid
-        # or older preferences. Do not modify the OS master volume.
-        saved_volume = preferences.get("volume", 35)
-        if (type(saved_volume) not in (int, float)
-                or not 0 <= saved_volume <= 100):
-            saved_volume = 35
-        self.volume_percent = tk.IntVar(value=int(saved_volume))
-        self.volume_label = tk.StringVar(value=f"{int(saved_volume)}%")
-        self.mute_button_text = tk.StringVar(
-            value="Unmute" if int(saved_volume) == 0 else "Mute"
-        )
-        previous_audible = preferences.get("last_nonzero_volume", 35)
-        if (type(previous_audible) not in (int, float)
-                or not 1 <= previous_audible <= 100):
-            previous_audible = 35
-        self._volume_before_mute = (
-            int(saved_volume) if saved_volume > 0 else int(previous_audible)
-        )
-        self.emu.set_volume(int(saved_volume) / 100.0)
+        self.initialize_game_volume(preferences)
         self.mapping_vars = {}
         self.zone_font_size = tk.IntVar(value=44)
         self.zone_opacity = tk.IntVar(value=85)
