@@ -96,8 +96,8 @@ def build_genesis_probe_rom():
     rom[:4] = (0x00FF0000).to_bytes(4, "big")  # stack pointer
     rom[4:8] = ENTRY.to_bytes(4, "big")        # reset entry
     rom[0x100:0x110] = b"SEGA MEGA DRIVE "
-    rom[0x120:0x120 + 31] = b"Anything Plays Genesis Audio Test"
-    rom[0x150:0x150 + 31] = b"Anything Plays Genesis Audio Test"
+    rom[0x120:0x120 + 31] = b"Anything Plays Genesis Audio Test"[:31]
+    rom[0x150:0x150 + 31] = b"Anything Plays Genesis Audio Test"[:31]
     rom[0x1A0:0x1A4] = (0).to_bytes(4, "big")
     rom[0x1A4:0x1A8] = (ROM_SIZE - 1).to_bytes(4, "big")
     rom[0x1F0:0x1F3] = b"U  "
