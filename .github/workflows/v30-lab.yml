@@ -623,6 +623,7 @@ jobs:
             --core cores/dolphin_libretro.so \
             --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
             --require-animated --require-audio --seconds 12 \
+            --require-controller-effect \
             --report test-evidence/gamecube-original-gx3d-linux.json
       - uses: actions/upload-artifact@v4
         if: always()

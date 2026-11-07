@@ -120,6 +120,14 @@ int main(void) {
 
     while (1) {
         PAD_ScanPads();
+        /* A button MUST reach the original game's physical PAD interface.
+         * Changing the native GX background is visible proof that the
+         * embedded Dolphin controller path is wired end to end. */
+        const u16 held = PAD_ButtonsHeld(0);
+        const GXColor inactive = {8, 12, 32, 255};
+        const GXColor a_pressed = {18, 190, 42, 255};
+        GX_SetCopyClear((held & PAD_BUTTON_A) ? a_pressed : inactive,
+                        0x00ffffff);
         guMtxRotAxisDeg(model, (guVector *)&axis,
                         (f32)(frame % 360));
         guMtxConcat(view, model, modelview);

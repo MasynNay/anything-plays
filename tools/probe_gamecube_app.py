@@ -43,7 +43,8 @@ def linux_rss_mb():
 
 
 def _child(core, rom, report, seconds, require_audio=False,
-           require_animated=False, max_growth_mb=None):
+           require_animated=False, max_growth_mb=None,
+           require_controller_effect=False):
     import faulthandler
     faulthandler.enable(all_threads=True)
     import ctypes as C
@@ -92,15 +93,31 @@ def _child(core, rom, report, seconds, require_audio=False,
     rss_samples = []
     frame_callbacks = 0
     sampled_nonblank = 0
+    controller_active_frames = 0
+    controller_idle_frames = 0
     preview = report.with_name("gamecube-app-accelerated-frame.png")
 
     def sample_real_output(data, width, height, pitch):
         nonlocal frame_callbacks, sampled_nonblank
+        nonlocal controller_active_frames, controller_idle_frames
         before = emu.frame_serial
         original_video(data, width, height, pitch)
         if emu.frame_serial == before:
             return
         frame_callbacks += 1
+        # Look at an unobstructed left-edge background sample, well away
+        # from the rotating cube. The actual original PowerPC homebrew
+        # changes GX_SetCopyClear only while PAD_BUTTON_A is held.
+        # This is a direct framebuffer effect, not a mock input poll.
+        with emu.lock:
+            image = emu.frame
+            if image is not None and image.shape[0] >= 24 and image.shape[1] >= 96:
+                r, g, b = map(int, image[image.shape[0] // 2,
+                                         image.shape[1] // 12, :3])
+                if g >= 135 and g >= r + 60 and g >= b + 55:
+                    controller_active_frames += 1
+                if r <= 45 and g <= 65 and b <= 95:
+                    controller_idle_frames += 1
         if frame_callbacks % 120 == 0:
             resident = linux_rss_mb()
             if resident is not None:
@@ -140,7 +157,7 @@ def _child(core, rom, report, seconds, require_audio=False,
         while not stop.is_set():
             button = buttons[index % len(buttons)]
             emu.inputs.set_manual(button, True)
-            if stop.wait(0.055):
+            if stop.wait(0.22 if button == "A" else 0.055):
                 break
             emu.inputs.set_manual(button, False)
             if stop.wait(0.055):
@@ -184,11 +201,16 @@ def _child(core, rom, report, seconds, require_audio=False,
     growth = max(0.0, max(stable) - stable[0]) if stable else None
     memory_ok = (max_growth_mb is None or
                  (growth is not None and growth <= max_growth_mb))
+    controller_effect_ok = (
+        controller_active_frames >= 2 and controller_idle_frames >= 2
+        and nonzero_polls >= 10
+    )
     passed = (
         core_visual_ok
         and (not require_animated or continuous_video_ok)
         and (not require_audio or real_audio_ok)
         and memory_ok
+        and (not require_controller_effect or controller_effect_ok)
     )
     evidence = {
         "system": "gamecube",
@@ -220,6 +242,10 @@ def _child(core, rom, report, seconds, require_audio=False,
         "native_rss_growth_mb": None if growth is None else round(growth, 2),
         "native_rss_growth_limit_mb": max_growth_mb,
         "native_rss_growth_verified": memory_ok,
+        "native_controller_active_green_frames": controller_active_frames,
+        "native_controller_idle_dark_frames": controller_idle_frames,
+        "gamecube_button_a_visual_effect_verified": controller_effect_ok,
+        "controller_effect_required": require_controller_effect,
         "continuous_video_20fps_requirement_met": continuous_video_ok,
         "native_nonzero_pcm_requirement_met": real_audio_ok,
         "continuous_animated_video_required": require_animated,
@@ -245,7 +271,7 @@ def _child(core, rom, report, seconds, require_audio=False,
 
 def _parent(core, report, seconds, rom_override=None,
             require_audio=False, require_animated=False,
-            max_growth_mb=None):
+            max_growth_mb=None, require_controller_effect=False):
     outcome = {
         "probe": "production embedded GameCube rendering / native sound",
         "passed": False, "native_exit_code": None,
@@ -281,6 +307,8 @@ def _parent(core, report, seconds, rom_override=None,
                 command.append("--require-animated")
             if max_growth_mb is not None:
                 command.extend(["--max-growth-mb", str(max_growth_mb)])
+            if require_controller_effect:
+                command.append("--require-controller-effect")
             env = os.environ.copy()
             env["HOME"] = str(root)
             env["XDG_CONFIG_HOME"] = str(root / "config")
@@ -328,6 +356,8 @@ def main():
                         help="Require continuously changing frames at >=20fps")
     parser.add_argument("--max-growth-mb", type=float,
                         help="Bound RSS growth after warm-up, on Linux")
+    parser.add_argument("--require-controller-effect", action="store_true",
+                        help="Require native GameCube A-button visual response")
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args()
     if not 2 <= args.seconds <= 1800:
@@ -343,12 +373,14 @@ def main():
             require_audio=args.require_audio,
             require_animated=args.require_animated,
             max_growth_mb=args.max_growth_mb,
+            require_controller_effect=args.require_controller_effect,
         )
     return _parent(
         args.core.resolve(), args.report.resolve(), args.seconds,
         rom_override=args.rom, require_audio=args.require_audio,
         require_animated=args.require_animated,
         max_growth_mb=args.max_growth_mb,
+        require_controller_effect=args.require_controller_effect,
     )
 
 
