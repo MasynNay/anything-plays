@@ -34,7 +34,17 @@ def build_gb_probe_rom(system="gb"):
     tile = ENTRY + len(code)
     emit(0x22, 0x05)  # (HL+)=A; DEC B
     nz(tile)
-    ldh(0x47, 0xe4)  # 4 grayscale palette values
+    ldh(0x47, 0xe4)  # DMG mode: 4 grayscale palette values
+    if system == "gbc":
+        # CGB boot ROM / HLE can initialize every BG palette entry to
+        # WHITE, so without BCPS/BCPD our moving hardware background is
+        # invisible in native color mode. Program BG palette zero explicitly:
+        # black, green, blue, white (little-endian RGB555).
+        # BGPI $80: write index 0 and auto-increment after every BCPD byte.
+        ldh(0x68, 0x80)
+        for component in (0x00, 0x00, 0xE0, 0x03,
+                          0x00, 0x7C, 0xFF, 0x7F):
+            ldh(0x69, component)
     for reg, value in (
         (0x26,0x80), (0x24,0x77), (0x25,0x11),
         (0x10,0x00), (0x11,0x80), (0x12,0xf3),

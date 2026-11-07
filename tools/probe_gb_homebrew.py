@@ -138,6 +138,7 @@ def _parent(system,core,report,seconds):
             )
             preview=output.with_name(f"{system}-frame.png")
             if preview.is_file():
+                report.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(preview,report.with_name(preview.name))
     except Exception as exc:
         data["error"]=f"{type(exc).__name__}: {exc}"

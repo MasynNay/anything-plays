@@ -27,6 +27,14 @@ class GameBoyOriginalCartridgeTests(unittest.TestCase):
                      b"\xe0\x14",b"\xe0\x40",b"\xe0\x43"):
             self.assertIn(data, code)
 
+    def test_color_mode_initializes_actual_cgb_palette_ram(self):
+        color = build_gb_probe_rom("gbc")[ENTRY:ENTRY+200]
+        gray = build_gb_probe_rom("gb")[ENTRY:ENTRY+200]
+        self.assertIn(b"\x3e\x80\xe0\x68", color)  # BGPI auto index
+        self.assertEqual(color.count(b"\xe0\x69"), 8)
+        self.assertNotIn(b"\xe0\x69", gray)
+        self.assertIn(b"\x3e\x7f\xe0\x69", color)
+
     def test_writer_does_not_accept_a_different_console(self):
         with TemporaryDirectory() as folder:
             one=Path(folder)/"one.gb"
