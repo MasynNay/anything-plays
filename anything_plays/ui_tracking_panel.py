@@ -79,6 +79,7 @@ def _toggle_panel(frame, enabled):
 
 def build_tracking_panel(app, right):
     """Build primary/secondary object, input, zones and advanced settings."""
+    app.mirror = tk.BooleanVar()
     primary = _section(
         right, "03", "PRIMARY OBJECT",
         "Choose the color the camera should follow. Tracking can recognize "
@@ -223,7 +224,7 @@ def build_tracking_panel(app, right):
         combo.pack(side="left", fill="x", expand=True)
         # Keep a widget reference compatible with refresh_system_buttons:
         # the frame is the layout unit, not an individual label/grid cell.
-        app.mapping_widgets[name] = (item, item)
+        app.mapping_widgets[name] = (item, combo)
         combo.bind(
             "<<ComboboxSelected>>",
             lambda _event, n=name: app.update_button_mapping(n),
@@ -249,7 +250,7 @@ def build_tracking_panel(app, right):
     app.min_area = tk.IntVar()
     app.hold_frames = tk.IntVar()
     app.cooldown = tk.IntVar()
-    app.mirror = getattr(app, "mirror", tk.BooleanVar())
+    # The mirror control is initialized before its visible checkbox.
     tuning = ttk.LabelFrame(
         app.advanced_tracking_controls, text="Detection & timing",
         padding=10,
