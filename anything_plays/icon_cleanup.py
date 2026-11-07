@@ -1,6 +1,7 @@
 """Remove ONLY edge-connected dark matte around the existing 3.0 icon.
 
 Preserve the approved betta/handheld illustration, border, colors and shape.
+This is NOT a redesign: every original RGB pixel is kept unchanged.
 The original WebP and stable 2.0 assets are never overwritten; package-time
 PNG/ICO/ICNS as well as the Tk app icon use the same transparent treatment.
 """
@@ -14,8 +15,8 @@ def clean_icon_background(source):
 
     The matte is identified as an edge-connected, low-brightness component.
     Interior black details are preserved because they are *not* connected
-    across the existing closed cyan border. Only a 2px antialias fringe
-    around that exterior component is softened.
+    across the existing closed cyan border. No edge smoothing or shape
+    changes are permitted; the only allowed change is exterior alpha.
     """
     rgba = np.array(source.convert("RGBA"), dtype=np.uint8, copy=True)
     rgb = rgba[:, :, :3]
@@ -55,20 +56,11 @@ def clean_icon_background(source):
         return Image.fromarray(rgba, "RGBA")
     alpha[exterior] = 0
 
-    # Bleed a tiny soft fade through antialiased dark pixels that were
-    # not fully black, without touching bright cyan/neon border pixels.
-    nearest = cv2.dilate(
-        exterior.astype(np.uint8),
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
-        iterations=1,
-    ).astype(bool) & ~exterior
-    fringe = nearest & (peak < 115)
-    alpha[fringe] = np.minimum(
-        alpha[fringe],
-        np.clip((peak[fringe].astype(np.int16) - 20) * 2, 0, 255).astype(np.uint8),
-    )
-    # Clear RGB in fully transparent matte pixels to prevent black halos in
-    # image scaling/compositing on macOS Dock / Windows taskbar.
-    rgb[alpha == 0] = 0
+    # Strict preservation contract: DO NOT touch any pixel bordering the
+    # illustration, its dark linework, eye, handheld, face, or cyan frame.
+    # In particular, NEVER dilate/blur this mask: a 2px "fringe cleanup"
+    # could visibly damage the original fish's dark outline.
+    # RGB channels remain byte-for-byte IDENTICAL to the user's source.
+    # Only fully connected exterior matte receives alpha=0.
     rgba[:, :, 3] = alpha
     return Image.fromarray(rgba, "RGBA")
