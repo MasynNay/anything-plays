@@ -174,8 +174,8 @@ def main():
             p.error("--child requires --rom")
         return _child(args.system,args.core.resolve(),args.rom.resolve(),
                       args.seconds,args.report.resolve())
-    return _parent(args.system,args.core.resolve(),args.seconds,
-                   args.report.resolve())
+    return _parent(args.system,args.core.resolve(),args.report.resolve(),
+                   args.seconds)
 
 
 if __name__=="__main__":
