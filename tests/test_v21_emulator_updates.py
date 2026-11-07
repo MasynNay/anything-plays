@@ -127,6 +127,20 @@ class EmulatorUpdaterTests(unittest.TestCase):
             self.assertEqual(item["installed_from"], "approved-core-pack")
             self.assertEqual(item["installed_version"], "v2.1.0-alpha.2")
             self.assertIn("approved", summary_text(report).lower())
+            # Online upstream checks must not replace the active pack's status
+            # with the original bundled core revision.
+            with patch("anything_plays.core_packs.managed_core_path",
+                       return_value="/vetted/mgba_libretro.so"), patch(
+                "anything_plays.core_packs.managed_core_release",
+                return_value="v2.1.0-alpha.2"
+            ):
+                online_report = check_emulator_updates(
+                    [tmp], opener=fake_opener, online=True
+                )
+            current = next(i for i in online_report["cores"] if i["key"] == "mgba")
+            self.assertEqual(current["status"], "managed-release")
+            self.assertEqual(current["installed_version"], "v2.1.0-alpha.2")
+            self.assertEqual(current["upstream_revision"], SHA)
 
     def test_tampered_bundle_is_reported_not_overwritten(self):
         with TemporaryDirectory() as tmp:
