@@ -85,6 +85,32 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
             self.assertEqual(saved["details"]["video_callback_frames"], 6)
             # Even a successful experimental probe is not a release approval.
 
+    def test_native_debugger_keeps_gdb_failure_evidence(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+
+            def fake_gdb(args, **kwargs):
+                self.assertEqual(args[0], "/usr/bin/gdb")
+                self.assertIn("thread apply all bt 24", args)
+                return CompletedProcess(args, 0, stdout="#0 fatal_native_frame()")
+
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.shutil.which",
+                           return_value="/usr/bin/gdb",
+                       ), patch("tools.probe_gamecube_homebrew.subprocess.run",
+                                side_effect=fake_gdb):
+                # gdb exits successfully after printing a crash stack; that
+                # must never count as successful software-rendered gameplay.
+                self.assertEqual(_parent(core, 1, report, debugger=True), 1)
+            evidence = json.loads(report.read_text())
+            self.assertEqual(evidence["debugger"], "gdb")
+            self.assertIn("fatal_native_frame", evidence["console_tail"])
+            self.assertFalse(evidence["probe_passed"])
+
     def test_missing_core_fails_without_downloading_anything(self):
         with TemporaryDirectory() as folder:
             report = Path(folder) / "missing.json"

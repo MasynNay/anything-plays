@@ -260,7 +260,6 @@ def _parent(core, seconds, report, debugger=False):
             )
             preview = child_report.with_name("gamecube-homebrew-frame.png")
             if preview.is_file():
-                import shutil
                 shutil.copyfile(preview, report.with_name(preview.name))
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
