@@ -1,5 +1,6 @@
 """Prevent oversized disk images from exhausting the Python/native heap."""
 import ctypes as C
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -36,6 +37,20 @@ class RomMemoryBudgetTests(unittest.TestCase):
             )):
                 with self.assertRaisesRegex(ValueError, "too large"):
                     session._game_info(False)
+
+    def test_rom_growth_after_size_check_is_still_bounded(self):
+        with TemporaryDirectory() as folder:
+            rom = Path(folder) / "growing.gba"
+            rom.write_bytes(b"small")
+            session = CoreSession(Emulator(), "gba", rom, None)
+            # Simulate a file changing from 5 bytes to a larger object
+            # between stat() and open(). Do not allocate an actual 256MB file.
+            with patch("anything_plays.gba_emulator.MAX_IN_MEMORY_ROM_BYTES", 16):
+                with patch.object(Path, "stat", return_value=SimpleNamespace(
+                    st_size=5
+                )), patch.object(Path, "open", return_value=BytesIO(b"Z" * 32)):
+                    with self.assertRaisesRegex(ValueError, "changed size"):
+                        session._game_info(False)
 
     def test_full_path_core_does_not_read_entire_disc(self):
         with TemporaryDirectory() as folder:
