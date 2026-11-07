@@ -25,7 +25,7 @@ python3 tools/prune_linux_system_libs.py dist/AnythingPlays
 mkdir -p dist/AnythingPlays/cores
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
-  CORE_LIST+=(fceumm genesis_plus_gx parallel_n64)
+  CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin)
 fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.so"
@@ -33,6 +33,11 @@ for name in "${CORE_LIST[@]}"; do
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
+  cp -R cores/dolphin-emu dist/AnythingPlays/cores/
+  cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays/cores/
+fi
 
 # Include project and third-party licensing documentation.
 mkdir -p dist/AnythingPlays/licenses
@@ -60,7 +65,7 @@ Architecture: $ARCH
 Maintainer: Anything Plays Project <noreply@example.invalid>
 Depends: libc6, libgl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
- Embedded GB/GBC/GBA, SNES, NES and Genesis cores; external N64/GameCube launch.
+ Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores.
 CONTROL
 cat > "$PKG/usr/bin/anything-plays-21-test" <<'LAUNCH'
 #!/bin/sh
