@@ -71,6 +71,39 @@ def _flash_entries(folder):
     return result
 
 
+def stage_homebrew_cartridge_size(rom, capacity=4 * 1024 * 1024):
+    """Pad only the disposable, already hash-verified MIT homebrew fixture.
+
+    StarGunner's flash journal lives at 0x3FA000, near the end of a 4 MiB
+    cartridge, but its development .ngc artifact contains only 79,765 bytes.
+    NeoPop backs its cartridge bus by the loaded file's actual length. Without
+    a full cartridge image, writes at 0x3FA000 cannot be backed by ROM data.
+    Filling unused cartridge bytes with erased-flash value 0xFF models a
+    physical 32 Mbit cart; never modify a user's original ROM to do this.
+    """
+    original = Path(rom)
+    length = original.stat().st_size
+    if not 0 < length <= capacity or capacity > 4 * 1024 * 1024:
+        raise ValueError("Unexpected cartridge-size fixture")
+    source_sha = hashlib.sha256(original.read_bytes()).hexdigest()
+    remaining = capacity - length
+    with original.open("ab") as stream:
+        while remaining:
+            n = min(remaining, 1024 * 1024)
+            stream.write(b"\xff" * n)
+            remaining -= n
+    if original.stat().st_size != capacity:
+        raise RuntimeError("Failed to stage complete homebrew cartridge image")
+    return {
+        "original_bytes": length,
+        "original_sha256": source_sha,
+        "staged_bytes": capacity,
+        "padding_is_erased_flash_ff": True,
+        "staged_sha256": hashlib.sha256(original.read_bytes()).hexdigest(),
+        "ships_with_app": False,
+    }
+
+
 def child(phase, core, rom, report, timeout, mode="flash"):
     import faulthandler
     faulthandler.enable(all_threads=True)
@@ -225,6 +258,7 @@ def parent(core, report, timeout, mode="flash"):
             root = Path(tmp)
             rom = root / "StarGunner.ngc"
             outcome["fixture"] = fetch_test_fixture("ngpc", rom)
+            outcome["staged_cartridge"] = stage_homebrew_cartridge_size(rom)
             env = os.environ.copy()
             # Preserve one portable save root across all THREE separate core
             # processes while never touching a GitHub runner's real profile.
