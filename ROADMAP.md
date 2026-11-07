@@ -75,19 +75,6 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 
 The explicit release-readiness work is in [#28](https://github.com/MasynNay/anything-plays/issues/28). **Stable 2.0 stays available throughout this work.**
 
-## Versioned plans following 3.0
-
-These are planning groups, **not scheduled releases**. Stability and user feedback may reorder them.
-
-| Proposed version | Product focus | Candidate improvements |
-| --- | --- | --- |
-| **3.1 Personalization** | Reduce setup friction | Per-game control presets, improved camera calibration, accessible label and layout defaults |
-| **3.2 Reliability** | Better long-running sessions | Local diagnostic report, GPU frame pacing, long-session memory/resource tests, crash recovery |
-| **3.3 Library experience** | More useful ROM collections | Recently played and favorites, optional offline artwork metadata, improved save visibility |
-| **4.0 Exploration** | Research, not a promise | Advanced multi-object input, local multiplayer improvements, modernized interface architecture |
-
-No new console or commercial content is promised. Third-party emulator compliance remains a release requirement.
-
 ## Ideas for after 3.0 — proposals, not commitments
 
 These are opportunities to investigate **after stability and compliance**, not features promised for 3.0.
