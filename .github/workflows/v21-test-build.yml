@@ -227,3 +227,49 @@ jobs:
             test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: warn
           retention-days: 21
+
+  gamecube-patched-native-experiment:
+    # Compile from GPL source only when a native(dolphin) change is submitted.
+    # This is a developer test; it does not add unaudited modified binaries
+    # to any public Anything Plays installer.
+    if: ${{ contains(github.event.head_commit.message, 'native(dolphin)') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      AP_DOLPHIN_BUILD_JOBS: '2'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned Dolphin source-build prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config git gdb xvfb \
+            libgl1-mesa-dev libegl1-mesa-dev libx11-dev libxi-dev \
+            libudev-dev libusb-1.0-0-dev libcurl4-openssl-dev \
+            liblzma-dev zlib1g-dev libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Build patched Dolphin Libretro from reviewed upstream GPL source
+        timeout-minutes: 70
+        run: bash tools/build_patched_dolphin_core.sh
+      - name: Probe modified Dolphin with pinned GameCube homebrew
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --debugger \
+            --report test-evidence/gamecube-patched-homebrew.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-patched-Dolphin-experiment-evidence
+          path: |
+            test-evidence/gamecube-patched-homebrew.json
+            test-evidence/gamecube-homebrew-frame.png
+            ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
+          if-no-files-found: warn
+          retention-days: 14
