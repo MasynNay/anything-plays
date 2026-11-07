@@ -52,6 +52,7 @@ class ProfilesMixin:
         prefs['n64_core_path'] = self.n64_core_override
         prefs['n64_embedded'] = bool(self.n64_embedded.get())
         prefs['gamecube_embedded'] = bool(self.gamecube_embedded.get())
+        prefs['gamecube_preview_mode'] = self.gamecube_preview_mode.get()
         prefs['view_mode'] = self.view_mode.get()
         prefs['volume'] = max(0, min(100, int(self.volume_percent.get())))
         prefs['last_nonzero_volume'] = max(
