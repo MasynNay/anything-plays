@@ -127,11 +127,15 @@ def _parent(core, report, seconds, *, debugger=False):
                 result["native_exit_code"] = completed.returncode
                 result["console_tail"] = completed.stdout[-14000:]
                 if debugger:
-                    # Preserve initial signal and native crashing thread even
-                    # when later debugger output exceeds the log tail.
-                    marker = completed.stdout.find("Program received signal")
+                    # GDB can exit zero even after its debuggee SIGSEGVs.
+                    # Never record that process exit as a passing native run.
+                    result["native_faulted"] = bool(
+                        "received signal SIGSEGV" in completed.stdout
+                        or "received signal SIGABRT" in completed.stdout
+                    )
+                    marker = completed.stdout.find("received signal")
                     result["native_fault_trace"] = (
-                        completed.stdout[marker:marker + 9500]
+                        completed.stdout[max(0, marker - 15):marker + 9500]
                         if marker >= 0 else completed.stdout[-9500:]
                     )
             except subprocess.TimeoutExpired as exc:
@@ -145,6 +149,7 @@ def _parent(core, report, seconds, *, debugger=False):
                 result["details"] = json.loads(report_child.read_text())
             result["passed"] = (
                 result["native_exit_code"] == 0
+                and not result.get("native_faulted", False)
                 and isinstance(result["details"], dict)
                 and result["details"].get("passed") is True
             )

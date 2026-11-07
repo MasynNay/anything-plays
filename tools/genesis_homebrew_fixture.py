@@ -93,7 +93,10 @@ def build_genesis_probe_rom():
     assert len(code) < 0x1000
 
     rom = bytearray(ROM_SIZE)
-    rom[:4] = (0x00FF0000).to_bytes(4, "big")  # stack pointer
+    # Reserve space for supervisor/interrupt stack pushes near the high end of
+    # $FF0000-$FFFFFF Genesis work RAM. $FF0000 is the *bottom* of RAM and
+    # would underflow on the first 68000 stack push.
+    rom[:4] = (0x00FFFF00).to_bytes(4, "big")  # initial supervisor SP
     rom[4:8] = ENTRY.to_bytes(4, "big")        # reset entry
     rom[0x100:0x110] = b"SEGA MEGA DRIVE "
     rom[0x120:0x120 + 31] = b"Anything Plays Genesis Audio Test"[:31]
