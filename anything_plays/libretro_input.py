@@ -8,6 +8,7 @@ from queue import Empty, Full, Queue
 from threading import Lock
 
 from anything_plays.remote_retropad import N64_AXES, N64_DIGITAL, desired_state
+from anything_plays.gamecube_software import GAMECUBE_INPUT, gamecube_state
 
 BUTTONS = ("Up", "Down", "Left", "Right", "A", "B", "Start", "Select",
            "X", "Y", "L", "R")
@@ -51,13 +52,15 @@ class InputBuffer:
         self.state_lock = Lock()
         self.remaining = {}
         self.pressed = set()
-        # Libretro may request dozens of N64 states per emulated frame.
-        # Cache the complete analogue/digital snapshot once per frame.
+        # N64 and GameCube may request dozens of analogue states per
+        # emulated frame. Cache the complete 3D controller snapshot once.
         self._n64_state = {}
 
     def id_for(self, button):
         if self.system == "n64":
             return N64_INPUT.get(button)
+        if self.system == "gamecube":
+            return GAMECUBE_INPUT.get(button)
         return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
 
     def queue_press(self, button, frames):
@@ -122,6 +125,12 @@ class InputBuffer:
                     if identity in self.pressed
                 )
                 self._n64_state = desired_state(active)
+            elif self.system == "gamecube":
+                active = (
+                    button for button, identity in GAMECUBE_INPUT.items()
+                    if identity in self.pressed
+                )
+                self._n64_state = gamecube_state(active)
             else:
                 self._n64_state.clear()
 
@@ -133,10 +142,10 @@ class InputBuffer:
                     del self.remaining[button_id]
 
     def state(self, port, device, index, button_id):
-        """Libretro callback: player-one digital and N64 analog input."""
+        """Libretro callback: player-one digital and N64/GameCube analog input."""
         if port != 0:
             return 0
         with self.state_lock:
-            if self.system != "n64":
+            if self.system not in ("n64", "gamecube"):
                 return int(device == 1 and button_id in self.pressed)
             return self._n64_state.get((device, index, button_id), 0)
