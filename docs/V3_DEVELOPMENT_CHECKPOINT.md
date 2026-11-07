@@ -40,8 +40,9 @@ Linux x64, macOS Intel x64 and macOS Apple Silicon**:
 | PC Engine (HuCard) | Mednafen PCE Fast | Four-platform workflow `42382893807` |
 | WonderSwan, WonderSwan Color | Mednafen WonderSwan | Four-platform workflow `42382893807` |
 | Nintendo 64 | ParaLLEl-N64, embedded software video | Four-platform workflow `42349568501` |
+| Neo Geo Pocket Color | Mednafen NeoPop | Four-platform native RGB, nonzero PCM and A/B input, workflow `42388394525` |
 
-**15 of 18** profiles have this level of cross-platform original ROM A/V
+**16 of 18** profiles have this level of cross-platform original ROM A/V
 verification. Tests typically last 8–20 seconds per profile. They are
 **not** evidence that every retail game runs, that physical speakers/cameras
 work, that all save formats persist, or that each device stays stable for days.
@@ -49,10 +50,12 @@ Sources are test-only original assembly/code generators under `tools/`.
 Never ship the generated test ROMs to users.
 
 The profiles **without comparable original playback verification on all four
-targets** remain: **Neo Geo Pocket, Neo Geo Pocket Color, and GameCube**.
-The two MIT-licensed NeoPop homebrew tests are pinned and CI-only; workflow
-`42383623857` was queued at the time of this handoff. Do not call them passed
-until their native RGB **and PCM** job-level tests succeed.
+targets** remain: **monochrome Neo Geo Pocket and GameCube**. NGP's
+MIT alignment-calibration fixture passes native changing video and real
+manual/camera input on all four operating systems but emits **zero nonzero
+PCM values**; that fixture alone is insufficient to certify sound.
+See the dedicated `.github/workflows/v30-ngp.yml` and the detailed
+continuation log below.
 
 ## Longevity and native lifecycle validation
 
@@ -133,9 +136,11 @@ experimental CPU-only GameCube renderer.
 
 ## Next engineering steps, in order
 
-1. **Close Neo Geo Pocket and Neo Geo Pocket Color cross-platform playback evidence** with original
-   rigorously pinned legal homebrew, real video and PCM on all platforms. Add manual input and save/restore checks
-   for each platform, not just test ROM startup.
+1. **Close remaining monochrome NGP audio and genuine flash-save evidence**
+   with a sound-producing, legally pinned original ROM on all four platforms.
+   NGPC RGB/PCM/manual/camera is verified, and its native state-resume
+   fallback passed two cold Linux processes; cartridge `.flash` restoration
+   remains unverified/failed. Expand physical-device/retail-game tests.
 2. **Fix/verify GameCube on actual Windows GPU hardware and Intel Mac.** Keep
    test evidence and performance thresholds honest. Add long native soaks
    and real in-panel QA for the Mac and Windows hardware paths.
@@ -223,3 +228,107 @@ do not meet that persistent-flash release gate.
 real commercial-game compatibility, clean-install physical input/audio,
 extended real-hardware soak, legal/source review, signing and installed
 package acceptance. The original 2.0 release and `main` remain untouched.
+
+
+## Continuation log — November 7, 2026: focused NGP CI and verified recovery
+
+**Follow-on starting point:** `926c8e1`, after the initial NeoPop
+save-directory and controller work. Work continued on
+`feature/v3.0-unified-test`, with no merge to `main` or modification of
+the public 2.0 release.
+
+### Native fixes and evidence
+
+- `7ff21ec`, `b1e5455`, `d2f37df`: Beetle NeoPop's
+  physical button **A** maps to Libretro **B**, and physical **B** to
+  Libretro **A**. Corrected manual/fish-camera mappings, then updated
+  the strict native callback tests and regressions.
+- `b2130aa`, `295c4ba`, `6212ed0`: original, immutable
+  MIT StarGunner native experiment crosses **three completely separate
+  core processes** with real menu presses, captures the in-game
+  CONTINUES pixel region and inspects the `.flash` written by core unload.
+- `847dcde`, `cf1b65a`, `5f15627`: Dolphin GameCube virtual
+  memory-card paths are now platform-user-owned and separate from
+  packaged, read-only Dolphin Sys; shared across GameCube games.
+  Source environment pointer regressions pass. Actual GameCube retail
+  memory-card writes/reads are NOT yet verified.
+- `d50e744`, `b1467e3`, `b715cfb`: dedicated
+  `.github/workflows/v30-ngp.yml` with eight genuine native RGB/PCM/
+  manual/camera jobs, plus original cartridge-flash investigation.
+  Moved these jobs out of the 80+ job generic emulator matrix so they
+  can finish without unrelated pushes repeatedly cancelling results.
+- Real run [42388394525](https://github.com/MasynNay/anything-plays/actions/runs/42388394525)
+  reported **all four NGPC native jobs passed** (Windows/Linux/Intel Mac/
+  Apple Silicon). Mono NGP jobs ran real emulation and passed changing LCD,
+  input polling and state serialization on all four platforms, but failed
+  nonzero native sound: `a_align_calib_v12.ngp` is a silent calibration
+  fixture. The gate remains strict; do not certify mono audio without a
+  properly licensed sound-producing mono NGP fixture.
+- Same run: the real StarGunner Options `.flash` test created a
+  272-byte `StarGunner.flash`; the modified Options pixels changed, and
+  the file remained byte-identical after cold core restart, **but the game
+  displayed the baseline number instead of the saved number**. Do not
+  claim genuine cartridge-flash restoration. See original `flash.c`,
+  `rom.c` and `system.c` in
+  [Beetle NeoPop upstream](https://github.com/libretro/beetle-ngp-libretro).
+- `8986f98`, `20a5942`, `64b9795`, `bae9bfb`:
+  introduced independent `anything_plays/libretro_state.py`
+  full-machine save-state fallback for NGP and NGPC. Bounded 64 MiB,
+  SHA-256 of exact ROM/core/serialized payload, atomic fsync+replace,
+  per-game names, reject invalid and incompatible states. This layer
+  does **not** overwrite or substitute native cartridge `.flash`.
+  A game launch restores only a correctly fingerprinted checkpoint;
+  a save failure warns without killing gameplay.
+- `223c89c`, `732d2b4`, `0f2412e`: separated the genuine
+  native `.flash` experiment (`--mode flash`, recovery disabled)
+  from `--mode state` (recovery enabled, no cartridge flash written).
+  **Native two-cold-process save-state resume PASSED** in real job
+  `ngpc-independent-native-state-resume`, workflow
+  [42389452506](https://github.com/MasynNay/anything-plays/actions/runs/42389452506).
+  The first StarGunner process changes the actual in-game Options
+  pixels and saves a real core state; second process loads the state,
+  reads back the **identical** cropped 8x16 RGB pixels, and reports
+  `native_state_resume_applied=true` and zero `.flash` files.
+  This is tested native fallback, not proof of in-game cartridge saves.
+- `65423ec`: updated the relocated NeoPop unit test to match the
+  dedicated workflow. The old assertion was the only reason the
+  Linux source regression and focused NGP contract test failed in
+  [42389452506](https://github.com/MasynNay/anything-plays/actions/runs/42389452506).
+  At revision `65423ec`, the global application workflow
+  [42389708320](https://github.com/MasynNay/anything-plays/actions/runs/42389708320)
+  **passed** and targeted `ngp-unit-contracts` in run
+  [42389708324](https://github.com/MasynNay/anything-plays/actions/runs/42389708324)
+  **passed**. The targeted aggregate run stays red because the
+  mono audio and raw flash experiments remain unresolved.
+- `2010934`, `3178f28`: game UI now reports a verified native
+  NGP/NGPC restored session for about 20 seconds instead of silently
+  replacing the message with Playing, and headless GUI tests cover
+  its precedence and lifecycle. Latest CI must still be inspected.
+
+### Remaining engineering blockers
+
+1. Obtain or source-generate a genuinely sound-producing **monochrome NGP**
+   homebrew with clear redistribution permission; require actual nonzero
+   native PCM on Windows/Linux/both macOS architectures. Existing mono
+   calibration is deliberately NOT certified for audio.
+2. Diagnose native NeoPop's failure to **reload a modified flash-backed
+   StarGunner Options value** on cold boot. The separate verified native
+   state fallback must not hide this in the native flash acceptance job.
+3. Verify native recovery across actual core updates/rollbacks and both
+   macOS platforms plus Windows, not just the Linux cold restart. Validate
+   physical speakers/camera controls and genuine games.
+4. GameCube still requires a real Windows GPU with OpenGL 3.3+;
+   acceptable Intel Mac 3D FPS; saves, sound devices, camera controls,
+   real-game compatibility, long hardware soaks. Do not fake a passing
+   GameCube matrix.
+5. All complete offline installers, licenses and source obligations,
+   signing/notarization, clean installs and distribution acceptance must
+   pass `tools/check_v30_release.py` before public release.
+
+**Continue after another stream error:** inspect the actual branch head,
+then the most recent `v30-ngp.yml` individual job statuses (especially
+`ngp-original-native-av` mono, `ngpc-real-flash-restart-lab`,
+`ngpc-independent-native-state-resume`, and `ngp-unit-contracts`).
+Inspect `v30-app.yml` and `v30-cores.yml` too. Do not infer
+pass/fail from aggregate labels when the raw flash lab uses
+`continue-on-error: true`. Branch is not ready for user acceptance.
