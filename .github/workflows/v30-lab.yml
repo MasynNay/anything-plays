@@ -368,3 +368,61 @@ jobs:
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
+
+  gamecube-cross-platform-gpu:
+    # Hardware-context and real Dolphin player experiments only. This does
+    # not approve 3.0, and failures still publish machine-readable evidence.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics runtime and virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6
+      - name: Install runtime and platform GPU context library
+        run: python -m pip install -r requirements.txt
+      - name: Prove native hidden GPU context in emulator worker
+        if: runner.os != 'Linux'
+        continue-on-error: true
+        run: python tools/smoke_gamecube_crossplatform.py --report test-evidence/gpu-${{ matrix.target }}.json
+      - name: Prove native Linux EGL FBO
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a python tools/smoke_gamecube_crossplatform.py --report test-evidence/gpu-${{ matrix.target }}.json
+      - name: Retrieve actual Dolphin Libretro and compatible Sys resources
+        continue-on-error: true
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Exercise actual in-app GPU Dolphin on Windows and macOS
+        if: runner.os != 'Linux'
+        continue-on-error: true
+        run: python tools/probe_gamecube_app.py --core cores/dolphin_libretro.${{ matrix.ext }} --seconds 12 --report test-evidence/gamecube-app-${{ matrix.target }}.json
+      - name: Exercise actual in-app GPU Dolphin on Linux
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a python tools/probe_gamecube_app.py --core cores/dolphin_libretro.so --seconds 12 --report test-evidence/gamecube-app-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
