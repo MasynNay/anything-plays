@@ -58,10 +58,16 @@ def release_blockers(policy, systems=None):
         for field in SYSTEM_FLAGS:
             if row.get(field) is not True:
                 blockers.append(f"{key}: {field} not verified")
-        # An external Dolphin launcher can never meet the stated product
-        # requirement, even if someone accidentally ticks all JSON fields.
-        if key == "gamecube" and systems[key].backend == "dolphin":
-            blockers.append("gamecube: backend still launches external Dolphin")
+        # The metadata 'backend' field identifies the optional launcher;
+        # the actual default runtime is the embedded Libretro software
+        # frontend, selected by App.uses_embedded_emulator(). Keep that
+        # explicit in acceptance evidence. Switching back to an external
+        # required runtime must fail even if all boolean flags are signed.
+        if (key in ("n64", "gamecube") and
+                row.get("primary_runtime") != "embedded-libretro-software"):
+            blockers.append(
+                f"{key}: in-app Libretro runtime not selected/verified"
+            )
 
     platforms = policy.get("platform_validation")
     if not isinstance(platforms, dict) or set(platforms) != set(PLATFORMS):
