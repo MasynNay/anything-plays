@@ -147,6 +147,31 @@ class AudioBufferTests(unittest.TestCase):
         whole.close()
         fragmented.close()
 
+    def test_large_native_audio_batches_cannot_exhaust_queue_memory(self):
+        from unittest.mock import Mock, patch
+        from anything_plays.libretro_audio import MAX_QUEUE_CHUNK_FRAMES
+        fake = Mock()
+        fake.query_devices.return_value = {"default_samplerate": 48000.0}
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(8000)
+        # A 192000-frame native batch at 8kHz must not queue a full 24s
+        # of PCM in one huge unbounded chunk when resampled to 48kHz.
+        # Force output-rate conversion even for the common 8kHz source.
+        audio._resample_step = 8000 / 48000
+        chunk = np.tile(np.array([[100, -100]], dtype=np.int16), (192000, 1))
+        audio.push(chunk)
+        self.assertLessEqual(audio.chunks.qsize(), 32)
+        self.assertTrue(all(
+            len(part) <= MAX_QUEUE_CHUNK_FRAMES
+            for part in list(audio.chunks.queue)
+        ))
+        self.assertLessEqual(
+            sum(part.nbytes for part in list(audio.chunks.queue)),
+            32 * MAX_QUEUE_CHUNK_FRAMES * 2 * np.dtype(np.int16).itemsize,
+        )
+        audio.close()
+
     def test_common_native_rate_is_not_needlessly_resampled(self):
         from unittest.mock import Mock, patch
         fake = Mock()

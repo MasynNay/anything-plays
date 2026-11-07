@@ -23,6 +23,7 @@ SAMPLE_BLOCK_FRAMES = 256
 MAX_AUDIO_BATCH_FRAMES = 192_000
 # Avoid huge interpolated arrays for cores using long native audio batches.
 RESAMPLE_INPUT_CHUNK = 2048
+MAX_QUEUE_CHUNK_FRAMES = 4096
 NORMAL_DEVICE_RATES = frozenset((
     8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000,
 ))
@@ -99,29 +100,32 @@ class AudioSink:
         self._resample_consumed = base + size
         return converted
 
+    def _enqueue_bounded(self, chunk):
+        """A malicious or broken core cannot retain an enormous queued batch."""
+        for start in range(0, len(chunk), MAX_QUEUE_CHUNK_FRAMES):
+            part = chunk[start:start + MAX_QUEUE_CHUNK_FRAMES].copy()
+            try:
+                self.chunks.put_nowait(part)
+            except Full:
+                try:
+                    self.chunks.get_nowait()
+                except Empty:
+                    pass
+                try:
+                    self.chunks.put_nowait(part)
+                except Full:
+                    pass
+
     def push(self, samples):
         if not len(samples):
             return
-        chunk = np.asarray(samples, dtype=np.int16).reshape(-1, 2).copy()
-        if self._resample_step is not None:
-            converted = [
-                self._resample(chunk[start:start + RESAMPLE_INPUT_CHUNK])
-                for start in range(0, len(chunk), RESAMPLE_INPUT_CHUNK)
-            ]
-            chunk = np.concatenate(converted, axis=0)
-        if not len(chunk):
-            return
-        try:
-            self.chunks.put_nowait(chunk)
-        except Full:
-            try:
-                self.chunks.get_nowait()
-            except Empty:
-                pass
-            try:
-                self.chunks.put_nowait(chunk)
-            except Full:
-                pass
+        chunk = np.asarray(samples, dtype=np.int16).reshape(-1, 2)
+        for start in range(0, len(chunk), RESAMPLE_INPUT_CHUNK):
+            part = chunk[start:start + RESAMPLE_INPUT_CHUNK].copy()
+            if self._resample_step is not None:
+                part = self._resample(part)
+            if len(part):
+                self._enqueue_bounded(part)
 
     def _flush_single_samples(self):
         """Move a completed fixed-size sample block to the bounded queue."""
