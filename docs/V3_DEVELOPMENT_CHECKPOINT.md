@@ -995,3 +995,42 @@ run the GUI as root. Stable main/v2.0 remain unchanged.
 If stream fails, inspect current workflow run statuses, fix any CI failures,
 append verified results and give the user the new Linux full offline artifact
 to test on their actual machine.
+
+
+### Linux GameCube read-only /opt fix — verified milestone
+
+**Linux test installer is ready.** The first verified full offline Linux
+artifact is [13591769697](https://github.com/MasynNay/anything-plays/actions/runs/42418643784/artifacts/13591769697)
+from [run 42418643784](https://github.com/MasynNay/anything-plays/actions/runs/42418643784).
+Its Linux job succeeded, including **real native GameCube homebrew playback
+against a read-only extracted DEB**. That earlier run's Windows job failed
+only because a newly added unit test compared Windows short-path and
+long-path aliases as literal strings; runtime Windows GameCube was unchanged.
+
+Updated the new Windows/macOS compatibility test to compare canonical paths
+and updated an old GameCube software test to expect the Linux XDG Sys
+copy instead of the old unsafe packaged directory. At source commit
+`cf34b7968fab613fb2afc3ee0b0a11501066f9e3`:
+
+- [App regression run 42418828051](https://github.com/MasynNay/anything-plays/actions/runs/42418828051):
+  **source-and-gui SUCCESS, 440 tests passed (3 skipped)**, including
+  all four new Linux Sys tests; Linux and Windows starter build jobs
+  also passed. Remaining Mac starter jobs may still be running.
+- [Full offline run 42418828118](https://github.com/MasynNay/anything-plays/actions/runs/42418828118):
+  **Linux and Windows full installer jobs SUCCESS**, including new Linux
+  Sys unit test and exact **read-only DEB native GameCube playback**
+  step 13 (SUCCESS). Intel Mac and Apple Silicon full jobs may still
+  be queued; do not claim four-platform final success until confirmed.
+- **Preferred newest Linux full artifact**:
+  [13592183266](https://github.com/MasynNay/anything-plays/actions/runs/42418828118/artifacts/13592183266).
+  Install over the previous preview using
+  `sudo dpkg -i 'anything-plays-preview_3.0.0~alpha1_amd64.deb'`.
+  Launch app normally as nonroot. Existing user settings and saves are
+  outside the installation and should be preserved.
+- Linux user has not yet reported physical GameCube retest after installing
+  this fixed DEB. Keep [#25](https://github.com/MasynNay/anything-plays/issues/25)
+  open until actual user confirmation. Windows was positive partial physical
+  QA and is documented in [#26](https://github.com/MasynNay/anything-plays/issues/26).
+
+No `sudo chmod 777` or `chown` of installed `/opt` resources; no
+replacement fish logo; stable 2.0 and main unchanged.
