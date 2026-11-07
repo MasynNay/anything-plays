@@ -141,6 +141,8 @@ class GameplayMixin:
     def stop_controls(self):
         self.armed = False
         self.emu.disarm()
+        if hasattr(self, "_last_camera_pulses"):
+            self._last_camera_pulses.clear()
         if self.external_input is not None:
             self.external_input.release_camera()
         if hasattr(self, 'arm_button'):
