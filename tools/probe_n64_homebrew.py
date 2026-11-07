@@ -125,6 +125,18 @@ def _child(rom, core, seconds, report):
     return 0 if result["playback_probe_passed"] else 1
 
 
+def copy_frame_evidence(preview: Path, report: Path) -> bool:
+    """Preserve frame evidence even when the CI output directory is absent."""
+    preview = Path(preview)
+    report = Path(report)
+    if not preview.is_file():
+        return False
+    output = report.with_name(preview.name)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(preview, output)
+    return True
+
+
 def _parent(core, seconds, report):
     start = time.monotonic()
     result = {
@@ -172,8 +184,7 @@ def _parent(core, seconds, report):
                 and result["details"].get("playback_probe_passed") is True
             )
             image_path = child_report.with_name("n64-homebrew-frame.png")
-            if image_path.is_file():
-                shutil.copyfile(image_path, report.with_name(image_path.name))
+            result["image_evidence_saved"] = copy_frame_evidence(image_path, report)
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
     finally:
