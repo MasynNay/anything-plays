@@ -719,3 +719,47 @@ jobs:
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
+
+  optional-core-install-play-rollback:
+    # Uses a temporary *simulated approved* pack built from the real core;
+    # no release asset or bogus review attestation is ever published.
+    # Proves the updater's exact bytes, digest, activation, in-app playback
+    # and rollback before asking maintainers to publish approved packs.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, core: fceumm}
+          - {os: ubuntu-24.04, target: linux-x64, core: stella2014}
+          - {os: windows-2025, target: windows-x64, core: fceumm}
+          - {os: windows-2025, target: windows-x64, core: stella2014}
+          - {os: macos-15, target: macos-arm64, core: fceumm}
+          - {os: macos-15, target: macos-arm64, core: stella2014}
+          - {os: macos-15-intel, target: macos-x64, core: fceumm}
+          - {os: macos-15-intel, target: macos-x64, core: stella2014}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install verified core pack, play original ROM, then roll back
+        run: |
+          python tools/validate_installable_core_pack.py --core ${{ matrix.core }} --seconds 8 --report test-evidence/install-play-rollback-${{ matrix.core }}-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-pack-e2e-${{ matrix.core }}-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
