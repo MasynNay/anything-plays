@@ -17,6 +17,7 @@ import os
 import json
 import platform
 import re
+import subprocess
 from pathlib import Path
 import sys
 from urllib import request
@@ -88,8 +89,8 @@ def reported_git_revision(version):
     return match.group(1) if match else None
 
 
-def inspect_core_identity(path, name):
-    """Read a downloaded native core's identity without loading game content.
+def _inspect_core_identity_in_process(path, name):
+    """Read core metadata directly; call in a child on Windows to release DLLs.
 
     Version-embedded hashes are the core's self-report, not independent proof
     of its build inputs. Keep exact binary hashes alongside this information.
@@ -115,6 +116,52 @@ def inspect_core_identity(path, name):
         "source_repository_url": repository,
         "reported_source_commit_url": (f"{repository}/commit/{revision}" if revision else None),
     }
+
+
+
+def _inspect_core_identity_isolated(path, name):
+    """Inspect a Windows DLL in a disposable Python process.
+
+    ctypes.CDLL keeps the library loaded for the parent process's lifetime.
+    Windows will then reject deleting or updating the source DLL, even after
+    a core is copied into an immutable user-owned pack. A short-lived child
+    is both safer for arbitrary native code and guarantees its handle exits.
+    """
+    if name not in SOURCE_REPOSITORIES:
+        raise ValueError(f"Unknown core: {name}")
+    script = (
+        "import json,sys;"
+        "sys.path.insert(0,sys.argv[1]);"
+        "from fetch_mgba_core import _inspect_core_identity_in_process;"
+        "value=_inspect_core_identity_in_process(sys.argv[2],sys.argv[3]);"
+        "print('AP_NATIVE_IDENTITY='+json.dumps(value,sort_keys=True))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script,
+         str(Path(__file__).resolve().parent), str(Path(path).resolve()), name],
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"Native core identity inspection failed for {name}: "
+            + (result.stderr or result.stdout)[-900:]
+        )
+    for line in reversed(result.stdout.splitlines()):
+        if line.startswith("AP_NATIVE_IDENTITY="):
+            value = json.loads(line.partition("=")[2])
+            if (not isinstance(value, dict)
+                    or not isinstance(value.get("libretro_library_name"), str)
+                    or not isinstance(value.get("libretro_library_version"), str)):
+                break
+            return value
+    raise ValueError(f"No valid native core identity from {name}")
+
+
+def inspect_core_identity(path, name):
+    """Return metadata without pinning a Windows core DLL in the parent."""
+    if sys.platform == "win32":
+        return _inspect_core_identity_isolated(path, name)
+    return _inspect_core_identity_in_process(path, name)
 
 
 def build_target(platform_name=None, architecture=None):
