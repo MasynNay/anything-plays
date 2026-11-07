@@ -41,9 +41,10 @@ class AudioSink:
         self.output_active = False
         self.source_sample_rate = None
         self.output_sample_rate = None
-        # UI gain applies only to Anything Plays' own stereo PortAudio
-        # callback. Start at a comfortable 35%, never modify system volume.
-        self._volume = 0.35
+        # AudioSink by itself is a transparent PCM sink for native testing.
+        # CoreSession explicitly applies the user's 35% default or saved gain
+        # before playback, leaving existing raw audio contracts unchanged.
+        self._volume = 1.0
         self._resample_step = None
         self._resample_next = 0.0
         self._resample_consumed = 0
