@@ -20,7 +20,7 @@ class ReleaseAcceptanceTests(unittest.TestCase):
         self.assertTrue(any("gamecube: bundled" in error for error in errors))
         self.assertTrue(any("gamecube: in_app_video" in error for error in errors))
         self.assertTrue(any("n64: real_game_verified" in error for error in errors))
-        self.assertTrue(any("external Dolphin" in error for error in errors))
+        self.assertTrue(any("gamecube: real_game_verified" in error for error in errors))
         self.assertEqual(main([]), 1)
         self.assertEqual(main(["--report-only"]), 0)
 
@@ -57,10 +57,19 @@ class ReleaseAcceptanceTests(unittest.TestCase):
                 row[name] = True
         for name in RELEASE_FLAGS:
             policy["required_release_evidence"][name] = True
+        # Every other requirement is marked complete, but a developer
+        # mistakenly changes GameCube's primary runtime to external Dolphin.
+        policy["systems"]["gamecube"]["primary_runtime"] = "external-dolphin"
         errors = release_blockers(policy)
         self.assertEqual(
-            errors, ["gamecube: backend still launches external Dolphin"]
+            errors, ["gamecube: in-app Libretro runtime not selected/verified"]
         )
+        # With a correct in-app runtime and reviewed evidence, the gate
+        # can in principle pass; the real alpha policy remains false.
+        policy["systems"]["gamecube"]["primary_runtime"] = (
+            "embedded-libretro-software"
+        )
+        self.assertEqual(release_blockers(policy), [])
 
 
 if __name__ == "__main__":
