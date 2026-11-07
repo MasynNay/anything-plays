@@ -123,7 +123,7 @@ class LinuxDolphinWritableSystemTests(unittest.TestCase):
                 ):
                     self.assertEqual(
                         writable_dolphin_system_directory(core),
-                        core.parent,
+                        core.parent.resolve(),
                     )
 
 
