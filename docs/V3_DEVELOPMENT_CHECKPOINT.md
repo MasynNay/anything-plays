@@ -762,3 +762,56 @@ preserve exact opt-in defaults and existing emulator/update/save
 functionality. The production source SHA under which all build jobs
 passed is `784798b0` (documentation-only updates after this point
 do not require rebuilding the installers).
+
+
+## November 7, 2026 — Original logo preservation, NOT a redesign
+
+**User's explicit correction:** Do not redesign or regenerate the fish icon!
+They want the existing cute fish, expression, handheld, colors, and rounded
+cyan frame left exactly as-is. The ONLY requested edit is transparency of
+the unwanted black matte **outside** that frame. An unrelated generated
+replacement illustration is REJECTED and is not used or added to GitHub.
+
+**Implemented:**
+
+- Canonical ORIGINAL artwork remains
+  `assets/anything_plays_v21.webp`, Git **blob SHA-1
+  `c620c4154e80768687dfde4c0541f544779af2ff`**.
+  Neither this file nor stable v2.0 artwork was touched.
+- `anything_plays/icon_cleanup.py` now changes **only the alpha channel
+  of edge-connected dark exterior matte**. Every RGB color byte in the
+  *entire original image* is preserved. An earlier proposed 2px fringe
+  smoothing was deliberately removed because it could damage dark
+  linework around the cute face, handheld, or cyan border.
+- Native icon generator `tools/render_v21_icon.py` and live Tk icon
+  `anything_plays/ui_icon.py` both read the same original WebP and use
+  the strictly alpha-only exterior cleanup. Fixed script-direct import
+  path on all four OSes; no new fish graphic is involved.
+- `tests/test_v30_icon_matte.py` now enforces exact original WebP Git
+  blob, all source RGB pixels byte-for-byte unchanged, central fish alpha
+  unchanged, transparent outer corners, native PNG/small PNG/ICO corners
+  transparent, and already-transparent graphics left unchanged.
+- All four full offline 18-console preview installers
+  [CI 42411730145](https://github.com/MasynNay/anything-plays/actions/runs/42411730145)
+  passed **SUCCESS** at source code `b16ed7194fd9b2f6337294d16f7402d3e60feeec`.
+  The [application/GUI build and regressions](https://github.com/MasynNay/anything-plays/actions/runs/42411729849)
+  also passed all jobs at the same source code commit.
+- New preview downloads: [Apple Silicon M2 Pro artifact 13589628802](https://github.com/MasynNay/anything-plays/actions/runs/42411730145/artifacts/13589628802),
+  [Intel Mac 13589892315](https://github.com/MasynNay/anything-plays/actions/runs/42411730145/artifacts/13589892315),
+  [Windows 13589931714](https://github.com/MasynNay/anything-plays/actions/runs/42411730145/artifacts/13589931714),
+  [Linux 13588939472](https://github.com/MasynNay/anything-plays/actions/runs/42411730145/artifacts/13588939472).
+
+**Other changes in this same preview:** the left camera panel now includes
+an always-visible **Shuffle control zones now** button, native emulator
+launch state distinguishes startup in progress vs true failed boot, N64
+object-control arming may wait for the launch to complete, stale failure
+details remain visible, and the game panel offers **Restart game** to try
+reloading the selected ROM. Source/UI regressions passed. The user's exact
+original N64 ROM crash has NOT been reproduced or verified as fully
+resolved on their Mac; don't claim it has.
+
+**IMPORTANT:** Never generate a replacement fish logo, change the original
+WebP, soften its exterior outlines, or reinterpret the illustrated handheld.
+If further image changes are needed, use only the canonical source and
+get explicit user approval before touching interior pixels. Stable main
+and v2.0 remain untouched.
