@@ -667,3 +667,98 @@ Libretro input callback path is tested, but actual two-player *gameplay*
 with real aquarium lighting and camera exposure remains unverified.
 Passing simulation is strong integration evidence, not a substitute for
 physical compatibility QA. Stable 2.0 and main untouched.
+
+
+## November 7, 2026 — Object-neutral right-side UI redesign + GameCube readback pacing
+
+**User request:** User supplied an Apple Silicon 3.0 screenshot and requested
+the right side be organized, readable and not fish-specific; clarified the
+project is Anything Plays, suitable for *any* camera-trackable objects. User
+also reported GameCube native emulation worked but looked uneven. They
+explicitly requested the code be developed and packaged, not a mockup.
+
+**Implemented, stable v2.0 and `main` untouched:**
+
+- New `anything_plays/ui_tracking_panel.py` builds dedicated, spacious
+  labeled 03 Primary Object, 04 Secondary Object (optional), 05 Input
+  Behavior, 06 Button Zones, 07 Advanced Settings sections. Primary
+  object and secondary object show **clickable RGB color swatches**, color
+  picker actions, readable labels and plain-language explanations.
+- All visible UI tracking controls are object-neutral: **Enable multiple
+  objects per color** (OFF by default), **Enable secondary object** (OFF by
+  default), **When an object...** phrasing, Primary/Secondary object counts
+  and color values; left camera label is now *Live tracking preview*.
+- Advanced detection/timing and zone appearance controls are collapsed
+  by default. Individual zone-to-button remapping is separately expandable
+  and retains all prior per-console mapping objects/callbacks. Primary and
+  secondary tracking continue working with either panel hidden.
+- The game area groups display + in-app volume (and GameCube preview rate)
+  in a nested **DISPLAY & SOUND** panel. Emulator maintenance/update
+  controls are still accessible but collapsed by default. Current-game
+  status has a distinct section. Right pane gets a slight width increase.
+- `anything_plays/ui_theme.py` defines theme-aware bold value labels,
+  helper labels and more legible checkbox/button typography without
+  discarding the existing 16 color palettes.
+- `anything_plays/ui_camera.py` refreshes the new swatches and
+  secondary section while preserving existing saved profiles, camera
+  routing, optional multi-object input and independent two-player controls.
+- **GameCube performance:** The new
+  `anything_plays/gamecube_preview.py` policy and updated
+  `anything_plays/gamecube_gpu.py` limit only *synchronous*
+  OpenGL->CPU framebuffer readback to selectable 20 / 30 / 60 FPS
+  preview budgets: Performance (20), Balanced (30, default),
+  Quality (60). `anything_plays/ui_gameplay.py` aligns the Tk
+  preview timer with the selected mode. All Dolphin native frames,
+  Libretro audio, controller updates and game saves still execute.
+  Mode may change while playing and persists in preferences. This is
+  an attempted reduction of GPU readback and UI CPU cost, NOT a proven
+  boost to GameCube's actual emulation FPS on macOS.
+- `tests/test_v30_gamecube_preview_optimization.py` invokes the actual
+  GameCube hardware video callback with controlled clock and a synthetic
+  offscreen host; asserts 7 native callbacks, only 3 expensive readbacks
+  across live mode switches, no erroneous stop, and proper null-frame
+  behavior. Existing full GUI, 18-console profile, tracking, and
+  2-player simulation tests continue to pass.
+- UI source is grouped in dedicated modules; original callbacks and
+  update/rollback actions remain present. The public v2.0 release
+  was not changed.
+
+**Strict passing build evidence at exact code revision
+`784798b0ba75224ec5aa3b8af7a9935c63c1c43a`:**
+
+- [Full offline installer CI run 42406279267](https://github.com/MasynNay/anything-plays/actions/runs/42406279267) — **SUCCESS**, all
+  four jobs (Windows x64, Intel Mac, Apple Silicon, Linux x64).
+  Verified 18 profiles/11 bundled emulator cores and Dolphin Sys,
+  new 12 multi-color/audio tests, new GameCube readback tests,
+  and headless Linux Xvfb GUI smoke. No external emulator download.
+- [Application/regression CI run 42406279349](https://github.com/MasynNay/anything-plays/actions/runs/42406279349) — **SUCCESS**,
+  all six jobs including full source + GUI regression and
+  Windows/Linux/two Mac application staging.
+- [Latest independent virtual aquarium test](https://github.com/MasynNay/anything-plays/actions/runs/42405777852) —
+  **SUCCESS**, 34/34 actual UI-to-Libretro controller assertions after
+  converting the status labels from fish to objects.
+
+**User-test download artifacts (GitHub Actions ZIPs, test-only, 14-day retention):**
+
+- Apple Silicon (M2 Pro):
+  [13586924633](https://github.com/MasynNay/anything-plays/actions/runs/42406279267/artifacts/13586924633)
+- Intel macOS:
+  [13587383778](https://github.com/MasynNay/anything-plays/actions/runs/42406279267/artifacts/13587383778)
+- Windows x64:
+  [13587027930](https://github.com/MasynNay/anything-plays/actions/runs/42406279267/artifacts/13587027930)
+- Linux x64:
+  [13587985332](https://github.com/MasynNay/anything-plays/actions/runs/42406279267/artifacts/13587985332)
+
+Each ZIP holds a native installer and digest/limitations manifest. These
+are **unnotarized, developer-only previews**, NOT a public, signed or
+legally cleared stable 3.0 release. Observe remaining NGP monochrome
+sound fixture, GameCube native FPS on real devices, commercial 2-player
+compatibility, native camera/objects and third-party license checks.
+Real Apple Silicon GameCube smoothness must be measured in actual
+gameplay; the synthetic video test demonstrates skipped copies only.
+
+**Continuation instruction:** Read this checkpoint before editing,
+preserve exact opt-in defaults and existing emulator/update/save
+functionality. The production source SHA under which all build jobs
+passed is `784798b0` (documentation-only updates after this point
+do not require rebuilding the installers).
