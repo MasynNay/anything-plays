@@ -157,7 +157,7 @@ def _child(core, rom, report, seconds):
     )
     evidence = {
         "system": "gamecube",
-        "backend": "production GameCubeHardwareSession + EGL",
+        "backend": "production GameCubeHardwareSession + platform GPU host",
         "core": core.name,
         "uses_external_dolphin": False,
         "uses_separate_game_window": False,
@@ -171,6 +171,11 @@ def _child(core, rom, report, seconds):
         "native_pcm_frame_samples": session.audio.pcm_frames,
         "native_pcm_nonzero_values": session.audio.pcm_nonzero,
         "native_pcm_sample_rate": session.audio.sample_rate,
+        "native_gpu_requests": session.hardware_requests,
+        "requested_cpu_core": session._software_options.values.get(
+            b"dolphin_cpu_core", b"?"
+        ).decode("ascii", "replace"),
+        "native_cpu_architecture": __import__("platform").machine(),
         "system_audio_device_active": session.audio.output_active,
         "physical_speaker_tested": False,
         "continuous_3d_gameplay_tested": False,

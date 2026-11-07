@@ -234,8 +234,10 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
             self.assertEqual(
                 session._software_options.values[b"dolphin_renderer"], b"Hardware"
             )
+            from platform import machine
+            cpu = b"4" if machine().lower() in ("arm64", "aarch64") else b"1"
             self.assertEqual(
-                session._software_options.values[b"dolphin_cpu_core"], b"1"
+                session._software_options.values[b"dolphin_cpu_core"], cpu
             )
             from anything_plays.libretro_audio import AudioSink
             self.assertIsInstance(session.audio, AudioSink)
