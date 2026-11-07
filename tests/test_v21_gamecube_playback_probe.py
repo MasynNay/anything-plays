@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
 
-from tools.probe_gamecube_homebrew import _parent, main
+from tools.probe_gamecube_homebrew import _parent, main, evaluate_video_probe
 
 
 def make_fixture(destination):
@@ -19,6 +19,17 @@ def make_fixture(destination):
 
 
 class GameCubePlaybackProbeTests(unittest.TestCase):
+    def test_three_slow_frames_cannot_be_reported_as_playable(self):
+        evidence = evaluate_video_probe(None, 3, 1, 12.0)
+        self.assertTrue(evidence["frames_valid"])
+        self.assertFalse(evidence["fps_target_met"])
+        self.assertEqual(evidence["frames_per_second_observed"], 0.25)
+
+    def test_nonblank_frames_and_usable_speed_both_required(self):
+        self.assertFalse(evaluate_video_probe(None, 300, 0, 12)["fps_target_met"])
+        self.assertFalse(evaluate_video_probe("load error", 300, 2, 12)["fps_target_met"])
+        self.assertTrue(evaluate_video_probe(None, 300, 2, 12)["fps_target_met"])
+
     def test_native_timeout_still_produces_explicit_failed_evidence(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)
