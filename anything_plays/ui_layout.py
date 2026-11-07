@@ -63,6 +63,14 @@ class LayoutMixin:
             command=self.switch_n64_backend,
         )
         self.n64_mode_toggle.pack(side='left')
+        self.gamecube_mode_row = ttk.Frame(game)
+        self.gamecube_mode_toggle = ttk.Checkbutton(
+            self.gamecube_mode_row,
+            text='Play GameCube in the app (experimental software graphics)',
+            variable=self.gamecube_embedded,
+            command=self.switch_gamecube_backend,
+        )
+        self.gamecube_mode_toggle.pack(side='left')
         self.external_setup = ttk.Frame(game)
         self.external_setup_label = ttk.Label(self.external_setup, text='', wraplength=430)
         self.external_setup_label.pack(fill='x', pady=(2, 4))
