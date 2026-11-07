@@ -1,0 +1,102 @@
+"""Bounded, failure-transparent real-game test harness contracts.
+
+No emulator, copyrighted game, or internet access is needed for these tests.
+The integration workflow separately runs an actual pinned homebrew DOL.
+"""
+import json
+from pathlib import Path
+from subprocess import CompletedProcess, TimeoutExpired
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+import unittest
+
+from tools.probe_gamecube_homebrew import _parent, main
+
+
+def make_fixture(destination):
+    destination.write_bytes(b"synthetic fixture, not an executable")
+    return destination
+
+
+class GameCubePlaybackProbeTests(unittest.TestCase):
+    def test_native_timeout_still_produces_explicit_failed_evidence(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.subprocess.run",
+                           side_effect=TimeoutExpired("core", timeout=10,
+                                                      output=b"booting..."),
+                       ):
+                self.assertEqual(_parent(core, 1, report), 1)
+            saved = json.loads(report.read_text())
+            self.assertFalse(saved["probe_passed"])
+            self.assertTrue(saved["timed_out"])
+            self.assertIn("booting", saved["console_tail"])
+            self.assertIsNone(saved["details"])
+
+    def test_native_crash_does_not_count_as_playback_success(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.subprocess.run",
+                           return_value=CompletedProcess(["native"], -11,
+                                                        stdout="segmentation fault"),
+                       ):
+                self.assertEqual(_parent(core, 1, report), 1)
+            saved = json.loads(report.read_text())
+            self.assertEqual(saved["child_returncode"], -11)
+            self.assertFalse(saved["probe_passed"])
+
+    def test_only_child_frame_evidence_can_mark_playback_success(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+
+            def fake_subprocess(command, **kwargs):
+                location = Path(command[command.index("--report") + 1])
+                location.write_text(
+                    json.dumps({
+                        "playback_probe_passed": True,
+                        "video_callback_frames": 6,
+                        "nonblank_sampled_frames": 1,
+                        "frames_per_second_observed": 3.0,
+                    })
+                )
+                return CompletedProcess(command, 0, stdout="native success")
+
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.subprocess.run",
+                           side_effect=fake_subprocess,
+                       ):
+                self.assertEqual(_parent(core, 1, report), 0)
+            saved = json.loads(report.read_text())
+            self.assertTrue(saved["probe_passed"])
+            self.assertEqual(saved["details"]["video_callback_frames"], 6)
+            # Even a successful experimental probe is not a release approval.
+
+    def test_missing_core_fails_without_downloading_anything(self):
+        with TemporaryDirectory() as folder:
+            report = Path(folder) / "missing.json"
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew") as net:
+                self.assertEqual(
+                    main(["--core", str(Path(folder) / "missing.dylib"),
+                          "--seconds", "1", "--report", str(report)]),
+                    1,
+                )
+                net.assert_not_called()
+            self.assertIn("missing", json.loads(report.read_text())["error"])
+
+
+if __name__ == "__main__":
+    unittest.main()
