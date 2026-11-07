@@ -100,6 +100,43 @@ class AudioBufferTests(unittest.TestCase):
         self.assertFalse(audio.output_active)
         self.assertIn("device missing", audio.output_error)
 
+    def test_no_default_audio_device_cannot_crash_native_gameplay(self):
+        from unittest.mock import Mock, patch
+        fake = Mock()
+        # Matches PortAudioError from sounddevice.query_devices(kind="output")
+        # when the OS has no current default output device.
+        class NoDefaultOutput(Exception):
+            pass
+        fake.query_devices.side_effect = NoDefaultOutput(
+            "Error querying device -1"
+        )
+        fake.OutputStream.side_effect = NoDefaultOutput(
+            "Error opening OutputStream: device -1"
+        )
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(48000)
+            self.assertFalse(audio.output_active)
+            self.assertIn("No usable audio output device", audio.output_error)
+            self.assertIn("device -1", audio.output_error)
+            # Core audio must still be accepted in silent-mode operation.
+            audio.push(np.array([[12, -12]], dtype=np.int16))
+            self.assertEqual(audio.chunks.qsize(), 1)
+            audio.close()
+
+    def test_no_default_device_can_fallback_to_48000_hz(self):
+        from unittest.mock import Mock, patch
+        fake = Mock()
+        fake.query_devices.side_effect = RuntimeError("No default speaker")
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(131072)
+            self.assertTrue(audio.output_active)
+            self.assertEqual(audio.source_sample_rate, 131072)
+            self.assertEqual(audio.output_sample_rate, 48000)
+            self.assertAlmostEqual(audio._resample_step, 131072 / 48000)
+            audio.close()
+
     def test_native_gb_sample_rate_resamples_to_real_device_frequency(self):
         from unittest.mock import Mock, patch
         fake = Mock()

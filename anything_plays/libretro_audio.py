@@ -191,7 +191,11 @@ class AudioSink:
         try:
             device = sd.query_devices(kind="output")
             preferred = int(round(float(device["default_samplerate"])))
-        except (AttributeError, KeyError, IndexError, TypeError, ValueError):
+        except Exception:
+            # sounddevice.PortAudioError is NOT an OSError or ValueError.
+            # Headless CI, unplugged speakers and sessions with no default
+            # device all raise here. Never let audio discovery kill a game.
+            # The fallback stream will report a device failure separately.
             preferred = 48000
         if preferred not in NORMAL_DEVICE_RATES:
             preferred = 48000
