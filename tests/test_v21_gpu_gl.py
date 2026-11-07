@@ -130,6 +130,32 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
         self.assertEqual(sampler.samples, 2)
         self.assertTrue(sampler.changed)
 
+    def test_gl_probe_disables_duplicate_frame_suppression_and_counts_nulls(self):
+        from tools.probe_gamecube_gl import GLCoreSession
+        from anything_plays.gba_emulator import Emulator
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"placeholder")
+            rom = root / "homebrew.dol"
+            rom.write_bytes(b"placeholder")
+            with patch("pathlib.Path.home", return_value=root):
+                session = GLCoreSession(Emulator(), rom, core, cpu_core=None)
+                self.assertEqual(
+                    session._software_options.values[b"dolphin_skip_dupe_frames"],
+                    b"disabled"
+                )
+                session.video(None, 640, 528, 0)
+                self.assertEqual(session.null_video_callbacks, 1)
+                self.assertEqual(session.raw_video_callbacks, 1)
+
     def test_hardware_core_session_never_uses_an_external_emulator(self):
         from tools.probe_gamecube_gl import GLCoreSession
         import inspect

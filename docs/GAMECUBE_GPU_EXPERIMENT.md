@@ -113,3 +113,18 @@ now returns true **once per new session** and false thereafter, letting
 Dolphin load its startup option values and avoiding perpetual refreshes.
 A native playback test is still necessary; the fix alone does not certify
 GameCube or allow enabling it for end users.
+
+
+## CI #300: startup option cache fixed, but only black frames
+
+[CI #300](https://github.com/MasynNay/anything-plays/actions/runs/42337268810)
+confirmed the first-option-update handshake regression fix does not by
+itself restore game video: dual/single core and JIT/cached interpreter each
+returned two blank hardware callbacks, despite RAM and audio progress.
+
+Pinned `GLContextLR::Swap()` only forwards a hardware framebuffer when
+`VideoCommon::g_is_duplicate_frame` is false; duplicates are represented
+with a null callback. The next isolated probe sets
+`dolphin_skip_dupe_frames=disabled` (the upstream core option) and counts
+null callbacks independently from nonblack pixels to distinguish missing
+presentation from duplicate-frame suppression. No shipped default changes.

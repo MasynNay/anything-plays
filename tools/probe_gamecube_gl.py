@@ -90,6 +90,10 @@ class GLCoreSession(CoreSession):
     def __init__(self, emulator, rom, core_path, cpu_core, single_core=False):
         super().__init__(emulator, "gamecube", rom, core_path)
         self._software_options.values[b"dolphin_renderer"] = b"Hardware"
+        # Disable duplicate-XFB suppression only in this isolated test: the
+        # pinned GLContextLR::Swap() otherwise sends a null video pointer
+        # when g_is_duplicate_frame is set. Count those callbacks separately.
+        self._software_options.values[b"dolphin_skip_dupe_frames"] = b"disabled"
         if single_core:
             self._software_options.values[b"dolphin_main_cpu_thread"] = b"disabled"
         if cpu_core is not None:
@@ -99,6 +103,8 @@ class GLCoreSession(CoreSession):
         self.hardware = None
         self.hardware_requests = 0
         self.hardware_frames = 0
+        self.null_video_callbacks = 0
+        self.raw_video_callbacks = 0
         self.gpu_error = None
         self.opengl_version = None
         self.opengl_renderer = None
@@ -122,6 +128,10 @@ class GLCoreSession(CoreSession):
         self.hardware.reset_core()
 
     def video(self, data, width, height, pitch):
+        self.raw_video_callbacks += 1
+        if not data:
+            self.null_video_callbacks += 1
+            return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
             try:
                 rgb = self.hardware.read_frame(width, height)
@@ -253,6 +263,8 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
         "seconds_elapsed": round(elapsed, 3),
         "hardware_negotiations": session.hardware_requests,
         "hardware_frames": session.hardware_frames,
+        "raw_video_callbacks": session.raw_video_callbacks,
+        "null_video_callbacks": session.null_video_callbacks,
         "video_frames": decoded, "nonblank_samples": nonblank,
         "last_shape": last_shape, "observed_fps": fps,
         "native_retro_run_calls": getattr(session.native, "run_calls", 0),
