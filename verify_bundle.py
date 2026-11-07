@@ -16,7 +16,10 @@ from fetch_mgba_core import inspect_core_identity, core_names_for_build
 
 
 CORE_NAMES = ("mgba", "snes9x")
-OPTIONAL_V21_LICENSES = ("FCEUmm-GPL-2.0.txt", "Genesis-Plus-GX-LICENSE.txt")
+OPTIONAL_V21_LICENSES = (
+    "FCEUmm-GPL-2.0.txt", "Genesis-Plus-GX-LICENSE.txt",
+    "Dolphin-GPL-2.0-or-later.txt",
+)
 REQUIRED_DOCUMENTS = (
     "AnythingPlays-MIT.txt",
     "CODE_OF_CONDUCT.md",
@@ -54,6 +57,67 @@ def verify_v21_artwork(bundle):
         for path in files
     ):
         raise ValueError("Corrected 2.1 fish icon has a checksum mismatch")
+
+
+def verify_dolphin_sys(cores, main_manifest):
+    """Validate every bundled Dolphin Sys file against the build inventory.
+
+    This catches missing/corrupted compatibility data in the actual installer,
+    including inside macOS DMGs and unpacked Windows/Linux distributions.
+    """
+    from tools.fetch_dolphin_sys import (
+        MANIFEST_NAME, MAX_FILES, MAX_EXTRACTED_BYTES, SYSTEM_ASSET_URL,
+    )
+
+    path = cores / MANIFEST_NAME
+    if not path.is_file() or path.stat().st_size > 1024 * 1024:
+        raise ValueError("Dolphin Sys provenance manifest is missing or oversized")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest != main_manifest.get("dolphin_system_assets"):
+        raise ValueError("Dolphin Sys provenance does not match the core manifest")
+    if manifest.get("source_url") != SYSTEM_ASSET_URL:
+        raise ValueError("Unexpected Dolphin Sys archive source")
+    records = manifest.get("files")
+    if not isinstance(records, dict) or not (5 <= len(records) <= MAX_FILES):
+        raise ValueError("Incomplete Dolphin Sys file inventory")
+
+    root = cores / "dolphin-emu" / "Sys"
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("Bundled Dolphin Sys directory is missing or symlinked")
+    if "codehandler.bin" not in records:
+        raise ValueError("Dolphin core requires codehandler.bin")
+
+    expected_paths = set()
+    cumulative = 0
+    for relative, identity in records.items():
+        components = Path(relative)
+        if (not relative or components.is_absolute() or
+                any(part in ("..", ".") for part in relative.split("/"))):
+            raise ValueError("Unsafe Dolphin Sys file name")
+        if not isinstance(identity, dict):
+            raise ValueError("Malformed Dolphin Sys file inventory")
+        expected_file = root / components
+        if expected_file.is_symlink() or not expected_file.is_file():
+            raise ValueError(f"Missing Dolphin Sys file: {relative}")
+        length = identity.get("size_bytes")
+        if not isinstance(length, int) or length < 1:
+            raise ValueError(f"Invalid Dolphin Sys length: {relative}")
+        cumulative += length
+        if cumulative > MAX_EXTRACTED_BYTES:
+            raise ValueError("Dolphin Sys exceeds memory safety budget")
+        if expected_file.stat().st_size != length:
+            raise ValueError(f"Dolphin Sys size mismatch: {relative}")
+        digest = hashlib.sha256(expected_file.read_bytes()).hexdigest()
+        if digest != identity.get("sha256"):
+            raise ValueError(f"Dolphin Sys checksum mismatch: {relative}")
+        expected_paths.add(expected_file.relative_to(root).as_posix())
+
+    observed = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*") if path.is_file()
+    }
+    if expected_paths != observed:
+        raise ValueError("Dolphin Sys files differ from the reviewed manifest")
 
 
 def verify_no_bundled_game_files(bundle):
@@ -181,6 +245,8 @@ def verify_bundle(bundle, platform_name, check_native=False):
             raise ValueError(f"Missing recorded native version for {name}")
         if not isinstance(record.get("source_repository_url"), str) or not record["source_repository_url"].startswith("https://"):
             raise ValueError(f"Missing upstream source repository for {name}")
+    if "dolphin" in expected_cores:
+        verify_dolphin_sys(cores, manifest)
     # Verify the staged file hashes against the approved release lock BEFORE
     # any ctypes-based native-core inspection can load the libraries.
     release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
