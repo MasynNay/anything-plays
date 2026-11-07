@@ -219,6 +219,24 @@ def _child(system, core, rom, seconds, report):
         pcm.samples > 1000 and pcm.nonzero > 100 and pcm.peak > 0
         and 8000 <= (pcm.sample_rate or 0) <= 192000
     )
+    # NeoPop writes cartridge flash during retro_unload_game(), not
+    # through RETRO_MEMORY_SAVE_RAM. Observe only after session.run()
+    # finishes and the native core has been unloaded. A homebrew demo
+    # that creates no flash is not proof that retail saves work.
+    flash_folder = Path(os.fsdecode(session._save_dir_buffer.value))
+    flash_artifacts = []
+    if flash_folder.is_dir():
+        for candidate in sorted(flash_folder.glob("*.flash"))[:16]:
+            if not candidate.is_file() or candidate.is_symlink():
+                continue
+            size = candidate.stat().st_size
+            flash_artifacts.append({
+                "name": candidate.name, "bytes": size,
+                "sha256": (
+                    hashlib.sha256(candidate.read_bytes()).hexdigest()
+                    if 0 <= size <= 8 * 1024 * 1024 else None
+                ),
+            })
     input_ok = (
         native_input["queries"] >= 30
         and native_input["manual_a_positive"] > 0
@@ -246,6 +264,9 @@ def _child(system, core, rom, seconds, report):
         "camera_b_native_positive_samples": native_input["camera_b_positive"],
         "input_gate_passed": input_ok,
         "save_state_roundtrip": save_state["result"],
+        "native_flash_files_after_core_unload": flash_artifacts,
+        "native_flash_save_directory_exists": flash_folder.is_dir(),
+        "cartridge_flash_roundtrip_verified": False,
         "cartridge_sram_persistence_verified": False,
         "physical_speakers_verified": False,
         "real_user_game_compatibility_verified": False,
@@ -272,7 +293,11 @@ def _parent(system, core, report, seconds):
             child_report = root / "child-result.json"
             env = os.environ.copy()
             env["HOME"] = str(root)
+            env["USERPROFILE"] = str(root)
+            env["APPDATA"] = str(root / "roaming")
+            env["LOCALAPPDATA"] = str(root / "local")
             env["XDG_CONFIG_HOME"] = str(root / "config")
+            env["XDG_DATA_HOME"] = str(root / "user-data")
             command = [
                 sys.executable, str(Path(__file__).resolve()), "--child",
                 "--system", system, "--core", str(core), "--rom", str(rom),
