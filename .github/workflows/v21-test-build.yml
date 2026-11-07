@@ -587,3 +587,42 @@ jobs:
           path: release/core-packs/*.zip
           if-no-files-found: error
           retention-days: 14
+
+  nes-video-audio-original-homebrew:
+    # Original iNES source-generated cartridge, no third-party game files.
+    # The core must produce changing nonblank RGB frames AND nonzero APU PCM
+    # through our real in-app Libretro callback plumbing, not just load.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless audio and video dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve the FCEUmm core independently of the starter installer
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('fceumm')"
+      - name: Verify NES graphics and actual generated APU audio samples
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_nes_homebrew.py \
+            --core cores/fceumm_libretro.so --seconds 8 \
+            --report test-evidence/nes-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-original-NES-video-audio-evidence
+          path: |
+            test-evidence/nes-video-audio.json
+            test-evidence/nes-test-frame.png
+          if-no-files-found: warn
+          retention-days: 14
