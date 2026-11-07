@@ -37,6 +37,14 @@ jobs:
           test -f site/CNAME
           test -f site/.nojekyll
           test -f site/assets/anything-plays-original.webp
+          test -s site/assets/anything-plays-desktop-preview.webp
+          python3 - <<'PY'
+          from pathlib import Path
+          image = Path('site/assets/anything-plays-desktop-preview.webp').read_bytes()
+          assert image[:4] == b'RIFF' and image[8:12] == b'WEBP'
+          assert len(image) > 20000, 'Real application screenshot missing'
+          print('Verified authentic desktop preview image asset')
+          PY
           test -f site/assets/anything-plays-desktop-preview.webp
           grep -qx 'anythingplays.masynnay.com' site/CNAME
           grep -q 'id="studio"' site/index.html
