@@ -94,7 +94,9 @@ def extract_dolphin_sys(archive_bytes, destination):
                 continue
             if item.external_attr >> 16 and stat.S_ISLNK(item.external_attr >> 16):
                 raise ValueError("Symlink entries are not allowed in Dolphin Sys")
-            if (item.file_size <= 0 or item.file_size > MAX_SINGLE_FILE):
+            # Dolphin ships intentional zero-byte GraphicMods text markers.
+            # Empty files are valid; only negative/oversized lengths are bad.
+            if (item.file_size < 0 or item.file_size > MAX_SINGLE_FILE):
                 raise ValueError(f"Invalid Dolphin Sys member size: {item.filename}")
             if str(name) in inventory:
                 raise ValueError("Duplicate Dolphin Sys path")
