@@ -186,3 +186,22 @@ Renderer as if it were a supported gameplay backend. A 3.0 GameCube release
 is blocked until the full target matrix passes. The current controller demo
 is event-driven, so its ~6 unique video callbacks per second are not an
 animated game's actual rendering rate.
+
+## Optional GameCube core plus Sys package format
+
+3.0 now has an experimental, fail-closed schema-2 in-app package for Dolphin.
+Unlike smaller console ZIPs, this package includes the exact native library,
+`dolphin-sys.json` with per-file SHA-256 and size records, and all
+`dolphin-emu/Sys/**` assets. Both the core and the complete Sys tree are
+staged under one immutable object identity and activated with a single atomic
+manifest pointer. Corrupt or missing files make the installed core unusable
+and rollback to the prior verified version or bundled fallback.
+
+Only explicit review-attested candidates from the project's own official
+3.0 emulator-pack catalog can be accepted by the downloader. The builder
+uses the preserved `CORE_PROVENANCE.json` and
+`DOLPHIN_SYS_PROVENANCE.json` and emits *unapproved* archives by default.
+The actual GameCube pack has **not** been published or approved for
+users; cross-platform, 3D gameplay and nonzero audio validation must pass
+before approval. No Wii library, ROM, firmware or external emulator install
+is supplied.
