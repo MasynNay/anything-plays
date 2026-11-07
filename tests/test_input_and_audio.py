@@ -100,6 +100,64 @@ class AudioBufferTests(unittest.TestCase):
         self.assertFalse(audio.output_active)
         self.assertIn("device missing", audio.output_error)
 
+    def test_native_gb_sample_rate_resamples_to_real_device_frequency(self):
+        from unittest.mock import Mock, patch
+        fake = Mock()
+        fake.query_devices.return_value = {"default_samplerate": 48000.0}
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(131072)
+        self.assertTrue(audio.output_active)
+        self.assertEqual(audio.source_sample_rate, 131072)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertAlmostEqual(audio._resample_step, 131072 / 48000)
+        self.assertEqual(fake.OutputStream.call_args.kwargs["samplerate"], 48000)
+        n = 2048
+        t = np.arange(n, dtype=np.float64)
+        signal = (10000 * np.sin(2 * np.pi * 440 * t / 131072)).astype(np.int16)
+        stereo = np.stack((signal, -signal), axis=1)
+        audio.push(stereo)
+        converted = audio.chunks.get_nowait()
+        self.assertGreater(len(converted), 700)
+        self.assertLess(len(converted), 780)
+        self.assertGreater(np.max(np.abs(converted)), 1000)
+        self.assertTrue(np.array_equal(converted[:, 0], -converted[:, 1]))
+        audio.close()
+
+    def test_resampling_does_not_restart_phase_at_chunk_boundaries(self):
+        from unittest.mock import Mock, patch
+        device = Mock()
+        device.query_devices.return_value = {"default_samplerate": 48000.0}
+        n = 4096
+        t = np.arange(n, dtype=np.float64)
+        values = (5000 * np.sin(2 * np.pi * 330 * t / 131072)).astype(np.int16)
+        wave = np.stack((values, values), axis=1)
+        with patch("anything_plays.libretro_audio.sd", device):
+            whole = AudioSink()
+            whole.start(131072)
+            fragmented = AudioSink()
+            fragmented.start(131072)
+        whole.push(wave)
+        for offset in range(0, len(wave), 157):
+            fragmented.push(wave[offset:offset + 157])
+        continuous = np.concatenate(list(whole.chunks.queue), axis=0)
+        fragments = np.concatenate(list(fragmented.chunks.queue), axis=0)
+        self.assertEqual(continuous.shape, fragments.shape)
+        np.testing.assert_array_equal(continuous, fragments)
+        whole.close()
+        fragmented.close()
+
+    def test_common_native_rate_is_not_needlessly_resampled(self):
+        from unittest.mock import Mock, patch
+        fake = Mock()
+        fake.query_devices.return_value = {"default_samplerate": 48000.0}
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(44100)
+        self.assertIsNone(audio._resample_step)
+        self.assertEqual(audio.output_sample_rate, 44100)
+        audio.close()
+
     def test_malformed_native_audio_count_is_ignored_before_pointer_read(self):
         from anything_plays.libretro_audio import MAX_AUDIO_BATCH_FRAMES
         audio = AudioSink()
