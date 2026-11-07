@@ -225,8 +225,14 @@ class GameplayMixin:
                 self.game_status.set("Display error (retrying): " + str(exc)[:100])
         finally:
             if not self._closing:
-                # Idle at 4 Hz, switch to 60 Hz when a core is running.
+                # A 3D preview does not need 60 Tk refresh timers when
+                # GPU readbacks are deliberately budgeted at 20 or 30 FPS.
+                # The native emulator and sound worker keep their own pace.
                 interval = 16 if self.emu.running else 250
+                if self.emu.running and self.system_key.get() == "gamecube":
+                    from anything_plays.gamecube_preview import preview_fps
+                    mode = getattr(self.emu, "gamecube_preview_mode", "")
+                    interval = round(1000 / preview_fps(mode))
                 self._game_tick_job = self.root.after(
                     interval, self.game_render_tick
                 )
