@@ -7,7 +7,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from anything_plays.libretro_video import RGB1555, RGB565, XRGB8888, decode_frame
+from anything_plays.libretro_video import (
+    RGB1555, RGB565, XRGB8888, SOFTWARE_RGBA8888, decode_frame,
+)
 from anything_plays.tracking import locate_target, zone_at
 from anything_plays.zone_rendering import render_zone_overlay
 
@@ -27,6 +29,20 @@ class VideoDecoderTests(unittest.TestCase):
         raw = C.create_string_buffer(bytes.fromhex("56341200"))
         self.assertEqual(decode_frame(raw, 1, 1, 4, XRGB8888)[0, 0].tolist(),
                          [18, 52, 86])
+
+    def test_dolphin_software_rgba8_keeps_red_and_blue_in_correct_order(self):
+        # SWTexture::Pixel in Dolphin is {r, g, b, a}. Old XRGB decoding
+        # swapped red and blue on all GameCube video frames.
+        raw = C.create_string_buffer(bytes([
+            250, 12, 34, 255,   # red, green, blue, alpha
+            6, 77, 230, 200,   # second RGBA pixel
+            0, 0, 0, 0,        # row padding
+        ]))
+        frame = decode_frame(raw, 2, 1, 12, SOFTWARE_RGBA8888)
+        self.assertEqual(frame.tolist(), [[[250, 12, 34], [6, 77, 230]]])
+        raw[0] = bytes([0])
+        # Decoder must own the frame, not refer to Dolphin's reused pointer.
+        self.assertEqual(frame[0, 0].tolist(), [250, 12, 34])
 
     def test_giant_native_frame_is_rejected_before_reading_pointer(self):
         # This tiny pointer must never be read as a 128 MB framebuffer.
