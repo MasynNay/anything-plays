@@ -242,8 +242,18 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
             from anything_plays.libretro_audio import AudioSink
             self.assertIsInstance(session.audio, AudioSink)
             session.host = fake_host
-            self.assertTrue(session.environment(14, 333))
-            fake_host.accept_core_render.assert_called_once_with(333)
+            # Native callback ABI: never pass a random integer address to
+            # ctypes.cast. The previous fake 333 caused a real SIGSEGV in CI.
+            native_request = HardwareRenderCallback()
+            native_request.context_type = 3
+            native_request.version_major = 3
+            native_request.version_minor = 3
+            native_request.context_reset = 123
+            request_pointer = C.addressof(native_request)
+            self.assertTrue(session.environment(14, request_pointer))
+            fake_host.accept_core_render.assert_called_once_with(request_pointer)
+            self.assertEqual(session.hardware_requests[-1]["type"], 3)
+            self.assertTrue(session.hardware_requests[-1]["granted"])
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 2, 2, 0)
             self.assertEqual(session.hardware_frames, 1)
             self.assertEqual(emu.frame_serial, 1)
