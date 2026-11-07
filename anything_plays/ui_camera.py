@@ -227,23 +227,28 @@ class CameraMixin:
                 and self.system_key.get() not in TWO_PLAYER_SYSTEMS):
             self.status.set(
                 'This console has no two-controller mode. '
-                'Choose Player 1 for Color 2.'
+                'Route the secondary object to Player 1.'
             )
         elif self.color2_enabled.get():
             self.status.set(
-                'Color 2 enabled. Use multi-input checkbox to track several fish per color.'
+                'Secondary object enabled. Turn on multiple objects per color to track more than one.'
             )
         else:
-            self.status.set('Color 2 disabled; primary color tracking continues.')
+            self.status.set('Secondary object disabled; primary tracking remains active.')
 
     def refresh_color(self):
         self.color_text.set(
-            'Color 1 · #%02X%02X%02X' % tuple(self.cfg['rgb'])
+            'Primary object color  ·  #%02X%02X%02X' % tuple(self.cfg['rgb'])
         )
         self.color2_text.set(
-            'Color 2 · #%02X%02X%02X' %
+            'Secondary object color  ·  #%02X%02X%02X' %
             tuple(self.cfg.get('rgb2', [255, 30, 180]))
         )
+        from anything_plays.ui_tracking_panel import (
+            refresh_color_swatches, update_secondary_controls,
+        )
+        refresh_color_swatches(self)
+        update_secondary_controls(self)
 
     def geometry(self):
         if self.frame is None:
@@ -276,9 +281,9 @@ class CameraMixin:
             if secondary:
                 self.color2_enabled.set(True)
                 self.update_tracking_preferences()
-                self.status.set('Color 2 sampled and enabled. Choose its player.')
+                self.status.set('Secondary object color sampled. Choose its player.')
             else:
-                self.status.set('Color 1 sampled. Multiple matching fish are supported.')
+                self.status.set('Primary object color sampled. Multi-object tracking is optional.')
         elif self.custom_draw_enabled.get():
             self.drag_start = point
 
@@ -390,13 +395,13 @@ class CameraMixin:
             if self.color2_enabled.get() and second_player_requested and (
                     not second_player_allowed or self.external_input is not None):
                 message = (
-                    'Color 2 Player 2 unavailable on this console/backend; '
+                    'Secondary object cannot use Player 2 on this console/backend; '
                     'choose Player 1 or a two-controller embedded game.'
                 )
             else:
                 message = (
-                    f'Tracking Color 1: {len(primary)} fish · '
-                    f'Color 2: {len(secondary)} · '
+                    f'Primary objects: {len(primary)} · '
+                    f'Secondary objects: {len(secondary)} · '
                     f'P1: {", ".join(sorted(buttons[0])) or "idle"} · '
                     f'P2: {", ".join(sorted(buttons[1])) or "idle"}'
                 )
