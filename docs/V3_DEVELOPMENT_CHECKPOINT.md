@@ -593,3 +593,26 @@ expire after 14 days and may require sign-in; don't invent sandbox links.
 run `42394706785`, report status and artifact refs for all four systems.
 Do not repeat already completed changes or run new code modifications
 unless a test or real-device failure warrants them.
+
+
+### Final QoL preview CI completion — all four platforms PASSED
+
+All four offline 3.0 preview package jobs **COMPLETED SUCCESSFULLY** at source
+commit `9af1afe50ad1a9379c02e3302876e51d9c271646`:
+[full installer run 42394706785](https://github.com/MasynNay/anything-plays/actions/runs/42394706785).
+This includes Linux Xvfb real GUI smoke test and all 12 dedicated volume,
+opt-in same-color multi-fish and independent P1/P2 tests on every target.
+
+The final remaining macOS Intel artifact is:
+[macos-x64 artifact 13582134993](https://github.com/MasynNay/anything-plays/actions/runs/42394706785/artifacts/13582134993),
+`AnythingPlays-3.0.0-FULL-TEST-ONLY-macos-x64`.
+
+The paired [application build and full GUI regression run
+42394706787](https://github.com/MasynNay/anything-plays/actions/runs/42394706787)
+also completed **all six jobs successfully** at the same source SHA.
+Earlier provisional note "Intel pending" above is therefore resolved.
+
+Current downloads all correspond to the same QoL source revision:
+Apple Silicon `13583470513`, Intel Mac `13582134993`,
+Windows x64 `13582767985`, Linux x64 `13582509228`.
+They are developer test packages, NOT a GitHub release. Keep 2.0 stable.
