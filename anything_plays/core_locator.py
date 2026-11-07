@@ -69,5 +69,9 @@ def find_core(system="gba"):
         for filename in filenames:
             candidate = folder / filename
             if candidate.is_file():
+                if core == "dolphin":
+                    codehandler = folder / "dolphin-emu" / "Sys" / "codehandler.bin"
+                    if not codehandler.is_file() or not codehandler.stat().st_size:
+                        continue
                 return str(candidate)
     return None

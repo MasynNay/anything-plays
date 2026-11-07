@@ -79,6 +79,9 @@ class DolphinInPanelTests(unittest.TestCase):
             folder = Path(tmp)
             path = folder / "dolphin_libretro.so"
             path.write_bytes(b"test")
+            sysdir = folder / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"original-test")
             with patch("anything_plays.gamecube_software._library_extension",
                        return_value=".so"), patch(
                 "anything_plays.gamecube_software._search_directories",
@@ -89,6 +92,28 @@ class DolphinInPanelTests(unittest.TestCase):
                 emulator = Emulator()
                 emulator.system = "gamecube"
                 self.assertEqual(emulator.find_system_core(), str(path))
+
+    def test_orphan_gamecube_binary_never_appears_installed(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"bare emulator binary")
+            with patch("anything_plays.gamecube_software._library_extension",
+                       return_value=".so"), patch(
+                "anything_plays.core_locator._library_extension",
+                return_value=".so"), patch(
+                "anything_plays.gamecube_software._search_directories",
+                return_value=(root,)), patch(
+                "anything_plays.core_locator._search_directories",
+                return_value=(root,)):
+                from anything_plays.core_locator import find_core
+                self.assertIsNone(find_dolphin_core())
+                self.assertIsNone(find_core("gamecube"))
+                sysdir = root / "dolphin-emu" / "Sys"
+                sysdir.mkdir(parents=True)
+                (sysdir / "codehandler.bin").write_bytes(b"test")
+                self.assertEqual(find_dolphin_core(), str(core))
+                self.assertEqual(find_core("gamecube"), str(core))
 
     def test_software_video_session_uses_sys_and_separate_save_directory(self):
         with TemporaryDirectory() as tmp:

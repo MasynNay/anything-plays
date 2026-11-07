@@ -94,7 +94,10 @@ def find_dolphin_core():
         return vetted
     for directory in _search_directories():
         candidate = Path(directory) / filename
-        if candidate.is_file():
+        # An orphan Dolphin DLL cannot boot without the matching Sys data.
+        # Do not advertise a corrupted/incomplete installer as "installed".
+        system = directory / "dolphin-emu" / "Sys" / "codehandler.bin"
+        if candidate.is_file() and system.is_file() and system.stat().st_size:
             return str(candidate)
     return None
 
@@ -115,8 +118,8 @@ def packaged_dolphin_system_directory(core_path):
         raise FileNotFoundError(
             "Bundled Dolphin system data is missing: dolphin-emu/Sys"
         )
-    if not any(sys_folder.iterdir()):
-        raise ValueError("Bundled Dolphin system data is empty")
+    if not (sys_folder / "codehandler.bin").is_file():
+        raise ValueError("Dolphin required system data is incomplete: codehandler.bin")
     return root
 
 
