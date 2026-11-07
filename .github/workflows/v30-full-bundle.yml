@@ -23,6 +23,9 @@ on:
       - 'anything_plays/ui_external.py'
       - 'anything_plays/gamecube_preview.py'
       - 'anything_plays/gamecube_gpu.py'
+      - 'anything_plays/gamecube_sys.py'
+      - 'anything_plays/gamecube_software.py'
+      - 'tests/test_v30_gamecube_linux_writable_sys.py'
       - 'anything_plays/ui_layout.py'
       - 'anything_plays/ui_view.py'
       - 'anything_plays/ui_panels.py'
@@ -101,6 +104,14 @@ jobs:
           else
             .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_icon_matte.py' -v
           fi
+      - name: Verify Linux Dolphin Sys is writable without changing /opt files
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_gamecube_linux_writable_sys.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_gamecube_linux_writable_sys.py' -v
+          fi
       - name: Verify 3.0 audio, multi-target and local two-player contracts
         shell: bash
         run: |
@@ -116,6 +127,18 @@ jobs:
         # A directly executed tests/smoke_gui.py lives under tests/, so
         # explicitly put the checked-out project root on Python's import path.
         run: PYTHONPATH=. xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
+      - name: Real GameCube playback from a read-only extracted Linux DEB
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          readonly_install="$(mktemp -d)"
+          trap 'chmod -R u+w "$readonly_install" 2>/dev/null || true; rm -rf "$readonly_install"' EXIT
+          dpkg-deb -x release/anything-plays-preview_3.0.0~alpha1_amd64.deb "$readonly_install"
+          chmod -R a-w "$readonly_install/opt/anything-plays-30-preview"
+          mkdir -p test-evidence
+          xvfb-run -a .build-venv/bin/python tools/probe_gamecube_app.py \
+            --core "$readonly_install/opt/anything-plays-30-preview/cores/dolphin_libretro.so" \
+            --seconds 5 --report test-evidence/gamecube-linux-readonly-deb.json
       - name: Verify every console has its native core in the installed payload
         env:
           TARGET: ${{ matrix.target }}
