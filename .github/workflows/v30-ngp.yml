@@ -14,6 +14,7 @@ on:
       - '.github/workflows/v30-ngp.yml'
       - 'anything_plays/libretro_input.py'
       - 'anything_plays/libretro_save.py'
+      - 'anything_plays/libretro_state.py'
       - 'anything_plays/libretro_video.py'
       - 'anything_plays/libretro_audio.py'
       - 'anything_plays/gba_emulator.py'
@@ -119,6 +120,36 @@ jobs:
         if: always()
         with:
           name: NeoGeoPocket-EXPERIMENTAL-three-cold-start-flash-save
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  ngpc-independent-native-state-resume:
+    # Strict test of the fallback layer, using the same immutable MIT
+    # StarGunner content and two cold core processes. Never flush cartridge
+    # flash; prove the recovered Options pixels came from native save-state.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Acquire matching native NeoPop core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      - name: Require actual cold restart from verified native recovery checkpoint
+        run: |
+          python tools/probe_ngp_flash_persistence.py --core cores/mednafen_ngp_libretro.so --mode state --seconds 12 --report test-evidence/ngpc-two-cold-session-real-state-resume.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NeoGeoPocket-REQUIRED-native-state-resume
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
