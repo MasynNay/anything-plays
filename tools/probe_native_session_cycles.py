@@ -32,6 +32,7 @@ CASES = (
     ("gamegear", "genesis_plus_gx", ".gg"),
     ("sg1000", "genesis_plus_gx", ".sg"),
     ("atari2600", "stella2014", ".a26"),
+    ("atari7800", "prosystem", ".a78"),
 )
 CORES = tuple(dict.fromkeys(core for _, core, _ in CASES))
 
@@ -45,6 +46,7 @@ def write_original_fixtures(folder):
     from tools.sega8_homebrew_fixture import write_sega8_probe
     from tools.sg1000_homebrew_fixture import write_sg1000_probe
     from tools.atari_homebrew_fixture import write_atari_probe
+    from tools.atari7800_homebrew_fixture import write_atari7800_probe
     files = {}
     for system, _, extension in CASES:
         rom = folder / ("original-" + system + extension)
@@ -64,6 +66,8 @@ def write_original_fixtures(folder):
             write_sg1000_probe(rom)
         elif system == "atari2600":
             write_atari_probe(rom)
+        elif system == "atari7800":
+            write_atari7800_probe(rom)
         files[system] = rom
     return files
 

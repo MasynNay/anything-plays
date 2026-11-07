@@ -158,9 +158,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  native-ten-console-lifecycle-soak:
-    # One Python process, 120 native Libretro restarts across 10 console
-    # profiles (5 distinct native libraries). Guards failed teardown, leaked
+  native-eleven-console-lifecycle-soak:
+    # One Python process, 132 native Libretro restarts across 11 console
+    # profiles (6 distinct native libraries). Guards failed teardown, leaked
     # worker threads, stale buttons, missing game frames and RSS growth.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -176,18 +176,18 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
           python -m pip install -r requirements.txt
-      - name: Retrieve five pinned Libretro engines in temporary CI environment
+      - name: Retrieve six pinned Libretro engines in temporary CI environment
         run: |
-          python -c "from fetch_mgba_core import fetch_core; [fetch_core(name) for name in ('mgba', 'snes9x', 'fceumm', 'genesis_plus_gx', 'stella2014')]"
-      - name: Require 120 successful original-game boots and bounded resident memory
+          python -c "from fetch_mgba_core import fetch_core; [fetch_core(name) for name in ('mgba', 'snes9x', 'fceumm', 'genesis_plus_gx', 'stella2014', 'prosystem')]"
+      - name: Require 132 successful original-game boots and bounded resident memory
         timeout-minutes: 12
         run: |
           mkdir -p test-evidence
-          python tools/probe_native_session_cycles.py --core-dir cores --cycles 12 --max-growth-mb 128 --report test-evidence/native-core-switch-120.json
+          python tools/probe_native_session_cycles.py --core-dir cores --cycles 12 --max-growth-mb 128 --report test-evidence/native-core-switch-132.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-120-real-native-console-restarts
+          name: AnythingPlays-3.0-132-real-native-console-restarts
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
