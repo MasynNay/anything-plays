@@ -11,6 +11,7 @@ Dolphin game and audio on every OS before it can be public release-ready.
 from __future__ import annotations
 
 import ctypes as C
+import re
 import sys
 import threading
 
@@ -86,11 +87,13 @@ class PortableGLFrameHost(EGLFrameHost):
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents
         # macOS CGL supports up to GL 4.1. Never pretend to satisfy a
         # native core asking for a newer context than what was created.
-        try:
-            major, minor = self.opengl_version.split(".", 2)[:2]
-            supported = int(major), int(minor)
-        except (ValueError, AttributeError):
+        # Drivers append arbitrary vendor/build suffixes to GL_VERSION:
+        # "4.1 Metal - 90.0", "4.1 INTEL-17", "4.5 (Core Profile)".
+        # Treat that trailing text as metadata, not part of the minor number.
+        version = re.match(r"^\s*(\d+)\.(\d+)", self.opengl_version or "")
+        if version is None:
             return False
+        supported = int(version.group(1)), int(version.group(2))
         if (req.version_major, req.version_minor) > supported:
             return False
         return super().accept_core_render(address)

@@ -38,6 +38,23 @@ class PortableGameCubeHostTests(TestCase):
         req.context_reset = 123
         self.assertFalse(host.accept_core_render(C.addressof(req)))
 
+    def test_macos_native_gl_41_version_accepts_actual_dolphin_gl33(self):
+        from anything_plays.libretro_gpu_egl import GET_FBO, GET_PROC
+        host = PortableGLFrameHost.__new__(PortableGLFrameHost)
+        host.owner = threading.get_ident()
+        host.opengl_version = "4.1 Metal - 90.0"
+        host.fbo = 32
+        host._fbo_callback = GET_FBO(lambda: host.fbo)
+        host._proc_callback = GET_PROC(lambda name: 123)
+        req = HardwareRenderCallback()
+        req.context_type = 3
+        req.version_major = 3
+        req.version_minor = 3
+        req.context_reset = 123
+        self.assertTrue(host.accept_core_render(C.addressof(req)))
+        self.assertEqual(host.core_reset, 123)
+        self.assertTrue(req.get_current_framebuffer)
+
     def test_no_context_procs_return_none_without_native_crash(self):
         host = PortableGLFrameHost.__new__(PortableGLFrameHost)
         host.context = None
