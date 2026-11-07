@@ -116,6 +116,37 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  snes-original-ppu-spc-audio:
+    # Generated 65816 LoROM and SPC IPL test tone, no copied game content.
+    # Must produce nonblank changing pixels AND native Snes9x DSP samples.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native graphics and PCM test requirements
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve Snes9x Libretro candidate for test, not installed game
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('snes9x')"
+      - name: Require original SNES mode-0 RGB and nonzero SPC DSP PCM
+        run: |
+          python tools/probe_snes_homebrew.py --core cores/snes9x_libretro.so --seconds 8 --report test-evidence/snes-original-ppu-spc.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-SNES-native-PPU-SPC-evidence
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   sega-8bit-original-native-av:
     # Generated Z80 programs: real 8-bit Sega VDP video and native PSG PCM.
     # These cartridges are original and never included in the installer.
