@@ -332,3 +332,111 @@ then the most recent `v30-ngp.yml` individual job statuses (especially
 Inspect `v30-app.yml` and `v30-cores.yml` too. Do not infer
 pass/fail from aggregate labels when the raw flash lab uses
 `continue-on-error: true`. Branch is not ready for user acceptance.
+
+
+## November 7, 2026 — continuation after input stream error: native NGP flash root cause and proof
+
+**Original restart head:** `65423ec895400cd20115bd3b0543ae0b33fdf1ad`.
+Prior automated application-build failure was a stale test assertion referencing
+the moved NGP workflow; it was fixed in `65423ec`. Application-build workflow
+[42389708320](https://github.com/MasynNay/anything-plays/actions/runs/42389708320)
+completed **all six jobs successfully**, including Linux, Windows, both Macs
+and the full source/GUI regressions.
+
+**Focused native Pocket evidence before cartridge-size correction:**
+
+- Workflow [42389708324](https://github.com/MasynNay/anything-plays/actions/runs/42389708324):
+  Neo Geo Pocket Color native LCD, real nonzero PCM, manual physical A and
+  camera physical B all **passed on four target platforms**.
+  Monochrome NGP LCD and both input types passed, but its pinned MIT
+  *alignment calibration ROM emits zero-valued PCM*, so its four native jobs
+  remain failed. A silent fixture does not demonstrate broken audio hardware;
+  **NGP mono audio acceptance remains open** until a suitable pinned,
+  permissively licensed, deliberately audible monochrome homebrew is obtained
+  and tested across all four platforms.
+- A true Libretro save-state checkpoint was added in
+  `8986f98` and `20a5942`; `bae9bfb` tests same-ROM/core fingerprints,
+  checksum rejection, 64 MiB bounds and cold restart. The native
+  **independent** recovery experiment passed in both
+  [42389452506](https://github.com/MasynNay/anything-plays/actions/runs/42389452506)
+  and subsequent Pocket run [42390603019](https://github.com/MasynNay/anything-plays/actions/runs/42390603019).
+  This preserves live session recovery if cartridge flash is unavailable,
+  but is *not* a substitute for testing normal in-game cartridge saves.
+
+**Flash root cause was isolated, NOT merely hidden with save-states:**
+
+The 79,765-byte MIT StarGunner development `.ngc` contains code that writes
+its 512-byte options/high-score journal near address **0x3FA000** (4,169,728),
+near the top of a 4 MiB cartridge. The bare development ROM is too short to
+back that address in NeoPop. In native test
+[42390351125](https://github.com/MasynNay/anything-plays/actions/runs/42390351125),
+the emulator wrote a 272-byte `.flash` file containing **one 256-byte
+block** at 0x3FA000. File content persisted, but a new process showed the
+old CONTINUES value; this was a legitimate failed save restoration.
+
+The **disposable CI-only test fixture** now pads *only the unused* ROM area to
+4,194,304 bytes with erased-flash 0xFF, retaining each of the 79,765 original
+bytes and recording SHA-256 hashes before and after staging. The fixture was
+verified by immutable Git blob SHA-1 **before** this padding. No commercial
+ROM is downloaded and no end-user ROM is edited.
+
+With that accurate cartridge capacity, the same actual Beetle NeoPop core
+produced **528-byte `.flash` data with one full 512-byte block**, still at
+0x3FA000. Workflow
+[42390603019](https://github.com/MasynNay/anything-plays/actions/runs/42390603019),
+job `ngpc-real-flash-restart-lab`, **PASSED** its strict 3-process test:
+unmodified baseline screen hash `feaac5a7...`, modified options hash
+`0d6a43a5...`, and reloaded options hash `0d6a43a5...`, with the same
+validated flash file persisting across restart. This demonstrates **real in-game
+native cartridge flash save and cold restore for one original MIT homebrew on
+Linux**. Do NOT generalize it to all games or hardware or claim the production
+frontend automatically stages undersized homebrew cartridges.
+
+**Defensive save validation introduced:**
+
+- `a5a2ad8`: added `anything_plays/neopop_flash.py`, validating NeoPop
+  native `.flash` magic 0x0053, 8-byte header, 8-byte padded block headers,
+  declared size, 1–256 blocks, 24-bit cartridge addresses, truncation, symlinks,
+  and an 8 MiB total bound. Does not rewrite malformed files.
+- `db75ee4`: `CoreSession._load_game` checks expected cartridge flash
+  **before** invoking native `retro_load_game`; malformed files get
+  actionable errors and are preserved.
+- `a1573f1`: unit tests exercise corruption, oversize, block layout,
+  filename handling and failure before native execution.
+- `54af5de`: native flash lab reports file format, physical block sizes,
+  block addresses, and hashes, making partial saves visible.
+- `79f4501`, `68748f7`, `a94f66b`: bounded, verified 4 MiB homebrew
+  staging and unit tests for unchanged original ROM bytes. Test staging
+  is intentionally separate from normal user ROM loading.
+- `11942b2`: focused CI watches native flash-validation source changes.
+
+**Current passing verification:** application-build workflow
+[42390602938](https://github.com/MasynNay/anything-plays/actions/runs/42390602938)
+passed all six jobs; Pocket verification
+[42390603019](https://github.com/MasynNay/anything-plays/actions/runs/42390603019)
+passed four NGPC native OS jobs, unit contracts, actual state restart and
+real cartridge flash restart. Four NGP mono native jobs remain **failed
+solely on the silent original test ROM's nonzero PCM gate**. Preserve that
+failure rather than weakening the sound requirement to get green CI.
+
+**Next steps, in order:**
+
+1. Find/build **a legally redistributable, deliberately audible original NGP
+   monochrome game/demo**, pin full source and byte hashes, and verify native
+   sound alongside video, controls, and recoverable progress on Linux,
+   Windows x64, Intel Mac and Apple Silicon.
+2. Only after evaluating actual compatibility, consider an **optional,
+   non-destructive, bounded virtual cartridge-capacity staging** mechanism
+   for undersized user-owned homebrew. Never pad/overwrite original ROM
+   libraries, silently change their identity, or falsely infer a game's
+   intended flash capacity from filename.
+3. Finish remaining GameCube requirements: actual GPU-driven Windows
+   OpenGL 3.3+ playback, Intel Mac rendering ≥20 FPS under representative
+   hardware, real controller and speaker QA, extended runtime acceptance.
+4. Check all game/profile release gates, licensing and native offline
+   distribution/signing; do not release 3.0 or touch stable 2.0 yet.
+
+**Recovery instructions:** inspect latest branch HEAD and focused workflow
+`.github/workflows/v30-ngp.yml` on that exact SHA; the last known native
+full-cartridge flash success is run `42390603019`. All changes above are
+committed, including this append-only durable checkpoint. 
