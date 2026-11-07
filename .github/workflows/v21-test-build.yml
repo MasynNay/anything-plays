@@ -29,11 +29,15 @@ jobs:
           import json, os, subprocess
           repo = os.environ["GITHUB_REPOSITORY"]
           current = os.environ["GITHUB_RUN_ID"]
+          current_number = int(os.environ["GITHUB_RUN_NUMBER"])
           url = f"repos/{repo}/actions/runs?branch=feature/v2.1-unified-test&per_page=100"
           runs = json.loads(subprocess.check_output(["gh", "api", url], text=True))["workflow_runs"]
           for run in runs:
               if (run["name"] == "Anything Plays 2.1 unified TEST build"
                   and str(run["id"]) != current
+                  # Previous runs only. A delayed old job must NEVER cancel
+                  # a newer commit's test run just because it launched late.
+                  and int(run.get("run_number", 0)) < current_number
                   and run["status"] in ("queued", "in_progress", "waiting", "requested")):
                   message = ((run.get("head_commit") or {}).get("message") or "")
                   if message.startswith("native(dolphin)"):
