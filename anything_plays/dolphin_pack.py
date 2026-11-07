@@ -78,6 +78,10 @@ def verify_dolphin_pack(data, item):
                 or not all(name.startswith(SYS_PREFIX) for name in extra)
                 or not all(_safe_name(name) for name in names)):
             raise ValueError("Invalid paired Dolphin archive files")
+        # Do not allocate/decompress the archive before enforcing a
+        # cumulative upper bound. Thousands of individually permitted
+        # members can otherwise be a multi-gigabyte ZIP bomb.
+        sys_total = 0
         for entry in members:
             if stat.S_ISLNK(entry.external_attr >> 16):
                 raise ValueError("Dolphin archive contains symlink")
@@ -85,8 +89,12 @@ def verify_dolphin_pack(data, item):
                       else MAX_SYS_INDEX if entry.filename == SYS_MANIFEST
                       else MAX_CORE_BINARY if entry.filename == filename
                       else MAX_SYS_SINGLE)
-            if entry.file_size > budget:
+            if entry.file_size < 0 or entry.file_size > budget:
                 raise ValueError("Oversized Dolphin archive member")
+            if entry.filename.startswith(SYS_PREFIX):
+                sys_total += entry.file_size
+                if sys_total > MAX_SYS_TOTAL:
+                    raise ValueError("Dolphin archive expanded Sys bytes exceed limit")
         meta = json.loads(archive.read("core-pack.json"))
         index_bytes = archive.read(SYS_MANIFEST)
         binary = archive.read(filename)

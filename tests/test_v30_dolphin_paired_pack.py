@@ -82,6 +82,52 @@ def item_for(result):
 
 
 class GameCubePairedPackTests(unittest.TestCase):
+    def test_cumulative_zip_expansion_guard_before_extracting_any_file(self):
+        # All six entries are individually within MAX_SYS_SINGLE, but their
+        # combined *declared uncompressed* size exceeds MAX_SYS_TOTAL.
+        # None of their contents should be read by the native updater.
+        from anything_plays.dolphin_pack import (
+            verify_dolphin_pack, MAX_SYS_SINGLE, MAX_SYS_TOTAL
+        )
+        from unittest.mock import patch
+        from zipfile import ZipInfo
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cores, _, _, _ = fake_dolphin_folder(root)
+            result = create_candidate_packs(
+                cores, root / "zip", "v3.0.0-alpha.2-cores",
+                selected=["dolphin"], license_reviewed=True,
+                runtime_tested=True,
+            )[0]
+            real_bytes = Path(result["file"]).read_bytes()
+            with zipfile.ZipFile(io.BytesIO(real_bytes)) as fixture:
+                entries = fixture.infolist()
+                # zipfile.ZipInfo.file_size is populated from the central
+                # directory. Replacing the list simulates an attack without
+                # allocating an 80+ MiB test archive.
+                bloated = [
+                    ZipInfo(f"dolphin-emu/Sys/mock-{index}.bin")
+                    for index in range(6)
+                ]
+                for entry in bloated:
+                    entry.file_size = MAX_SYS_SINGLE
+                self.assertGreater(sum(e.file_size for e in bloated),
+                                   MAX_SYS_TOTAL)
+                with patch.object(fixture, "infolist",
+                                  return_value=entries + bloated), patch(
+                                       "anything_plays.dolphin_pack.zipfile.ZipFile",
+                                       return_value=fixture
+                                  ), patch.object(
+                                      fixture, "read",
+                                      side_effect=AssertionError(
+                                          "ZIP contents read before size limits"
+                                      )
+                                  ):
+                    with self.assertRaisesRegex(ValueError, "expanded Sys"):
+                        verify_dolphin_pack(
+                            real_bytes, item_for(result)
+                        )
+
     def test_unreviewed_candidate_fails_closed(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
