@@ -121,7 +121,15 @@ jobs:
     # Strict native ProSystem video and real TIA PCM acceptance (not a
     # mere ROM load or simulated video frame).
     continue-on-error: true
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 14
     env:
       AP_V30_TEST_CORES: '1'
@@ -130,20 +138,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install headless native audio and graphics
+      - name: Install Linux graphics and audio dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
       - name: Obtain optional ProSystem core for test
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('prosystem')"
       - name: Require original MARIA changing video and nonzero TIA PCM
         run: |
-          python tools/probe_atari7800_homebrew.py --core cores/prosystem_libretro.so --seconds 8 --report test-evidence/atari7800-original-maria-tia.json
+          python tools/probe_atari7800_homebrew.py --core cores/prosystem_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/atari7800-original-${{ matrix.target }}-maria-tia.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-Atari7800-MARIA-TIA
+          name: AnythingPlays-3.0-original-Atari7800-MARIA-TIA-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
