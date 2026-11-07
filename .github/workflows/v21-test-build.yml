@@ -664,3 +664,48 @@ jobs:
             test-evidence/atari-test-frame.png
           if-no-files-found: warn
           retention-days: 14
+
+  optional-2d-native-video-and-audio:
+    # Independently validate native optional cores on EACH supported desktop OS.
+    # Source-created ROMs contain no commercial games; sound is actual emitted
+    # PCM captured through Libretro, not a physical speaker validation.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, extension: so, system: nes, core: fceumm}
+          - {os: windows-2025, extension: dll, system: nes, core: fceumm}
+          - {os: macos-15, extension: dylib, system: nes, core: fceumm}
+          - {os: macos-15-intel, extension: dylib, system: nes, core: fceumm}
+          - {os: ubuntu-24.04, extension: so, system: atari, core: stella2014}
+          - {os: windows-2025, extension: dll, system: atari, core: stella2014}
+          - {os: macos-15, extension: dylib, system: atari, core: stella2014}
+          - {os: macos-15-intel, extension: dylib, system: atari, core: stella2014}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless native core and audio prerequisites on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Prepare Python environment
+        run: python -m pip install -r requirements.txt
+      - name: Fetch platform-matched optional emulator (no standalone emulator)
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('${{ matrix.core }}')"
+      - name: Require generated changing graphics and nonzero emulator audio PCM
+        run: |
+          python tools/probe_${{ matrix.system }}_homebrew.py --core cores/${{ matrix.core }}_libretro.${{ matrix.extension }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.os }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-${{ matrix.system }}-${{ matrix.os }}-audio-video
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
