@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
-VERSION="${VERSION:-2.1.0~alpha1}"
+cd "$(dirname "$0")/.."
+VERSION="${VERSION:-3.0.0~alpha1}"
 ARCH="$(dpkg --print-architecture)"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -21,12 +21,12 @@ fi
 # The DEB depends on OS libportaudio2. Do not redistribute frozen copies of
 # PortAudio, JACK, ALSA, Berkeley DB, or the unused GPL Readline extension.
 python3 tools/prune_linux_system_libs.py dist/AnythingPlays
-# A 2.1 starter installer ships only mGBA; other cores are approved in-app downloads.
+# A 3.0 starter installer ships only mGBA; other cores are approved in-app downloads.
 mkdir -p dist/AnythingPlays/cores
 CORE_LIST=(mgba snes9x)
-if [[ "${AP_V21_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
+if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
   CORE_LIST=(mgba)
-elif [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+elif [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
 for name in "${CORE_LIST[@]}"; do
@@ -35,7 +35,7 @@ for name in "${CORE_LIST[@]}"; do
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
-if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
   cp -R cores/dolphin-emu dist/AnythingPlays/cores/
   cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays/cores/
@@ -51,18 +51,18 @@ cp licenses/*.txt dist/AnythingPlays/licenses/
 .build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
-if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
   .build-venv/bin/python tools/probe_embedded_3d.py linux dist/AnythingPlays
 fi
 
-PKG="build/deb/anything-plays-test_${VERSION}_${ARCH}"
+PKG="build/deb/anything-plays-preview_${VERSION}_${ARCH}"
 rm -rf "$PKG"
-mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-21-test" "$PKG/usr/bin" "$PKG/usr/share/applications"
-cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-21-test/"
+mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-30-preview" "$PKG/usr/bin" "$PKG/usr/share/applications"
+cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-30-preview/"
 mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
-cp build/v21-icon/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-test.png"
+cp build/v21-icon/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png"
 cat > "$PKG/DEBIAN/control" <<CONTROL
-Package: anything-plays-test
+Package: anything-plays-preview
 Version: $VERSION
 Section: games
 Priority: optional
@@ -72,31 +72,31 @@ Depends: libc6, libgl1, libegl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
  Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores.
 CONTROL
-cat > "$PKG/usr/bin/anything-plays-21-test" <<'LAUNCH'
+cat > "$PKG/usr/bin/anything-plays-30-preview" <<'LAUNCH'
 #!/bin/sh
-exec /opt/anything-plays-21-test/AnythingPlays "$@"
+exec /opt/anything-plays-30-preview/AnythingPlays "$@"
 LAUNCH
-chmod +x "$PKG/usr/bin/anything-plays-21-test"
-cat > "$PKG/usr/share/applications/anything-plays-test.desktop" <<'DESKTOP'
+chmod +x "$PKG/usr/bin/anything-plays-30-preview"
+cat > "$PKG/usr/share/applications/anything-plays-preview.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Anything Plays 2.1 Test
+Name=Anything Plays 3.0 Preview
 Comment=Camera-controlled multi-system gaming studio
-Exec=anything-plays-21-test
-Icon=anything-plays-test
+Exec=anything-plays-30-preview
+Icon=anything-plays-preview
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
 mkdir -p release
 chmod g-s "$PKG/DEBIAN"
 chmod 0755 "$PKG/DEBIAN"
-dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays-test_${VERSION}_${ARCH}.deb"
+dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays-preview_${VERSION}_${ARCH}.deb"
 # Verify the exact DEB payload, not only the staging folder.
 AUDIT_DIR="$(mktemp -d)"
 trap 'rm -rf "$AUDIT_DIR"' EXIT
-dpkg-deb -x "release/anything-plays-test_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
-python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-21-test"
-python3 - "$AUDIT_DIR/opt/anything-plays-21-test" <<'PY'
+dpkg-deb -x "release/anything-plays-preview_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
+python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-30-preview"
+python3 - "$AUDIT_DIR/opt/anything-plays-30-preview" <<'PY'
 import sys
 from pathlib import Path
 from tools.prune_linux_system_libs import EXCLUDED_RELATIVE_FILES
@@ -107,4 +107,4 @@ print("Validated clean Linux installed payload without redundant audio system li
 PY
 rm -rf "$AUDIT_DIR"
 trap - EXIT
-echo "Created release/anything-plays-test_${VERSION}_${ARCH}.deb"
+echo "Created release/anything-plays-preview_${VERSION}_${ARCH}.deb"

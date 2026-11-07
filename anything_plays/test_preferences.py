@@ -1,20 +1,22 @@
-"""Give the 2.1 alpha a private copy of the stable user's settings.
+"""Give the 3.0 preview a private copy of the stable user's settings.
 
-The 2.0 preferences and profiles are never written by the test branch.
-A later production 2.1 release should use the explicit upgrade/migration
+The 2.0 and 2.1 preferences and profiles are never written by the test branch.
+A later production 3.0 release should use the explicit upgrade/migration
 path rather than treating this test-only location as the stable default.
 """
 from pathlib import Path
 
 
 LEGACY_DIR = Path(".config") / "fish-plays-pokemon-studio"
-TEST_DIR = Path(".config") / "anything-plays-21-test"
+TEST_DIR = Path(".config") / "anything-plays-30-preview"
+PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-21-test"
 
 
 def prepare_test_preferences(home=None):
     """Seed a separate alpha settings directory once, without editing 2.0."""
     home = Path.home() if home is None else Path(home)
-    source = home / LEGACY_DIR
+    previous_preview = home / PREVIOUS_PREVIEW_DIR
+    source = previous_preview if previous_preview.is_dir() else home / LEGACY_DIR
     destination = home / TEST_DIR
     destination.mkdir(parents=True, exist_ok=True)
     for filename in ("preferences.json", "system_profiles.json"):

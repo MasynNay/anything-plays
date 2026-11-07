@@ -1,13 +1,13 @@
-name: Anything Plays 2.1 unified TEST build
+name: Anything Plays 3.0 | Preview and emulator verification
 
 on:
   push:
-    branches: [feature/v2.1-unified-test]
+    branches: [feature/v3.0-unified-test]
   workflow_dispatch:
 
 # Do not lock all alpha runs behind one GitHub concurrency group:
 # a cancelled, stuck macOS runner can otherwise leave newer runs pending.
-# The cancel-superseded-v21-builds job handles old test runs explicitly.
+# The cancel-superseded-v30-builds job handles old test runs explicitly.
 
 permissions:
   contents: read
@@ -17,11 +17,11 @@ env:
   AP_RELEASE_BUILD: '0'
 
 jobs:
-  cancel-superseded-v21-builds:
+  cancel-superseded-v30-builds:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Cancel only earlier 2.1 test workflow runs on this branch
+      - name: Cancel only earlier 3.0 preview workflow runs on this branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -30,10 +30,10 @@ jobs:
           repo = os.environ["GITHUB_REPOSITORY"]
           current = os.environ["GITHUB_RUN_ID"]
           current_number = int(os.environ["GITHUB_RUN_NUMBER"])
-          url = f"repos/{repo}/actions/runs?branch=feature/v2.1-unified-test&per_page=100"
+          url = f"repos/{repo}/actions/runs?branch=feature/v3.0-unified-test&per_page=100"
           runs = json.loads(subprocess.check_output(["gh", "api", url], text=True))["workflow_runs"]
           for run in runs:
-              if (run["name"] == "Anything Plays 2.1 unified TEST build"
+              if (run["name"] == "Anything Plays 3.0 | Preview and emulator verification"
                   and str(run["id"]) != current
                   # Previous runs only. A delayed old job must NEVER cancel
                   # a newer commit's test run just because it launched late.
@@ -70,8 +70,8 @@ jobs:
           pulseaudio --start --exit-idle-time=-1 || true
           # Preserve Python frame stacks if a native extension segfaults.
           python -X faulthandler -m unittest discover -s tests -v
-      - name: Report 2.1 release blockers (development builds may proceed)
-        run: python tools/check_v21_release.py --report-only
+      - name: Report 3.0 release blockers (development builds may proceed)
+        run: python tools/check_v30_release.py --report-only
       - name: Review GameCube open-source homebrew fixture checksum (candidate only)
         continue-on-error: true
         run: python tools/gamecube_homebrew_fixture.py --inspect
@@ -86,14 +86,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1.0-alpha1-UI-soak-evidence
+          name: AnythingPlays-3.0.0-alpha1-UI-soak-evidence
           path: test-evidence/soak-gui-30s.json
           if-no-files-found: warn
           retention-days: 21
 
   windows-test-installer:
     env:
-      AP_V21_MINIMAL_CORE_BUILD: '1'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
     runs-on: windows-latest
     timeout-minutes: 75
     steps:
@@ -105,23 +105,23 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
-      - name: Build 2.1 Windows installer with the mGBA starter core
+      - name: Build 3.0 Windows installer with the mGBA starter core
         shell: cmd
-        run: call build_windows.bat
+        run: call packaging/build_windows.bat
       - name: Inspect exact mGBA-only starter bundle
         run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays test-evidence/windows-x86_64.json
       - uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-2.1.0-alpha1-Windows-x64-TEST
+          name: AnythingPlays-3.0.0-alpha1-Windows-x64-TEST
           path: |
-            release/AnythingPlaysSetup-2.1.0-alpha.1.exe
+            release/AnythingPlaysSetup-3.0.0-alpha.1.exe
             test-evidence/windows-x86_64.json
           if-no-files-found: error
           retention-days: 21
 
   macos-test-installer:
     env:
-      AP_V21_MINIMAL_CORE_BUILD: '1'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -137,22 +137,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Build 2.1 macOS DMG with the mGBA starter core
-        run: bash build_macos_dmg.sh
+      - name: Build 3.0 macOS DMG with the mGBA starter core
+        run: bash packaging/build_macos_dmg.sh
       - name: Inspect staged test app
-        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays21Test.app test-evidence/macos-${{ matrix.arch }}.json
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays30Test.app test-evidence/macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-2.1.0-alpha1-macOS-${{ matrix.arch }}-TEST
+          name: AnythingPlays-3.0.0-alpha1-macOS-${{ matrix.arch }}-TEST
           path: |
-            release/AnythingPlays-2.1.0-alpha.1.dmg
+            release/AnythingPlays-3.0.0-alpha.1.dmg
             test-evidence/macos-${{ matrix.arch }}.json
           if-no-files-found: error
           retention-days: 21
 
   linux-test-installer:
     env:
-      AP_V21_MINIMAL_CORE_BUILD: '1'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -164,20 +164,20 @@ jobs:
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
-      - name: Build 2.1 Debian package with the mGBA starter core
-        run: bash build_linux_deb.sh
+      - name: Build 3.0 Debian package with the mGBA starter core
+        run: bash packaging/build_linux_deb.sh
       - name: Verify alpha DEB package identity and launch entry
         run: |
-          test "$(dpkg-deb -f 'release/anything-plays-test_2.1.0~alpha1_amd64.deb' Package)" = 'anything-plays-test'
-          dpkg-deb -c 'release/anything-plays-test_2.1.0~alpha1_amd64.deb' | grep -F '/usr/bin/anything-plays-21-test'
-          dpkg-deb -c 'release/anything-plays-test_2.1.0~alpha1_amd64.deb' | grep -F '/usr/share/applications/anything-plays-test.desktop'
+          test "$(dpkg-deb -f 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' Package)" = 'anything-plays-preview'
+          dpkg-deb -c 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' | grep -F '/usr/bin/anything-plays-30-preview'
+          dpkg-deb -c 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' | grep -F '/usr/share/applications/anything-plays-preview.desktop'
       - name: Inspect Linux test installation
         run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays test-evidence/linux-x86_64.json
       - uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
+          name: AnythingPlays-3.0.0-alpha1-Linux-x64-TEST
           path: |
-            release/anything-plays-test_2.1.0~alpha1_amd64.deb
+            release/anything-plays-preview_3.0.0~alpha1_amd64.deb
             test-evidence/linux-x86_64.json
           if-no-files-found: error
           retention-days: 21
@@ -189,7 +189,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
       LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v4
@@ -253,7 +253,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-GameCube-native-debug-evidence
+          name: AnythingPlays-3.0-GameCube-native-debug-evidence
           path: |
             test-evidence/gamecube-homebrew-gdb.json
             test-evidence/gamecube-homebrew-cached-gdb.json
@@ -287,7 +287,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
       LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v4
@@ -312,7 +312,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-N64-real-homebrew-evidence
+          name: AnythingPlays-3.0-N64-real-homebrew-evidence
           path: |
             test-evidence/n64-homebrew-playback.json
             test-evidence/n64-homebrew-frame.png
@@ -335,7 +335,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 12
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -352,7 +352,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-N64-${{ matrix.os }}-real-video-evidence
+          name: AnythingPlays-3.0-N64-${{ matrix.os }}-real-video-evidence
           path: |
             test-evidence/n64-homebrew-playback.json
             test-evidence/n64-homebrew-frame.png
@@ -367,7 +367,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
       LIBGL_ALWAYS_SOFTWARE: '1'
       MESA_GL_VERSION_OVERRIDE: '4.5'
     steps:
@@ -454,7 +454,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-GameCube-offscreen-OpenGL-experiment
+          name: AnythingPlays-3.0-GameCube-offscreen-OpenGL-experiment
           path: |
             test-evidence/gamecube-opengl-jit.json
             test-evidence/gamecube-opengl-cached.json
@@ -493,9 +493,9 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: dolphin-v21-ubuntu24-${{ github.sha }}
+          key: dolphin-v30-ubuntu24-${{ github.sha }}
           restore-keys: |
-            dolphin-v21-ubuntu24-
+            dolphin-v30-ubuntu24-
       - name: Limit and report native compiler cache
         run: |
           ccache -M 1G
@@ -548,11 +548,11 @@ jobs:
         continue-on-error: true
         with:
           path: ~/.cache/ccache
-          key: dolphin-v21-ubuntu24-${{ github.sha }}
+          key: dolphin-v30-ubuntu24-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-patched-Dolphin-experiment-evidence
+          name: AnythingPlays-3.0-patched-Dolphin-experiment-evidence
           path: |
             test-evidence/gamecube-native-build.log
             test-evidence/gamecube-patched-homebrew.json
@@ -584,7 +584,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      AP_V21_CORE_PACK_BUILD: '1'
+      AP_V30_CORE_PACK_BUILD: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -594,10 +594,10 @@ jobs:
         run: python fetch_mgba_core.py
       - name: Create checksum-verified UNAPPROVED optional packages
         run: |
-          python tools/create_core_packs.py --release v2.1.0-alpha.2 --output release/core-packs
+          python tools/create_core_packs.py --release v3.0.0-alpha.2-cores --output release/core-packs
       - uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-2.1-UNAPPROVED-core-candidates-${{ matrix.target }}
+          name: AnythingPlays-3.0-UNAPPROVED-core-candidates-${{ matrix.target }}
           path: release/core-packs/*.zip
           if-no-files-found: error
           retention-days: 14
@@ -609,7 +609,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -634,7 +634,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-original-NES-video-audio-evidence
+          name: AnythingPlays-3.0-original-NES-video-audio-evidence
           path: |
             test-evidence/nes-video-audio.json
             test-evidence/nes-test-frame.png
@@ -647,7 +647,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -672,7 +672,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-original-Atari-video-audio-evidence
+          name: AnythingPlays-3.0-original-Atari-video-audio-evidence
           path: |
             test-evidence/atari-video-audio.json
             test-evidence/atari-test-frame.png
@@ -698,7 +698,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -719,7 +719,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-${{ matrix.system }}-${{ matrix.os }}-audio-video
+          name: AnythingPlays-3.0-${{ matrix.system }}-${{ matrix.os }}-audio-video
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
@@ -744,7 +744,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 16
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -763,7 +763,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-pack-e2e-${{ matrix.core }}-${{ matrix.target }}
+          name: AnythingPlays-3.0-pack-e2e-${{ matrix.core }}-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
@@ -776,7 +776,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -796,7 +796,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-2.1-experimental-Genesis-VDP-PSG
+          name: AnythingPlays-3.0-experimental-Genesis-VDP-PSG
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14

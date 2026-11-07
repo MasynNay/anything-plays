@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 RELEASE_API = "https://api.github.com/repos/MasynNay/anything-plays/releases"
 RELEASES_PAGE = "https://github.com/MasynNay/anything-plays/releases"
-CURRENT_VERSION = "2.1.0-alpha.1"
+CURRENT_VERSION = "3.0.0-alpha.1"
 MAX_RESPONSE_BYTES = 512 * 1024
 _VERSION = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-.]?(alpha|beta|rc)[.-]?(\d+))?$", re.I)
 _RELEASE_LINK = re.compile(
@@ -76,7 +76,7 @@ def check_published_updates(*, current=CURRENT_VERSION, opener=None):
         RELEASE_API,
         headers={
             "Accept": "application/vnd.github+json",
-            "User-Agent": "AnythingPlays/2.1-update-check",
+            "User-Agent": "AnythingPlays/3.0-update-check",
         },
     )
     opener = opener or urllib.request.urlopen

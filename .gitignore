@@ -26,3 +26,6 @@ __MACOSX/
 *.zip
 cores/*
 !cores/.gitkeep
+
+# Generated PyInstaller specifications are not source files
+*.spec

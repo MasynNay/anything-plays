@@ -37,7 +37,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
 
     def __init__(self, root):
         self.root = root
-        root.title('Anything Plays 2.1 · Testing')
+        root.title('Anything Plays 3.0 · Preview')
         self.set_app_icon()
         root.geometry('1400x880')
         root.minsize(820, 540)

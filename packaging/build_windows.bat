@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
-set "VERSION=2.1.0-alpha.1"
+cd /d "%~dp0.."
+set "VERSION=3.0.0-alpha.1"
 REM Use one explicit interpreter for the downloader, build venv and bundle
 REM verification. The unqualified Windows 'py' launcher may select a different
 REM installation than actions/setup-python (observed Python 3.15 vs 3.13).
@@ -34,17 +34,17 @@ if defined AP_CUSTOM_OPENCV_WHEEL (
 )
 .build-venv\Scripts\python.exe tools/check_opencv_build.py
 if errorlevel 1 exit /b 1
-REM The corrected 2.1 icon is built independently from stable 2.0 artwork.
+REM The corrected 3.0 preview icon is built independently from stable 2.0 artwork.
 .build-venv\Scripts\python.exe tools\render_v21_icon.py
 if errorlevel 1 exit /b 1
 .build-venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name AnythingPlays --icon build\v21-icon\anything_plays.ico --add-data "assets\anything_plays.png;assets" --add-data "assets\anything_plays_v21.webp;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
 set "CORE_LIST=mgba snes9x"
-if "%AP_V21_MINIMAL_CORE_BUILD%"=="1" (
+if "%AP_V30_MINIMAL_CORE_BUILD%"=="1" (
   set "CORE_LIST=mgba"
 ) else (
-  if "%AP_V21_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
+  if "%AP_V30_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
 )
 for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
@@ -53,7 +53,7 @@ for %%C in (%CORE_LIST%) do (
 )
 copy /Y "cores\CORE_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
 if errorlevel 1 exit /b 1
-if "%AP_V21_TEST_CORES%"=="1" (
+if "%AP_V30_TEST_CORES%"=="1" (
   if not exist "cores\dolphin-emu\Sys\codehandler.bin" (
     echo Missing bundled Dolphin Sys resources
     exit /b 1
@@ -80,7 +80,7 @@ if errorlevel 1 exit /b 1
 
 python verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
-if "%AP_V21_TEST_CORES%"=="1" (
+if "%AP_V30_TEST_CORES%"=="1" (
   .build-venv\Scripts\python.exe tools\probe_embedded_3d.py windows dist\AnythingPlays
   if errorlevel 1 exit /b 1
 )
@@ -99,7 +99,7 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-"%ISCC%" /DAppVersion=%VERSION% installer.iss
+"%ISCC%" /DAppVersion=%VERSION% packaging\installer.iss
 if errorlevel 1 exit /b 1
 echo.
 echo SUCCESS: release\AnythingPlaysSetup-%VERSION%.exe

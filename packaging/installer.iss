@@ -1,18 +1,18 @@
-#define AppName "Anything Plays 2.1 Test"
+#define AppName "Anything Plays 3.0 Preview"
 #ifndef AppVersion
-  #define AppVersion "2.1.0-alpha.1"
+  #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-AppId={{1DCC721E-A1D2-4A91-8B49-C7A453EEDB21}
+AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-DefaultDirName={autopf}\Anything Plays 2.1 Test
-DefaultGroupName=Anything Plays 2.1 Test
+DefaultDirName={autopf}\Anything Plays 3.0 Preview
+DefaultGroupName=Anything Plays 3.0 Preview
 DisableProgramGroupPage=yes
-OutputDir=release
+OutputDir=..\release
 OutputBaseFilename=AnythingPlaysSetup-{#AppVersion}
-SetupIconFile=build\v21-icon\anything_plays.ico
+SetupIconFile=..\build\v21-icon\anything_plays.ico
 UninstallDisplayIcon={app}\AnythingPlays.exe
 Compression=lzma2
 SolidCompression=yes
@@ -23,11 +23,11 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
 [Files]
-Source: "dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Anything Plays 2.1 Test"; Filename: "{app}\AnythingPlays.exe"
-Name: "{autodesktop}\Anything Plays 2.1 Test"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+Name: "{group}\Anything Plays 3.0 Preview"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.0 Preview"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
