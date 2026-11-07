@@ -155,7 +155,7 @@ jobs:
       - name: Install Linux build requirements
         run: |
           sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
       - name: Build 2.1 Debian package with five native test cores
         run: bash build_linux_deb.sh
       - name: Verify alpha DEB package identity and launch entry
@@ -165,11 +165,26 @@ jobs:
           dpkg-deb -c 'release/anything-plays-test_2.1.0~alpha1_amd64.deb' | grep -F '/usr/share/applications/anything-plays-test.desktop'
       - name: Inspect Linux test installation
         run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays test-evidence/linux-x86_64.json
+      - name: Probe bundled Dolphin with pinned GameCube homebrew (experimental)
+        id: gamecube_probe
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          # Experimental: failure is recorded in evidence, not hidden as a
+          # successful native game test. Public release remains blocked.
+          PYTHONUNBUFFERED=1 xvfb-run -a .build-venv/bin/python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core dist/AnythingPlays/cores/dolphin_libretro.so \
+            --seconds 25 --report test-evidence/gamecube-homebrew-playback.json
       - uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
           path: |
             release/anything-plays-test_2.1.0~alpha1_amd64.deb
             test-evidence/linux-x86_64.json
+            test-evidence/gamecube-homebrew-playback.json
+            test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: error
           retention-days: 21
