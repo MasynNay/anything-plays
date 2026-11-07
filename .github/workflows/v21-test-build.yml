@@ -343,7 +343,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --seconds 20 \
+            --core cores/dolphin_libretro.so --seconds 75 \
             --report test-evidence/gamecube-opengl-jit.json
       - name: Probe accelerated Dolphin with cached interpreter (diagnostic)
         id: accelerated_interpreter
@@ -353,7 +353,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 20 \
+            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 35 \
             --report test-evidence/gamecube-opengl-cached.json
       - name: Require real nonblank playable-speed GameCube frames
         if: always()
@@ -385,7 +385,8 @@ jobs:
           path: |
             test-evidence/gamecube-opengl-jit.json
             test-evidence/gamecube-opengl-cached.json
-            test-evidence/gamecube-opengl-frame.png
+            test-evidence/gamecube-opengl-frame-*.png
+            test-evidence/gamecube-opengl-first-*.png
             test-evidence/gc-opengl-sys-source.json
           if-no-files-found: warn
           retention-days: 14

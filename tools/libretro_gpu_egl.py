@@ -35,6 +35,8 @@ GL_LINEAR = 0x2601
 GL_DEPTH24_STENCIL8 = 0x88F0
 GL_PACK_ALIGNMENT = 0x0D05
 GL_VERSION = 0x1F02
+GL_RENDERER = 0x1F01
+GL_VENDOR = 0x1F00
 MAX_PIXELS = 4096 * 4096
 
 GET_FBO = C.CFUNCTYPE(C.c_size_t)
@@ -151,9 +153,14 @@ class EGLFrameHost:
             raise RuntimeError("Could not create offscreen OpenGL core context")
         if not self._eglfunc["eglMakeCurrent"](self.display, self.surface, self.surface, self.context):
             raise RuntimeError("Could not make offscreen OpenGL context current")
-        version = self._gl("glGetString", C.c_char_p, [UI])(GL_VERSION)
+        get_string = self._gl("glGetString", C.c_char_p, [UI])
+        version = get_string(GL_VERSION)
         if not version:
             raise RuntimeError("Created EGL context does not expose OpenGL")
+        self.opengl_version = version.decode("utf-8", errors="replace")
+        self.opengl_vendor = (get_string(GL_VENDOR) or b"").decode("utf-8", errors="replace")
+        self.opengl_renderer = (get_string(GL_RENDERER) or b"").decode("utf-8", errors="replace")
+        self.last_gl_error = 0
 
     def get_proc_address(self, symbol):
         if not symbol:
@@ -249,6 +256,7 @@ class EGLFrameHost:
             self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
                 GL_READ_FRAMEBUFFER, old_read.value
             )
+        self.last_gl_error = self._gl("glGetError", C.c_uint, [])()
         arr = np.frombuffer(image, dtype=np.uint8).reshape(h, w, 4)[:, :, :3]
         return arr[::-1].copy() if flip_vertical else arr.copy()
 

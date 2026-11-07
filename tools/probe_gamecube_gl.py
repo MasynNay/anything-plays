@@ -61,6 +61,10 @@ class GLCoreSession(CoreSession):
         self.hardware_requests = 0
         self.hardware_frames = 0
         self.gpu_error = None
+        self.opengl_version = None
+        self.opengl_renderer = None
+        self.opengl_vendor = None
+        self.final_gl_error = None
 
     def environment(self, command, data):
         if command == 14:  # RETRO_ENVIRONMENT_SET_HW_RENDER
@@ -89,12 +93,18 @@ class GLCoreSession(CoreSession):
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1
+            self.final_gl_error = self.hardware.last_gl_error
         else:
             super().video(data, width, height, pitch)
 
     def run(self):
         with EGLFrameHost(width=640, height=576) as hardware:
             self.hardware = hardware
+            self.opengl_version = hardware.opengl_version
+            self.opengl_renderer = hardware.opengl_renderer
+            self.opengl_vendor = hardware.opengl_vendor
+            print("GL-PROBE: renderer =", hardware.opengl_renderer, flush=True)
+            print("GL-PROBE: version =", hardware.opengl_version, flush=True)
             # CoreSession.run closes/unloads the native core while this EGL
             # context is still current; only then is its FBO destroyed.
             try:
@@ -105,6 +115,31 @@ class GLCoreSession(CoreSession):
 
 def _child(core, rom, seconds, report, cpu_core):
     from PIL import Image
+    from anything_plays import gba_emulator as engine
+
+    class TimedNativeCore(engine.NativeCore):
+        """Capture native retro_run call counts and stalls before teardown."""
+        def __init__(self, path):
+            super().__init__(path)
+            wrapped_run = self.run
+            self.run_calls = 0
+            self.slowest_call_s = 0.0
+
+            def timed_run():
+                started = time.monotonic()
+                try:
+                    return wrapped_run()
+                finally:
+                    elapsed = time.monotonic() - started
+                    self.run_calls += 1
+                    self.slowest_call_s = max(self.slowest_call_s, elapsed)
+                    if self.run_calls <= 5 or self.run_calls % 60 == 0:
+                        print("GL-PROBE: retro_run", self.run_calls,
+                              "seconds", round(elapsed, 3), flush=True)
+            self.run = timed_run
+
+    # Confined to the disposable child; never patch the player's native core.
+    engine.NativeCore = TimedNativeCore
     emu = Emulator()
     emu.system = "gamecube"
     emu.inputs.system = "gamecube"
@@ -115,11 +150,16 @@ def _child(core, rom, seconds, report, cpu_core):
     session.audio = SilentAudio()
 
     decoded, nonblank, last_shape = 0, 0, None
-    preview = report.with_name("gamecube-opengl-frame.png")
+    minimum_sampled_rgb = None
+    maximum_sampled_rgb = None
+    label = "cached" if cpu_core == "5" else "jit"
+    preview = report.with_name(f"gamecube-opengl-frame-{label}.png")
+    first_frame = report.with_name(f"gamecube-opengl-first-{label}.png")
     original = session.video
 
     def inspect_frame(data, width, height, pitch):
         nonlocal decoded, nonblank, last_shape
+        nonlocal minimum_sampled_rgb, maximum_sampled_rgb
         serial = emu.frame_serial
         original(data, width, height, pitch)
         if emu.frame_serial == serial:
@@ -130,7 +170,14 @@ def _child(core, rom, seconds, report, cpu_core):
                 frame = emu.frame
                 if frame is not None:
                     last_shape = list(frame.shape)
-                    if int(frame.max()) > 4 and int(frame.min()) != int(frame.max()):
+                    lo, hi = int(frame.min()), int(frame.max())
+                    minimum_sampled_rgb = lo if minimum_sampled_rgb is None else min(minimum_sampled_rgb, lo)
+                    maximum_sampled_rgb = hi if maximum_sampled_rgb is None else max(maximum_sampled_rgb, hi)
+                    if decoded == 1:
+                        # Preserve black startup frames too; they help debug
+                        # incorrect framebuffer ownership separately.
+                        Image.fromarray(frame).save(first_frame, format="PNG")
+                    if hi > 4 and lo != hi:
                         nonblank += 1
                         if nonblank == 1:
                             Image.fromarray(frame).save(preview, format="PNG")
@@ -166,6 +213,16 @@ def _child(core, rom, seconds, report, cpu_core):
         "hardware_frames": session.hardware_frames,
         "video_frames": decoded, "nonblank_samples": nonblank,
         "last_shape": last_shape, "observed_fps": fps,
+        "native_retro_run_calls": getattr(session.native, "run_calls", 0),
+        "slowest_native_retro_run_seconds": round(
+            getattr(session.native, "slowest_call_s", 0), 3
+        ),
+        "gl_version": session.opengl_version,
+        "gl_vendor": session.opengl_vendor,
+        "gl_renderer": session.opengl_renderer,
+        "last_gl_error": session.final_gl_error,
+        "sampled_rgb_min": minimum_sampled_rgb,
+        "sampled_rgb_max": maximum_sampled_rgb,
         "frames_valid": valid,
         "playback_probe_passed": valid and fps >= MIN_USABLE_FPS,
         "minimum_usable_fps": MIN_USABLE_FPS,
@@ -224,11 +281,14 @@ def _parent(core, seconds, report, cpu_core):
                 and isinstance(data["details"], dict)
                 and data["details"].get("playback_probe_passed") is True
             )
-            frame = temp / "gamecube-opengl-frame.png"
-            if frame.is_file():
-                report.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(frame, report.with_name("gamecube-opengl-frame.png"))
-                data["frame_evidence_saved"] = True
+            label = "cached" if cpu_core == "5" else "jit"
+            for category in ("first", "frame"):
+                filename = f"gamecube-opengl-{category}-{label}.png"
+                frame = temp / filename
+                if frame.is_file():
+                    report.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(frame, report.with_name(filename))
+                    data[f"{category}_image_saved"] = True
     except Exception as exc:
         data["error"] = f"{type(exc).__name__}: {exc}"
     finally:
@@ -248,8 +308,8 @@ def main(argv=None):
     parser.add_argument("--rom", type=Path)
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args(argv)
-    if not 1 <= args.seconds <= 90:
-        parser.error("seconds must be in [1,90]")
+    if not 1 <= args.seconds <= 180:
+        parser.error("seconds must be in [1,180]")
     core = args.core.resolve()
     report = args.report.resolve()
     if args.child:

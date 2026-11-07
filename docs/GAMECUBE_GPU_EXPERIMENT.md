@@ -42,3 +42,22 @@ alone cannot qualify a cross-platform GameCube release.
 
 Never mark `config/v2.1-release-acceptance.json` requirements true
 without their evidence. Do not overwrite released 2.0.
+
+
+## CI #295: Offscreen context works, gameplay still blocked
+
+[Run #295](https://github.com/MasynNay/anything-plays/actions/runs/42336215058)
+verified an offscreen OpenGL 4.5 pbuffer and its RGB framebuffer readback,
+then negotiated the bundled nightly Dolphin hardware renderer. The first
+**20-second game runs did not pass**: both JIT and cached interpreter emitted
+two blank frames, 0 nonblank samples, and approximately 0.1 FPS. The
+probe steps intentionally continued on error so both modes could run;
+**the final evidence gate failed**. A green continue-on-error *step*
+is NOT a passed gameplay probe.
+
+The runner uses `LIBGL_ALWAYS_SOFTWARE=1` Mesa llvmpipe, so this is
+a software GPU-driver result, not a hardware-accelerated performance
+measurement. A follow-up records the GL vendor/renderer, actual
+`retro_run()` timings, RGB ranges and first blank frames, and runs
+the engine for longer to distinguish shader startup cost from incorrect
+video submission. Do not switch the default player to this backend yet.
