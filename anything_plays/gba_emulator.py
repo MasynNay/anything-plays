@@ -160,7 +160,14 @@ class CoreSession:
             requested = C.cast(data, C.POINTER(C.c_int))[0]
             if requested not in SUPPORTED_FORMATS:
                 return False
-            self.pixel_format = requested
+            # Dolphin's pinned Libretro core negotiates XRGB8888 at init,
+            # but its software SWTexture video callback supplies raw RGBA8.
+            # Keep the private decoder marker for that exact combination or
+            # red and blue channels will be swapped on every rendered frame.
+            if self.system == "gamecube" and requested == 1:
+                self.pixel_format = SOFTWARE_RGBA8888
+            else:
+                self.pixel_format = requested
             return True
         if command in (9, 31) and data:  # GET_SYSTEM_DIRECTORY / GET_SAVE_DIRECTORY
             folder = (self._save_dir_buffer if self.system == "gamecube"

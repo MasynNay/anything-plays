@@ -86,6 +86,15 @@ class DolphinInPanelTests(unittest.TestCase):
                 session = CoreSession(emulator, "gamecube", rom, core)
             self.assertEqual(session.pixel_format, SOFTWARE_RGBA8888)
             self.assertIsInstance(session._software_options, DolphinSoftwareOptions)
+            # Upstream retro_init requests XRGB8888; the patched software
+            # video callback still supplies RGBA bytes.
+            xrgb_request = C.c_int(1)
+            self.assertTrue(session.environment(10, C.addressof(xrgb_request)))
+            self.assertEqual(session.pixel_format, SOFTWARE_RGBA8888)
+            # Honor a genuinely different negotiated format if upstream changes.
+            rgb565_request = C.c_int(2)
+            self.assertTrue(session.environment(10, C.addressof(rgb565_request)))
+            self.assertEqual(session.pixel_format, 2)
             system_path = C.c_char_p()
             save_path = C.c_char_p()
             self.assertTrue(session.environment(9, C.addressof(system_path)))
