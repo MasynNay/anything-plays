@@ -21,8 +21,10 @@ SOURCE_URL = (
     "https://github.com/corenting/GC-Controller-Test/"
     "releases/download/v1.2/gc-1-2.zip"
 )
-# Fill only after reviewing the exact downloaded archive and its license.
-PINNED_SHA256 = ""
+# Pinned from the fixed v1.2 GitHub release in the 2.1 CI review on
+# 2026-11-07. The upstream project states zlib licensing; this binary is
+# used only as a short-lived CI fixture and is never redistributed.
+PINNED_SHA256 = "5b6ebacd90791f7d1dfd7bad5c3b962f9ff03664131e45c00e31720e7f881905"
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024
 MAX_DOL_BYTES = 4 * 1024 * 1024
 
