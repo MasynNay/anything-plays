@@ -325,7 +325,10 @@ class CoreSession:
         # ParaLLEl-N64's global graphics state is not reset by retro_deinit
         # alone. Remapping the same CDLL after unload results in a blank
         # second game. Release its module only once all callbacks are gone.
-        self.native.release_library_on_close = self.system == "n64"
+        self.native.release_library_on_close = (
+            self.system == "n64"
+            and not getattr(self.emulator, "isolated_process", False)
+        )
         try:
             self.native.configure(
                 self.environment, self.video, self.audio, self.emulator.inputs
@@ -516,6 +519,12 @@ class Emulator:
                 # CPU-only software renderer, owns game frames.
                 from anything_plays.gamecube_gpu import GameCubeHardwareSession
                 GameCubeHardwareSession(self, self.rom, self.core_path).run()
+            elif self.system == "n64" and sys.platform == "darwin":
+                # A second native N64 init freezes the same-process core on
+                # macOS; direct dlclose even segfaults inside dyld. Spawn a
+                # *new* process per ROM and bridge audio/video/controls.
+                from anything_plays.n64_process import MacN64ProcessSession
+                MacN64ProcessSession(self, self.rom, self.core_path).run()
             else:
                 CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
