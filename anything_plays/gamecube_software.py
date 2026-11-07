@@ -27,6 +27,53 @@ SOFTWARE_OPTIONS = {
     b"dolphin_efb_scale": b"x1 (640 x 528)",
 }
 
+# From DolphinLibretro/Input.cpp's GameCube RetroPad port map:
+# A=8, B=0, X=9, Y=1, Start=3, Z=R(11), L=L2(12), R=R2(13).
+# Analogue stick directions are generated from camera zones; C uses the
+# standard right stick. D-pad events accompany the main stick for games
+# that use either, while actual speed remains a fixed digital step.
+GAMECUBE_BUTTON_IDS = {
+    "B": 0, "Y": 1, "Start": 3, "A": 8, "X": 9,
+    "Z": 11, "L": 12, "R": 13,
+}
+GAMECUBE_DPAD = {"Up": 4, "Down": 5, "Left": 6, "Right": 7}
+GAMECUBE_AXES = {
+    "Left": (0, 0, -28000), "Right": (0, 0, 28000),
+    "Up": (0, 1, -28000), "Down": (0, 1, 28000),
+    "C Left": (1, 0, -28000), "C Right": (1, 0, 28000),
+    "C Up": (1, 1, -28000), "C Down": (1, 1, 28000),
+}
+GAMECUBE_INPUT = {
+    **{name: ("digital", identity) for name, identity
+       in {**GAMECUBE_BUTTON_IDS, **GAMECUBE_DPAD}.items()},
+    **{name: ("stick", *axes) for name, axes in GAMECUBE_AXES.items()},
+}
+
+
+def gamecube_state(buttons):
+    """Return both RetroPad digital buttons and analogue stick coordinates.
+
+    The state is computed once per emulation frame and is never routed through
+    global OS keyboard events or an external Dolphin process.
+    """
+    active = frozenset(buttons)
+    result = {}
+    for name in active:
+        identifier = GAMECUBE_BUTTON_IDS.get(name)
+        if identifier is not None:
+            result[(1, 0, identifier)] = 1
+        dpad = GAMECUBE_DPAD.get(name)
+        if dpad is not None:
+            result[(1, 0, dpad)] = 1
+
+    for name, (index, axis, amount) in GAMECUBE_AXES.items():
+        if name in active:
+            identity = (5, index, axis)
+            result[identity] = max(-32768, min(32767,
+                result.get(identity, 0) + amount
+            ))
+    return {key: value for key, value in result.items() if value}
+
 
 class RetroVariable(C.Structure):
     """Libretro retro_variable ABI: char *key, char *value."""
