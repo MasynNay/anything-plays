@@ -48,7 +48,7 @@ iconutil -c icns "$ICONSET" -o dist/AnythingPlays21Test.app/Contents/Resources/A
 mkdir -p dist/AnythingPlays21Test.app/Contents/Resources/cores
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
-  CORE_LIST+=(fceumm genesis_plus_gx parallel_n64)
+  CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin)
 fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
@@ -57,6 +57,13 @@ for name in "${CORE_LIST[@]}"; do
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays21Test.app/Contents/Resources/cores/
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  # Dolphin's self-contained core needs compatibility tables under Sys/.
+  # Ship them with the signed app; never ask the player to download them.
+  [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
+  cp -R cores/dolphin-emu dist/AnythingPlays21Test.app/Contents/Resources/cores/
+  cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays21Test.app/Contents/Resources/cores/
+fi
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="dist/AnythingPlays21Test.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
