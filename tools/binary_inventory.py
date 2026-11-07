@@ -10,8 +10,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import sys
 
-from fetch_mgba_core import core_names_for_build
+# Direct invocation (python tools/binary_inventory.py) places tools/ rather
+# than the project root on sys.path. Preserve a single shared core inventory.
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from fetch_mgba_core import core_names_for_build  # noqa: E402
 
 MAGIC = {
     b"\x7fELF": "ELF",
