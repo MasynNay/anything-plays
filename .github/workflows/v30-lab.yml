@@ -580,8 +580,9 @@ jobs:
           retention-days: 14
 
   gamecube-original-gx3d-gpu-playback:
-    # Original 3D cube: GPU position transforms, depth buffer, vertex colors
-    # and GameCube GX EFB -> XFB. Not a commercial-game compatibility claim.
+    # Original 3D cube: GPU position transforms, depth buffer, vertex colors,
+    # GameCube GX EFB -> XFB, and continuous original stereo PCM in the
+    # same native session. Not a commercial-game compatibility claim.
     continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 24
@@ -608,13 +609,13 @@ jobs:
         run: |
           python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
           python tools/fetch_dolphin_sys.py cores
-      - name: Require moving GPU-rendered GameCube 3D frames
+      - name: Require moving GameCube 3D frames and nonzero native PCM
         run: |
           mkdir -p test-evidence
           xvfb-run -a python tools/probe_gamecube_app.py \
             --core cores/dolphin_libretro.so \
             --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
-            --require-animated --seconds 12 \
+            --require-animated --require-audio --seconds 12 \
             --report test-evidence/gamecube-original-gx3d-linux.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -664,7 +665,7 @@ jobs:
         run: |
           python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
           python tools/fetch_dolphin_sys.py cores
-      - name: Require moving actual GameCube GX 3D graphics inside the app
+      - name: Require simultaneous original GX 3D rendering and DSP audio on Mac
         run: |
           python tools/probe_gamecube_app.py \
             --core cores/dolphin_libretro.dylib \

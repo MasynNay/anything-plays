@@ -6,15 +6,18 @@
  * Video frames must reach the SAME hidden Dolphin GL framebuffer as the app.
  */
 #include <gccore.h>
+#include <asndlib.h>
 #include <malloc.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define FIFO_BYTES (256 * 1024)
+#define AUDIO_FRAMES 4800
 static void *fifo;
 static void *framebuffers[2];
 static GXRModeObj *video_mode;
+static s16 audio_tone[AUDIO_FRAMES * 2] __attribute__((aligned(32)));
 
 static const f32 faces[6][4][3] = {
     {{-1,-1, 1},{ 1,-1, 1},{ 1, 1, 1},{-1, 1, 1}},
@@ -28,6 +31,21 @@ static const GXColor face_color[6] = {
     {255, 45, 85,255}, { 60,175,250,255}, {240,195, 40,255},
     { 80,230,115,255}, {185, 90,240,255}, {255,125, 45,255},
 };
+
+/* Original generated stereo signal verifies DSP while GX renders moving 3D.
+ * A silence-only callback must not pass combined in-app video/audio CI. */
+static void init_audio(void) {
+    for (int frame = 0; frame < AUDIO_FRAMES; frame++) {
+        s16 sample = (frame % 109 < 54) ? 6200 : -6200;
+        audio_tone[frame * 2] = sample;
+        audio_tone[frame * 2 + 1] = sample;
+    }
+    DCFlushRange(audio_tone, sizeof(audio_tone));
+    ASND_Init();
+    ASND_SetInfiniteVoice(0, VOICE_STEREO_16BIT_BE, 48000, 0,
+                          audio_tone, sizeof(audio_tone), 180, 180);
+    ASND_Pause(0);
+}
 
 static void init_video_and_gx(void) {
     VIDEO_Init();
@@ -91,6 +109,7 @@ static void init_video_and_gx(void) {
 
 int main(void) {
     init_video_and_gx();
+    init_audio();
     const guVector cam = {0.0f, 0.0f, 5.0f};
     const guVector up = {0.0f, 1.0f, 0.0f};
     const guVector target = {0.0f, 0.0f, 0.0f};
