@@ -18,6 +18,7 @@ SOURCE_URL = (
 )
 GIT_BLOB_SHA1 = "ddf6d3bd484556db0a3c35e72a359b8201b2255f"
 ROM_BYTES = 1064960
+ROM_SHA256 = "c09cb939ef802f788aaba0d09d3a8937e4989a9c9a165574d56f379c060c601a"
 MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024
 N64_MAGIC = bytes.fromhex("80371240")
 
@@ -33,10 +34,13 @@ def checked_rom(data: bytes) -> dict:
     ).hexdigest()
     if git_blob != GIT_BLOB_SHA1:
         raise ValueError("Nintendo 64 fixture differs from reviewed upstream blob")
+    sha256 = hashlib.sha256(data).hexdigest()
+    if sha256 != ROM_SHA256:
+        raise ValueError("Nintendo 64 fixture fails reviewed SHA-256")
     return {
         "source_commit": SOURCE_COMMIT,
         "git_blob_sha1": git_blob,
-        "sha256": hashlib.sha256(data).hexdigest(),
+        "sha256": sha256,
         "bytes": len(data),
         "license": "Unlicense (public domain)",
     }
