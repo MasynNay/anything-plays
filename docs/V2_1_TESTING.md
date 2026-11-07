@@ -180,6 +180,13 @@ reported in CI; passing it is not a substitute for testing playable games,
 sound, analog inputs, saves, camera controls, and sustained operation on
 all supported platforms.
 
+**First native video result:** [CI run #291](https://github.com/MasynNay/anything-plays/actions/runs/42333130745)
+successfully decoded 1,198 frames at 59.9 FPS with 239 nonblank samples
+during a 20-second run of the public-domain test ROM on Linux x64.
+This proves an N64 homebrew RGB video path works in the app's core
+frontend on that runner. It does not certify other ROMs, other platforms,
+camera controls, saves or hours-long operation.
+
 ## Testing priorities
 
 1. Validate each installer starts without replacing stable 2.0.
