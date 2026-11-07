@@ -39,7 +39,12 @@ def build_genesis_probe_rom(phase="full"):
         imm_word(0x8000 | (index << 8) | value, VDP_CTRL)
     def dbra(dreg, start):
         w(0x51C8 | dreg)
-        distance = start - (ENTRY + len(code) + 2)
+        # Motorola DBcc uses the PC at the displacement EXTENSION word,
+        # i.e. opcode address + 2, not the end of the instruction.  We have
+        # already appended the 2-byte opcode, so len(code) is that PC.
+        # The previous +2 branched into immediate data and eventually
+        # corrupted native Genesis Plus GX execution during retro_run().
+        distance = start - (ENTRY + len(code))
         assert -32768 <= distance <= 32767
         w(distance)
 
