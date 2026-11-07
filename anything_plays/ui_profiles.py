@@ -80,11 +80,13 @@ class ProfilesMixin:
         for name, (label, combo) in self.mapping_widgets.items():
             if name in names:
                 label.grid()
-                combo.grid()
+                if combo.winfo_manager() == 'grid':
+                    combo.grid()
                 combo.configure(values=[DISABLED_MAPPING, *names])
             else:
                 label.grid_remove()
-                combo.grid_remove()
+                if combo.winfo_manager() == 'grid':
+                    combo.grid_remove()
 
     def persist_system_profile(self):
         self.read_settings()
