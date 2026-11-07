@@ -63,8 +63,12 @@ class SystemAssetsTests(unittest.TestCase):
                      for item in inputs.infolist()
                      if not item.filename.endswith("codehandler.bin")}
         with TemporaryDirectory() as tmp:
+            incomplete = io.BytesIO()
+            with zipfile.ZipFile(incomplete, "w", zipfile.ZIP_DEFLATED) as output:
+                for name, blob in files.items():
+                    output.writestr(name, blob)
             with self.assertRaisesRegex(ValueError, "missing required system data"):
-                extract_dolphin_sys(sample_archive(files), Path(tmp) / "cores")
+                extract_dolphin_sys(incomplete.getvalue(), Path(tmp) / "cores")
 
     def test_path_traversal_and_symlinks_are_rejected(self):
         for malicious in (
