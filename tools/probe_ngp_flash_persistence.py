@@ -69,6 +69,9 @@ def child(phase, core, rom, report, timeout):
     emulator.system = emulator.inputs.system = "ngpc"
     emulator.core_path = str(core)
     session = CoreSession(emulator, "ngpc", rom, str(core))
+    # Prove raw cartridge flash without allowing the new last-session
+    # recovery layer to conceal a native core flash-load failure.
+    session.enable_state_resume = False
     session.audio.close()
     session.audio = ObservedAudio()
 
