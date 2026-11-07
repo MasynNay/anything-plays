@@ -296,35 +296,114 @@ class CameraMixin:
             self.cfg['zones'][self.zone_name.get()] = [x1, y1, x2, y2]
 
     def draw_camera(self):
+        """Detect all matching fish and route every occupied zone concurrently.
+
+        This operates only on our current webcam frame, with no global OS
+        keyboard injection. An absent fish releases its held button on the
+        following camera frame; STOP clears both players immediately.
+        """
         frame = self.frame.copy()
         h, w = frame.shape[:2]
         tol = max(1, min(90, int(self.tolerance.get())))
         area = max(5, int(self.min_area.get()))
-        center, contour = locate_target(frame, self.cfg['rgb'], tol, area)
-        if center is not None:
-            cv2.circle(frame, center, 8, (0, 255, 0), -1)
-            cv2.drawContours(frame, [contour], -1, (0, 255, 255), 2)
-        mapping = {name: var.get() for name, var in self.mapping_vars.items()}
-        active = zone_at(
-            center, (w, h), self.cfg['zones'], mapping, self.shuffle_enabled.get()
+        limit = 16 if self.multi_fish_enabled.get() else 1
+        primary = locate_targets(
+            frame, self.cfg['rgb'], tol, area, max_targets=limit
         )
-        frame = self.render_zones(frame, active)
-        if active != 'Shuffle':
+        secondary = (
+            locate_targets(
+                frame, self.cfg.get('rgb2', [255, 30, 180]),
+                tol, area, max_targets=limit,
+            ) if self.color2_enabled.get() else []
+        )
+        mapping = {name: var.get() for name, var in self.mapping_vars.items()}
+        active_zones = set()
+        buttons = {0: set(), 1: set()}
+        shuffle_seen = False
+        second_player_allowed = self.system_key.get() in TWO_PLAYER_SYSTEMS
+        second_player_requested = self.color2_player.get() == 'Player 2'
+
+        for tracker, matches in ((0, primary), (1, secondary)):
+            # OpenCV's BGR preview: bright green for Color 1, bright
+            # magenta for Color 2. The actual image used for tracking is
+            # never replaced with this drawn visualization.
+            contour_color = (50, 245, 90) if tracker == 0 else (220, 65, 255)
+            port = 0 if tracker == 0 or not second_player_requested else 1
+            valid_port = port == 0 or (
+                second_player_allowed and self.external_input is None
+            )
+            for center, contour in matches:
+                cv2.circle(frame, center, 7, contour_color, -1)
+                cv2.drawContours(frame, [contour], -1, contour_color, 2)
+                zone = zone_at(
+                    center, (w, h), self.cfg['zones'], mapping,
+                    self.shuffle_enabled.get(),
+                )
+                if zone is None:
+                    continue
+                active_zones.add(zone)
+                if zone == 'Shuffle':
+                    shuffle_seen = True
+                elif valid_port:
+                    button = mapping.get(zone, zone)
+                    if button != DISABLED_MAPPING:
+                        buttons[port].add(button)
+
+        if not shuffle_seen:
             self._shuffle_latched = False
-        if active == 'Shuffle':
-            if self.armed and self.shuffle_enabled.get() and not self._shuffle_latched:
-                self._shuffle_latched = True
-                self.shuffle_zones()
-                self.action.set('Object activated Shuffle — controls rearranged')
-        elif active and self.armed and time.monotonic() - self.last_action >= max(.05, int(self.cooldown.get()) / 1000):
-            button = self.mapping_vars[active].get()
-            if button != DISABLED_MAPPING:
-                if self.external_input is not None:
-                    self.external_input.press(button, self.hold_frames.get())
-                else:
-                    self.emu.press(button, self.hold_frames.get())
-                self.last_action = time.monotonic()
-                self.action.set(f'Object zone: {active} → game button: {button} (isolated)')
+        if (shuffle_seen and self.armed and self.shuffle_enabled.get()
+                and not self._shuffle_latched):
+            self._shuffle_latched = True
+            self.shuffle_zones()
+
+        if self.armed:
+            if self.external_input is not None:
+                # Developer-only external controller bridges do not support
+                # a second port. Use bounded classic pulses for P1 only.
+                now = time.monotonic()
+                cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
+                for button in sorted(buttons[0]):
+                    key = (0, button)
+                    if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
+                        self.external_input.press(button, self.hold_frames.get())
+                        self._last_camera_pulses[key] = now
+            elif self.camera_input_mode.get() == 'Pulse (classic)':
+                # Each button has an independent cooldown; multiple objects
+                # trigger multiple keys on the same emulator frame.
+                self.emu.set_camera_buttons((), ())
+                now = time.monotonic()
+                cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
+                for port in (0, 1):
+                    for button in sorted(buttons[port]):
+                        key = (port, button)
+                        if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
+                            self.emu.press(
+                                button, self.hold_frames.get(), port=port
+                            )
+                            self._last_camera_pulses[key] = now
+            else:
+                # Continuous per-frame input with no per-fish queue growth.
+                # This is the ideal mode for a tank with several moving fish.
+                self.emu.set_camera_buttons(buttons[0], buttons[1])
+                self._last_camera_pulses.clear()
+
+            if self.color2_enabled.get() and second_player_requested and (
+                    not second_player_allowed or self.external_input is not None):
+                message = (
+                    'Color 2 Player 2 unavailable on this console/backend; '
+                    'choose Player 1 or a two-controller embedded game.'
+                )
+            else:
+                message = (
+                    f'Tracking Color 1: {len(primary)} fish · '
+                    f'Color 2: {len(secondary)} · '
+                    f'P1: {", ".join(sorted(buttons[0])) or "idle"} · '
+                    f'P2: {", ".join(sorted(buttons[1])) or "idle"}'
+                )
+            if self.action.get() != message:
+                self.action.set(message)
+
+        frame = self.render_zones(frame, active_zones)
         geom = self.geometry()
         if geom:
             x, y, dw, dh, _, _ = geom
@@ -334,13 +413,11 @@ class CameraMixin:
             if (photo is None or photo.width() != dw or
                     photo.height() != dh):
                 # Reuse the Tcl image buffer while webcam dimensions stay
-                # stable; don't allocate 20 new native images per second.
+                # stable, preventing native allocation growth for long runs.
                 photo = ImageTk.PhotoImage(image)
             else:
                 photo.paste(image)
             item = getattr(self, "_camera_canvas_item", None)
-            # Reuse one Tk canvas item rather than allocating and deleting
-            # ~20 canvas objects a second for days at a time.
             if item is None or not self.canvas.type(item):
                 self.canvas.delete("all")
                 item = self.canvas.create_image(
