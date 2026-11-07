@@ -53,6 +53,7 @@ class ProfilesMixin:
         prefs['n64_embedded'] = bool(self.n64_embedded.get())
         prefs['gamecube_embedded'] = bool(self.gamecube_embedded.get())
         prefs['view_mode'] = self.view_mode.get()
+        prefs['volume'] = max(0, min(100, int(self.volume_percent.get())))
         if core_path:
             paths = prefs.get('core_paths', {})
             paths = paths if isinstance(paths, dict) else {}
@@ -129,6 +130,13 @@ class ProfilesMixin:
         self.hold_frames.set(self.cfg['hold_frames'])
         self.cooldown.set(self.cfg['cooldown_ms'])
         self.mirror.set(self.cfg['mirror'])
+        self.color2_enabled.set(self.cfg.get('color2_enabled', False))
+        self.color2_player.set(self.cfg.get('color2_player', 'Player 2'))
+        self.multi_fish_enabled.set(self.cfg.get('multi_fish_enabled', True))
+        self.camera_input_mode.set(
+            self.cfg.get('camera_input_mode', 'Held while visible')
+        )
+        self._last_camera_pulses.clear()
         for name, var in self.mapping_vars.items():
             var.set(self.cfg.get('mapping', {}).get(name, name))
         self.zone_font_size.set(max(8, min(160, self.cfg.get('zone_font_size', 44))))
@@ -147,6 +155,17 @@ class ProfilesMixin:
         self.cfg['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
         self.cfg['cooldown_ms'] = max(50, int(self.cooldown.get()))
         self.cfg['mirror'] = self.mirror.get()
+        self.cfg['color2_enabled'] = bool(self.color2_enabled.get())
+        self.cfg['color2_player'] = (
+            self.color2_player.get() if self.color2_player.get()
+            in ('Player 1', 'Player 2') else 'Player 2'
+        )
+        self.cfg['multi_fish_enabled'] = bool(self.multi_fish_enabled.get())
+        self.cfg['camera_input_mode'] = (
+            self.camera_input_mode.get() if self.camera_input_mode.get()
+            in ('Held while visible', 'Pulse (classic)')
+            else 'Held while visible'
+        )
         self.cfg['zone_font_size'] = max(8, min(160, int(self.zone_font_size.get())))
         self.cfg['zone_opacity'] = max(75, min(100, int(self.zone_opacity.get())))
         self.cfg['zone_style'] = self.zone_style.get()
