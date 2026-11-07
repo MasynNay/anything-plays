@@ -83,7 +83,7 @@ class IconMatteTests(unittest.TestCase):
         # generated fish. This test fails if anybody substitutes artwork.
         data = source.read_bytes()
         blob_sha = hashlib.sha1(
-            b"blob " + str(len(data)).encode() + b"\\0" + data
+            b"blob " + str(len(data)).encode() + bytes([0]) + data
         ).hexdigest()
         self.assertEqual(
             blob_sha, "c620c4154e80768687dfde4c0541f544779af2ff",
