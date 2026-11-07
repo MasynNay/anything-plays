@@ -1,5 +1,9 @@
 name: Anything Plays 3.0 | Application builds
 
+concurrency:
+  group: application-preview-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [feature/v3.0-unified-test]

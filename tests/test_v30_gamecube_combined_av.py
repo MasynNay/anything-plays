@@ -19,6 +19,18 @@ class GameCubeCombinedAVContractTests(unittest.TestCase):
         self.assertIn("-lasnd", makefile)
         self.assertIn("GX_Begin(GX_QUADS", source)
 
+    def test_windows_plays_same_gx_native_fixture_without_external_emulator(self):
+        workflow = (ROOT / ".github/workflows/v30-lab.yml").read_text("utf-8")
+        job = workflow.split("  gamecube-original-gx3d-windows:", 1)[1].split(
+            "  gamecube-original-gx3d-macos:", 1
+        )[0]
+        self.assertIn("needs: gamecube-original-gx3d-gpu-playback", job)
+        self.assertIn("runs-on: windows-2025", job)
+        self.assertIn("dolphin_libretro.dll", job)
+        self.assertIn("anythingplays-gc-gx-gamecube.dol", job)
+        self.assertIn("--require-animated --require-audio", job)
+        self.assertIn("probe_gamecube_app.py", job)
+
     def test_linux_and_both_macs_require_3d_and_audio_together(self):
         workflow = (ROOT / ".github/workflows/v30-lab.yml").read_text("utf-8")
         linux = workflow.split("  gamecube-original-gx3d-gpu-playback:", 1)[1]

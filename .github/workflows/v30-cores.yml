@@ -1,5 +1,11 @@
 name: Anything Plays 3.0 | Emulator verification
 
+# Continuous pushes during emulator research should not consume the entire
+# Actions runner quota with obsolete cross-platform native jobs.
+concurrency:
+  group: emulator-verify-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [feature/v3.0-unified-test]

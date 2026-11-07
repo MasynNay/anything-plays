@@ -641,6 +641,43 @@ jobs:
           retention-days: 3
 
 
+  gamecube-original-gx3d-windows:
+    # Run the SAME original PowerPC GX/ASND fixture from Linux on Windows.
+    # Hosted Windows GPU drivers may expose only OpenGL 1.1; explicitly
+    # record a native failure rather than treating a context mock as gameplay.
+    needs: gamecube-original-gx3d-gpu-playback
+    continue-on-error: true
+    runs-on: windows-2025
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native GPU and audio Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Download identical original GameCube 3D and audio test game
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: original-gx3d
+      - name: Retrieve Windows Dolphin core with matching system files
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Demand native Windows GameCube in-panel animated GX and PCM
+        run: |
+          python tools/probe_gamecube_app.py --core cores/dolphin_libretro.dll --rom original-gx3d/anythingplays-gc-gx-gamecube.dol --require-animated --require-audio --seconds 12 --report test-evidence/gamecube-original-gx3d-windows-x64.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GX3D-windows-x64
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   gamecube-original-gx3d-macos:
     # Cross-platform native GX transforms, vertex colors, and depth path.
     # Uses the exact original GameCube GX binary from Linux devkitPPC CI.
