@@ -31,7 +31,7 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 # Generate platform icons from the corrected v3.0 source, not the v2.0 PNG.
 .build-venv/bin/python tools/render_v21_icon.py
-.build-venv/bin/python -m PyInstaller --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
+.build-venv/bin/python -m PyInstaller --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
 # Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
 mv dist/AnythingPlays.app dist/AnythingPlays30Preview.app
