@@ -136,6 +136,9 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
             saved_volume = 35
         self.volume_percent = tk.IntVar(value=int(saved_volume))
         self.volume_label = tk.StringVar(value=f"{int(saved_volume)}%")
+        self.mute_button_text = tk.StringVar(
+            value="Unmute" if int(saved_volume) == 0 else "Mute"
+        )
         self._volume_before_mute = max(1, int(saved_volume))
         self.emu.set_volume(int(saved_volume) / 100.0)
         self.mapping_vars = {}
@@ -163,6 +166,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.bind('<Escape>', self.exit_view_or_stop)
         root.bind('<F10>', self.toggle_borderless)
         root.bind('<F11>', self.toggle_fullscreen)
+        root.bind('<Control-Shift-m>', self.toggle_game_mute)
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.scan_cameras)
         # Keep exactly one camera timer and one game timer alive. Record their
