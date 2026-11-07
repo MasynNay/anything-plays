@@ -48,9 +48,14 @@ def run_once(executable, home, *, prior_gamecube=False, seconds=18):
             if process.poll() is not None:
                 error = f"preview exited early: {process.returncode}"
                 break
+            # xwininfo converts UTF8_STRING to the process locale.
+            # Under bare C/POSIX it prints "(failure in conversion ...)"
+            # rather than the actual title "Anything Plays 3.0 · Preview".
+            utf8_environment = environment.copy()
+            utf8_environment["LC_ALL"] = "C.UTF-8"
             windows = subprocess.run(
                 ["xwininfo", "-root", "-tree"], capture_output=True,
-                text=True, timeout=5, check=True,
+                text=True, timeout=5, check=True, env=utf8_environment,
             ).stdout
             if "Anything Plays 3.0" in windows:
                 appeared = True
