@@ -31,7 +31,8 @@ class LayoutMixin:
         left_host = ttk.Frame(body)
         right_host = ttk.Frame(body)
         body.add(left_host, weight=3)
-        body.add(right_host, weight=3)
+        # Give text-heavy controls slightly more room on laptop displays.
+        body.add(right_host, weight=4)
         left = self.make_scrollable_pane(left_host)
         right = self.make_scrollable_pane(right_host)
 
@@ -42,17 +43,25 @@ class LayoutMixin:
 
     def _build_game_panel(self, right):
         """Console selector, embedded display, and interactive ROM shelf."""
-        game = ttk.LabelFrame(right, text='02   GAME  ·  Your play space', padding=10)
-        game.pack(fill='x', padx=(14, 0), pady=(0, 10))
+        game = ttk.LabelFrame(
+            right, text='02   GAME · LIBRARY & DISPLAY',
+            padding=(14, 12, 14, 13),
+        )
+        game.pack(fill='x', padx=(12, 2), pady=(0, 13))
         system_row = ttk.Frame(game)
         system_row.pack(fill='x', pady=(0, 6))
-        ttk.Label(system_row, text='Choose emulator:').pack(side='left', padx=(0, 6))
+        ttk.Label(system_row, text='Console', style='Value.TLabel').pack(
+            side='left', padx=(0, 10)
+        )
         self.system_combo = ttk.Combobox(system_row, textvariable=self.system_key, state='readonly',
                                          values=list(SYSTEMS), width=17)
         self.system_combo.pack(side='left')
         self.system_combo.bind('<<ComboboxSelected>>', self.switch_system)
-        self.system_description = ttk.Label(system_row, text=SYSTEMS[self.system_key.get()].title)
-        self.system_description.pack(side='left', padx=8)
+        self.system_description = ttk.Label(
+            game, text=SYSTEMS[self.system_key.get()].title,
+            style='Helper.TLabel',
+        )
+        self.system_description.pack(anchor='w', pady=(1, 10))
         # A software-rendering N64 core can run in the existing game canvas.
         # Keep a clearly labeled RetroArch fallback for experimental hardware.
         self.n64_mode_row = ttk.Frame(game)
@@ -96,8 +105,12 @@ class LayoutMixin:
                    command=self.clear_rom_directory).grid(
             row=1, column=0, columnspan=2, sticky='ew', pady=(5, 0))
         ttk.Button(game, text='Open game ROM', command=self.load_rom).pack(fill='x', pady=(5, 0))
-        view_row = ttk.Frame(game)
-        view_row.pack(fill='x', pady=(7, 0))
+        display_settings = ttk.LabelFrame(
+            game, text='DISPLAY & SOUND', padding=(11, 10),
+        )
+        display_settings.pack(fill='x', pady=(12, 9))
+        view_row = ttk.Frame(display_settings)
+        view_row.pack(fill='x', pady=(1, 5))
         ttk.Label(view_row, text='View mode:').pack(side='left', padx=(0, 6))
         view_combo = ttk.Combobox(view_row, textvariable=self.view_mode, state='readonly',
                                   values=['Windowed', 'Borderless', 'Fullscreen', 'Game only'],
@@ -109,8 +122,8 @@ class LayoutMixin:
         self.shortcuts_button.pack(side='right')
         # Put audio where the player actually watches the game. Gain applies
         # to ALL native cores, not the host operating system or browser.
-        volume_row = ttk.Frame(game)
-        volume_row.pack(fill='x', pady=(8, 0))
+        volume_row = ttk.Frame(display_settings)
+        volume_row.pack(fill='x', pady=(7, 0))
         ttk.Label(volume_row, text='Game volume').pack(side='left', padx=(0, 8))
         self.volume_slider = ttk.Scale(
             volume_row, from_=0, to=100, orient='horizontal',
@@ -130,14 +143,41 @@ class LayoutMixin:
             volume_row, textvariable=self.mute_button_text,
             command=self.toggle_game_mute, style='Compact.TButton',
         ).pack(side='right')
-        download_row = ttk.Frame(game)
-        download_row.pack(fill='x', pady=(7, 0))
+        # Video is generated at normal native speed. Only the expensive
+        # GPU->Tk preview copy is rate-limited for smoother GameCube play.
+        self.gamecube_preview_row = ttk.Frame(display_settings)
+        ttk.Label(
+            self.gamecube_preview_row, text='GameCube preview rate',
+            style='Value.TLabel',
+        ).pack(side='left', fill='x', expand=True)
+        self.gamecube_preview_combo = ttk.Combobox(
+            self.gamecube_preview_row,
+            textvariable=self.gamecube_preview_mode, state='readonly',
+            values=['Performance (20 FPS)', 'Balanced (30 FPS)', 'Quality (60 FPS)'],
+            width=22,
+        )
+        self.gamecube_preview_combo.pack(side='right', padx=(8, 0))
+        self.gamecube_preview_combo.bind(
+            '<<ComboboxSelected>>', self.set_gamecube_preview_mode,
+        )
+        # Emulator maintenance remains available but no longer crowds out
+        # regular game/audio/tracking controls in the main scroll column.
+        self.maintenance_expanded = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            game, text='Show emulator maintenance & updates',
+            variable=self.maintenance_expanded,
+            command=self.toggle_maintenance_panel,
+            style='Primary.TCheckbutton',
+        ).pack(anchor='w', pady=(4, 1))
+        self.maintenance_frame = ttk.Frame(game)
+        download_row = ttk.Frame(self.maintenance_frame)
+        download_row.pack(fill='x', pady=(8, 0))
         ttk.Label(download_row, text='Emulator status:').pack(side='left')
         ttk.Label(
             download_row, textvariable=self._selected_emulator_status,
             wraplength=370,
         ).pack(side='left', padx=(8, 0), fill='x', expand=True)
-        update_row = ttk.Frame(game)
+        update_row = ttk.Frame(self.maintenance_frame)
         update_row.pack(fill='x', pady=(7, 0))
         ttk.Button(
             update_row, text='Check emulator updates',
@@ -155,11 +195,11 @@ class LayoutMixin:
             style='Compact.TButton',
         ).pack(side='left', padx=(8, 0))
         ttk.Label(
-            game, textvariable=self._emulator_update_status,
+            self.maintenance_frame, textvariable=self._emulator_update_status,
             wraplength=480,
         ).pack(fill='x', pady=(4, 0))
         # Embedded emulators use the existing on-canvas software-video renderer.
-        self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
+        self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=340, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)
         self.game_canvas.configure(takefocus=1, highlightthickness=2, highlightbackground='#23456f', highlightcolor='#5aa9ff')
         self.game_canvas.bind('<Button-1>', self.activate_manual)
@@ -197,15 +237,30 @@ class LayoutMixin:
         self.library_grid.bind('<Configure>', lambda e: self.library_canvas.configure(scrollregion=self.library_canvas.bbox('all')))
         self.root.bind_all('<B1-Motion>', self.shelf_motion, add='+')
         self.root.bind_all('<ButtonRelease-1>', self.shelf_release, add='+')
-        self.playing_info = ttk.Frame(self.below_game)
+        self.playing_info = ttk.LabelFrame(
+            self.below_game, text='CURRENT GAME SESSION', padding=10,
+        )
         self.playing_row = ttk.Frame(self.playing_info)
         self.playing_row.pack(fill='x')
         ttk.Label(self.playing_row, textvariable=self.manual_label, wraplength=345).pack(side='left', fill='x', expand=True)
         ttk.Button(self.playing_row, text='Unload ROM', command=self.unload_rom, style='Danger.TButton').pack(side='right', padx=(8, 0))
-        ttk.Label(self.playing_info, textvariable=self.game_status, wraplength=470).pack(anchor='w', pady=(4, 0))
-        ttk.Label(game, text='Embedded libretro · No system-wide keyboard injection', wraplength=470).pack(anchor='w', pady=5)
+        ttk.Label(
+            self.playing_info, textvariable=self.game_status,
+            style='Value.TLabel', wraplength=500,
+        ).pack(anchor='w', pady=(9, 2))
+        ttk.Label(
+            game, text='Embedded emulation · Local inputs only · No global keyboard injection',
+            style='Helper.TLabel', wraplength=490,
+        ).pack(anchor='w', pady=(2, 6))
         self.populate_inline_library()
 
+
+    def toggle_maintenance_panel(self):
+        """Keep advanced update tools accessible without overcrowding play."""
+        if self.maintenance_expanded.get():
+            self.maintenance_frame.pack(fill='x', pady=(2, 10))
+        else:
+            self.maintenance_frame.pack_forget()
 
     def make_scrollable_pane(self, host):
         """Create a vertically scrollable column with a visible scrollbar."""
