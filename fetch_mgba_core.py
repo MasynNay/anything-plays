@@ -26,7 +26,7 @@ BUILD_BOT = "https://buildbot.libretro.com/nightly"
 CORE_NAMES = ("mgba", "snes9x")
 # Only on the 2.1 testing branch; never silently add cores to the
 # already approved v2.0.0 release lock.
-OPTIONAL_V21_CORES = ("fceumm", "genesis_plus_gx", "parallel_n64")
+OPTIONAL_V21_CORES = ("fceumm", "genesis_plus_gx", "parallel_n64", "dolphin")
 
 
 def core_names_for_build():
@@ -45,6 +45,7 @@ SOURCE_REPOSITORIES = {
     "fceumm": "https://github.com/libretro/libretro-fceumm",
     "genesis_plus_gx": "https://github.com/libretro/Genesis-Plus-GX",
     "parallel_n64": "https://github.com/libretro/parallel-n64",
+    "dolphin": "https://github.com/libretro/dolphin",
 }
 
 
@@ -253,6 +254,15 @@ def fetch_all(destination=CORE_FOLDER):
     (destination / "CORE_PROVENANCE.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
+    if "dolphin" in core_names_for_build():
+        # GameCube users must never need to install Dolphin or fetch system
+        # data themselves. The test build fails if assets cannot be bundled.
+        from tools.fetch_dolphin_sys import fetch_dolphin_sys
+
+        manifest["dolphin_system_assets"] = fetch_dolphin_sys(destination)
+        (destination / "CORE_PROVENANCE.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
     from tools.core_release_lock import (
         LOCK_PATH, candidate_fingerprint, verify_release_lock,
     )
