@@ -9,6 +9,8 @@ on:
       - '.github/workflows/v30-endurance.yml'
       - 'tests/soak_gui.py'
       - 'tools/probe_gamecube_app.py'
+      - 'anything_plays/libretro_audio.py'
+      - 'tests/test_input_and_audio.py'
   workflow_dispatch:
 
 permissions:
