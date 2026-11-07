@@ -13,6 +13,7 @@ build output. No files in assets/ or stable v2.0 are overwritten.
 from pathlib import Path
 
 from PIL import Image
+from anything_plays.icon_cleanup import clean_icon_background
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "anything_plays_v21.webp"
@@ -31,7 +32,7 @@ def render(source=SOURCE, output=OUTPUT):
         if raw.width != raw.height or min(raw.size) < 128:
             raise ValueError("The 2.1 app icon must be a square, high-res image")
         # Keep a single RGBA master so PNG/ICO/iconutil use matching artwork.
-        image = raw.convert("RGBA")
+        image = clean_icon_background(raw)
 
     output.mkdir(parents=True, exist_ok=True)
     master = image.resize((1024, 1024), Image.Resampling.LANCZOS)
