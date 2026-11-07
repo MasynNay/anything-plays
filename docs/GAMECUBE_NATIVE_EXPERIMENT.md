@@ -35,3 +35,15 @@ frame rates. Then repeat on Windows and both Mac architectures, with clean
 installation, saves, game-only and borderless views, multi-hour camera soak,
 and legally user-provided game discs. The full 2.1 release gate stays closed
 until all eight consoles pass.
+
+
+## Libretro backend constructor correction
+
+The pinned upstream `SW::VideoSoftware::Initialize` in
+`Source/Core/VideoBackends/Software/SWmain.cpp` creates
+`SWOGLWindow` before instantiating `SW::SWGfx`. Patching only
+`DolphinLibretro/Video.h` was insufficient because that Libretro subclass
+was never constructed. The experimental build-time patch now modifies both
+pinned source files, retains the original path outside Libretro, and emits a
+combined source diff digest. Native compilation and real frame evidence are
+still required before GameCube can be marked playable.

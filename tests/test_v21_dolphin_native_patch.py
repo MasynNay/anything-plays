@@ -6,6 +6,7 @@ import unittest
 
 from tools.patch_dolphin_software import (
     HEADER, ORIGINAL, UPSTREAM_REVISION, patched_text,
+    BACKEND_SOURCE, BACKEND_INCLUDE, BACKEND_ORIGINAL, patched_backend_text,
     patch_source_checkout,
 )
 
@@ -21,6 +22,20 @@ class DolphinNativePatchTests(unittest.TestCase):
         self.assertIn("GetSurfaceInfo() const override", result)
         self.assertIn("video_cb();", result)
 
+    def test_native_backend_instantiates_libretro_software_gfx(self):
+        result = patched_backend_text(BACKEND_INCLUDE + "\n" + BACKEND_ORIGINAL)
+        self.assertIn("std::make_unique<Libretro::Video::SWGfx>()", result)
+        self.assertIn("#ifdef __LIBRETRO__", result)
+        self.assertIn("std::move(gfx)", result)
+        # Non-Libretro builds retain their normal upstream window path.
+        self.assertIn("SWOGLWindow::Create(wsi)", result)
+
+    def test_backend_patch_rejects_mismatched_upstream_source(self):
+        for invalid in ("missing header", BACKEND_ORIGINAL, BACKEND_ORIGINAL * 2):
+            with self.subTest(source=invalid[:20]):
+                with self.assertRaisesRegex(ValueError, "backend source changed"):
+                    patched_backend_text(invalid)
+
     def test_changes_to_upstream_are_rejected_instead_of_patching_wrong_code(self):
         for invalid in ("unrelated file", ORIGINAL * 2, ""):
             with self.subTest(source=invalid[:20]):
@@ -31,8 +46,12 @@ class DolphinNativePatchTests(unittest.TestCase):
         with TemporaryDirectory() as root:
             source = Path(root)
             video = source / HEADER
+            backend = source / BACKEND_SOURCE
             video.parent.mkdir(parents=True)
+            backend.parent.mkdir(parents=True)
             video.write_text(ORIGINAL, encoding="utf-8")
+            backend.write_text(BACKEND_INCLUDE + "\n" + BACKEND_ORIGINAL,
+                               encoding="utf-8")
             with patch("tools.patch_dolphin_software.subprocess.check_output",
                        return_value="another-revision"):
                 with self.assertRaisesRegex(ValueError, "Unreviewed"):
@@ -43,6 +62,8 @@ class DolphinNativePatchTests(unittest.TestCase):
                 patch_source_checkout(source)
             self.assertIn("SW::SWGfx(nullptr)", video.read_text())
             self.assertNotIn("SWOGLWindow::Create(", video.read_text())
+            self.assertIn("Libretro::Video::SWGfx", backend.read_text())
+            self.assertIn("#ifdef __LIBRETRO__", backend.read_text())
 
 
 if __name__ == "__main__":

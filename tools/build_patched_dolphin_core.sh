@@ -27,7 +27,9 @@ python tools/patch_dolphin_software.py "$SOURCE_DIR"
 # Record exactly what native source the compiler receives. Keep this next to
 # the output binary so CI can distinguish the patched build from upstream.
 git -C "$SOURCE_DIR" diff --check
-git -C "$SOURCE_DIR" diff -- Source/Core/DolphinLibretro/Video.h \
+git -C "$SOURCE_DIR" diff -- \
+  Source/Core/DolphinLibretro/Video.h \
+  Source/Core/VideoBackends/Software/SWmain.cpp \
   > "$WORK_DIR/dolphin-video-software.patch"
 sha256sum "$WORK_DIR/dolphin-video-software.patch" \
   | tee "$WORK_DIR/dolphin-video-patch-sha256.txt"

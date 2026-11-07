@@ -9,7 +9,7 @@ Dolphin's "Software Renderer" still constructs SWOGLWindow/GLContextLR,
 whose Initialize() requires an existing frontend GL context. Anything Plays
 uses Tk's software RGB image panel and deliberately provides no HW context.
 SWOGLWindow::Create() therefore returns null; SWGfx dereferences m_window
-when first executing retro_run(). The patched Libretro subclass must supply
+when first executing retro_run(). Both the backend initializer and its patched Libretro subclass must supply
 the video surface metrics and forward its CPU SWTexture directly to video_cb,
 without requiring a second GPU-backed window.
 
@@ -23,6 +23,50 @@ import subprocess
 
 UPSTREAM_REVISION = "32c61f9d0e933331bb7087ba57e96883241b4960"
 HEADER = Path("Source/Core/DolphinLibretro/Video.h")
+BACKEND_SOURCE = Path("Source/Core/VideoBackends/Software/SWmain.cpp")
+BACKEND_INCLUDE = '#include "VideoBackends/Software/SWGfx.h"'
+BACKEND_INCLUDE_REPLACEMENT = """#include "VideoBackends/Software/SWGfx.h"
+#ifdef __LIBRETRO__
+#include "DolphinLibretro/Video.h"
+#endif"""
+BACKEND_ORIGINAL = """bool VideoSoftware::Initialize(const WindowSystemInfo& wsi)
+{
+  std::unique_ptr<SWOGLWindow> window = SWOGLWindow::Create(wsi);
+  if (!window)
+    return false;
+
+  Clipper::Init();
+  Rasterizer::Init();
+
+  return InitializeShared(std::make_unique<SWGfx>(std::move(window)),
+                          std::make_unique<SWVertexLoader>(), std::make_unique<PerfQuery>(),
+                          std::make_unique<SWBoundingBox>(), std::make_unique<SWEFBInterface>(),
+                          std::make_unique<TextureCache>());
+}"""
+BACKEND_REPLACEMENT = """bool VideoSoftware::Initialize(const WindowSystemInfo& wsi)
+{
+  // Libretro has no standalone GLFW/OpenGL window: the frontend receives
+  // software pixels directly from Libretro::Video::SWGfx::ShowImage().
+  // Keep upstream's normal OpenGL window path for non-Libretro builds.
+  std::unique_ptr<AbstractGfx> gfx;
+#ifdef __LIBRETRO__
+  gfx = std::make_unique<Libretro::Video::SWGfx>();
+#else
+  std::unique_ptr<SWOGLWindow> window = SWOGLWindow::Create(wsi);
+  if (!window)
+    return false;
+  gfx = std::make_unique<SWGfx>(std::move(window));
+#endif
+
+  Clipper::Init();
+  Rasterizer::Init();
+
+  return InitializeShared(std::move(gfx),
+                          std::make_unique<SWVertexLoader>(), std::make_unique<PerfQuery>(),
+                          std::make_unique<SWBoundingBox>(), std::make_unique<SWEFBInterface>(),
+                          std::make_unique<TextureCache>());
+}"""
+
 
 ORIGINAL = """  SWGfx()
     : SW::SWGfx(SWOGLWindow::Create(
@@ -69,6 +113,16 @@ def patched_text(source):
     return source.replace(ORIGINAL, REPLACEMENT)
 
 
+def patched_backend_text(source):
+    """Patch the actual SW::VideoSoftware construction path as well."""
+    if source.count(BACKEND_INCLUDE) != 1 or source.count(BACKEND_ORIGINAL) != 1:
+        raise ValueError(
+            "Upstream Dolphin software backend source changed; review the native patch"
+        )
+    return (source.replace(BACKEND_INCLUDE, BACKEND_INCLUDE_REPLACEMENT, 1)
+                  .replace(BACKEND_ORIGINAL, BACKEND_REPLACEMENT, 1))
+
+
 def patch_source_checkout(root):
     """Verify the exact reviewed source revision before modifying its header."""
     root = Path(root).resolve()
@@ -80,9 +134,16 @@ def patch_source_checkout(root):
             f"Unreviewed Dolphin revision: {sha}, expected {UPSTREAM_REVISION}"
         )
     header = root / HEADER
-    content = header.read_text(encoding="utf-8")
-    header.write_text(patched_text(content), encoding="utf-8")
+    backend = root / BACKEND_SOURCE
+    # Validate BOTH reviewed source anchors before touching either file.
+    # A half-applied native patch could compile but silently select the
+    # unmodified OpenGL backend at runtime.
+    patched_header = patched_text(header.read_text(encoding="utf-8"))
+    patched_backend = patched_backend_text(backend.read_text(encoding="utf-8"))
+    header.write_text(patched_header, encoding="utf-8")
+    backend.write_text(patched_backend, encoding="utf-8")
     print(f"Patched embedded GameCube CPU renderer: {header}", flush=True)
+    print(f"Patched Dolphin software backend initialization: {backend}", flush=True)
 
 
 if __name__ == "__main__":
