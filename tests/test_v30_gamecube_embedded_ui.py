@@ -37,15 +37,16 @@ class GameCubeEmbeddedGuiTests(TestCase):
         panel.show_playing_info.assert_called_once()
         error.assert_not_called()
 
-    def test_missing_gamecube_requests_in_app_download_not_external_install(self):
+    def test_missing_gamecube_reports_damaged_install_without_external_download(self):
         panel = self.fake_panel(core=None)
         with patch("anything_plays.ui_library.messagebox.showerror") as err:
             panel.start_rom(Path("/home/user/gamecube/Original-Homebrew.dol"))
         panel.start_external_rom.assert_not_called()
         panel.emu.start.assert_not_called()
         err.assert_called_once()
-        self.assertIn("Download emulator", err.call_args.args[1])
-        self.assertIn("required system files", err.call_args.args[1])
+        self.assertIn("Repair or reinstall", err.call_args.args[1])
+        self.assertIn("required", err.call_args.args[1])
+        self.assertNotIn("Download emulator", err.call_args.args[1])
 
     def test_staging_core_blocks_native_launch(self):
         panel = self.fake_panel("/library/dolphin_libretro.so")

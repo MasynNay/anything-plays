@@ -109,15 +109,11 @@ class LayoutMixin:
         self.shortcuts_button.pack(side='right')
         download_row = ttk.Frame(game)
         download_row.pack(fill='x', pady=(7, 0))
-        self.download_emulator_button = ttk.Button(
-            download_row, text='Download emulator',
-            command=self.download_selected_emulator, style='Accent.TButton',
-        )
-        self.download_emulator_button.pack(side='left')
+        ttk.Label(download_row, text='Emulator status:').pack(side='left')
         ttk.Label(
             download_row, textvariable=self._selected_emulator_status,
             wraplength=370,
-        ).pack(side='left', padx=(10, 0), fill='x', expand=True)
+        ).pack(side='left', padx=(8, 0), fill='x', expand=True)
         update_row = ttk.Frame(game)
         update_row.pack(fill='x', pady=(7, 0))
         ttk.Button(

@@ -364,15 +364,16 @@ class LibraryMixin:
                 if not self.emu.core_path:
                     if self.system_key.get() == 'gamecube':
                         raise RuntimeError(
-                            'GameCube emulator is not installed. Select GameCube '
-                            'and click Download emulator to install its '
-                            'verified Dolphin core and required system files '
-                            'inside Anything Plays. If no approved package '
-                            'is available, the download will explain why.'
+                            'The installed GameCube emulator or its required '
+                            'Dolphin system files are missing. The complete '
+                            'Anything Plays 3.0 installer includes both. '
+                            'Repair or reinstall the application. No separate '
+                            'Dolphin or emulator download is required.'
                         )
                     raise RuntimeError(
-                        'Emulator not installed. Choose the console, then '
-                        'click Download emulator inside Anything Plays.'
+                        'A bundled emulator core is missing or damaged. '
+                        'Repair or reinstall Anything Plays 3.0; every console '
+                        'is included and must work offline.'
                     )
                 self.emu.start(str(path))
             self.current_rom = str(path)

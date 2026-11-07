@@ -24,11 +24,6 @@ from anything_plays.emulator_updates import (
 )
 
 CHECK_INTERVAL_SECONDS = 24 * 60 * 60
-# GameCube requires an approved paired Dolphin+Sys package. Until its
-# release gate is passed, no such catalog ZIP exists or can be installed.
-FULL_APP_ONLY = set()
-
-
 class UpdatesMixin:
     """Never stall the Tk event loop or swap a loaded native emulator."""
 
@@ -268,112 +263,28 @@ class UpdatesMixin:
             messagebox.showerror("Restore emulator", str(exc), parent=self.root)
 
     def _selected_core_name(self):
-        """Resolve console shelves to one core download (including shared cores)."""
+        """Resolve every console shelf to its embedded native core."""
         from anything_plays.systems import SYSTEMS
         system = self.system_key.get()
         return "parallel_n64" if system == "n64" else SYSTEMS[system].core
 
     def refresh_selected_emulator_state(self):
-        """Update per-console install controls without doing any network I/O."""
-        button = getattr(self, "download_emulator_button", None)
+        """Show offline emulator health, never offer mandatory first-run downloads."""
         status = getattr(self, "_selected_emulator_status", None)
-        if button is None or status is None:
+        if status is None:
             return
         system = self.system_key.get()
         core = self._selected_core_name()
-        # Paired Dolphin+Sys can be installed only through the verified catalog.
         from anything_plays.core_locator import find_core
         from anything_plays.n64_software import find_parallel_n64_core
         installed = (find_parallel_n64_core() if system == "n64"
                      else find_core(system))
         if installed:
-            button.configure(text="Emulator installed", state="disabled")
             status.set("Ready inside Anything Plays · " + core)
         elif getattr(self, "_core_install_busy", False):
-            button.configure(text="Installing emulator…", state="disabled")
-            status.set("Installing a verified emulator core")
+            status.set("Installing an approved emulator update…")
         else:
-            button.configure(text="Download emulator", state="normal")
-            status.set("Not installed · " + core + " is an optional download")
+            # The full 3.0 installer has ALL 11 cores. Missing binaries
+            # indicate corruption/packaging failure, not an optional feature.
+            status.set("Emulator files missing · repair or reinstall Anything Plays")
 
-    def download_selected_emulator(self):
-        """Explicitly download only a trusted, platform-matched core."""
-        if self._closing or getattr(self, "_updates_busy", False):
-            return
-        core = self._selected_core_name()
-        if core in FULL_APP_ONLY:
-            return  # Reserved for future disallowed components.
-        if not self._can_update_emulators():
-            messagebox.showwarning(
-                "Emulator download",
-                "Unload your current game before installing another emulator.",
-                parent=self.root,
-            )
-            return
-        from anything_plays.core_locator import find_core
-        from anything_plays.n64_software import find_parallel_n64_core
-        system = self.system_key.get()
-        current = (find_parallel_n64_core() if system == "n64"
-                   else find_core(system))
-        if current:
-            self.refresh_selected_emulator_state()
-            return
-        if not messagebox.askyesno(
-            "Download emulator",
-            f"Install {core} directly in Anything Plays?\n\n"
-            "Only verified official core packs are allowed. "
-            "No separate emulator application is needed.",
-            parent=self.root,
-        ):
-            return
-        self._updates_busy = True
-        self._core_install_busy = True
-        self.refresh_selected_emulator_state()
-        self._emulator_update_status.set("Searching for approved " + core + " download…")
-        results = Queue(maxsize=1)
-
-        def worker():
-            try:
-                available = [p for p in discover_core_packs() if p["name"] == core]
-                if not available:
-                    raise ValueError(
-                        "No approved emulator package is published yet for "
-                        "this console and platform. No files were changed."
-                    )
-                results.put((install_core_pack(available[0]), None))
-            except Exception as exc:
-                results.put((None, str(exc)))
-
-        Thread(target=worker, daemon=True, name="emulator-download-" + core).start()
-        self.root.after(150, lambda: self._poll_selected_emulator_install(results, core))
-
-    def _poll_selected_emulator_install(self, results, core):
-        if self._closing:
-            return
-        try:
-            path, error = results.get_nowait()
-        except Empty:
-            self.root.after(150, lambda: self._poll_selected_emulator_install(results, core))
-            return
-        self._updates_busy = False
-        self._core_install_busy = False
-        if error:
-            self._emulator_update_status.set("Download unavailable · " + core)
-            self.refresh_selected_emulator_state()
-            messagebox.showwarning("Emulator download", error, parent=self.root)
-            return
-        # The active core pointer is atomically switched between game sessions.
-        # Stay in the current app window; do not overwrite loaded native DLLs.
-        if hasattr(self, "emu"):
-            self.emu.core_path = self.emu.find_system_core()
-        self._available_core_packs = [
-            p for p in getattr(self, "_available_core_packs", [])
-            if p["name"] != core
-        ]
-        self.refresh_selected_emulator_state()
-        self._emulator_update_status.set(core + " installed · Ready for next game")
-        messagebox.showinfo(
-            "Emulator installed",
-            core + " is installed and verified. Open your game ROM in Anything Plays.",
-            parent=self.root,
-        )
