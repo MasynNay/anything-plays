@@ -12,7 +12,8 @@ from PIL import Image, ImageTk
 
 from anything_plays.cameras import discover
 from anything_plays.system_profiles import DISABLED_MAPPING
-from anything_plays.tracking import locate_target, zone_at
+from anything_plays.tracking import locate_target, locate_targets, zone_at
+from anything_plays.libretro_input import TWO_PLAYER_SYSTEMS
 
 
 class CameraMixin:
@@ -199,8 +200,50 @@ class CameraMixin:
             self.cfg['rgb'] = [int(x) for x in color[0]]
             self.refresh_color()
 
+    def pick_second_color(self):
+        if self.frame is None:
+            messagebox.showinfo('Color 2', 'Start a webcam first.')
+            return
+        self.pick_mode = 'color2'
+        self.status.set('Click a second target in the camera preview to sample Color 2.')
+
+    def choose_second_color(self):
+        rgb = self.cfg.get('rgb2', [255, 30, 180])
+        color = colorchooser.askcolor(
+            color='#%02x%02x%02x' % tuple(rgb)
+        )
+        if color[0]:
+            self.cfg['rgb2'] = [int(x) for x in color[0]]
+            self.refresh_color()
+            self.update_tracking_preferences()
+
+    def update_tracking_preferences(self, event=None):
+        """Persist independent color and controller settings per console."""
+        self.read_settings()
+        self.profile_store.put(self.system_key.get(), self.cfg)
+        self._last_camera_pulses.clear()
+        if (self.color2_enabled.get()
+                and self.color2_player.get() == 'Player 2'
+                and self.system_key.get() not in TWO_PLAYER_SYSTEMS):
+            self.status.set(
+                'This console has no two-controller mode. '
+                'Choose Player 1 for Color 2.'
+            )
+        elif self.color2_enabled.get():
+            self.status.set(
+                'Color 2 is tracking; each matching fish can press its own zone.'
+            )
+        else:
+            self.status.set('Color 2 disabled; primary color tracking continues.')
+
     def refresh_color(self):
-        self.color_text.set('Selected target color: #%02X%02X%02X' % tuple(self.cfg['rgb']))
+        self.color_text.set(
+            'Color 1 · #%02X%02X%02X' % tuple(self.cfg['rgb'])
+        )
+        self.color2_text.set(
+            'Color 2 · #%02X%02X%02X' %
+            tuple(self.cfg.get('rgb2', [255, 30, 180]))
+        )
 
     def geometry(self):
         if self.frame is None:
@@ -226,10 +269,16 @@ class CameraMixin:
             return
         if self.pick_mode:
             rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)[point[1], point[0]]
-            self.cfg['rgb'] = [int(v) for v in rgb]
+            secondary = self.pick_mode == 'color2'
+            self.cfg['rgb2' if secondary else 'rgb'] = [int(v) for v in rgb]
             self.refresh_color()
             self.pick_mode = False
-            self.status.set('Target color selected. Adjust tolerance if needed.')
+            if secondary:
+                self.color2_enabled.set(True)
+                self.update_tracking_preferences()
+                self.status.set('Color 2 sampled and enabled. Choose its player.')
+            else:
+                self.status.set('Color 1 sampled. Multiple matching fish are supported.')
         elif self.custom_draw_enabled.get():
             self.drag_start = point
 
