@@ -88,6 +88,10 @@ class RetroVariable(C.Structure):
 def find_dolphin_core():
     """Locate a packaged Dolphin Libretro library, not the Dolphin app."""
     filename = "dolphin_libretro" + _library_extension()
+    from anything_plays.core_packs import managed_core_path
+    vetted = managed_core_path("dolphin")
+    if vetted is not None:
+        return vetted
     for directory in _search_directories():
         candidate = Path(directory) / filename
         if candidate.is_file():

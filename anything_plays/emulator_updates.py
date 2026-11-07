@@ -167,8 +167,7 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
     from anything_plays.core_packs import managed_core_path, managed_core_release
     for item in items:
         name = item["key"]
-        if name == "dolphin":
-            continue  # Dolphin must be updated with matching Sys assets.
+        # Approved paired Dolphin+Sys packages are now verified together.
         if managed_core_path(name):
             item["installed_from"] = "approved-core-pack"
             item["installed_version"] = managed_core_release(name) or "approved core pack"

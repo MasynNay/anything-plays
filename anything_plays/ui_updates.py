@@ -24,10 +24,9 @@ from anything_plays.emulator_updates import (
 )
 
 CHECK_INTERVAL_SECONDS = 24 * 60 * 60
-# Dolphin Libretro needs matching 'dolphin-emu/Sys' assets; a standalone DLL
-# is not an independently installable update until a full Sys-pack format
-# and cross-platform testing have been approved.
-FULL_APP_ONLY = {"dolphin"}
+# GameCube requires an approved paired Dolphin+Sys package. Until its
+# release gate is passed, no such catalog ZIP exists or can be installed.
+FULL_APP_ONLY = set()
 
 
 class UpdatesMixin:
@@ -282,10 +281,7 @@ class UpdatesMixin:
             return
         system = self.system_key.get()
         core = self._selected_core_name()
-        if core == "dolphin":
-            button.configure(text="GameCube in development", state="disabled")
-            status.set("Dolphin renderer is not verified; no external install needed.")
-            return
+        # Paired Dolphin+Sys can be installed only through the verified catalog.
         from anything_plays.core_locator import find_core
         from anything_plays.n64_software import find_parallel_n64_core
         installed = (find_parallel_n64_core() if system == "n64"
@@ -306,13 +302,7 @@ class UpdatesMixin:
             return
         core = self._selected_core_name()
         if core in FULL_APP_ONLY:
-            messagebox.showinfo(
-                "GameCube under development",
-                "GameCube needs a tested Dolphin renderer and matching Sys "
-                "assets before one-click installation can be offered.",
-                parent=self.root,
-            )
-            return
+            return  # Reserved for future disallowed components.
         if not self._can_update_emulators():
             messagebox.showwarning(
                 "Emulator download",

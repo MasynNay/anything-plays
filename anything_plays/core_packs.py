@@ -102,6 +102,9 @@ def _valid_installed(name, record, root, target, extension):
         return None
     if record.get("target") != target or not isinstance(rel, str):
         return None
+    if name == "dolphin":
+        from anything_plays.dolphin_pack import verify_installed_dolphin
+        return verify_installed_dolphin(record, root, target, extension)
     expected = f"{name}_libretro{extension}"
     if rel != f"objects/{name}/{digest}/{expected}":
         return None
@@ -227,8 +230,7 @@ def discover_core_packs(*, opener=None, target=None):
 def _validate_asset_metadata(item):
     if not isinstance(item, dict) or item.get("name") not in UPSTREAM_REPOS:
         raise ValueError("Unapproved core pack")
-    if item["name"] == "dolphin":
-        raise ValueError("GameCube core needs matching Sys assets: use a vetted full app update")
+    # Dolphin is allowed only as a verified paired binary+Sys schema-2 ZIP.
     target, _ = target_identity()
     if item.get("target") != target:
         raise ValueError("Core pack is for another operating system")
@@ -310,6 +312,34 @@ def install_core_pack(item, *, root=None, opener=None, emulator_busy=False):
         raise ValueError("Refusing a symlinked managed-core folder")
     fetch = opener or urlopen
     data = _download(item, fetch)
+    if item["name"] == "dolphin":
+        from anything_plays.dolphin_pack import (
+            verify_dolphin_pack, stage_dolphin_object,
+            verify_installed_dolphin,
+        )
+        checked = verify_dolphin_pack(data, item)
+        target, ext = target_identity()
+        root.mkdir(parents=True, exist_ok=True)
+        identity, directory = stage_dolphin_object(root, checked)
+        filename = checked["file"]
+        destination = directory / filename
+        record = {
+            "target": target,
+            "path": f"objects/dolphin/{identity}/{filename}",
+            "sha256": checked["core_sha"],
+            "sys_manifest_sha256": checked["sys_sha"],
+            "object_sha256": identity,
+            "release": item["release"],
+            "asset_sha256": item["sha256"],
+        }
+        if verify_installed_dolphin(record, root, target, ext) != destination:
+            raise ValueError("Dolphin core+Sys failed installed-file verification")
+        state = _load_state(root)
+        old = state["active"].get("dolphin")
+        record["previous"] = old if isinstance(old, dict) else None
+        state["active"]["dolphin"] = record
+        _atomic_state(root, state)
+        return str(destination)
     sha, filename, content = _verify_core_pack(data, item)
     target, ext = target_identity()
     root.mkdir(parents=True, exist_ok=True)
