@@ -1034,3 +1034,44 @@ copy instead of the old unsafe packaged directory. At source commit
 
 No `sudo chmod 777` or `chown` of installed `/opt` resources; no
 replacement fish logo; stable 2.0 and main unchanged.
+
+
+## November 7, 2026 — Anything Plays portfolio site and roadmap refreshed
+
+**Public portfolio deployed**: [anythingplays.masynnay.com](https://anythingplays.masynnay.com/)
+via the `Publish Anything Plays portfolio` workflow from `main`.
+[Run 42423892320](https://github.com/MasynNay/anything-plays/actions/runs/42423892320)
+succeeded after adding a fully static responsive site with the exact original
+fish Git blob (SHA-1 `c620c4154e80768687dfde4c0541f544779af2ff`),
+authentic desktop screenshot, concept-only zone interaction, Python/OpenCV/Tk
+and Libretro engineering details, stable download links and GitHub source.
+
+**Roadmap upgraded:** `ROADMAP.md` on both `main` and this dev branch now
+records recent Apple Silicon N64 owner confirmation, partial Windows physical
+QA, Linux permission/startup fixes verified under nonroot CI and still
+awaiting physical Linux retest, GameCube performance review, licensing,
+signing, and per-console releases. Explicit post-3.0 proposal issues:
+- [#29 Camera calibration and local tracking diagnostics](https://github.com/MasynNay/anything-plays/issues/29)
+- [#30 Versioned settings-only profile export/import](https://github.com/MasynNay/anything-plays/issues/30)
+
+The website's roadmap now has four stages (2.0 released, 3.0 implemented
+developer preview, real-device QA active, stable 3.0 gate pending), links to
+real CI and open issues [#24–30], and clear separation between proposed
+ideas and shipped features. [Pages run 42423892320](https://github.com/MasynNay/anything-plays/actions/runs/42423892320)
+and [source CI](https://github.com/MasynNay/anything-plays/actions/runs/42423892070)
+both **SUCCESS**.
+
+The related [Coastal-Portfolio](https://github.com/MasynNay/Coastal-Portfolio)
+repository has a shared `src/data/projects.js` Anything Plays entry with a
+real desktop preview, standalone website link, code link and development
+roadmap link, shown in glass and normal project cards, alternate design
+views and island project room. That portfolio's own quality checks are
+tracked separately and must pass before declaring its integration final.
+
+**Linux latest verified corrective package:** [Full offline CI 42421756448](https://github.com/MasynNay/anything-plays/actions/runs/42421756448)
+SUCCESS all 4 OSes, including Linux nonroot installed UI both with clean
+and saved-GameCube config and native GameCube from read-only DEB.
+[Linux artifact 13593866535](https://github.com/MasynNay/anything-plays/actions/runs/42421756448/artifacts/13593866535).
+**Physical Linux retry not yet confirmed**. Never mark stable 3.0 complete
+or suggest changing the original fish artwork. v2.0 release remains
+untouched. Continue from specific GitHub commits and test reports.
