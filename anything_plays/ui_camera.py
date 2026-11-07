@@ -231,7 +231,7 @@ class CameraMixin:
             )
         elif self.color2_enabled.get():
             self.status.set(
-                'Color 2 is tracking; each matching fish can press its own zone.'
+                'Color 2 enabled. Use multi-input checkbox to track several fish per color.'
             )
         else:
             self.status.set('Color 2 disabled; primary color tracking continues.')
