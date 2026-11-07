@@ -6,9 +6,9 @@ Libretro and copy rendered frames to the existing Tk game canvas. The
 base CoreSession handles *real PortAudio output*, keyboard/camera input and
 save persistence.
 
-Only Linux EGL is integrated so far. The experimental interpreter/CPU render
-implementation must not be silently substituted on other platforms: it can
-crash or crawl under heavy 3D content.
+Linux uses the proven EGL host; Windows and macOS use independently
+auditable, hidden WGL/CGL contexts. The experimental interpreter/CPU
+renderer must never be silently substituted for a missing GPU host.
 
 This backend is not proof of 3D game compatibility; native GameCube playback
 is still quarantined from stable 3.0 releases until cross-platform testing.
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sys
 from anything_plays.gba_emulator import CoreSession
-from anything_plays.libretro_gpu_egl import EGLFrameHost
+from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
 
@@ -35,7 +35,7 @@ class GameCubeHardwareSession(CoreSession):
             b"dolphin_cpu_core": b"1",
             b"dolphin_skip_dupe_frames": b"disabled",
         })
-        self._host_factory = host_factory or EGLFrameHost
+        self._host_factory = host_factory or choose_gamecube_gpu_host()
         self.host = None
         self.hardware_frames = 0
         self.raw_video_callbacks = 0
@@ -80,12 +80,6 @@ class GameCubeHardwareSession(CoreSession):
         super().video(data, width, height, pitch)
 
     def run(self):
-        if sys.platform != "linux" and self._host_factory is EGLFrameHost:
-            raise RuntimeError(
-                "GameCube accelerated rendering currently requires the "
-                "Linux EGL backend; Windows and macOS host integration is "
-                "under active development"
-            )
         with self._host_factory(width=640, height=576) as host:
             self.host = host
             try:

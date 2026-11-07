@@ -43,7 +43,7 @@ included in this release plan. Historical license:
 
 ## Python and native dependencies
 
-OpenCV, NumPy, Pillow, sounddevice, PyObjC (macOS), and transitive native
+OpenCV, NumPy, Pillow, sounddevice, glcontext, PyObjC (macOS), and transitive native
 libraries retain their own licensing and attribution requirements. The
 installed versions and full dependency notices need a release-specific audit.
 
@@ -76,3 +76,12 @@ that unrelated native dependencies or all source/license obligations are met.
 ## Redistribution status
 
 **Published for the project's stated free/noncommercial use only.** The [v2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) includes exact source snapshots and all four installer hashes. This does not confer commercial reuse rights for Snes9x or the commissioned artwork or establish independent reproducible upstream core builds. See [the scoped review](RELEASE_DISTRIBUTION_REVIEW.md) and [source access instructions](RELEASE_SOURCE_ACCESS.md).
+
+### glcontext 3.0.0 — headless WGL/CGL GameCube rendering
+
+- Upstream: https://github.com/moderngl/glcontext
+- License: MIT, copyright 2021 ModernGL Contributors
+- Complete upstream license: `licenses/glcontext-MIT.txt` (to be
+  included verbatim with frozen application notices)
+- The module uses system graphics drivers. It supplies OpenGL contexts, **not**
+  Dolphin code, firmware, ROMs, or the standalone RetroArch application.
