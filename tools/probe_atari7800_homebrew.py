@@ -38,9 +38,13 @@ def _child(core, rom, seconds, report):
     original = session.video
     frames = nonblank = 0
     hashes = set()
+    all_frame_hashes = set()
+    frame_rgb_low, frame_rgb_high = 255, 0
+    first_frame_size = None
+    first_frame_means = []
 
     def capture(ptr, width, height, pitch):
-        nonlocal frames, nonblank
+        nonlocal frames, nonblank, frame_rgb_low, frame_rgb_high, first_frame_size
         previous = emu.frame_serial
         original(ptr, width, height, pitch)
         if emu.frame_serial == previous:
@@ -53,13 +57,20 @@ def _child(core, rom, seconds, report):
             if frame is None:
                 return
             low, high = int(frame.min()), int(frame.max())
+            frame_rgb_low = min(frame_rgb_low, low)
+            frame_rgb_high = max(frame_rgb_high, high)
+            if first_frame_size is None:
+                first_frame_size = list(frame.shape)
+                Image.fromarray(frame).save(
+                    report.with_name("atari7800-original-frame.png")
+                )
+            if len(first_frame_means) < 12:
+                first_frame_means.append(round(float(frame.mean()), 3))
+            digest = hashlib.sha256(frame.tobytes()).hexdigest()[:16]
+            all_frame_hashes.add(digest)
             if high > 8 and high != low:
                 nonblank += 1
-                hashes.add(hashlib.sha256(frame.tobytes()).hexdigest()[:16])
-                if nonblank == 1:
-                    Image.fromarray(frame).save(
-                        report.with_name("atari7800-original-frame.png")
-                    )
+                hashes.add(digest)
 
     session.video = capture
     timer = threading.Timer(seconds, emu.stop_event.set)
@@ -90,6 +101,11 @@ def _child(core, rom, seconds, report):
         "observed_fps": round(frames / duration, 2),
         "sampled_nonblank_frames": nonblank,
         "distinct_rgb_frames": len(hashes),
+        "total_distinct_frame_hashes_including_blank": len(all_frame_hashes),
+        "rgb_min_observed": frame_rgb_low,
+        "rgb_max_observed": frame_rgb_high,
+        "first_frame_shape": first_frame_size,
+        "first_frame_mean_samples": first_frame_means,
         "native_audio_frames": audio.samples,
         "native_nonzero_pcm_values": audio.nonzero,
         "audio_peak": audio.peak,
