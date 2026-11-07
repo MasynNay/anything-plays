@@ -132,7 +132,7 @@ class ProfilesMixin:
         self.mirror.set(self.cfg['mirror'])
         self.color2_enabled.set(self.cfg.get('color2_enabled', False))
         self.color2_player.set(self.cfg.get('color2_player', 'Player 2'))
-        self.multi_fish_enabled.set(self.cfg.get('multi_fish_enabled', True))
+        self.multi_fish_enabled.set(self.cfg.get('multi_fish_enabled', False))
         self.camera_input_mode.set(
             self.cfg.get('camera_input_mode', 'Held while visible')
         )
