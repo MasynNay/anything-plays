@@ -28,10 +28,14 @@ class DolphinInPanelTests(unittest.TestCase):
         self.assertTrue(options.environment(15, C.addressof(variable)))
         self.assertEqual(variable.value, b"Software")
         self.assertFalse(options.environment(14, None))
-        self.assertTrue(options.environment(52, C.addressof(C.c_uint())))
-        self.assertFalse(options.environment(15, C.addressof(
-            RetroVariable(b"unrecognized", None)
-        )))
+        # Never call addressof() on an inline temporary: once argument
+        # evaluation ends, CPython may free that native structure before
+        # the callback dereferences its integer address.
+        version = C.c_uint()
+        self.assertTrue(options.environment(52, C.addressof(version)))
+        self.assertEqual(version.value, 0)
+        unknown = RetroVariable(b"unrecognized", None)
+        self.assertFalse(options.environment(15, C.addressof(unknown)))
 
     def test_bundled_core_and_sys_are_required(self):
         with TemporaryDirectory() as tmp:
