@@ -5,6 +5,10 @@ deliberate <250-line composition boundary and avoids UI/gameplay coupling.
 """
 import tkinter as tk
 
+from anything_plays.gamecube_preview import (
+    PREVIEW_FPS, DEFAULT_PREVIEW_MODE,
+)
+
 
 class VolumeMixin:
     """Own the visible game-only volume and remembered mute state."""
@@ -28,6 +32,22 @@ class VolumeMixin:
             int(saved_volume) if saved_volume > 0 else int(previous_audible)
         )
         self.emu.set_volume(int(saved_volume) / 100.0)
+        saved_preview = preferences.get(
+            "gamecube_preview_mode", DEFAULT_PREVIEW_MODE
+        )
+        if saved_preview not in PREVIEW_FPS:
+            saved_preview = DEFAULT_PREVIEW_MODE
+        self.gamecube_preview_mode = tk.StringVar(value=saved_preview)
+        self.emu.gamecube_preview_mode = saved_preview
+
+    def set_gamecube_preview_mode(self, event=None):
+        """Change displayed GameCube frame budget without restarting ROM."""
+        mode = self.gamecube_preview_mode.get()
+        if mode not in PREVIEW_FPS:
+            mode = DEFAULT_PREVIEW_MODE
+            self.gamecube_preview_mode.set(mode)
+        self.emu.gamecube_preview_mode = mode
+        self.save_preferences()
 
     def set_game_volume(self, _value=None, *, save=False):
         """Update current Libretro PCM gain without altering system volume."""
