@@ -63,7 +63,7 @@ Section: games
 Priority: optional
 Architecture: $ARCH
 Maintainer: Anything Plays Project <noreply@example.invalid>
-Depends: libc6, libgl1, libglib2.0-0, libportaudio2
+Depends: libc6, libgl1, libegl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
  Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores.
 CONTROL
