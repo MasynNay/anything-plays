@@ -46,9 +46,8 @@ def create_candidate_packs(cores_dir: Path, output_dir: Path, tag: str,
         for row in provenance["cores"]
         if isinstance(row, dict) and row.get("name") in UPSTREAM_REPOS
     }
-    # GameCube remains a paired-core-and-Sys full-app update. Do not
-    # accidentally make the default all-core candidate command fail or
-    # generate a core-only package that cannot boot.
+    # Paired GameCube candidate generation is explicit, never automatic.
+    # Without a source/license/runtime audit, it stays an unapproved ZIP.
     names = (list(selected) if selected is not None
              else [name for name in records if name != "dolphin"])
     if not names or len(set(names)) != len(names):
@@ -59,11 +58,13 @@ def create_candidate_packs(cores_dir: Path, output_dir: Path, tag: str,
         if name not in UPSTREAM_REPOS or name not in records:
             raise ValueError(f"Unknown or absent native core: {name}")
         if name == "dolphin":
-            raise ValueError(
-                "Dolphin must be distributed with matching Sys files in "
-                "a full signed application update until standalone core "
-                "pack compatibility is reviewed"
-            )
+            from tools.create_dolphin_core_pack import make_candidate_dolphin_pack
+            summaries.append(make_candidate_dolphin_pack(
+                cores_dir, output_dir, tag, target=target,
+                license_reviewed=license_reviewed,
+                runtime_tested=runtime_tested,
+            ))
+            continue
         row = records[name]
         filename = f"{name}_libretro{ext}"
         if row.get("file") != filename:
