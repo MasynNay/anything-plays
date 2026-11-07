@@ -44,6 +44,20 @@ class AuxiliaryPanelsMixin:
         self.canvas.bind('<Button-1>', self.on_click)
         self.canvas.bind('<ButtonRelease-1>', self.on_release)
         self.shuffle_enabled.trace_add('write', lambda *_: self.update_shuffle_visibility())
+        # Keep the manual Shuffle action visible even when the right-hand
+        # advanced appearance panel is collapsed. This moves existing zones
+        # only; it never starts an emulator or injects keyboard input.
+        quick_row = ttk.Frame(left)
+        quick_row.pack(fill='x', pady=(6, 3))
+        self.quick_shuffle_button = ttk.Button(
+            quick_row, text='Shuffle control zones now',
+            command=self.shuffle_zones, style='Accent.TButton',
+        )
+        self.quick_shuffle_button.pack(side='left', fill='x', expand=True)
+        ttk.Label(
+            quick_row, text='Manual shuffle · no camera needed',
+            style='Helper.TLabel',
+        ).pack(side='left', padx=(9, 2))
         ttk.Label(left, textvariable=self.status).pack(anchor='w')
         ttk.Label(left, textvariable=self.action, font=('DejaVu Sans', 11, 'bold')).pack(anchor='w', pady=4)
 
