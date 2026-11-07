@@ -82,6 +82,9 @@ cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays21Test.app
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  .build-venv/bin/python tools/probe_embedded_3d.py macos dist/AnythingPlays21Test.app
+fi
 # Sign the outer application only. --deep would mutate nested Libretro dylibs
 # after their SHA-256 values were recorded in CORE_PROVENANCE.json.
 codesign --force --sign - dist/AnythingPlays21Test.app
