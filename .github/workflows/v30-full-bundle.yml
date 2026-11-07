@@ -14,6 +14,25 @@ on:
       - 'verify_bundle.py'
       - 'anything_plays/core_locator.py'
       - 'anything_plays/systems.py'
+      # Changes to visible 3.0 gameplay controls must produce a NEW full
+      # preview, not silently leave the old packaged builds on GitHub.
+      - 'app.py'
+      - 'anything_plays/ui_volume.py'
+      - 'anything_plays/ui_layout.py'
+      - 'anything_plays/ui_view.py'
+      - 'anything_plays/ui_panels.py'
+      - 'anything_plays/ui_profiles.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_gameplay.py'
+      - 'anything_plays/tracking.py'
+      - 'anything_plays/zone_rendering.py'
+      - 'anything_plays/libretro_input.py'
+      - 'anything_plays/libretro_audio.py'
+      - 'anything_plays/gba_emulator.py'
+      - 'anything_plays/system_profiles.py'
+      - 'anything_plays/settings_defaults.py'
+      - 'tests/test_v30_multi_fish_qol.py'
+      - 'tests/smoke_gui.py'
       - 'tools/check_v30_release.py'
       - 'config/v3.0-release-acceptance.json'
   workflow_dispatch:
@@ -62,6 +81,17 @@ jobs:
       - name: Compile complete Linux DEB (test only)
         if: runner.os == 'Linux'
         run: bash packaging/build_linux_deb.sh
+      - name: Verify 3.0 audio, multi-target and local two-player contracts
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_multi_fish_qol.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_multi_fish_qol.py' -v
+          fi
+      - name: Smoke-test visible preview settings in a real Tk UI
+        if: runner.os == 'Linux'
+        run: xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
       - name: Verify every console has its native core in the installed payload
         env:
           TARGET: ${{ matrix.target }}
