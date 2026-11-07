@@ -154,6 +154,28 @@ def normalize(system, profile, base):
         for button in result["mapping"]:
             if mapping.get(button) in allowed:
                 result["mapping"][button] = mapping[button]
+
+    # Never let a malformed imported color/profile silently enable player 2
+    # or flood the camera driver. Older profiles inherit safe defaults.
+    rgb2 = profile.get("rgb2")
+    if (isinstance(rgb2, (list, tuple)) and len(rgb2) == 3
+            and all(type(x) is int and 0 <= x <= 255 for x in rgb2)):
+        result["rgb2"] = list(rgb2)
+    else:
+        result["rgb2"] = list(base.get("rgb2", [255, 30, 180]))
+    for key, default in (("color2_enabled", False),
+                         ("multi_fish_enabled", True)):
+        value = profile.get(key, default)
+        result[key] = value if type(value) is bool else default
+    player = profile.get("color2_player", "Player 2")
+    result["color2_player"] = (
+        player if player in ("Player 1", "Player 2") else "Player 2"
+    )
+    mode = profile.get("camera_input_mode", "Held while visible")
+    result["camera_input_mode"] = (
+        mode if mode in ("Held while visible", "Pulse (classic)")
+        else "Held while visible"
+    )
     return result
 
 
