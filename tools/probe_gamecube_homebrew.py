@@ -49,15 +49,82 @@ class SilentProbeAudio:
 
 def _child(rom, core, seconds, report_path):
     """Run real native gameplay; parent process enforces an absolute timeout."""
-    from anything_plays.gba_emulator import CoreSession, Emulator
+    import faulthandler
+
+    # Native SIGSEGV traces belong in the report, not a discarded stderr
+    # stream. Log each ABI lifecycle phase to identify the exact failure.
+    faulthandler.enable(all_threads=True)
+    from anything_plays import gba_emulator as engine
     from PIL import Image
 
-    emu = Emulator()
+    def stage(message):
+        print("GC-PLAYBACK-STAGE: " + message, flush=True)
+
+    class ProbeNativeCore(engine.NativeCore):
+        """Delegate to the real core, logging calls that can fault natively."""
+
+        def __init__(self, path):
+            stage("dlopen begin")
+            super().__init__(path)
+            stage("dlopen succeeded")
+            native_init = self.init
+            native_load = self.load
+            native_run = self.run
+            self._runs = 0
+
+            def traced_init():
+                stage("retro_init begin")
+                value = native_init()
+                stage("retro_init succeeded")
+                return value
+
+            def traced_load(game):
+                stage("retro_load_game begin")
+                result = native_load(game)
+                stage(f"retro_load_game returned {result}")
+                return result
+
+            def traced_run():
+                self._runs += 1
+                if self._runs == 1 or self._runs % 120 == 0:
+                    stage(f"retro_run frame {self._runs} begin")
+                return native_run()
+
+            self.init = traced_init
+            self.load = traced_load
+            self.run = traced_run
+
+        def configure(self, *args, **kwargs):
+            stage("configure callbacks begin")
+            result = super().configure(*args, **kwargs)
+            stage("configure callbacks succeeded")
+            return result
+
+        def close(self):
+            stage("native deinitialize begin")
+            try:
+                return super().close()
+            finally:
+                stage("native deinitialize completed")
+
+    class ProbeSession(engine.CoreSession):
+        def _load_game(self):
+            stage("query core identity and content path")
+            return super()._load_game()
+
+    # Instrument the production CoreSession's NativeCore construction only
+    # inside this disposable child process; the installed app is unchanged.
+    engine.NativeCore = ProbeNativeCore
+    stage("creating emulator")
+    emu = engine.Emulator()
+    stage("emulator created")
     emu.system = "gamecube"
     emu.core_path = str(core)
     emu.inputs.system = "gamecube"
     emu.armed = False
-    session = CoreSession(emu, "gamecube", rom, str(core))
+    stage("creating game session")
+    session = ProbeSession(emu, "gamecube", rom, str(core))
+    stage("game session created")
     session.audio.close()
     session.audio = SilentProbeAudio()
 
@@ -73,6 +140,8 @@ def _child(rom, core, seconds, report_path):
         original_video(data, width, height, pitch)
         if emu.frame_serial != before:
             decoded_frames += 1
+            if decoded_frames == 1:
+                stage("first decoded software-video callback")
             if decoded_frames % 5 == 1:
                 # Inspect real decoded pixels, not merely libretro_run calls.
                 with emu.lock:
@@ -90,7 +159,9 @@ def _child(rom, core, seconds, report_path):
     start = time.monotonic()
     error = None
     try:
+        stage("CoreSession.run begin")
         session.run()
+        stage("CoreSession.run returned normally")
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         traceback.print_exc()
