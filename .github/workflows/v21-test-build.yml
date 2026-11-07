@@ -5,9 +5,9 @@ on:
     branches: [feature/v2.1-unified-test]
   workflow_dispatch:
 
-concurrency:
-  group: anything-plays-v21-branch
-  cancel-in-progress: true
+# Do not lock all alpha runs behind one GitHub concurrency group:
+# a cancelled, stuck macOS runner can otherwise leave newer runs pending.
+# The cancel-superseded-v21-builds job handles old test runs explicitly.
 
 permissions:
   contents: read
