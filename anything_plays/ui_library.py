@@ -322,6 +322,17 @@ class LibraryMixin:
         self.library_strip.pack_forget()
         self.playing_info.pack(fill='x')
 
+    def retry_current_rom(self):
+        """Recover a failed/stalled native emulator without restarting the UI."""
+        path = self.current_rom or getattr(self.emu, "rom", None)
+        if not path:
+            self.game_status.set("Choose a game ROM before restarting.")
+            return
+        if getattr(self, "_core_install_busy", False):
+            self.game_status.set("Finish emulator updates before restarting.")
+            return
+        self.start_rom(str(path))
+
     def unload_rom(self):
         self.stop_external_emulator()
         self.deactivate_manual()
@@ -348,6 +359,10 @@ class LibraryMixin:
             return
         self.deactivate_manual()
         self.stop_controls()
+        # Save the selected path before starting a background Libretro worker.
+        # A failure in retro_init/retro_load_game can then be retried in-place.
+        self.current_rom = str(path)
+        self._save_warning_until = 0
         try:
             if not self.uses_embedded_emulator():
                 if not self.start_external_rom(str(path)):
@@ -381,6 +396,11 @@ class LibraryMixin:
                 self.game_status.set('Starting ' + Path(path).stem)
             self.show_playing_info()
         except Exception as exc:
+            self.game_status.set(
+                "Game could not start: " + str(exc)[:220]
+                + " · Select Restart game after correcting the issue."
+            )
+            self.show_playing_info()
             messagebox.showerror('ROM', f'Could not start game: {exc}')
 
     def load_rom(self):
