@@ -97,8 +97,14 @@ def find_dolphin_core():
         # An orphan Dolphin DLL cannot boot without the matching Sys data.
         # Do not advertise a corrupted/incomplete installer as "installed".
         system = directory / "dolphin-emu" / "Sys" / "codehandler.bin"
-        if candidate.is_file() and system.is_file() and system.stat().st_size:
-            return str(candidate)
+        try:
+            if candidate.is_file() and system.is_file() and system.stat().st_size:
+                return str(candidate)
+        except OSError:
+            # Never crash the entire app on startup because a root-owned
+            # /opt/ Sys folder is unreadable. Report missing/corrupted
+            # GameCube until a correctly packaged core is available.
+            continue
     return None
 
 
