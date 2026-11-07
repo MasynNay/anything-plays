@@ -7,7 +7,8 @@ import unittest
 from tools.patch_dolphin_software import (
     HEADER, ORIGINAL, UPSTREAM_REVISION, patched_text,
     BACKEND_SOURCE, BACKEND_INCLUDE, BACKEND_ORIGINAL, patched_backend_text,
-    patch_source_checkout,
+    BOOT_SOURCE, BOOT_GBP_CONFIG_ORIGINAL, BOOT_SPECIAL_ANCHOR,
+    patched_boot_text, patch_source_checkout,
 )
 
 
@@ -29,6 +30,17 @@ class DolphinNativePatchTests(unittest.TestCase):
         self.assertIn("std::move(gfx)", result)
         # Non-Libretro builds retain their normal upstream window path.
         self.assertIn("SWOGLWindow::Create(wsi)", result)
+
+    def test_optional_gbplayer_settings_are_disabled_when_mgba_is_not_built(self):
+        result = patched_boot_text(BOOT_SPECIAL_ANCHOR + BOOT_GBP_CONFIG_ORIGINAL)
+        self.assertIn("#ifdef HAS_LIBMGBA", result)
+        self.assertIn("#ifndef HAS_LIBMGBA", result)
+        self.assertIn("use the bundled mGBA core", result)
+        self.assertIn(BOOT_GBP_CONFIG_ORIGINAL, result)
+
+    def test_gbplayer_boot_patch_requires_exact_source(self):
+        with self.assertRaisesRegex(ValueError, "boot source changed"):
+            patched_boot_text("not pinned Dolphin boot source")
 
     def test_backend_patch_rejects_mismatched_upstream_source(self):
         for invalid in ("missing header", BACKEND_ORIGINAL, BACKEND_ORIGINAL * 2):
@@ -52,6 +64,9 @@ class DolphinNativePatchTests(unittest.TestCase):
             video.write_text(ORIGINAL, encoding="utf-8")
             backend.write_text(BACKEND_INCLUDE + "\n" + BACKEND_ORIGINAL,
                                encoding="utf-8")
+            boot = source / BOOT_SOURCE
+            boot.write_text(BOOT_SPECIAL_ANCHOR + BOOT_GBP_CONFIG_ORIGINAL,
+                            encoding="utf-8")
             with patch("tools.patch_dolphin_software.subprocess.check_output",
                        return_value="another-revision"):
                 with self.assertRaisesRegex(ValueError, "Unreviewed"):
@@ -64,6 +79,7 @@ class DolphinNativePatchTests(unittest.TestCase):
             self.assertNotIn("SWOGLWindow::Create(", video.read_text())
             self.assertIn("Libretro::Video::SWGfx", backend.read_text())
             self.assertIn("#ifdef __LIBRETRO__", backend.read_text())
+            self.assertIn("#ifdef HAS_LIBMGBA", boot.read_text())
 
 
 if __name__ == "__main__":

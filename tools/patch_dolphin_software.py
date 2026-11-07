@@ -24,6 +24,36 @@ import subprocess
 UPSTREAM_REVISION = "32c61f9d0e933331bb7087ba57e96883241b4960"
 HEADER = Path("Source/Core/DolphinLibretro/Video.h")
 BACKEND_SOURCE = Path("Source/Core/VideoBackends/Software/SWmain.cpp")
+BOOT_SOURCE = Path("Source/Core/DolphinLibretro/Boot.cpp")
+BOOT_GBP_CONFIG_ORIGINAL = """  if (Libretro::GBPlayer_active)
+  {
+    Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], Libretro::GBPlayer_rom_path);
+    INFO_LOG_FMT(BOOT, "GBPlayer: GBA ROM path applied from subsystem: '{}'", Libretro::GBPlayer_rom_path);
+    Config::SetBase(Config::MAIN_GBA_SAVES_PATH, std::string(gba_save_dir));
+    INFO_LOG_FMT(BOOT, "GBPlayer: ROM save set to: '{}'", gba_save_dir);
+    // In order to prevent confusion for the settings of the save location between RA and the
+    // emulator we just turn this off
+    Config::SetBase(Config::MAIN_GBA_SAVES_IN_ROM_PATH, false);
+  }
+  else
+  {
+    Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], std::string{});
+  }
+
+"""
+BOOT_SPECIAL_ANCHOR = """bool retro_load_game_special(unsigned game_type, const struct retro_game_info* info, size_t num_info)
+{
+"""
+BOOT_SPECIAL_GUARD = """bool retro_load_game_special(unsigned game_type, const struct retro_game_info* info, size_t num_info)
+{
+#ifndef HAS_LIBMGBA
+  // This standalone GameCube development core omits the optional mGBA
+  // dependency. Do not offer its separate Game Boy Player subsystem.
+  ERROR_LOG_FMT(BOOT, "Game Boy Player is unavailable in this build; use the bundled mGBA core");
+  return false;
+#endif
+"""
+
 BACKEND_INCLUDE = '#include "VideoBackends/Software/SWGfx.h"'
 BACKEND_INCLUDE_REPLACEMENT = """#include "VideoBackends/Software/SWGfx.h"
 #ifdef __LIBRETRO__
@@ -123,6 +153,19 @@ def patched_backend_text(source):
                   .replace(BACKEND_ORIGINAL, BACKEND_REPLACEMENT, 1))
 
 
+def patched_boot_text(source):
+    """Guard obsolete GB Player config references when USE_MGBA=OFF."""
+    if (source.count(BOOT_GBP_CONFIG_ORIGINAL) != 1
+            or source.count(BOOT_SPECIAL_ANCHOR) != 1):
+        raise ValueError(
+            "Upstream Dolphin Game Boy Player boot source changed; review native patch"
+        )
+    return (source.replace(
+        BOOT_GBP_CONFIG_ORIGINAL,
+        "#ifdef HAS_LIBMGBA\\n" + BOOT_GBP_CONFIG_ORIGINAL + "#endif\\n", 1,
+    ).replace(BOOT_SPECIAL_ANCHOR, BOOT_SPECIAL_GUARD, 1))
+
+
 def patch_source_checkout(root):
     """Verify the exact reviewed source revision before modifying its header."""
     root = Path(root).resolve()
@@ -135,15 +178,17 @@ def patch_source_checkout(root):
         )
     header = root / HEADER
     backend = root / BACKEND_SOURCE
-    # Validate BOTH reviewed source anchors before touching either file.
-    # A half-applied native patch could compile but silently select the
-    # unmodified OpenGL backend at runtime.
+    boot = root / BOOT_SOURCE
+    # Validate all pinned source anchors before touching any of the files.
     patched_header = patched_text(header.read_text(encoding="utf-8"))
     patched_backend = patched_backend_text(backend.read_text(encoding="utf-8"))
+    patched_boot = patched_boot_text(boot.read_text(encoding="utf-8"))
     header.write_text(patched_header, encoding="utf-8")
     backend.write_text(patched_backend, encoding="utf-8")
+    boot.write_text(patched_boot, encoding="utf-8")
     print(f"Patched embedded GameCube CPU renderer: {header}", flush=True)
     print(f"Patched Dolphin software backend initialization: {backend}", flush=True)
+    print(f"Disabled unsupported Game Boy Player-only config: {boot}", flush=True)
 
 
 if __name__ == "__main__":

@@ -47,3 +47,16 @@ was never constructed. The experimental build-time patch now modifies both
 pinned source files, retains the original path outside Libretro, and emits a
 combined source diff digest. Native compilation and real frame evidence are
 still required before GameCube can be marked playable.
+
+
+## Pinned Game Boy Player compile compatibility
+
+The full pinned Linux native compilation uncovered that `DolphinLibretro/Boot.cpp`
+uses `Config::MAIN_GBA_ROM_PATHS` and other Game Boy Player settings
+defined only under `HAS_LIBMGBA`. This experiment deliberately builds with
+`USE_MGBA=OFF`, because Anything Plays already bundles its own mGBA core
+for GB/GBC/GBA. The additional reviewed source patch guards these
+Game Boy Player-only settings and rejects `retro_load_game_special` when
+mGBA is unavailable, without altering normal GameCube disc/homebrew boot.
+The three-file source diff is retained and hashed. This is a compile fix,
+not evidence that Dolphin now renders playable frames.
