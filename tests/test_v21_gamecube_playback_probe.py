@@ -96,6 +96,32 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
             self.assertEqual(saved["details"]["video_callback_frames"], 6)
             # Even a successful experimental probe is not a release approval.
 
+    def test_jit_fastmem_crash_isolation_reaches_child_and_failures_stay_red(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "jit.json"
+
+            def check_command(args, **kwargs):
+                self.assertEqual(args[args.index("--cpu-core") + 1], "1")
+                self.assertIn("--disable-fastmem", args)
+                self.assertIn("--single-core", args)
+                return CompletedProcess(args, -11, stdout="jit still crashes")
+
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                        "tools.probe_gamecube_homebrew.subprocess.run",
+                        side_effect=check_command):
+                self.assertEqual(_parent(
+                    core, 2, report, cpu_core="1", disable_fastmem=True,
+                    single_core=True
+                ), 1)
+            data = json.loads(report.read_text())
+            self.assertTrue(data["fastmem_disabled"])
+            self.assertEqual(data["cpu_core_mode"], "1")
+            self.assertFalse(data["probe_passed"])
+
     def test_cached_interpreter_mode_is_forwarded_to_isolated_child(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)

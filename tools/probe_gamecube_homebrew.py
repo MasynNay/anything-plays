@@ -65,7 +65,8 @@ class SilentProbeAudio:
 
 
 def _child(rom, core, seconds, report_path, cpu_core=None,
-           exercise_controls=False, single_core=False, fast_controls=False):
+           exercise_controls=False, single_core=False, fast_controls=False,
+           disable_fastmem=False):
     """Run real native gameplay; parent process enforces an absolute timeout."""
     import faulthandler
 
@@ -170,6 +171,12 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
             str(cpu_core).encode("ascii")
         )
         stage("CPU emulation core override: " + str(cpu_core))
+    if disable_fastmem:
+        # Isolate emitted-code SIGSEGV from Dolphin's fast memory mapping,
+        # retaining JIT core 1 for an apples-to-apples performance experiment.
+        session._software_options.values[b"dolphin_fastmem"] = b"disabled"
+        session._software_options.values[b"dolphin_fastmem_arena"] = b"disabled"
+        stage("JIT fastmem and memory arena disabled")
     if single_core:
         # Test Dolphin's synchronous CPU/GPU execution as an alternative to
         # the dual-thread FIFO rendezvous that otherwise stalls presentation.
@@ -281,6 +288,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         "unique_nonblank_rgb_frames": len(unique_nonblank_frames),
         "controller_input_exercised": exercise_controls,
         "fast_controller_stimulus": fast_controls,
+        "fastmem_disabled": disable_fastmem,
         "core_emulation_steps": native_steps,
         "emulation_steps_per_second": round(native_steps / max(elapsed, 0.001), 2),
         "static_homebrew_interactive_passed": interactive_valid,
@@ -301,7 +309,8 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
 
 
 def _parent(core, seconds, report, debugger=False, cpu_core=None,
-            exercise_controls=False, single_core=False, fast_controls=False):
+            exercise_controls=False, single_core=False, fast_controls=False,
+            disable_fastmem=False):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
@@ -312,6 +321,7 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
         "single_core": single_core,
         "controller_input_exercised": bool(exercise_controls or fast_controls),
         "fast_controller_stimulus": fast_controls,
+        "fastmem_disabled": disable_fastmem,
         "seconds_requested": seconds,
         "probe_passed": False,
         "debugger": "gdb" if debugger else None,
@@ -345,6 +355,8 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
                 command.append("--single-core")
             if fast_controls:
                 command.extend(["--fast-controls", "--exercise-controls"])
+            if disable_fastmem:
+                command.append("--disable-fastmem")
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -400,8 +412,10 @@ def main(argv=None):
     parser.add_argument("--child", action="store_true")
     parser.add_argument("--debugger", action="store_true",
                         help="Run the native child under gdb and capture C++ backtraces")
-    parser.add_argument("--cpu-core", choices=("0", "5"),
-                        help="Diagnostic only: 0=interpreter, 5=cached interpreter")
+    parser.add_argument("--cpu-core", choices=("0", "1", "5"),
+                        help="Diagnostic: 0=interpreter, 1=x86 JIT, 5=cached interpreter")
+    parser.add_argument("--disable-fastmem", action="store_true",
+                        help="Disable JIT fastmem and memory arena to isolate native code crashes")
     parser.add_argument("--exercise-controls", action="store_true",
                         help="Pulse controller buttons to test changing rendered frames")
     parser.add_argument("--single-core", action="store_true",
@@ -419,10 +433,12 @@ def main(argv=None):
             parser.error("--rom is required for a child process")
         return _child(args.rom.resolve(), core, args.seconds, report,
                       cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
-                      single_core=args.single_core, fast_controls=args.fast_controls)
+                      single_core=args.single_core, fast_controls=args.fast_controls,
+                       disable_fastmem=args.disable_fastmem)
     return _parent(core, args.seconds, report, debugger=args.debugger,
                    cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
-                   single_core=args.single_core, fast_controls=args.fast_controls)
+                   single_core=args.single_core, fast_controls=args.fast_controls,
+                       disable_fastmem=args.disable_fastmem)
 
 
 if __name__ == "__main__":

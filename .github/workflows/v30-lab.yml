@@ -293,6 +293,16 @@ jobs:
             --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
             --seconds 20 --cpu-core 5 --fast-controls --debugger \
             --report test-evidence/gamecube-fast-controller-rendering.json
+      - name: Diagnose JIT with fastmem disabled and a connected controller
+        if: always() && steps.build_dolphin.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 18 --cpu-core 1 --disable-fastmem --single-core --fast-controls --debugger \
+            --report test-evidence/gamecube-jit-without-fastmem.json
       - uses: actions/cache/save@v4
         if: always()
         continue-on-error: true
@@ -309,6 +319,7 @@ jobs:
             test-evidence/gamecube-cached-interpreter.json
             test-evidence/gamecube-singlecore-cached.json
             test-evidence/gamecube-fast-controller-rendering.json
+            test-evidence/gamecube-jit-without-fastmem.json
             test-evidence/gamecube-homebrew-frame.png
             ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
           if-no-files-found: warn

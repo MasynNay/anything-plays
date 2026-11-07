@@ -139,7 +139,7 @@ class CoreSession:
         self._system_dir_buffer = self._make_system_directory()
         # Save files are separate from the bundled, read-only Dolphin Sys
         # assets. The alpha never writes into its installed emulator folder.
-        save_folder = (Path.home() / ".config" / "anything-plays-21-test" /
+        save_folder = (Path.home() / ".config" / "anything-plays-30-preview" /
                        "gamecube-saves")
         if system == "gamecube":
             save_folder.mkdir(parents=True, exist_ok=True)

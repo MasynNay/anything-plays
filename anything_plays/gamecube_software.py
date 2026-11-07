@@ -25,6 +25,10 @@ from anything_plays.core_locator import _library_extension, _search_directories
 SOFTWARE_OPTIONS = {
     b"dolphin_renderer": b"Software",
     b"dolphin_efb_scale": b"1",
+    # Pinned Dolphin JIT crashes in generated CPU code under this frontend.
+    # Start experimental sessions with the known-working cached interpreter
+    # until a JIT mode passes native runtime checks on all target platforms.
+    b"dolphin_cpu_core": b"5",
 }
 
 # From DolphinLibretro/Input.cpp's GameCube RetroPad port map:
