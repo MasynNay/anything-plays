@@ -242,8 +242,19 @@ class LayoutMixin:
         )
         self.playing_row = ttk.Frame(self.playing_info)
         self.playing_row.pack(fill='x')
-        ttk.Label(self.playing_row, textvariable=self.manual_label, wraplength=345).pack(side='left', fill='x', expand=True)
-        ttk.Button(self.playing_row, text='Unload ROM', command=self.unload_rom, style='Danger.TButton').pack(side='right', padx=(8, 0))
+        ttk.Label(
+            self.playing_row, textvariable=self.manual_label,
+            wraplength=270,
+        ).pack(side='left', fill='x', expand=True)
+        ttk.Button(
+            self.playing_row, text='Unload ROM', command=self.unload_rom,
+            style='Danger.TButton',
+        ).pack(side='right', padx=(8, 0))
+        self.retry_game_button = ttk.Button(
+            self.playing_row, text='Restart game',
+            command=self.retry_current_rom, style='Compact.TButton',
+        )
+        self.retry_game_button.pack(side='right', padx=(8, 0))
         ttk.Label(
             self.playing_info, textvariable=self.game_status,
             style='Value.TLabel', wraplength=500,
