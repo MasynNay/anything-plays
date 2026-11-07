@@ -815,3 +815,96 @@ WebP, soften its exterior outlines, or reinterpret the illustrated handheld.
 If further image changes are needed, use only the canonical source and
 get explicit user approval before touching interior pixels. Stable main
 and v2.0 remain untouched.
+
+
+## November 7, 2026 — N64 only plays first ROM: ROOT CAUSE REPRODUCED AND FIXED
+
+**User-reported exact failure:** Nintendo 64 game runs once, then after
+Unload/Restart/Different ROM it never produces video again. Quitting and
+reopening Anything Plays fixes one game only. User also tested GB, GBC,
+GBA, SNES and GameCube, which did not show the same repeatability defect.
+
+**Hard evidence before fix:** A new real-native regression
+[`tools/probe_n64_restart.py` CI run 42414504317](https://github.com/MasynNay/anything-plays/actions/runs/42414504317)
+used pinned public-domain SaveTest-N64 homebrew and the production
+`Emulator.start()`/`stop()` worker in one Python process.
+**All four OSes failed on second ROM boot**: Linux, Windows, Intel macOS and
+Apple Silicon macOS. The first produced nonblank core video and stopped
+cleanly; the second boot produced no usable frames without a useful Python
+exception. Earlier CI only checked one successful launch.
+
+**Root cause:** ParaLLEl N64 retains process-global native graphics/core
+state beyond `retro_unload_game` / `retro_deinit`; merely spawning a fresh
+Python thread to `ctypes.CDLL` the *same resident native module* does not
+reset it. On Linux and Windows, explicitly releasing its library handle
+AFTER complete core unload/deinit and callback release resets the core.
+A first attempt to apply native `dlclose` to macOS produced a genuine
+**SIGSEGV on both Mac architectures**
+[`42414731946`](https://github.com/MasynNay/anything-plays/actions/runs/42414731946);
+that unsafe approach is **NOT** shipped on macOS.
+
+**Safe production solution, no external emulators:**
+
+- `anything_plays/libretro_native_loader.py` supplies
+  `release_inactive_core_library`, enforcing unloaded/deinitialized core
+  and cleared callback pointers before releasing N64's native module on
+  **Linux/Windows only**. GB/GBC/GBA/SNES/GC and all other core loaders
+  retain their previous lifecycle and are not subjected to forced unloading.
+- `anything_plays/n64_process.py` is the **macOS-only** per-game
+  subprocess bridge. Each N64 ROM boots an entirely NEW spawned operating
+  system process with its bundled ParaLLEl native core, so macOS never
+  invokes unsafe `dlclose`, and all N64 globals disappear when the worker
+  process exits. Parent Tk UI remains running. Bounded shared memory passes
+  decoded frames (up to 1024×1024), 30FPS preview and two local Retropad
+  digital/analog states; the child's native PortAudio sink handles sound,
+  live game-only volume and existing saves. Existing camera/manual input
+  and Player 2 routing remain connected. A crashed child cannot segfault
+  the parent UI. Native processes are stopped/joined and terminated if they
+  refuse to shut down. `app.py` invokes `multiprocessing.freeze_support`
+  so a frozen PyInstaller child does not start a duplicate GUI.
+- `anything_plays/gba_emulator.py` chooses safe per-game Mac child only
+  for N64. Windows/Linux use explicit handle release only for N64; other
+  consoles and GameCube continue unchanged.
+- Additional UI repair from preceding checkpoint: preserves failed launch
+  status and offers Restart game; does not force new external downloads.
+
+**Passed AFTER fix:** focused
+[4-OS real native triple-restart run 42415242942](https://github.com/MasynNay/anything-plays/actions/runs/42415242942)
+at code SHA `24553f4ab4f95fca48e82bf716a936b137396dd7` —
+**SUCCESS: 4/4 native jobs, three real nonblank and cleanly stopped N64
+games each**, no app restart. The subsequent `app.py` change to invoke
+`freeze_support` leaves the session implementation unchanged.
+
+Full offline installer and source GUI validation at code SHA
+`bbdcdfc9fd971f9a414003eb317746535a909f7e`:
+
+- [Full 18-profile/11-core installer run 42415284318](https://github.com/MasynNay/anything-plays/actions/runs/42415284318):
+  **SUCCESS, all four native OS packages passed**.
+  - [Apple Silicon / user's M2 Pro artifact 13591515884](https://github.com/MasynNay/anything-plays/actions/runs/42415284318/artifacts/13591515884)
+  - [Intel Mac artifact 13591621104](https://github.com/MasynNay/anything-plays/actions/runs/42415284318/artifacts/13591621104)
+  - [Windows x64 artifact 13590164796](https://github.com/MasynNay/anything-plays/actions/runs/42415284318/artifacts/13590164796)
+  - [Linux x64 artifact 13590994185](https://github.com/MasynNay/anything-plays/actions/runs/42415284318/artifacts/13590994185)
+- [Full application regression and installer run 42415284288](https://github.com/MasynNay/anything-plays/actions/runs/42415284288):
+  **SUCCESS, all six jobs**, including source/GUI long-run regression.
+
+**Evidence for other user-tested consoles:** existing
+[`native-eleven-console-lifecycle-soak` in emulator run 42412156427](https://github.com/MasynNay/anything-plays/actions/runs/42412156427)
+passed 12 repeated start/stop cycles of 11 original homebrew console profiles,
+including GB, GBC, GBA and SNES, using six native cores in one process;
+other 3D GameCube engine has its own embedded GPU tests and has not been
+changed by this N64-only fix.
+
+**Release and honesty:** This is a **full developer TEST installer**, not
+a public stable 3.0 release; bundles may be unsigned/notarized and GitHub
+artifact links expire. The exact user's Majora's Mask and other commercial
+ROMs on their personal Mac have not been executed by CI. Native game audio,
+input bridge, freeze_support and saves are implemented but need hands-on
+owner verification in the installed Mac DMG. No ROMs, BIOS or external
+emulator are bundled beyond licensed native cores and Dolphin Sys. The
+original fish artwork remains immutable; main and stable 2.0 untouched.
+
+**If a stream fails:** resume from this verified SHA, not the broken
+single-boot assumption. Do NOT re-enable macOS `dlclose`. A user test
+should repeat N64 ROM A → Unload → ROM B → Unload → ROM A with sound and
+manual/camera controls. Record any error display or hangs and then improve
+only the failing path.
