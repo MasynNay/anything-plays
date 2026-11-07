@@ -166,3 +166,23 @@ hashes, and compares an explicit x86 JIT (core 1) to cached interpreter (5).
 The `input_driven_hardware_video_verified` field is separate from the 20-FPS
 release gate; a static controller test does not certify continuous 3D play.
 No external Dolphin executable is used or installed.
+
+
+## 3.0 runtime GameCube accelerated integration
+
+The Linux hardware rendering path now uses `anything_plays/gamecube_gpu.py`
+plus `anything_plays/libretro_gpu_egl.py` **inside the regular Emulator worker**,
+rather than only `tools/probe_gamecube_gl.py`. The research probe subclasses
+this exact production session, so successful tests exercise the same native
+video callback, frame storage, GameCube port setup and emulator run loop as
+the application. Production audio is the normal `AudioSink`, with its bounded
+native PCM queue and PortAudio output; our headless CI test does not establish
+physical speaker functionality. No RetroArch or Dolphin application process
+is launched. The EGL FBO and core are unloaded on the same worker thread.
+
+Windows and macOS need separate accelerated GPU context implementations and
+native stability testing. Their paths must not silently use the Software
+Renderer as if it were a supported gameplay backend. A 3.0 GameCube release
+is blocked until the full target matrix passes. The current controller demo
+is event-driven, so its ~6 unique video callbacks per second are not an
+animated game's actual rendering rate.

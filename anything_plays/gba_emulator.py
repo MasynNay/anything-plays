@@ -403,7 +403,14 @@ class Emulator:
 
     def _run(self):
         try:
-            CoreSession(self, self.system, self.rom, self.core_path).run()
+            if self.system == "gamecube":
+                # Lazy import avoids a CoreSession -> GameCube circular import.
+                # Offscreen accelerated rendering, not Dolphin's slow/crashing
+                # CPU-only software renderer, owns game frames.
+                from anything_plays.gamecube_gpu import GameCubeHardwareSession
+                GameCubeHardwareSession(self, self.rom, self.core_path).run()
+            else:
+                CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
             self.error = f"{type(exc).__name__}: {exc}"
         finally:

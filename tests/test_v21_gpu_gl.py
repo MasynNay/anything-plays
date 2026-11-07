@@ -205,6 +205,75 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
                 self.assertEqual(session.null_video_callbacks, 1)
                 self.assertEqual(session.raw_video_callbacks, 1)
 
+    def test_production_gamecube_session_owns_gpu_and_reuses_native_audio_sink(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import Mock, patch
+        import numpy as np
+
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"placeholder")
+            rom = root / "owned.dol"
+            rom.write_bytes(b"placeholder")
+            fake_host = Mock()
+            fake_host.core_reset = 123
+            fake_host.read_frame.return_value = np.ones((2, 2, 3), dtype=np.uint8)
+            emu = Emulator()
+            with patch("pathlib.Path.home", return_value=root):
+                session = GameCubeHardwareSession(
+                    emu, rom, core, host_factory=Mock()
+                )
+            self.assertEqual(
+                session._software_options.values[b"dolphin_renderer"], b"Hardware"
+            )
+            self.assertEqual(
+                session._software_options.values[b"dolphin_cpu_core"], b"1"
+            )
+            from anything_plays.libretro_audio import AudioSink
+            self.assertIsInstance(session.audio, AudioSink)
+            session.host = fake_host
+            self.assertTrue(session.environment(14, 333))
+            fake_host.accept_core_render.assert_called_once_with(333)
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 2, 2, 0)
+            self.assertEqual(session.hardware_frames, 1)
+            self.assertEqual(emu.frame_serial, 1)
+            self.assertEqual(emu.frame.shape, (2, 2, 3))
+            session.video(None, 2, 2, 0)
+            self.assertEqual(session.null_video_callbacks, 1)
+
+    def test_gpu_failure_stops_emulation_instead_of_hiding_blank_frames(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import Mock, patch
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            folder_sys = root / "dolphin-emu" / "Sys"
+            folder_sys.mkdir(parents=True)
+            (folder_sys / "codehandler.bin").write_bytes(b"placeholder")
+            rom = root / "owned.dol"
+            rom.write_bytes(b"placeholder")
+            with patch("pathlib.Path.home", return_value=root):
+                emu = Emulator()
+                session = GameCubeHardwareSession(emu, rom, core)
+            session.host = Mock()
+            session.host.read_frame.side_effect = RuntimeError("FBO unavailable")
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 640, 480, 0)
+            self.assertTrue(emu.stop_event.is_set())
+            self.assertIn("FBO unavailable", session.opengl_error)
+
     def test_hardware_core_session_never_uses_an_external_emulator(self):
         from tools.probe_gamecube_gl import GLCoreSession
         import inspect

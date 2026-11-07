@@ -24,7 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.gamecube_homebrew_fixture import verified_homebrew
-from tools.libretro_gpu_egl import EGLFrameHost
+from anything_plays.libretro_gpu_egl import EGLFrameHost
+from anything_plays.gamecube_gpu import GameCubeHardwareSession
 from anything_plays.gba_emulator import CoreSession, Emulator
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
@@ -84,11 +85,11 @@ class RamProgress:
         return len(self.digests) > 1
 
 
-class GLCoreSession(CoreSession):
-    """Specialized research session sharing the production Libretro callbacks."""
+class GLCoreSession(GameCubeHardwareSession):
+    """Diagnostic probe using the SAME accelerated GameCube player session."""
 
     def __init__(self, emulator, rom, core_path, cpu_core, single_core=False):
-        super().__init__(emulator, "gamecube", rom, core_path)
+        super().__init__(emulator, rom, core_path)
         self._software_options.values[b"dolphin_renderer"] = b"Hardware"
         # Disable duplicate-XFB suppression only in this isolated test: the
         # pinned GLContextLR::Swap() otherwise sends a null video pointer
