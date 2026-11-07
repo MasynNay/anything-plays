@@ -116,6 +116,37 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  pce-original-hucard-vdc-psg:
+    # Original HuC6280 code, VDC/VCE graphics and native PSG tone.
+    # No CD firmware, commercial game or diagnostic ROM shipped in the app.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native libraries for Libretro frontend
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve pinned Mednafen PCE FAST HuCard core for test
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_pce_fast')"
+      - name: Require original PC Engine VDC color and nonzero HuC6280 PSG
+        run: |
+          python tools/probe_pce_homebrew.py --core cores/mednafen_pce_fast_libretro.so --seconds 8 --report test-evidence/pce-original-hucard-av.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-PCE-HuCard-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   atari7800-original-maria-tia-av:
     # Original .a78 cartridge built at test time, optional BIOS omitted.
     # Strict native ProSystem video and real TIA PCM acceptance (not a
