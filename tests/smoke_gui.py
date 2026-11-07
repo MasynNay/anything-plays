@@ -52,12 +52,20 @@ def main():
                     # game canvas. RetroArch remains an explicit fallback.
                     assert app.uses_embedded_emulator()
                     assert not app.external_setup.winfo_manager()
-                    assert app.n64_mode_row.winfo_manager()
+                    assert not app.n64_mode_row.winfo_manager()
                     assert not app.arm_button.instate(("disabled",))
                     assert not app.shortcuts_button.instate(("disabled",))
                     app.set_view_mode("Game only", persist=False)
                     assert app._game_only_canvas is not None
                     app.set_view_mode("Windowed", persist=False)
+                    app.n64_embedded.set(False)
+                    app.switch_n64_backend()
+                    # Normal players cannot be pushed into an extra download.
+                    assert app.uses_embedded_emulator()
+                    assert not app.external_setup.winfo_manager()
+                    app.external_fallback_enabled = True
+                    app.update_external_setup()
+                    assert app.n64_mode_row.winfo_manager()
                     app.n64_embedded.set(False)
                     app.switch_n64_backend()
                     assert not app.uses_embedded_emulator()
@@ -84,6 +92,9 @@ def main():
                     app.switch_gamecube_backend()
                     assert app.uses_embedded_emulator()
                     assert not app.external_setup.winfo_manager()
+                    app.external_fallback_enabled = False
+                    app.update_external_setup()
+                    assert not app.gamecube_mode_row.winfo_manager()
                     app.system_key.set("genesis")
                     app.switch_system()
                     assert not app.external_setup.winfo_manager()
