@@ -1,0 +1,98 @@
+"""Experimental single-window GameCube software-rendering Libretro backend.
+
+Dolphin's Libretro core includes a Software Renderer that emits ordinary
+CPU-owned XRGB video frames through retro_video_refresh_t. Unlike Dolphin's
+default Hardware renderer, this mode does not require SET_HW_RENDER, so it can
+use Anything Plays' existing game canvas and camera overlays.
+
+**This is an integration path, not a supported-gameplay claim.**
+Frame rates, console memory-card behavior, and hardware compatibility need
+real-game testing before this mode can ship as complete. The binary and its
+Dolphin Sys resources must be bundled at build time, never downloaded by users.
+
+Upstream implementation:
+libretro/dolphin Source/Core/DolphinLibretro/Video.cpp, Main.cpp, Video.h
+"""
+
+import ctypes as C
+from pathlib import Path
+
+from anything_plays.core_locator import _library_extension, _search_directories
+
+
+# Select the core's actual CPU/software renderer, not its Null backend.
+# Keeping settings minimal avoids overriding game-specific configurations.
+SOFTWARE_OPTIONS = {
+    b"dolphin_renderer": b"Software",
+    b"dolphin_efb_scale": b"x1 (640 x 528)",
+}
+
+
+class RetroVariable(C.Structure):
+    """Libretro retro_variable ABI: char *key, char *value."""
+
+    _fields_ = [("key", C.c_char_p), ("value", C.c_char_p)]
+
+
+def find_dolphin_core():
+    """Locate a packaged Dolphin Libretro library, not the Dolphin app."""
+    filename = "dolphin_libretro" + _library_extension()
+    for directory in _search_directories():
+        candidate = Path(directory) / filename
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def packaged_dolphin_system_directory(core_path):
+    """Return a validated read-only system root containing dolphin-emu/Sys.
+
+    Dolphin requires the Sys data alongside its core; the frontend exposes
+    the parent through RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY. This prevents
+    a seemingly complete installer from silently depending on global Dolphin
+    installation directories or asking the end user to install a ZIP.
+    """
+    if core_path is None:
+        raise FileNotFoundError("Bundled Dolphin core is missing")
+    root = Path(core_path).resolve().parent
+    sys_folder = root / "dolphin-emu" / "Sys"
+    if not sys_folder.is_dir():
+        raise FileNotFoundError(
+            "Bundled Dolphin system data is missing: dolphin-emu/Sys"
+        )
+    if not any(sys_folder.iterdir()):
+        raise ValueError("Bundled Dolphin system data is empty")
+    return root
+
+
+class DolphinSoftwareOptions:
+    """Supply Libretro core options for software frames without GPU contexts."""
+
+    def __init__(self):
+        # Keep Python byte strings referenced until the native core unloads.
+        self.values = dict(SOFTWARE_OPTIONS)
+
+    def environment(self, command, data):
+        """Return None when another part of the frontend should handle a call."""
+        if command == 15 and data:  # RETRO_ENVIRONMENT_GET_VARIABLE
+            request = C.cast(data, C.POINTER(RetroVariable))
+            choice = self.values.get(request.contents.key)
+            if choice is None:
+                return False
+            request.contents.value = choice
+            return True
+        if command == 16:  # SET_VARIABLES (core may supply option definitions)
+            return True
+        if command == 17 and data:  # GET_VARIABLE_UPDATE
+            C.cast(data, C.POINTER(C.c_bool))[0] = False
+            return True
+        if command == 52 and data:  # GET_CORE_OPTIONS_VERSION
+            # Ask upstream Dolphin for the backward-compatible v0 options.
+            C.cast(data, C.POINTER(C.c_uint))[0] = 0
+            return True
+        if command == 14:  # SET_HW_RENDER
+            # Never claim a GPU context that Tk cannot actually provide.
+            return False
+        if command == 0x10000 | 44:  # Experimental shared GPU context request
+            return False
+        return None
