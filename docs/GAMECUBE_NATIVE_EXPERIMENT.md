@@ -106,3 +106,16 @@ to create the complete renderer before the frontend processes the FIFO.
 This is a hypothesis grounded in the first-frame native backtrace and
 upstream lifecycle, not an assertion of working gameplay. A new native
 homebrew runtime probe must verify it.
+
+
+## JIT versus cached-interpreter diagnostic
+
+With the CPU renderer initialized, Dolphin now passes native compilation,
+links, initializes Libretro and loads the homebrew, but the first `retro_run()`
+segfaults on the separate emulated CPU thread inside executable JIT code
+(`0x7ffc...` with no ordinary source symbol). The CI experiment now launches
+**two isolated probes** of the same pinned binary: default JIT and
+`dolphin_cpu_core=5` (cached interpreter), both with native GDB backtraces
+and separate reports. The interpreter option is test-only; installed-player
+settings and release readiness remain unchanged. These two outcomes will
+help distinguish JIT-specific behavior from the software render path.

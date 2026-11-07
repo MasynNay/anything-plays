@@ -341,6 +341,7 @@ jobs:
           ccache -M 1G
           ccache -s
       - name: Build patched Dolphin Libretro from reviewed upstream GPL source
+        id: build_dolphin
         timeout-minutes: 70
         run: |
           mkdir -p test-evidence
@@ -355,6 +356,15 @@ jobs:
             --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
             --seconds 20 --debugger \
             --report test-evidence/gamecube-patched-homebrew.json
+      - name: Diagnose generated-JIT crash with cached interpreter (not a release pass)
+        if: always() && steps.build_dolphin.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --cpu-core 5 --debugger \
+            --report test-evidence/gamecube-cached-interpreter.json
       - uses: actions/cache/save@v4
         if: always()
         continue-on-error: true
@@ -368,6 +378,7 @@ jobs:
           path: |
             test-evidence/gamecube-native-build.log
             test-evidence/gamecube-patched-homebrew.json
+            test-evidence/gamecube-cached-interpreter.json
             test-evidence/gamecube-homebrew-frame.png
             ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
           if-no-files-found: warn

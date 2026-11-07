@@ -64,7 +64,7 @@ class SilentProbeAudio:
         return None
 
 
-def _child(rom, core, seconds, report_path):
+def _child(rom, core, seconds, report_path, cpu_core=None):
     """Run real native gameplay; parent process enforces an absolute timeout."""
     import faulthandler
 
@@ -142,6 +142,14 @@ def _child(rom, core, seconds, report_path):
     stage("creating game session")
     session = ProbeSession(emu, "gamecube", rom, str(core))
     stage("game session created")
+    # CI-only CPU-mode override: isolate a generated-JIT-code segfault from
+    # software-video initialization. The installed player's settings are
+    # never changed by this diagnostic.
+    if cpu_core is not None:
+        session._software_options.values[b"dolphin_cpu_core"] = (
+            str(cpu_core).encode("ascii")
+        )
+        stage("CPU emulation core override: " + str(cpu_core))
     session.audio.close()
     session.audio = SilentProbeAudio()
 
@@ -190,6 +198,7 @@ def _child(rom, core, seconds, report_path):
     evidence = evaluate_video_probe(error, decoded_frames, nonblank_frames, elapsed)
     result = {
         "system": "gamecube",
+        "cpu_core_mode": cpu_core or "default",
         "core": core.name,
         "source": "pinned open-source GC-Controller-Test homebrew",
         "real_game_loaded": error is None,
@@ -209,13 +218,14 @@ def _child(rom, core, seconds, report_path):
     return 0 if result["playback_probe_passed"] else 1
 
 
-def _parent(core, seconds, report, debugger=False):
+def _parent(core, seconds, report, debugger=False, cpu_core=None):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
         "system": "gamecube",
         "probe": "real-homebrew-cpu-software-frames",
         "packaged_core": str(core),
+        "cpu_core_mode": cpu_core or "default",
         "seconds_requested": seconds,
         "probe_passed": False,
         "debugger": "gdb" if debugger else None,
@@ -241,6 +251,8 @@ def _parent(core, seconds, report, debugger=False):
                 "--child", "--core", str(core), "--rom", str(homebrew),
                 "--seconds", str(seconds), "--report", str(child_report),
             ]
+            if cpu_core is not None:
+                command.extend(["--cpu-core", str(cpu_core)])
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -296,6 +308,8 @@ def main(argv=None):
     parser.add_argument("--child", action="store_true")
     parser.add_argument("--debugger", action="store_true",
                         help="Run the native child under gdb and capture C++ backtraces")
+    parser.add_argument("--cpu-core", choices=("0", "5"),
+                        help="Diagnostic only: 0=interpreter, 5=cached interpreter")
     parser.add_argument("--rom", type=Path)
     args = parser.parse_args(argv)
     if not 1 <= args.seconds <= 90:
@@ -305,8 +319,10 @@ def main(argv=None):
     if args.child:
         if args.rom is None:
             parser.error("--rom is required for a child process")
-        return _child(args.rom.resolve(), core, args.seconds, report)
-    return _parent(core, args.seconds, report, debugger=args.debugger)
+        return _child(args.rom.resolve(), core, args.seconds, report,
+                      cpu_core=args.cpu_core)
+    return _parent(core, args.seconds, report, debugger=args.debugger,
+                   cpu_core=args.cpu_core)
 
 
 if __name__ == "__main__":

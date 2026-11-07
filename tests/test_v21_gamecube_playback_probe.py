@@ -96,6 +96,27 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
             self.assertEqual(saved["details"]["video_callback_frames"], 6)
             # Even a successful experimental probe is not a release approval.
 
+    def test_cached_interpreter_mode_is_forwarded_to_isolated_child(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+
+            def fake_child(args, **kwargs):
+                self.assertIn("--cpu-core", args)
+                self.assertEqual(args[args.index("--cpu-core") + 1], "5")
+                return CompletedProcess(args, -11, stdout="cached interpreter crash")
+
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.subprocess.run",
+                           side_effect=fake_child):
+                self.assertEqual(_parent(core, 1, report, cpu_core="5"), 1)
+            saved = json.loads(report.read_text())
+            self.assertEqual(saved["cpu_core_mode"], "5")
+            self.assertFalse(saved["probe_passed"])
+
     def test_native_debugger_keeps_gdb_failure_evidence(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)
