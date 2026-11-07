@@ -26,6 +26,12 @@ on:
       - 'anything_plays/ui_layout.py'
       - 'anything_plays/ui_view.py'
       - 'anything_plays/ui_panels.py'
+      - 'anything_plays/ui_library.py'
+      - 'anything_plays/icon_cleanup.py'
+      - 'anything_plays/ui_icon.py'
+      - 'tools/render_v21_icon.py'
+      - 'assets/anything_plays_v21.webp'
+      - 'tests/test_v30_icon_matte.py'
       - 'anything_plays/ui_profiles.py'
       - 'anything_plays/ui_camera.py'
       - 'anything_plays/ui_gameplay.py'
@@ -87,6 +93,14 @@ jobs:
       - name: Compile complete Linux DEB (test only)
         if: runner.os == 'Linux'
         run: bash packaging/build_linux_deb.sh
+      - name: Verify original unchanged fish art and transparent black exterior
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_icon_matte.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_icon_matte.py' -v
+          fi
       - name: Verify 3.0 audio, multi-target and local two-player contracts
         shell: bash
         run: |
