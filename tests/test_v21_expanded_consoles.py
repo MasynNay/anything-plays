@@ -48,6 +48,16 @@ class ExpandedConsoleInventory(unittest.TestCase):
             paths = [str(path) for path in _search_directories()]
             self.assertTrue(any("retroarch" in path.lower() for path in paths))
 
+    def test_every_console_draws_a_local_transparent_cartridge_thumbnail(self):
+        from anything_plays.cartridge_art import cartridge_image
+        for key in SYSTEMS:
+            with self.subTest(console=key):
+                frame = cartridge_image("Owned demo game", system=key)
+                self.assertEqual(frame.mode, "RGBA")
+                self.assertEqual(frame.size, (300, 226))
+                self.assertEqual(frame.getpixel((0, 0))[3], 0)
+                self.assertIsNotNone(frame.getbbox())
+
     def test_sega_reuses_same_core_without_separate_download(self):
         self.assertEqual(SYSTEMS["mastersystem"].extensions, (".sms", ".bms"))
         self.assertEqual(SYSTEMS["gamegear"].extensions, (".gg",))
