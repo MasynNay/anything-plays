@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tkinter as tk
 from PIL import Image, ImageTk
+from anything_plays.icon_cleanup import clean_icon_background
 
 
 class IconMixin:
@@ -18,7 +19,7 @@ class IconMixin:
         if artwork.is_file():
             try:
                 with Image.open(artwork) as source:
-                    icon = source.convert("RGBA")
+                    icon = clean_icon_background(source)
                 self._app_icon = ImageTk.PhotoImage(icon, master=self.root)
                 self.root.iconphoto(True, self._app_icon)
                 return
