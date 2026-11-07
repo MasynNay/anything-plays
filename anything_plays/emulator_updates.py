@@ -23,8 +23,8 @@ UPSTREAM_REPOS = {
     "fceumm": "libretro/libretro-fceumm",
     "genesis_plus_gx": "libretro/Genesis-Plus-GX",
     "parallel_n64": "libretro/parallel-n64",
-    # Dolphin is not bundled. This is project tracking, not a core download.
-    "dolphin": "dolphin-emu/dolphin",
+    # The distributed core is the Libretro Dolphin fork, not Dolphin Qt.
+    "dolphin": "libretro/dolphin",
 }
 DISPLAY_NAMES = {
     "mgba": "Game Boy / GBC / GBA · mGBA",
@@ -32,7 +32,7 @@ DISPLAY_NAMES = {
     "fceumm": "NES · FCEUmm",
     "genesis_plus_gx": "Genesis · Genesis Plus GX",
     "parallel_n64": "Nintendo 64 · ParaLLEl-N64 (test core)",
-    "dolphin": "GameCube · Dolphin (not bundled)",
+    "dolphin": "GameCube · Dolphin Libretro (experimental)",
 }
 MAX_MANIFEST_BYTES = 250_000
 MAX_API_BYTES = 150_000
@@ -59,7 +59,7 @@ def _verified_record(record, folder):
     name = record.get("name")
     filename = record.get("file", "")
     expected = record.get("sha256", "")
-    if name not in UPSTREAM_REPOS or name == "dolphin":
+    if name not in UPSTREAM_REPOS:
         return "invalid"
     if (not isinstance(filename, str) or not filename.startswith(name + "_libretro.")
             or Path(filename).name != filename or
@@ -131,7 +131,7 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
             if not isinstance(record, dict):
                 continue
             name = record.get("name")
-            if name not in UPSTREAM_REPOS or name == "dolphin" or name in known:
+            if name not in UPSTREAM_REPOS or name in known:
                 continue
             try:
                 integrity = _verified_record(record, path.parent)
@@ -157,9 +157,7 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
             try:
                 sha = github_head(UPSTREAM_REPOS[item["key"]], opener=opener)
                 item["upstream_revision"] = sha
-                if item["key"] == "dolphin":
-                    item["status"] = "not-bundled"
-                elif item["integrity"] == "verified":
+                if item["integrity"] == "verified":
                     item["status"] = _version_status(
                         item["key"], known[item["key"]][0],
                         sha, item["integrity"]
@@ -208,7 +206,7 @@ def summary_text(report):
     lines += [
         "", "Checks do not replace native core libraries.",
         "New verified binaries must ship in a tested, signed application update.",
-        "N64 and GameCube are not yet fully embedded; no separate emulator",
-        "installation requirement can be removed until their GPU runtime ships.",
+        "GameCube and N64 software cores are still experimental.",
+        "Real-game validation is required before a public 2.1 release.",
     ]
     return "\n".join(lines)
