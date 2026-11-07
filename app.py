@@ -122,6 +122,22 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.camera_name = tk.StringVar()
         self.zone_name = tk.StringVar(value='Up')
         self.color_text = tk.StringVar()
+        self.color2_text = tk.StringVar()
+        self.color2_enabled = tk.BooleanVar(value=False)
+        self.color2_player = tk.StringVar(value="Player 2")
+        self.multi_fish_enabled = tk.BooleanVar(value=True)
+        self.camera_input_mode = tk.StringVar(value="Held while visible")
+        self._last_camera_pulses = {}
+        # Saved independently from every ROM, with safe defaults on invalid
+        # or older preferences. Do not modify the OS master volume.
+        saved_volume = preferences.get("volume", 35)
+        if (type(saved_volume) not in (int, float)
+                or not 0 <= saved_volume <= 100):
+            saved_volume = 35
+        self.volume_percent = tk.IntVar(value=int(saved_volume))
+        self.volume_label = tk.StringVar(value=f"{int(saved_volume)}%")
+        self._volume_before_mute = max(1, int(saved_volume))
+        self.emu.set_volume(int(saved_volume) / 100.0)
         self.mapping_vars = {}
         self.zone_font_size = tk.IntVar(value=44)
         self.zone_opacity = tk.IntVar(value=85)
