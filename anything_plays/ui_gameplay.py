@@ -173,6 +173,13 @@ class GameplayMixin:
                 self.game_status.set("Audio unavailable: " + self.emu.audio_warning)
                 self._save_warning_until = time.monotonic() + 20
                 self.emu.audio_warning = None
+            elif getattr(self.emu, "resume_info", None):
+                # Tell the player a real, integrity-checked core recovery
+                # resumed their session; do not overwrite it with the
+                # normal Playing text on the next GUI timer callback.
+                self.game_status.set(self.emu.resume_info)
+                self._save_warning_until = time.monotonic() + 20
+                self.emu.resume_info = None
             elif self.emu.running:
                 if (self.current_rom and
                         time.monotonic() >= getattr(self, "_save_warning_until", 0)):
