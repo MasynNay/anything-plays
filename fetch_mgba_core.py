@@ -34,6 +34,12 @@ OPTIONAL_V21_CORES = (
 
 
 def core_names_for_build():
+    # On 2.1 only, the starter installer ships mGBA for GB/GBC/GBA.
+    # Unset: stable v2.0's two-core build remains unchanged.
+    if os.environ.get("AP_V21_MINIMAL_CORE_BUILD", "") == "1":
+        if os.environ.get("AP_RELEASE_BUILD") == "1":
+            raise ValueError("2.1 minimal build is not an approved v2.0 release")
+        return ("mgba",)
     if os.environ.get("AP_V21_TEST_CORES", "") == "1":
         if os.environ.get("AP_RELEASE_BUILD") == "1":
             raise ValueError("Unapproved 2.1 test cores cannot enter the v2.0 release path")

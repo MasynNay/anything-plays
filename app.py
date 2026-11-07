@@ -61,6 +61,8 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self._emulator_update_status = tk.StringVar(
             value='Emulator update checks run automatically every 24 hours'
         )
+        self._selected_emulator_status = tk.StringVar(value='')
+        self._core_install_busy = False
         self.emu = Emulator()
         # Preserve stable 2.0 preferences; make an independent alpha copy.
         self.preferences_path = prepare_test_preferences()
@@ -135,6 +137,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.refresh_settings()
         self.refresh_system_buttons()
         self.update_external_setup()
+        self.refresh_selected_emulator_state()
         self.show_external_placeholder()
         self._active_profile_system = self.system_key.get()
         if self.view_mode.get() != 'Windowed':
