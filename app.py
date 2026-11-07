@@ -125,7 +125,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.color2_text = tk.StringVar()
         self.color2_enabled = tk.BooleanVar(value=False)
         self.color2_player = tk.StringVar(value="Player 2")
-        self.multi_fish_enabled = tk.BooleanVar(value=True)
+        self.multi_fish_enabled = tk.BooleanVar(value=False)
         self.camera_input_mode = tk.StringVar(value="Held while visible")
         self._last_camera_pulses = {}
         # Saved independently from every ROM, with safe defaults on invalid
