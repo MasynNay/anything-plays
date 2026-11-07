@@ -85,7 +85,7 @@ jobs:
 
   windows-test-installer:
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V21_MINIMAL_CORE_BUILD: '1'
     runs-on: windows-latest
     timeout-minutes: 75
     steps:
@@ -97,10 +97,10 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
-      - name: Build 2.1 Windows installer with five native test cores
+      - name: Build 2.1 Windows installer with the mGBA starter core
         shell: cmd
         run: call build_windows.bat
-      - name: Inspect exact staged four-core test bundle
+      - name: Inspect exact mGBA-only starter bundle
         run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays test-evidence/windows-x86_64.json
       - uses: actions/upload-artifact@v4
         with:
@@ -113,7 +113,7 @@ jobs:
 
   macos-test-installer:
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V21_MINIMAL_CORE_BUILD: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Build 2.1 macOS DMG with five native test cores
+      - name: Build 2.1 macOS DMG with the mGBA starter core
         run: bash build_macos_dmg.sh
       - name: Inspect staged test app
         run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays21Test.app test-evidence/macos-${{ matrix.arch }}.json
@@ -144,7 +144,7 @@ jobs:
 
   linux-test-installer:
     env:
-      AP_V21_TEST_CORES: '1'
+      AP_V21_MINIMAL_CORE_BUILD: '1'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -156,7 +156,7 @@ jobs:
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
-      - name: Build 2.1 Debian package with five native test cores
+      - name: Build 2.1 Debian package with the mGBA starter core
         run: bash build_linux_deb.sh
       - name: Verify alpha DEB package identity and launch entry
         run: |
@@ -165,27 +165,12 @@ jobs:
           dpkg-deb -c 'release/anything-plays-test_2.1.0~alpha1_amd64.deb' | grep -F '/usr/share/applications/anything-plays-test.desktop'
       - name: Inspect Linux test installation
         run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays test-evidence/linux-x86_64.json
-      - name: Probe bundled Dolphin with pinned GameCube homebrew (experimental)
-        id: gamecube_probe
-        continue-on-error: true
-        timeout-minutes: 3
-        env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
-        run: |
-          # Experimental: failure is recorded in evidence, not hidden as a
-          # successful native game test. Public release remains blocked.
-          PYTHONUNBUFFERED=1 xvfb-run -a .build-venv/bin/python -X faulthandler \
-            tools/probe_gamecube_homebrew.py \
-            --core dist/AnythingPlays/cores/dolphin_libretro.so \
-            --seconds 20 --report test-evidence/gamecube-homebrew-playback.json
       - uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
           path: |
             release/anything-plays-test_2.1.0~alpha1_amd64.deb
             test-evidence/linux-x86_64.json
-            test-evidence/gamecube-homebrew-playback.json
-            test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: error
           retention-days: 21
 
@@ -549,4 +534,42 @@ jobs:
             test-evidence/gamecube-homebrew-frame.png
             ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
           if-no-files-found: warn
+          retention-days: 14
+
+  optional-core-pack-candidates:
+    # Independent native-core downloads, NOT shipped inside the small installer.
+    # This workflow never marks a candidate as approved or publishes a release.
+    # Maintainers must individually audit sources, licenses, installed gameplay,
+    # audio, controls, saves and signatures before publishing official assets.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: windows-2025
+            target: windows-x64
+          - os: macos-15
+            target: macos-arm64
+          - os: macos-15-intel
+            target: macos-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Retrieve separate platform-matched native core candidates
+        run: python fetch_mgba_core.py
+      - name: Create checksum-verified UNAPPROVED optional packages
+        run: |
+          python tools/create_core_packs.py --release v2.1.0-alpha.2 --output release/core-packs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-2.1-UNAPPROVED-core-candidates-${{ matrix.target }}
+          path: release/core-packs/*.zip
+          if-no-files-found: error
           retention-days: 14

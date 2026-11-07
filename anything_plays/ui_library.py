@@ -361,9 +361,14 @@ class LibraryMixin:
                 # restart; an already-loaded native DLL is never replaced.
                 self.emu.core_path = self.emu.find_system_core()
                 if not self.emu.core_path:
+                    if self.system_key.get() == 'gamecube':
+                        raise RuntimeError(
+                            'GameCube is still under development; native video '
+                            'has not passed real gameplay testing.'
+                        )
                     raise RuntimeError(
-                        'Bundled emulator core is unavailable. '
-                        'Reinstall the 2.1 test build or select the external fallback.'
+                        'Emulator not installed. Choose the console, then '
+                        'click Download emulator inside Anything Plays.'
                     )
                 self.emu.start(str(path))
             self.current_rom = str(path)

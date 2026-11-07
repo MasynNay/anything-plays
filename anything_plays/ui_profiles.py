@@ -112,6 +112,7 @@ class ProfilesMixin:
         self.rom_directory = self.rom_directories.get(key, '')
         self.system_description.configure(text=SYSTEMS[key].title)
         self.update_external_setup()
+        self.refresh_selected_emulator_state()
         self.current_rom = None
         self.game_canvas.delete('all')
         self.show_external_placeholder()

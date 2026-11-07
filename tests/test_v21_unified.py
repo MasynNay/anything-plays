@@ -111,6 +111,21 @@ class UnifiedV21Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Unapproved 2.1'):
                 core_names_for_build()
 
+    def test_small_21_starter_build_does_not_touch_v20_release_lock(self):
+        with patch.dict(os.environ, {
+            'AP_V21_TEST_CORES': '1',
+            'AP_V21_MINIMAL_CORE_BUILD': '1',
+            'AP_RELEASE_BUILD': '0',
+        }):
+            self.assertEqual(core_names_for_build(), ('mgba',))
+        with patch.dict(os.environ, {
+            'AP_V21_TEST_CORES': '1',
+            'AP_V21_MINIMAL_CORE_BUILD': '1',
+            'AP_RELEASE_BUILD': '1',
+        }):
+            with self.assertRaisesRegex(ValueError, 'not an approved v2.0'):
+                core_names_for_build()
+
     def test_camera_overlay_font_is_reused_between_frames(self):
         cached_zone_font.cache_clear()
         first = cached_zone_font(46)
