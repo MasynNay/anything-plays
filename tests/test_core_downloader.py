@@ -124,7 +124,7 @@ class DownloaderTests(unittest.TestCase):
             "libretro_library_version": "3.9",
             "reported_source_revision": None,
         }
-        output = "Native status message\\nAP_NATIVE_IDENTITY=" + json.dumps(metadata) + "\\n"
+        output = "Native status message\nAP_NATIVE_IDENTITY=" + json.dumps(metadata) + "\n"
         with patch("fetch_mgba_core.subprocess.run",
                    return_value=CompletedProcess([], 0, output, "")) as run:
             value = _inspect_core_identity_isolated(
