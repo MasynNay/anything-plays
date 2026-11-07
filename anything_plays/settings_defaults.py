@@ -5,7 +5,7 @@ from anything_plays.gba_emulator import BUTTONS
 DEFAULT = {
     'rgb': [255, 0, 0], 'rgb2': [255, 30, 180],
     'color2_enabled': False, 'color2_player': 'Player 2',
-    'multi_fish_enabled': True, 'camera_input_mode': 'Held while visible',
+    'multi_fish_enabled': False, 'camera_input_mode': 'Held while visible',
     'tolerance': 20, 'min_area': 120,
     'hold_frames': 8, 'cooldown_ms': 450, 'mirror': False,
     'zone_font_size': 50, 'zone_opacity': 90, 'zone_style': 'Bold',
