@@ -228,6 +228,44 @@ jobs:
           if-no-files-found: warn
           retention-days: 21
 
+  n64-homebrew-playback:
+    # Independent playable-video evidence using Unlicensed/public-domain ROM;
+    # never include the fixture or download it in a player installation.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      AP_V21_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prepare bundled N64 test core and headless dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libx11-6 libxi6 libxrandr2 libportaudio2
+          python -m pip install -r requirements.txt
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('parallel_n64')"
+      - name: Boot pinned public-domain N64 homebrew and require nonblank video
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_n64_homebrew.py \
+            --core cores/parallel_n64_libretro.so --seconds 20 \
+            --report test-evidence/n64-homebrew-playback.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-N64-real-homebrew-evidence
+          path: |
+            test-evidence/n64-homebrew-playback.json
+            test-evidence/n64-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
   gamecube-patched-native-experiment:
     # Compile from GPL source only when a native(dolphin) change is submitted.
     # This is a developer test; it does not add unaudited modified binaries
@@ -250,8 +288,18 @@ jobs:
             build-essential cmake ninja-build pkg-config git gdb xvfb \
             libgl1-mesa-dev libegl1-mesa-dev libx11-dev libxi-dev libxrandr-dev \
             libudev-dev libusb-1.0-0-dev libcurl4-openssl-dev \
-            liblzma-dev zlib1g-dev libportaudio2
+            liblzma-dev zlib1g-dev libportaudio2 ccache
           python -m pip install -r requirements.txt
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: dolphin-v21-ubuntu24-${{ github.sha }}
+          restore-keys: |
+            dolphin-v21-ubuntu24-
+      - name: Limit and report native compiler cache
+        run: |
+          ccache -M 1G
+          ccache -s
       - name: Build patched Dolphin Libretro from reviewed upstream GPL source
         timeout-minutes: 70
         run: |
@@ -267,6 +315,12 @@ jobs:
             --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
             --seconds 20 --debugger \
             --report test-evidence/gamecube-patched-homebrew.json
+      - uses: actions/cache/save@v4
+        if: always()
+        continue-on-error: true
+        with:
+          path: ~/.cache/ccache
+          key: dolphin-v21-ubuntu24-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

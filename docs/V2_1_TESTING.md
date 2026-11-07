@@ -161,6 +161,25 @@ Dolphin uses local named pipes and its separate alpha user profile.
 Dolphin accepts fullscreen and borderless display settings at startup.
 The embedded Game only view is limited to software-rendered Libretro cores.
 
+## Public-domain Nintendo 64 video diagnostic
+
+The 2.1 CI now has a dedicated N64 in-panel rendering probe. It downloads
+Christopher Bonhage's **Unlicensed/public-domain SaveTest-N64** test ROM from
+an exact pinned upstream commit into a temporary CI directory, verifies the
+expected Git blob hash, and records a SHA-256 identity. The ROM is **not**
+committed or bundled with Anything Plays and is never fetched at runtime.
+The probe loads it through the actual ParaLLEl-N64 / Angrylion
+`CoreSession` (no external emulator), captures a real decoded RGB image,
+and records FPS, frame count, and whether frames contain nonblank pixels.
+The probe runs in an isolated subprocess so a native crash cannot kill the
+whole packaging process. Its artifact is called
+`AnythingPlays-2.1-N64-real-homebrew-evidence`.
+
+The probe is an engineering test, not a release certification. Failure is
+reported in CI; passing it is not a substitute for testing playable games,
+sound, analog inputs, saves, camera controls, and sustained operation on
+all supported platforms.
+
 ## Testing priorities
 
 1. Validate each installer starts without replacing stable 2.0.
