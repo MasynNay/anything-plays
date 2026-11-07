@@ -29,6 +29,12 @@ from anything_plays.libretro_video import SUPPORTED_FORMATS, decode_frame
 from anything_plays.systems import SYSTEMS
 
 
+# Legacy Libretro cores may request the complete ROM in one pointer-sized
+# memory allocation. GameCube/other disc systems must use full-path loading,
+# not silently copy entire disc images into the application's heap.
+MAX_IN_MEMORY_ROM_BYTES = 256 * 1024 * 1024
+
+
 class NativeCore:
     """Bind one dynamic library with explicit Libretro argument signatures."""
 
@@ -160,7 +166,16 @@ class CoreSession:
         path_bytes = self._rom_path_bytes
         if full_path:
             return GameInfo(path_bytes, None, 0, None)
+        size = self.rom.stat().st_size
+        if size < 0 or size > MAX_IN_MEMORY_ROM_BYTES:
+            raise ValueError(
+                f"{self.rom.name} is too large for the core's in-memory ROM "
+                f"interface ({size:,} bytes). Select a compatible game or "
+                "a core that supports loading from a file path."
+            )
         rom_bytes = self.rom.read_bytes()
+        if len(rom_bytes) > MAX_IN_MEMORY_ROM_BYTES:
+            raise ValueError("ROM changed size while loading; refusing oversized buffer")
         buffer = C.create_string_buffer(rom_bytes)
         self._rom_buffers.append(buffer)
         return GameInfo(path_bytes, C.cast(buffer, C.c_void_p), len(rom_bytes), None)
