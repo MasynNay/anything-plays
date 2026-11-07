@@ -162,7 +162,7 @@ def patched_boot_text(source):
         )
     return (source.replace(
         BOOT_GBP_CONFIG_ORIGINAL,
-        "#ifdef HAS_LIBMGBA\\n" + BOOT_GBP_CONFIG_ORIGINAL + "#endif\\n", 1,
+        "#ifdef HAS_LIBMGBA\n" + BOOT_GBP_CONFIG_ORIGINAL + "#endif\n", 1,
     ).replace(BOOT_SPECIAL_ANCHOR, BOOT_SPECIAL_GUARD, 1))
 
 

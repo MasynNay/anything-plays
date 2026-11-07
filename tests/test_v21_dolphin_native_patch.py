@@ -34,6 +34,8 @@ class DolphinNativePatchTests(unittest.TestCase):
     def test_optional_gbplayer_settings_are_disabled_when_mgba_is_not_built(self):
         result = patched_boot_text(BOOT_SPECIAL_ANCHOR + BOOT_GBP_CONFIG_ORIGINAL)
         self.assertIn("#ifdef HAS_LIBMGBA", result)
+        self.assertIn("#ifdef HAS_LIBMGBA", result.splitlines())
+        self.assertIn("#endif", result.splitlines())
         self.assertIn("#ifndef HAS_LIBMGBA", result)
         self.assertIn("use the bundled mGBA core", result)
         self.assertIn(BOOT_GBP_CONFIG_ORIGINAL, result)
