@@ -367,9 +367,9 @@ jobs:
       - name: Isolate crash across every original 68000 initialization phase
         run: |
           mkdir -p test-evidence
-          python tools/probe_genesis_phases.py \\
-            --core cores/genesis_plus_gx_libretro.so \\
-            --report test-evidence/genesis-phase-isolation.json \\
+          python tools/probe_genesis_phases.py \
+            --core cores/genesis_plus_gx_libretro.so \
+            --report test-evidence/genesis-phase-isolation.json \
             --seconds 3
       - name: Probe generated Genesis VDP frames and actual PSG PCM
         run: |

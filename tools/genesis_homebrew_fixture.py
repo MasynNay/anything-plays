@@ -109,7 +109,7 @@ def build_genesis_probe_rom(phase="full"):
         # Preserve opcode offsets of all phases; truncate execution, not ROM.
         boundary = checkpoints[phase]
         assert boundary % 2 == 0 and boundary + 2 <= len(code)
-        code[boundary:boundary + 2] = b"\\x60\\xfe"  # BRA.S * (infinite idle)
+        code[boundary:boundary + 2] = b"\x60\xfe"  # BRA.S * (infinite idle)
 
     rom = bytearray(ROM_SIZE)
     # Reserve space for supervisor/interrupt stack pushes near the high end of

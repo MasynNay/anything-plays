@@ -17,7 +17,7 @@ class GenesisStageIsolationContracts(unittest.TestCase):
                 self.assertEqual(rom[0x100:0x104], b"SEGA")
                 if phase != "full":
                     self.assertNotEqual(rom, full)
-                    self.assertIn(b"\\x60\\xfe", rom[ENTRY:ENTRY+4096])
+                    self.assertIn(b"\x60\xfe", rom[ENTRY:ENTRY+4096])
         self.assertEqual(full, build_genesis_probe_rom())
 
     def test_invalid_phase_fails_closed(self):
