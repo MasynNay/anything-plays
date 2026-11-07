@@ -96,10 +96,13 @@ class GLCoreSession(CoreSession):
         self._software_options.values[b"dolphin_skip_dupe_frames"] = b"disabled"
         if single_core:
             self._software_options.values[b"dolphin_main_cpu_thread"] = b"disabled"
-        if cpu_core is not None:
-            self._software_options.values[b"dolphin_cpu_core"] = (
-                str(cpu_core).encode("ascii")
-            )
+        # The installed preview deliberately defaults to cached interpreter
+        # while its software renderer's JIT crashes. Restore *explicit* x86
+        # JIT in the isolated GPU experiment so default vs cached evidence
+        # still compares distinct Dolphin CPU engines.
+        self._software_options.values[b"dolphin_cpu_core"] = (
+            str(cpu_core).encode("ascii") if cpu_core is not None else b"1"
+        )
         self.hardware = None
         self.hardware_requests = 0
         self.hardware_frames = 0
@@ -162,7 +165,8 @@ class GLCoreSession(CoreSession):
                 self.hardware = None
 
 
-def _child(core, rom, seconds, report, cpu_core, single_core=False):
+def _child(core, rom, seconds, report, cpu_core, single_core=False,
+           exercise_controls=False):
     from PIL import Image
     from anything_plays import gba_emulator as engine
 
@@ -197,11 +201,25 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
     emu.inputs.system = "gamecube"
     emu.core_path = str(core)
     emu.armed = False
+    controller_state_requests = 0
+    nonzero_controller_samples = 0
+    actual_input_state = emu.inputs.state
+
+    def measure_controller(port, device, index, identity):
+        nonlocal controller_state_requests, nonzero_controller_samples
+        result = actual_input_state(port, device, index, identity)
+        controller_state_requests += 1
+        if result:
+            nonzero_controller_samples += 1
+        return result
+
+    emu.inputs.state = measure_controller
     session = GLCoreSession(emu, rom, str(core), cpu_core=cpu_core, single_core=single_core)
     session.audio.close()
     session.audio = SilentAudio()
 
     decoded, nonblank, last_shape = 0, 0, None
+    unique_nonblank_frames = set()
     minimum_sampled_rgb = None
     maximum_sampled_rgb = None
     label = ("cached" if cpu_core == "5" else "jit") + ("-single" if single_core else "-dual")
@@ -217,7 +235,7 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
         if emu.frame_serial == serial:
             return
         decoded += 1
-        if decoded == 1 or decoded % 10 == 0:
+        if decoded <= 48 or decoded % 11 == 1:
             with emu.lock:
                 frame = emu.frame
                 if frame is not None:
@@ -231,10 +249,37 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
                         Image.fromarray(frame).save(first_frame, format="PNG")
                     if hi > 4 and lo != hi:
                         nonblank += 1
+                        unique_nonblank_frames.add(
+                            hashlib.sha256(frame.tobytes()).hexdigest()[:16]
+                        )
                         if nonblank == 1:
                             Image.fromarray(frame).save(preview, format="PNG")
     session.video = inspect_frame
 
+    controller_stop = threading.Event()
+    controller_worker = None
+    if exercise_controls:
+        def drive_buttons():
+            # The upstream GC-Controller-Test homebrew normally draws only
+            # when a physical pad changes. Without button stimuli a healthy
+            # hardware renderer looks frozen despite live RAM and audio.
+            buttons = ("A", "B", "Left", "Right", "Up", "Down",
+                       "X", "Y", "Start")
+            i = 0
+            while not controller_stop.is_set():
+                button = buttons[i % len(buttons)]
+                emu.inputs.set_manual(button, True)
+                if controller_stop.wait(0.055):
+                    break
+                emu.inputs.set_manual(button, False)
+                if controller_stop.wait(0.055):
+                    break
+                i += 1
+            emu.inputs.release_manual()
+        controller_worker = threading.Thread(
+            target=drive_buttons, daemon=True, name="gamecube-gl-input-stimulus"
+        )
+        controller_worker.start()
     timer = threading.Timer(seconds, emu.stop_event.set)
     timer.daemon = True
     timer.start()
@@ -254,9 +299,18 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
     finally:
         emu.stop_event.set()
         timer.cancel()
+        controller_stop.set()
+        if controller_worker is not None:
+            controller_worker.join(timeout=1)
+        emu.inputs.release_manual()
     elapsed = max(time.monotonic() - began, 0.001)
     fps = round(decoded / elapsed, 2)
     valid = error is None and decoded >= MIN_VALID_VIDEO_FRAMES and nonblank > 0
+    interactive_homebrew = (
+        valid and exercise_controls and len(unique_nonblank_frames) >= 2
+        and controller_state_requests >= 100 and nonzero_controller_samples >= 10
+        and session.native.ram_progress.changed
+    )
     result = {
         "system": "gamecube", "host": "linux-offscreen-egl-opengl",
         "cpu_mode": cpu_core or "default", "single_core": single_core, "core": core.name,
@@ -266,6 +320,11 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
         "raw_video_callbacks": session.raw_video_callbacks,
         "null_video_callbacks": session.null_video_callbacks,
         "video_frames": decoded, "nonblank_samples": nonblank,
+        "distinct_nonblank_rgb_frames": len(unique_nonblank_frames),
+        "controller_stimulus": exercise_controls,
+        "native_controller_poll_calls": controller_state_requests,
+        "native_nonzero_controller_samples": nonzero_controller_samples,
+        "input_driven_hardware_video_verified": interactive_homebrew,
         "last_shape": last_shape, "observed_fps": fps,
         "native_retro_run_calls": getattr(session.native, "run_calls", 0),
         "slowest_native_retro_run_seconds": round(
@@ -299,10 +358,12 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
     return 0 if result["playback_probe_passed"] else 1
 
 
-def _parent(core, seconds, report, cpu_core, single_core=False):
+def _parent(core, seconds, report, cpu_core, single_core=False,
+            exercise_controls=False):
     data = {
         "system": "gamecube", "mode": "offscreen-egl", "cpu_mode": cpu_core or "default",
         "single_core": single_core,
+        "controller_stimulus": exercise_controls,
         "passed": False, "native_exit_code": None, "timed_out": False,
         "details": None, "error": None, "console_tail": "",
     }
@@ -324,6 +385,8 @@ def _parent(core, seconds, report, cpu_core, single_core=False):
                 command.extend(["--cpu-core", str(cpu_core)])
             if single_core:
                 command.append("--single-core")
+            if exercise_controls:
+                command.append("--exercise-controls")
             env = os.environ.copy()
             env["HOME"] = str(temp)
             env["XDG_CONFIG_HOME"] = str(temp / "config")
@@ -374,6 +437,8 @@ def main(argv=None):
     parser.add_argument("--cpu-core", choices=("0", "5"))
     parser.add_argument("--single-core", action="store_true",
                         help="Diagnose Dolphin frame-step/FIFO synchronization without dual-core")
+    parser.add_argument("--exercise-controls", action="store_true",
+                        help="Pulse an actual GameCube pad and verify GPU redraws")
     parser.add_argument("--rom", type=Path)
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args(argv)
@@ -385,9 +450,11 @@ def main(argv=None):
         if args.rom is None:
             parser.error("--child requires --rom")
         return _child(core, args.rom.resolve(), args.seconds, report, args.cpu_core,
-                      single_core=args.single_core)
+                      single_core=args.single_core,
+                      exercise_controls=args.exercise_controls)
     return _parent(core, args.seconds, report, args.cpu_core,
-                   single_core=args.single_core)
+                   single_core=args.single_core,
+                   exercise_controls=args.exercise_controls)
 
 
 if __name__ == "__main__":

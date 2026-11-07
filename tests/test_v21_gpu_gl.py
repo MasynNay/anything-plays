@@ -96,6 +96,55 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
                     b"dolphin_main_cpu_thread", standard._software_options.values
                 )
 
+    def test_gpu_experiment_explicitly_selects_x86_jit_not_safe_software_fallback(self):
+        from tools.probe_gamecube_gl import GLCoreSession
+        from anything_plays.gba_emulator import Emulator
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"placeholder")
+            rom = root / "owned.dol"
+            rom.write_bytes(b"placeholder")
+            with patch("pathlib.Path.home", return_value=root):
+                jit = GLCoreSession(Emulator(), rom, core, cpu_core=None)
+                cached = GLCoreSession(Emulator(), rom, core, cpu_core="5")
+            self.assertEqual(jit._software_options.values[b"dolphin_cpu_core"], b"1")
+            self.assertEqual(cached._software_options.values[b"dolphin_cpu_core"], b"5")
+
+    def test_original_homebrew_gpu_probe_forwards_input_stimulus(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from subprocess import CompletedProcess
+        from tools.probe_gamecube_gl import _parent
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            report = root / "result.json"
+            def inspect(args, **kwargs):
+                self.assertIn("--exercise-controls", args)
+                return CompletedProcess(args, -11, stdout="native failure")
+            def fixture(path):
+                path.write_bytes(b"synthetic")
+                return path
+            with patch("tools.probe_gamecube_gl.verified_homebrew",
+                       side_effect=fixture), patch(
+                           "tools.probe_gamecube_gl.subprocess.run",
+                           side_effect=inspect):
+                self.assertEqual(
+                    _parent(core, 2, report, cpu_core="5", exercise_controls=True),
+                    1
+                )
+            saved = json.loads(report.read_text())
+            self.assertTrue(saved["controller_stimulus"])
+            self.assertFalse(saved["passed"])
+
     def test_audio_and_ram_diagnostic_detects_actual_emulation_progress(self):
         import ctypes as C
         from tools.probe_gamecube_gl import RamProgress, SilentAudio

@@ -149,3 +149,20 @@ The default JIT still faults, and no full-motion commercial game, physical
 audio device, or save game QA passed. Do not ship Dolphin or mark GameCube
 fully supported until the complete GPU path, license provenance and
 cross-platform native runtime pass the release gate.
+
+
+## Re-test GPU framebuffer with real input
+
+The previous Linux EGL hardware-renderer proof showed nearly 1,000
+`retro_run` iterations over 20 seconds and approximately 928,000 audio
+sample frames, but the GC-Controller-Test homebrew emitted only two frame
+callbacks because the test did not actuate any emulated GameCube buttons.
+This produced mostly duplicate-frame null callbacks and cannot establish
+whether the OpenGL renderer could present an actively changing game.
+
+The isolated GPU probe now presses A/B/sticks at a fixed interval, records
+actual Libretro input callbacks, counts unique nonblank GPU-readback frame
+hashes, and compares an explicit x86 JIT (core 1) to cached interpreter (5).
+The `input_driven_hardware_video_verified` field is separate from the 20-FPS
+release gate; a static controller test does not certify continuous 3D play.
+No external Dolphin executable is used or installed.
