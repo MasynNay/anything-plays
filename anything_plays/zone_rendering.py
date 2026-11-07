@@ -50,7 +50,12 @@ def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, 
         box = (int(x1 * width), int(y1 * height), int(x2 * width), int(y2 * height))
         if box[2] <= box[0] or box[3] <= box[1]:
             continue
-        chosen = name == active
+        # A single color may occupy several zones at once. Preserve the
+        # legacy one-zone argument while supporting multi-fish highlights.
+        chosen = (
+            name in active if isinstance(active, (set, frozenset, tuple, list))
+            else name == active
+        )
         color = (75, 240, 150) if chosen else (90, 220, 245)
         if style in ('High contrast', 'Bold'):
             # Bold has a dark readable panel plus a vivid translucent fill.
