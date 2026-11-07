@@ -18,7 +18,7 @@ from tools.genesis_homebrew_fixture import write_genesis_probe
 from tools.probe_nes_homebrew import ObservedAudio
 
 
-def _child(core, rom, seconds, report):
+def _child(core, rom, seconds, report, *, smoke_only=False):
     import faulthandler
     faulthandler.enable(all_threads=True)
     from anything_plays.gba_emulator import Emulator, CoreSession
@@ -68,10 +68,17 @@ def _child(core, rom, seconds, report):
         timer.cancel()
     elapsed = max(time.monotonic() - started, 0.001)
     audio = session.audio
-    passed = (error is None and frames >= 30 and frames / elapsed >= 20
-              and nonblank >= 2 and len(fingerprints) >= 2
-              and audio.samples > 1000 and audio.nonzero > 100
-              and audio.sample_rate is not None and audio.peak > 0)
+    # Early cartridge phases deliberately have no VDP output or PSG tone.
+    # Smoke means the native core can execute the exact phase without crashing
+    # while continuing to invoke frames; full production A/V requires much more.
+    passed = (
+        error is None and frames >= 10 and frames / elapsed >= 5
+        if smoke_only else
+        error is None and frames >= 30 and frames / elapsed >= 20
+        and nonblank >= 2 and len(fingerprints) >= 2
+        and audio.samples > 1000 and audio.nonzero > 100
+        and audio.sample_rate is not None and audio.peak > 0
+    )
     data = {
         "system": "genesis", "source": "original M68000 homebrew",
         "real_video_frames": frames,
@@ -79,7 +86,8 @@ def _child(core, rom, seconds, report):
         "nonblank_samples": nonblank, "distinct_rgb_frames": len(fingerprints),
         "psg_pcm_frames": audio.samples, "nonzero_audio_values": audio.nonzero,
         "audio_peak": audio.peak, "sample_rate": audio.sample_rate,
-        "real_speakers_tested": False, "passed": passed, "error": error,
+        "real_speakers_tested": False, "smoke_only": smoke_only,
+        "passed": passed, "error": error,
     }
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(data, indent=2) + "\n")
@@ -87,7 +95,7 @@ def _child(core, rom, seconds, report):
     return 0 if passed else 1
 
 
-def _parent(core, report, seconds, *, debugger=False):
+def _parent(core, report, seconds, *, debugger=False, phase="full", smoke_only=False):
     result = {"system": "genesis", "passed": False, "timed_out": False,
               "native_exit_code": None, "details": None, "error": None}
     try:
@@ -96,7 +104,8 @@ def _parent(core, report, seconds, *, debugger=False):
         with tempfile.TemporaryDirectory(prefix="anything-plays-genesis-test-") as path:
             folder = Path(path)
             rom = folder / "original-genesis-demo.md"
-            result["fixture"] = write_genesis_probe(rom)
+            result["fixture"] = write_genesis_probe(rom, phase=phase)
+            result["smoke_only"] = bool(smoke_only)
             report_child = folder / "child.json"
             env = os.environ.copy()
             env["HOME"] = str(folder)
@@ -106,6 +115,8 @@ def _parent(core, report, seconds, *, debugger=False):
                 "--core", str(core), "--rom", str(rom),
                 "--seconds", str(seconds), "--report", str(report_child)
             ]
+            if smoke_only:
+                command.append("--smoke-only")
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -172,6 +183,11 @@ def main():
     p.add_argument("--rom", type=Path)
     p.add_argument("--seconds", type=int, default=8)
     p.add_argument("--child", action="store_true")
+    p.add_argument("--phase", choices=__import__(
+        "tools.genesis_homebrew_fixture", fromlist=["PHASES"]
+    ).PHASES, default="full")
+    p.add_argument("--smoke-only", action="store_true",
+                   help="Stage isolation only: allow blank frames and silent PCM")
     p.add_argument("--debugger", action="store_true",
                    help="Capture the native Genesis Plus GX SIGSEGV stack with gdb")
     args = p.parse_args()
@@ -179,9 +195,10 @@ def main():
         if args.rom is None:
             p.error("--child requires --rom")
         return _child(args.core.resolve(), args.rom.resolve(), args.seconds,
-                      args.report.resolve())
+                      args.report.resolve(), smoke_only=args.smoke_only)
     return _parent(args.core.resolve(), args.report.resolve(), args.seconds,
-                   debugger=args.debugger)
+                   debugger=args.debugger, phase=args.phase,
+                   smoke_only=args.smoke_only)
 
 
 if __name__ == "__main__":
