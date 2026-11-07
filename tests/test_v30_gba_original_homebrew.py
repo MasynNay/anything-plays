@@ -30,6 +30,17 @@ class GBAOriginalCartridgeContracts(unittest.TestCase):
                       (struct.unpack_from("<I",build_gba_probe_rom(),0)[0],))
         self.assertLess(len(program),2048)
 
+    def test_gba_ci_runs_native_gpu_and_audio_on_each_desktop_platform(self):
+        content = (Path(__file__).resolve().parents[1] /
+                   ".github/workflows/v30-cores.yml").read_text("utf-8")
+        job = content.split("  gba-original-video-audio:", 1)[1].split(
+            "  gb-gbc-original-video-audio:", 1
+        )[0]
+        for target in ("linux-x64", "windows-x64", "macos-arm64", "macos-x64"):
+            self.assertIn(target, job)
+        self.assertIn("probe_gba_homebrew.py", job)
+        self.assertIn("mgba_libretro.", job)
+
     def test_writer_requires_native_gba_extension(self):
         with TemporaryDirectory() as tmp:
             a=Path(tmp)/"one.gba"

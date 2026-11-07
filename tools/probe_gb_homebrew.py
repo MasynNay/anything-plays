@@ -82,7 +82,10 @@ def _child(system, core, rom, report, seconds):
         and sound.peak>0 and sound.sample_rate is not None
     )
     data={
-        "system":system, "source":"original LR35902 ROM",
+        "system":system, "source": (
+            "original ARM7TDMI GBA ROM" if system == "gba"
+            else "original LR35902 GB/GBC ROM"
+        ),
         "native_video_frames":frames, "observed_fps":round(frames/elapsed,2),
         "sampled_nonblank_frames":nonblank,
         "distinct_rgb_frames":len(hashes),
