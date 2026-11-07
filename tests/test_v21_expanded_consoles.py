@@ -22,9 +22,13 @@ class ExpandedConsoleInventory(unittest.TestCase):
             self.assertEqual(SYSTEMS[key].core, core)
             self.assertIn(core, OPTIONAL_V21_CORES)
         for item in SYSTEMS.values():
-            self.assertIn(item.core, SOURCE_REPOSITORIES)
-            self.assertIn(item.core, UPSTREAM_REPOS)
-            self.assertIn(item.core, DISPLAY_NAMES)
+            # The legacy N64 system metadata intentionally names a
+            # developer-only RetroArch fallback, while the installed app's
+            # real in-panel core is ParaLLEl-N64.
+            core = "parallel_n64" if item.key == "n64" else item.core
+            self.assertIn(core, SOURCE_REPOSITORIES)
+            self.assertIn(core, UPSTREAM_REPOS)
+            self.assertIn(core, DISPLAY_NAMES)
             self.assertIn(item.key, BUTTONS_BY_SYSTEM)
             if item.key not in ("n64", "gamecube"):
                 self.assertEqual(item.backend, "libretro")
