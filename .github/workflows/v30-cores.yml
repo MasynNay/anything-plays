@@ -152,6 +152,41 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  wswan-original-screen-psg:
+    # Original V30MZ cartridges, no downloaded game assets, source-generated
+    # only during CI. Must show animated WonderSwan LCD and native PCM.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [ws, wsc]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native graphics and audio libraries
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Fetch native Mednafen WonderSwan core for temporary CI
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_wswan')"
+      - name: Test original WonderSwan tile-video and wavetable PCM
+        run: |
+          python tools/probe_wswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.so --seconds 8 --report test-evidence/${{ matrix.system }}-original-screen-psg.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-${{ matrix.system }}-video-audio
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   pce-original-vdc-vce-psg-av:
     # Native Mednafen PCE Fast executes an original HuC6280 HuCard.
     # No CD firmware or commercial ROMs. Enforce real VDC/VCE output and
