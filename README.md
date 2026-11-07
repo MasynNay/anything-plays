@@ -11,6 +11,7 @@
 
   [Releases](https://github.com/MasynNay/anything-plays/releases) ·
   [Get started](#get-started) ·
+  [Roadmap](ROADMAP.md) ·
   [How it works](#how-it-works) ·
   [Report an issue](https://github.com/MasynNay/anything-plays/issues)
 </div>
@@ -248,6 +249,7 @@ ROMs, `.sav` files, and settings before replacing an installed build.
 
 ## Project resources
 
+- [Public development roadmap](ROADMAP.md)
 - [Architecture and module boundaries](docs/ARCHITECTURE.md)
 - [Pre-release QA checklist](docs/QA_CHECKLIST.md)
 - [Release candidate notes](docs/RELEASE_NOTES.md)
