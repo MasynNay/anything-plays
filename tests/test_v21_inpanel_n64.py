@@ -35,11 +35,15 @@ class EmbeddedN64Contracts(unittest.TestCase):
         app = object.__new__(App)
         app.system_key = _CurrentSystem("n64")
         app.n64_embedded = _Toggle(True)
+        app.gamecube_embedded = _Toggle(True)
         self.assertTrue(app.uses_embedded_emulator())
         self.assertTrue(app.uses_embedded_emulator("gba"))
-        self.assertFalse(app.uses_embedded_emulator("gamecube"))
+        self.assertTrue(app.uses_embedded_emulator("gamecube"))
         app.n64_embedded.enabled = False
         self.assertFalse(app.uses_embedded_emulator("n64"))
+        self.assertTrue(app.uses_embedded_emulator("gamecube"))
+        app.gamecube_embedded.enabled = False
+        self.assertFalse(app.uses_embedded_emulator("gamecube"))
         self.assertTrue(app.uses_embedded_emulator("genesis"))
 
     def test_embedded_n64_selects_parallel_software_core_not_mupen(self):
