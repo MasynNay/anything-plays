@@ -9,6 +9,19 @@ from tools.probe_gamecube_app import _parent
 
 
 class ProductionGameCubeProbeTests(TestCase):
+    def test_native_probe_tracks_synchronous_gpu_readback_overhead(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        production = (root / "anything_plays/gamecube_gpu.py").read_text("utf-8")
+        diagnostic = (root / "tools/probe_gamecube_app.py").read_text("utf-8")
+        self.assertIn("gpu_readback_seconds", production)
+        self.assertIn("gpu_readback_max_seconds", production)
+        self.assertIn("time.perf_counter()", production)
+        for field in ("gpu_readback_calls", "gpu_readback_total_seconds",
+                      "gpu_readback_mean_ms", "gpu_readback_max_ms",
+                      "gpu_readback_fraction_elapsed"):
+            self.assertIn(field, diagnostic)
+
     def test_native_crash_is_reported_without_marking_embedded_playback_ready(self):
         with TemporaryDirectory() as root:
             folder = Path(root)

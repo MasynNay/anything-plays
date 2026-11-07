@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import sys
 import platform
+import time
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
@@ -45,6 +46,12 @@ class GameCubeHardwareSession(CoreSession):
         self._host_factory = host_factory or choose_gamecube_gpu_host()
         self.host = None
         self.hardware_frames = 0
+        # Per-frame GL readback is synchronous; keep bounded counters so
+        # slow Intel CGL sessions can be diagnosed without assuming the CPU
+        # emulator, GPU context, or canvas is at fault.
+        self.gpu_readback_seconds = 0.0
+        self.gpu_readback_max_seconds = 0.0
+        self.gpu_readback_calls = 0
         self.raw_video_callbacks = 0
         self.null_video_callbacks = 0
         self.opengl_error = None
@@ -89,6 +96,7 @@ class GameCubeHardwareSession(CoreSession):
             self.null_video_callbacks += 1
             return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
+            begun = time.perf_counter()
             try:
                 rgb = self.host.read_frame(width, height)
             except (RuntimeError, ValueError) as exc:
@@ -97,6 +105,10 @@ class GameCubeHardwareSession(CoreSession):
                 self.opengl_error = f"{type(exc).__name__}: {exc}"
                 self.emulator.stop_event.set()
                 return
+            duration = max(0.0, time.perf_counter() - begun)
+            self.gpu_readback_seconds += duration
+            self.gpu_readback_max_seconds = max(self.gpu_readback_max_seconds, duration)
+            self.gpu_readback_calls += 1
             with self.emulator.lock:
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1

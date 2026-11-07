@@ -184,6 +184,15 @@ def _child(core, rom, report, seconds, require_audio=False,
         "native_pcm_frame_samples": session.audio.pcm_frames,
         "native_pcm_nonzero_values": session.audio.pcm_nonzero,
         "continuous_render_fps": round(frame_callbacks / elapsed, 2),
+        "gpu_readback_calls": session.gpu_readback_calls,
+        "gpu_readback_total_seconds": round(session.gpu_readback_seconds, 4),
+        "gpu_readback_mean_ms": round(
+            1000.0 * session.gpu_readback_seconds /
+            max(session.gpu_readback_calls, 1), 3),
+        "gpu_readback_max_ms": round(
+            1000.0 * session.gpu_readback_max_seconds, 3),
+        "gpu_readback_fraction_elapsed": round(
+            session.gpu_readback_seconds / elapsed, 4),
         "continuous_video_20fps_requirement_met": continuous_video_ok,
         "native_nonzero_pcm_requirement_met": real_audio_ok,
         "continuous_animated_video_required": require_animated,
