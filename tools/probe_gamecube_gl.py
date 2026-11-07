@@ -50,9 +50,11 @@ class SilentAudio:
 class GLCoreSession(CoreSession):
     """Specialized research session sharing the production Libretro callbacks."""
 
-    def __init__(self, emulator, rom, core_path, cpu_core):
+    def __init__(self, emulator, rom, core_path, cpu_core, single_core=False):
         super().__init__(emulator, "gamecube", rom, core_path)
         self._software_options.values[b"dolphin_renderer"] = b"Hardware"
+        if single_core:
+            self._software_options.values[b"dolphin_main_cpu_thread"] = b"disabled"
         if cpu_core is not None:
             self._software_options.values[b"dolphin_cpu_core"] = (
                 str(cpu_core).encode("ascii")
@@ -113,7 +115,7 @@ class GLCoreSession(CoreSession):
                 self.hardware = None
 
 
-def _child(core, rom, seconds, report, cpu_core):
+def _child(core, rom, seconds, report, cpu_core, single_core=False):
     from PIL import Image
     from anything_plays import gba_emulator as engine
 
@@ -145,14 +147,14 @@ def _child(core, rom, seconds, report, cpu_core):
     emu.inputs.system = "gamecube"
     emu.core_path = str(core)
     emu.armed = False
-    session = GLCoreSession(emu, rom, str(core), cpu_core=cpu_core)
+    session = GLCoreSession(emu, rom, str(core), cpu_core=cpu_core, single_core=single_core)
     session.audio.close()
     session.audio = SilentAudio()
 
     decoded, nonblank, last_shape = 0, 0, None
     minimum_sampled_rgb = None
     maximum_sampled_rgb = None
-    label = "cached" if cpu_core == "5" else "jit"
+    label = ("cached" if cpu_core == "5" else "jit") + ("-single" if single_core else "-dual")
     preview = report.with_name(f"gamecube-opengl-frame-{label}.png")
     first_frame = report.with_name(f"gamecube-opengl-first-{label}.png")
     original = session.video
@@ -207,7 +209,7 @@ def _child(core, rom, seconds, report, cpu_core):
     valid = error is None and decoded >= MIN_VALID_VIDEO_FRAMES and nonblank > 0
     result = {
         "system": "gamecube", "host": "linux-offscreen-egl-opengl",
-        "cpu_mode": cpu_core or "default", "core": core.name,
+        "cpu_mode": cpu_core or "default", "single_core": single_core, "core": core.name,
         "seconds_elapsed": round(elapsed, 3),
         "hardware_negotiations": session.hardware_requests,
         "hardware_frames": session.hardware_frames,
@@ -235,9 +237,10 @@ def _child(core, rom, seconds, report, cpu_core):
     return 0 if result["playback_probe_passed"] else 1
 
 
-def _parent(core, seconds, report, cpu_core):
+def _parent(core, seconds, report, cpu_core, single_core=False):
     data = {
         "system": "gamecube", "mode": "offscreen-egl", "cpu_mode": cpu_core or "default",
+        "single_core": single_core,
         "passed": False, "native_exit_code": None, "timed_out": False,
         "details": None, "error": None, "console_tail": "",
     }
@@ -257,6 +260,8 @@ def _parent(core, seconds, report, cpu_core):
             ]
             if cpu_core is not None:
                 command.extend(["--cpu-core", str(cpu_core)])
+            if single_core:
+                command.append("--single-core")
             env = os.environ.copy()
             env["HOME"] = str(temp)
             env["XDG_CONFIG_HOME"] = str(temp / "config")
@@ -281,7 +286,7 @@ def _parent(core, seconds, report, cpu_core):
                 and isinstance(data["details"], dict)
                 and data["details"].get("playback_probe_passed") is True
             )
-            label = "cached" if cpu_core == "5" else "jit"
+            label = ("cached" if cpu_core == "5" else "jit") + ("-single" if single_core else "-dual")
             for category in ("first", "frame"):
                 filename = f"gamecube-opengl-{category}-{label}.png"
                 frame = temp / filename
@@ -305,6 +310,8 @@ def main(argv=None):
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--seconds", type=int, default=20)
     parser.add_argument("--cpu-core", choices=("0", "5"))
+    parser.add_argument("--single-core", action="store_true",
+                        help="Diagnose Dolphin frame-step/FIFO synchronization without dual-core")
     parser.add_argument("--rom", type=Path)
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args(argv)
@@ -315,8 +322,10 @@ def main(argv=None):
     if args.child:
         if args.rom is None:
             parser.error("--child requires --rom")
-        return _child(core, args.rom.resolve(), args.seconds, report, args.cpu_core)
-    return _parent(core, args.seconds, report, args.cpu_core)
+        return _child(core, args.rom.resolve(), args.seconds, report, args.cpu_core,
+                      single_core=args.single_core)
+    return _parent(core, args.seconds, report, args.cpu_core,
+                   single_core=args.single_core)
 
 
 if __name__ == "__main__":

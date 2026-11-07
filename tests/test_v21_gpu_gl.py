@@ -61,6 +61,41 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Linux-only"):
                 EGLFrameHost()
 
+    def test_single_core_override_changes_only_diagnostic_session(self):
+        from tools.probe_gamecube_gl import GLCoreSession
+        from unittest.mock import patch
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from anything_plays.gba_emulator import Emulator
+
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"placeholder")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"placeholder")
+            rom = root / "homebrew.dol"
+            rom.write_bytes(b"placeholder")
+            with patch("pathlib.Path.home", return_value=root):
+                session = GLCoreSession(
+                    Emulator(), rom, core, cpu_core=None, single_core=True
+                )
+                self.assertEqual(
+                    session._software_options.values[b"dolphin_main_cpu_thread"],
+                    b"disabled"
+                )
+                self.assertEqual(
+                    session._software_options.values[b"dolphin_renderer"],
+                    b"Hardware"
+                )
+                standard = GLCoreSession(
+                    Emulator(), rom, core, cpu_core=None, single_core=False
+                )
+                self.assertNotIn(
+                    b"dolphin_main_cpu_thread", standard._software_options.values
+                )
+
     def test_hardware_core_session_never_uses_an_external_emulator(self):
         from tools.probe_gamecube_gl import GLCoreSession
         import inspect

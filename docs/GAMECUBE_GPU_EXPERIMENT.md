@@ -61,3 +61,22 @@ measurement. A follow-up records the GL vendor/renderer, actual
 `retro_run()` timings, RGB ranges and first blank frames, and runs
 the engine for longer to distinguish shader startup cost from incorrect
 video submission. Do not switch the default player to this backend yet.
+
+
+## CI #296: frame submission/synchronization is the blocker
+
+[Run #296](https://github.com/MasynNay/anything-plays/actions/runs/42336417071):
+Mesa llvmpipe/OpenGL 4.5, no GL errors, 3,739 successful native `retro_run()`
+invocations in 75.3 seconds (JIT), but only **two blank frame callbacks**.
+Cached interpreter similarly returned 2 blank frames in 35.6 seconds.
+The longest native `retro_run()` call was 73 ms; simply waiting longer
+will not restore gameplay. The observed video failure is not evidence
+that a real GPU is merely too slow.
+
+The next isolated run tests `dolphin_main_cpu_thread=disabled` in both
+JIT and cached-interpreter modes. Dolphin's Libretro `retro_run` calls
+`Core::DoFrameStep` and `FifoManager::RunGpuLoop` in dual-core mode;
+with one emulated CPU thread it instead executes `RunSingleFrame`.
+This can narrow down whether frontend frame stepping and GPU thread
+synchronization are preventing presentation. Neither option is applied to
+installed apps without usable frames and full QA.

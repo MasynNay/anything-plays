@@ -355,6 +355,24 @@ jobs:
             tools/probe_gamecube_gl.py \
             --core cores/dolphin_libretro.so --cpu-core 5 --seconds 35 \
             --report test-evidence/gamecube-opengl-cached.json
+      - name: Diagnose frame-step synchronization with single-core JIT
+        id: accelerated_single_jit
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --single-core --seconds 25 \
+            --report test-evidence/gamecube-opengl-single-jit.json
+      - name: Diagnose single-core cached interpreter as fallback
+        id: accelerated_single_cached
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --single-core --cpu-core 5 --seconds 25 \
+            --report test-evidence/gamecube-opengl-single-cached.json
       - name: Require real nonblank playable-speed GameCube frames
         if: always()
         run: |
@@ -364,6 +382,8 @@ jobs:
           reports = [
               Path("test-evidence/gamecube-opengl-jit.json"),
               Path("test-evidence/gamecube-opengl-cached.json"),
+              Path("test-evidence/gamecube-opengl-single-jit.json"),
+              Path("test-evidence/gamecube-opengl-single-cached.json"),
           ]
           for report in reports:
               if not report.is_file():
@@ -385,6 +405,8 @@ jobs:
           path: |
             test-evidence/gamecube-opengl-jit.json
             test-evidence/gamecube-opengl-cached.json
+            test-evidence/gamecube-opengl-single-jit.json
+            test-evidence/gamecube-opengl-single-cached.json
             test-evidence/gamecube-opengl-frame-*.png
             test-evidence/gamecube-opengl-first-*.png
             test-evidence/gc-opengl-sys-source.json
