@@ -81,6 +81,18 @@ class AudioBufferTests(unittest.TestCase):
             32 * 256 * 2 * np.dtype(np.int16).itemsize,
         )
 
+    def test_malformed_native_audio_count_is_ignored_before_pointer_read(self):
+        from anything_plays.libretro_audio import MAX_AUDIO_BATCH_FRAMES
+        audio = AudioSink()
+        # Invalid lengths paired with a nonsense pointer must not even try
+        # to dereference the native core's memory.
+        bogus = C.c_void_p(1)
+        self.assertEqual(
+            audio.batch(bogus, MAX_AUDIO_BATCH_FRAMES + 1), 0
+        )
+        self.assertEqual(audio.batch(bogus, -1), 0)
+        self.assertTrue(audio.chunks.empty())
+
     def test_native_audio_batch_copies_core_owned_buffer(self):
         audio = AudioSink()
         samples = (C.c_int16 * 4)(1, 2, 3, 4)
