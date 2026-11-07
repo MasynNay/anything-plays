@@ -21,6 +21,11 @@ class ExternalBackendMixin:
         """Select a 3D renderer without disturbing other console settings."""
         if self.system_key.get() != system:
             return
+        if not getattr(self, "external_fallback_enabled", False):
+            # External launchers are not an acceptable user-facing fallback:
+            # select the packaged core even if old test preferences said no.
+            self.n64_embedded.set(True)
+            self.gamecube_embedded.set(True)
         self.stop_controls()
         self.unload_rom()
         if not self.uses_embedded_emulator() and self.view_mode.get() == "Game only":
@@ -50,7 +55,8 @@ class ExternalBackendMixin:
 
     def update_external_setup(self):
         backend = SYSTEMS[self.system_key.get()].backend
-        if self.system_key.get() == "n64":
+        if (self.system_key.get() == "n64" and
+                getattr(self, "external_fallback_enabled", False)):
             self.n64_mode_row.pack(fill="x", pady=(0, 6))
             self.system_description.configure(
                 text="Nintendo 64 · Built-in test"
@@ -59,7 +65,8 @@ class ExternalBackendMixin:
             )
         else:
             self.n64_mode_row.pack_forget()
-        if self.system_key.get() == "gamecube":
+        if (self.system_key.get() == "gamecube" and
+                getattr(self, "external_fallback_enabled", False)):
             self.gamecube_mode_row.pack(fill="x", pady=(0, 6))
             self.system_description.configure(
                 text="Nintendo GameCube · Built-in software test"
@@ -68,6 +75,17 @@ class ExternalBackendMixin:
             )
         else:
             self.gamecube_mode_row.pack_forget()
+        if (not getattr(self, "external_fallback_enabled", False)
+                and backend in ("retroarch", "dolphin")):
+            # This can only happen with a corrupt test preference or a
+            # developer forcibly changing a Tk value. Never ask a regular
+            # player to locate another executable.
+            self.n64_embedded.set(True)
+            self.gamecube_embedded.set(True)
+            self.external_setup.pack_forget()
+            self.arm_button.configure(state="normal", text="Enable object controls")
+            self.shortcuts_button.configure(state="normal")
+            return
         if self.uses_embedded_emulator():
             self.arm_button.configure(state="normal", text="Enable object controls")
             self.shortcuts_button.configure(state="normal")
