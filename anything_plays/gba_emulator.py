@@ -269,6 +269,7 @@ class CoreSession:
                 av.timing.fps if 20 < av.timing.fps < 240 else 59.7275
             )
             self.audio.start(av.timing.sample_rate)
+            self.emulator.audio_warning = getattr(self.audio, "output_error", None)
             self.save_ram = SaveRAM(
                 self.rom, self.native.memory_data, self.native.memory_size
             )
@@ -320,6 +321,7 @@ class Emulator:
         self.armed = False
         self.error = None
         self.save_warning = None
+        self.audio_warning = None
         self.frame = None
         self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
@@ -345,6 +347,7 @@ class Emulator:
         self.rom = str(rom)
         self.error = None
         self.save_warning = None
+        self.audio_warning = None
         self.stop_event.clear()
         with self.lock:
             self.frame = None

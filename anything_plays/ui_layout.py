@@ -23,7 +23,7 @@ class LayoutMixin:
         ttk.Combobox(theme_row, textvariable=self.theme_name, state='readonly',
                      values=list(self.THEMES), width=17).pack(side='left')
         self.theme_name.trace_add('write', self.select_theme)
-        ttk.Label(main, text='A little world where movement becomes play  •  Camera tracking  •  Classic consoles and 3D launcher', style='Subtitle.TLabel').pack(anchor='w', pady=(2, 16))
+        ttk.Label(main, text='A little world where movement becomes play  •  Camera tracking  •  Classic consoles and optional in-app emulators', style='Subtitle.TLabel').pack(anchor='w', pady=(2, 16))
         body = ttk.Panedwindow(main, orient='horizontal')
         body.pack(fill='both', expand=True)
         # Each pane scrolls independently. Large controls never get clipped by

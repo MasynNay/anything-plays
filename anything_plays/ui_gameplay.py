@@ -167,6 +167,12 @@ class GameplayMixin:
                 self.game_status.set(self.emu.save_warning)
                 self._save_warning_until = time.monotonic() + 20
                 self.emu.save_warning = None
+            elif getattr(self.emu, "audio_warning", None):
+                # Native audio output errors must be visible in packaged GUI
+                # builds where users cannot read a terminal log.
+                self.game_status.set("Audio unavailable: " + self.emu.audio_warning)
+                self._save_warning_until = time.monotonic() + 20
+                self.emu.audio_warning = None
             elif self.emu.running:
                 if (self.current_rom and
                         time.monotonic() >= getattr(self, "_save_warning_until", 0)):

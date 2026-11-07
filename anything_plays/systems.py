@@ -37,7 +37,7 @@ SYSTEMS = {
     "ngpc": System("ngpc", "Neo Geo Pocket Color", "mednafen_ngp", (".ngc", ".ngpc")),
     "ws": System("ws", "WonderSwan", "mednafen_wswan", (".ws",)),
     "wsc": System("wsc", "WonderSwan Color", "mednafen_wswan", (".wsc",)),
-    "n64": System("n64", "Nintendo 64 (RetroArch)", "mupen64plus_next", (".n64", ".z64", ".v64"), "retroarch"),
+    "n64": System("n64", "Nintendo 64", "mupen64plus_next", (".n64", ".z64", ".v64"), "retroarch"),
     "gamecube": System(
         "gamecube", "Nintendo GameCube", "dolphin",
         # Dolphin Libretro also supports homebrew .dol/.elf, TGC, WIA and

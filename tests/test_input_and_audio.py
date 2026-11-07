@@ -81,6 +81,25 @@ class AudioBufferTests(unittest.TestCase):
             32 * 256 * 2 * np.dtype(np.int16).itemsize,
         )
 
+    def test_missing_audio_backend_is_reported_to_game(self):
+        from unittest.mock import patch
+        with patch("anything_plays.libretro_audio.sd", None):
+            audio = AudioSink()
+            audio.start(44100)
+        self.assertFalse(audio.output_active)
+        self.assertIn("audio backend", audio.output_error)
+        audio.close()
+
+    def test_device_failure_is_not_silently_treated_as_sound(self):
+        from unittest.mock import Mock, patch
+        fake = Mock()
+        fake.OutputStream.side_effect = RuntimeError("device missing")
+        with patch("anything_plays.libretro_audio.sd", fake):
+            audio = AudioSink()
+            audio.start(48000)
+        self.assertFalse(audio.output_active)
+        self.assertIn("device missing", audio.output_error)
+
     def test_malformed_native_audio_count_is_ignored_before_pointer_read(self):
         from anything_plays.libretro_audio import MAX_AUDIO_BATCH_FRAMES
         audio = AudioSink()

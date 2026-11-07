@@ -35,6 +35,10 @@ jobs:
               if (run["name"] == "Anything Plays 2.1 unified TEST build"
                   and str(run["id"]) != current
                   and run["status"] in ("queued", "in_progress", "waiting", "requested")):
+                  message = ((run.get("head_commit") or {}).get("message") or "")
+                  if message.startswith("native(dolphin)"):
+                      print("Preserving long GameCube native experiment", run["id"])
+                      continue
                   subprocess.run(
                       ["gh", "api", "-X", "POST",
                        f"repos/{repo}/actions/runs/{run['id']}/cancel"],

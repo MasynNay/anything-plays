@@ -1,8 +1,10 @@
 # In-app emulator core updates — 2.1 engineering contract
 
-Anything Plays ships usable emulator core binaries **inside** every supported
-desktop installer. Users never need to install RetroArch, Dolphin, or another
-emulator application, and they can continue playing offline.
+Anything Plays 2.1 ships **mGBA (GB/GBC/GBA)** inside the small starter
+installer. Other systems use verified, manually approved core packs downloaded
+from **within** the app; once installed they work offline. Users never need
+to install RetroArch, Dolphin or another emulator application. GameCube
+remains unavailable for one-click install until native rendering is verified.
 
 ## What the buttons do
 

@@ -31,6 +31,8 @@ class AudioSink:
         self.pending = np.empty((0, 2), dtype=np.int16)
         self.position = 0
         self.stream = None
+        self.output_error = None
+        self.output_active = False
         # Some Libretro cores send individual samples instead of batches.
         # Avoid creating 44,100 NumPy arrays / queue entries per second.
         self._single_samples = np.empty(
@@ -101,10 +103,14 @@ class AudioSink:
             self.position += count
 
     def start(self, sample_rate):
+        self.output_error = None
+        self.output_active = False
         if sd is None:
-            print("Audio unavailable: sounddevice not installed", file=sys.stderr)
+            self.output_error = "PortAudio or the audio backend is unavailable"
+            print("Audio unavailable: " + self.output_error, file=sys.stderr)
             return
         if not (8_000 <= sample_rate <= 192_000):
+            self.output_error = "Emulator reported an invalid sample rate"
             return
         try:
             self.stream = sd.OutputStream(
@@ -112,12 +118,15 @@ class AudioSink:
                 dtype="int16", blocksize=1024, callback=self.callback,
             )
             self.stream.start()
+            self.output_active = True
         except Exception as exc:
-            print(f"Audio output unavailable: {exc}", file=sys.stderr)
+            self.output_error = "No usable audio output device: " + str(exc)[:110]
+            print("Audio output unavailable: " + str(exc), file=sys.stderr)
             self.close()
 
     def close(self):
         self._flush_single_samples()
+        self.output_active = False
         stream, self.stream = self.stream, None
         if stream is not None:
             try:
