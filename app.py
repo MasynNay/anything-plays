@@ -6,6 +6,7 @@ the layout or migrating a user's settings. No OS-level keyboard injection occurs
 """
 
 import copy
+import os
 import sys
 import tkinter as tk
 
@@ -73,14 +74,19 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.n64_core_override = preferences.get('n64_core_path', '')
         if not isinstance(self.n64_core_override, str):
             self.n64_core_override = ''
-        # The 2.1 alpha can try bundled ParaLLEl-N64 software video in the
-        # actual Tk game panel. This is experimental and user-selectable.
-        self.n64_embedded = tk.BooleanVar(value=preferences.get('n64_embedded', True) is True)
-        # GameCube also has a CPU video mode. Keep it independent of N64
-        # so a 3D console can be safely switched without affecting others.
-        self.gamecube_embedded = tk.BooleanVar(
-            value=preferences.get('gamecube_embedded', True) is True
+        # Players need a single self-contained game window. External
+        # launchers remain an opt-in diagnostic for developers only.
+        self.external_fallback_enabled = (
+            os.environ.get("AP_V21_DEVELOPER_EXTERNAL", "") == "1"
         )
+        self.n64_embedded = tk.BooleanVar(value=(
+            preferences.get("n64_embedded", True) is True
+            if self.external_fallback_enabled else True
+        ))
+        self.gamecube_embedded = tk.BooleanVar(value=(
+            preferences.get("gamecube_embedded", True) is True
+            if self.external_fallback_enabled else True
+        ))
         self.external_process = None
         self.external_input = None  # Local camera/keyboard bridge for N64
         self._game_only_window = None
