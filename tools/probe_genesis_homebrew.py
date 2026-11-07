@@ -150,7 +150,6 @@ def _parent(core, report, seconds, *, debugger=False):
             )
             preview = report_child.with_name("genesis-homebrew-frame.png")
             if preview.is_file():
-                import shutil
                 shutil.copyfile(preview, report.with_name(preview.name))
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
