@@ -228,6 +228,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 21
 
+  core-pack-cross-platform-tests:
+    # Verify the in-app updater's path, hash, rollback and approval gates on
+    # native Windows and both Mac architectures. Linux runs these tests in
+    # source-and-gui. This job downloads NO runnable emulator binary.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify approved core-pack installation and rollback off-line
+        run: |
+          python -m unittest discover -s tests -p "test_v21_core*.py" -v
+          python -m unittest discover -s tests -p "test_v21_create_core_packs.py" -v
+
   n64-homebrew-playback:
     # Independent playable-video evidence using Unlicensed/public-domain ROM;
     # never include the fixture or download it in a player installation.

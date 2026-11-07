@@ -35,7 +35,7 @@ DISPLAY_NAMES = {
     "mgba": "Game Boy / GBC / GBA · mGBA",
     "snes9x": "Super Nintendo · Snes9x",
     "fceumm": "NES · FCEUmm",
-    "genesis_plus_gx": "Genesis · Genesis Plus GX",
+    "genesis_plus_gx": "Genesis / Master System / Game Gear / SG-1000 · Genesis Plus GX",
     "parallel_n64": "Nintendo 64 · ParaLLEl-N64 (test core)",
     "dolphin": "GameCube · Dolphin Libretro (experimental)",
     "stella2014": "Atari 2600 · Stella 2014",

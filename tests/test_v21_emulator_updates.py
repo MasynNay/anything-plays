@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import unittest
 
 from anything_plays.emulator_updates import (
@@ -112,6 +112,21 @@ class EmulatorUpdaterTests(unittest.TestCase):
             self.assertEqual(dolphin["status"], "current-source")
             self.assertIn("libretro/dolphin", dolphin["repository"])
             self.assertFalse(report["updates_install_automatically"])
+
+    def test_approved_managed_core_is_reported_instead_of_old_bundle(self):
+        with TemporaryDirectory() as tmp:
+            self._bundle(tmp, version="aaaaaaa")
+            with patch("anything_plays.core_packs.managed_core_path",
+                       return_value="/vetted/mgba_libretro.so"), patch(
+                "anything_plays.core_packs.managed_core_release",
+                return_value="v2.1.0-alpha.2"
+            ):
+                report = check_emulator_updates([tmp], online=False)
+            item = next(i for i in report["cores"] if i["key"] == "mgba")
+            self.assertEqual(item["status"], "managed-release")
+            self.assertEqual(item["installed_from"], "approved-core-pack")
+            self.assertEqual(item["installed_version"], "v2.1.0-alpha.2")
+            self.assertIn("approved", summary_text(report).lower())
 
     def test_tampered_bundle_is_reported_not_overwritten(self):
         with TemporaryDirectory() as tmp:

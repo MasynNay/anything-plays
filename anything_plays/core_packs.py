@@ -364,3 +364,17 @@ def installed_pack_revision(name, *, root=None):
         return active.get("asset_sha256") if managed_core_path(name, root=root) and isinstance(active, dict) else None
     except (ValueError, OSError):
         return None
+
+
+def managed_core_release(name, *, root=None):
+    """Display the actual approved core-pack release instead of bundle metadata."""
+    root = Path(root) if root is not None else managed_core_root()
+    try:
+        active = _load_state(root)["active"].get(name)
+        if not isinstance(active, dict) or not managed_core_path(name, root=root):
+            return None
+        tag = active.get("release")
+        return tag if isinstance(tag, str) and RELEASE_TAG_RE.fullmatch(tag) else None
+    except (OSError, ValueError):
+        return None
+

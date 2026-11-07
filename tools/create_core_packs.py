@@ -46,7 +46,11 @@ def create_candidate_packs(cores_dir: Path, output_dir: Path, tag: str,
         for row in provenance["cores"]
         if isinstance(row, dict) and row.get("name") in UPSTREAM_REPOS
     }
-    names = list(selected) if selected is not None else list(records)
+    # GameCube remains a paired-core-and-Sys full-app update. Do not
+    # accidentally make the default all-core candidate command fail or
+    # generate a core-only package that cannot boot.
+    names = (list(selected) if selected is not None
+             else [name for name in records if name != "dolphin"])
     if not names or len(set(names)) != len(names):
         raise ValueError("Select distinct, vetted native cores")
     output_dir.mkdir(parents=True, exist_ok=True)
