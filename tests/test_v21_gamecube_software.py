@@ -28,6 +28,9 @@ class DolphinInPanelTests(unittest.TestCase):
         variable.key = b"dolphin_renderer"
         self.assertTrue(options.environment(15, C.addressof(variable)))
         self.assertEqual(variable.value, b"Software")
+        resolution = RetroVariable(b"dolphin_efb_scale", None)
+        self.assertTrue(options.environment(15, C.addressof(resolution)))
+        self.assertEqual(resolution.value, b"1")
         self.assertFalse(options.environment(14, None))
         # Never call addressof() on an inline temporary: once argument
         # evaluation ends, CPython may free that native structure before

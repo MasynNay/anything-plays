@@ -2,6 +2,7 @@
 
 import ctypes as C
 import unittest
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -43,6 +44,17 @@ class VideoDecoderTests(unittest.TestCase):
         raw[0] = bytes([0])
         # Decoder must own the frame, not refer to Dolphin's reused pointer.
         self.assertEqual(frame[0, 0].tolist(), [250, 12, 34])
+
+    def test_hardware_framebuffer_marker_is_never_dereferenced(self):
+        # Libretro's -1 pointer sentinel means the frame lives on the GPU.
+        # It must not be used as a CPU memory address, even on a malformed
+        # mixed hardware/software core request.
+        sentinel = C.c_void_p(-1)
+        with patch("anything_plays.libretro_video.C.string_at",
+                   side_effect=AssertionError("Do not read GPU framebuffer")):
+            self.assertIsNone(decode_frame(sentinel, 640, 528, 2560, XRGB8888))
+            self.assertIsNone(decode_frame(sentinel.value, 640, 528, 2560,
+                                           SOFTWARE_RGBA8888))
 
     def test_giant_native_frame_is_rejected_before_reading_pointer(self):
         # This tiny pointer must never be read as a 128 MB framebuffer.

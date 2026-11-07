@@ -1,7 +1,7 @@
 """Experimental single-window GameCube software-rendering Libretro backend.
 
 Dolphin's Libretro core includes a Software Renderer that emits ordinary
-CPU-owned XRGB video frames through retro_video_refresh_t. Unlike Dolphin's
+CPU-owned RGBA video frames through retro_video_refresh_t. Unlike Dolphin's
 default Hardware renderer, this mode does not require SET_HW_RENDER, so it can
 use Anything Plays' existing game canvas and camera overlays.
 
@@ -24,7 +24,7 @@ from anything_plays.core_locator import _library_extension, _search_directories
 # Keeping settings minimal avoids overriding game-specific configurations.
 SOFTWARE_OPTIONS = {
     b"dolphin_renderer": b"Software",
-    b"dolphin_efb_scale": b"x1 (640 x 528)",
+    b"dolphin_efb_scale": b"1",
 }
 
 # From DolphinLibretro/Input.cpp's GameCube RetroPad port map:

@@ -19,6 +19,7 @@ RGB565 = 2
 SOFTWARE_RGBA8888 = 3
 SUPPORTED_FORMATS = (RGB1555, XRGB8888, RGB565)
 MAX_FRAME_BYTES = 64 * 1024 * 1024  # Bound a malformed core's frame allocation.
+RETRO_HW_FRAME_BUFFER_VALID = C.c_void_p(-1).value
 
 
 def decode_frame(buffer, width, height, pitch, pixel_format):
@@ -27,7 +28,14 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
     An empty frame is signaled by ``None``. Invalid pitch/format combinations
     raise ``ValueError`` so tests and callers can detect malformed buffers.
     """
-    if not buffer or width <= 0 or height <= 0:
+    # Never dereference the reserved Libretro hardware framebuffer sentinel.
+    # Software-only rendering may still receive it if a native core ignores
+    # graphics negotiation, and ctypes.string_at(-1) crashes the process.
+    if isinstance(buffer, C.c_void_p):
+        buffer = buffer.value
+    if not buffer or buffer == RETRO_HW_FRAME_BUFFER_VALID:
+        return None
+    if width <= 0 or height <= 0:
         return None
     if pixel_format not in (*SUPPORTED_FORMATS, SOFTWARE_RGBA8888):
         raise ValueError(f"Unsupported Libretro pixel format: {pixel_format}")
