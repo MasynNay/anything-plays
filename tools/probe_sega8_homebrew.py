@@ -20,7 +20,9 @@ import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.sega8_homebrew_fixture import SYSTEMS, write_sega8_probe
+from tools.sega8_homebrew_fixture import SYSTEMS as SMS_GG_SYSTEMS, write_sega8_probe
+from tools.sg1000_homebrew_fixture import write_sg1000_probe
+SYSTEMS = (*SMS_GG_SYSTEMS, "sg1000")
 from tools.probe_nes_homebrew import ObservedAudio
 
 
@@ -107,9 +109,13 @@ def _parent(system, core, report, seconds):
             raise FileNotFoundError("Missing native Genesis Plus GX core")
         with tempfile.TemporaryDirectory(prefix="anything-plays-sega8-") as tmp:
             root = Path(tmp)
-            suffix = ".gg" if system == "gamegear" else ".sms"
+            suffix = { "gamegear": ".gg", "mastersystem": ".sms",
+                       "sg1000": ".sg" }[system]
             rom = root / ("original-sega8" + suffix)
-            result["fixture"] = write_sega8_probe(rom, system)
+            result["fixture"] = (
+                write_sg1000_probe(rom) if system == "sg1000"
+                else write_sega8_probe(rom, system)
+            )
             child_report = root / "child.json"
             command = [
                 sys.executable, str(Path(__file__).resolve()), "--child",

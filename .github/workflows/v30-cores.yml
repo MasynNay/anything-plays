@@ -123,8 +123,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        system: [mastersystem, gamegear]
-    runs-on: ubuntu-24.04
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: mastersystem}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: gamegear}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: sg1000}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: mastersystem}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: gamegear}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: sg1000}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: mastersystem}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: gamegear}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: sg1000}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: mastersystem}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: gamegear}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: sg1000}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 14
     env:
       AP_V30_TEST_CORES: '1'
@@ -133,20 +145,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install Linux audio and render dependencies
+      - name: Install Linux native library requirements
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
       - name: Retrieve pinned Genesis Plus GX test core
         run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
       - name: Require original Sega 8-bit graphics and native PSG audio
         run: |
-          python tools/probe_sega8_homebrew.py --system ${{ matrix.system }} --core cores/genesis_plus_gx_libretro.so --seconds 8 --report test-evidence/${{ matrix.system }}-original-video-audio.json
+          python tools/probe_sega8_homebrew.py --system ${{ matrix.system }} --core cores/genesis_plus_gx_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-video-audio.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-${{ matrix.system }}-video-audio
+          name: AnythingPlays-3.0-original-${{ matrix.system }}-${{ matrix.target }}-video-audio
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
