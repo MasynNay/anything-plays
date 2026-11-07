@@ -626,3 +626,41 @@ jobs:
             test-evidence/nes-test-frame.png
           if-no-files-found: warn
           retention-days: 14
+
+  atari2600-video-audio-original-homebrew:
+    # Test independent Stella 2014 core with original TIA/6507 ROM generated
+    # from our own source; require distinct frames and nonzero native PCM.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless camera audio and renderer prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve standalone Stella 2014 optional core for test only
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('stella2014')"
+      - name: Verify original Atari 2600 changing video and generated TIA PCM
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_atari_homebrew.py \
+            --core cores/stella2014_libretro.so --seconds 8 \
+            --report test-evidence/atari-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-original-Atari-video-audio-evidence
+          path: |
+            test-evidence/atari-video-audio.json
+            test-evidence/atari-test-frame.png
+          if-no-files-found: warn
+          retention-days: 14
