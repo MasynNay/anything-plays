@@ -143,13 +143,13 @@ class CoreSession:
         # Every ROM needs a unique user-writable directory or two different
         # games with the same filename can silently overwrite progress.
         # Dolphin keeps its independent user save directory and Sys files.
-        if system in ("ngp", "ngpc"):
-            save_folder = native_core_save_directory(self.rom, system)
-        else:
-            save_folder = (Path.home() / ".config" / "anything-plays-30-preview" /
-                           "gamecube-saves")
         if system in ("gamecube", "ngp", "ngpc"):
+            save_folder = native_core_save_directory(self.rom, system)
             save_folder.mkdir(parents=True, exist_ok=True)
+        else:
+            # Unused by generic SRAM-only cores. The native environment
+            # callback continues to point their save request at system_dir.
+            save_folder = Path.home() / ".config" / "anything-plays"
         self._save_dir_buffer = C.create_string_buffer(
             os.fsencode(str(save_folder))
         )
