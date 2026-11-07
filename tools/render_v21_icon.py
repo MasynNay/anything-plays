@@ -11,11 +11,16 @@ The generated files live under build/v21-icon/, which is already temporary
 build output. No files in assets/ or stable v2.0 are overwritten.
 """
 from pathlib import Path
+import sys
 
 from PIL import Image
-from anything_plays.icon_cleanup import clean_icon_background
 
+# Build scripts execute this file directly, not with python -m; make the
+# checkout root importable before loading the original-icon cleanup helper.
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from anything_plays.icon_cleanup import clean_icon_background
 SOURCE = ROOT / "assets" / "anything_plays_v21.webp"
 OUTPUT = ROOT / "build" / "v21-icon"
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
