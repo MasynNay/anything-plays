@@ -56,7 +56,7 @@ webcams, GPU drivers, audio devices, or macOS Gatekeeper.
 | NES | Yes | FCEUmm in alpha | Yes | Needs expanded real-game QA |
 | Genesis | Yes | Genesis Plus GX in alpha | Yes | Needs expanded real-game QA |
 | N64 | **Experimental** Angrylion software video | ParaLLEl-N64 in alpha | Analog/digital in app | Physical-hardware validation outstanding |
-| GameCube | **No**; external Dolphin GPU window | **No** | Pipe bridge on macOS/Linux | **Does not meet 2.1 release goal** |
+| GameCube | **Experimental** Dolphin CPU renderer in app | Dolphin core and Sys staged in alpha | In-app RetroPad mapping | **Native gameplay/performance unverified; release blocked** |
 
 ### Native embedded N64
 
@@ -71,7 +71,15 @@ camera buttons, analog range, audio, SRAM persistence, resizing, game-only
 mode, stop/restart and expected performance on Apple Silicon, Intel,
 Windows and Linux.
 
-### GameCube GPU-host blocker
+### GameCube native renderer and GPU-host blocker
+
+The alpha now stages Dolphin Libretro and its Sys assets, and attempts an
+in-panel CPU renderer. The pinned native patch removes a software-renderer
+dependency on a separate OpenGL window. It still must compile successfully
+and demonstrate nonblank homebrew frames at minimally usable speed.
+The native CI job retains build logs on compilation failure and records
+separate frame-validity and frame-rate evidence. No success is assumed
+from the presence of a binary alone.
 
 Dolphin's accelerated renderer requires an owned OpenGL/Vulkan/Metal graphics
 context and video presentation into the app. A Libretro core that requests a
