@@ -310,7 +310,7 @@ jobs:
     # Research-only Linux frontend: hidden EGL core GL context + FBO readback.
     # Tests the already bundled *unmodified* Dolphin Libretro core. Never
     # silently toggles real player settings or publishes experimental cores.
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(gl)') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(gl)') || contains(github.event.head_commit.message, 'fix(dolphin)') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
