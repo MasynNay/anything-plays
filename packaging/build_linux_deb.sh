@@ -39,6 +39,17 @@ if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
   cp -R cores/dolphin-emu dist/AnythingPlays/cores/
   cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays/cores/
+  # REAL Linux startup regression: upstream Sys archive's dolphin-emu/
+  # directory can have mode 2700. With dpkg --root-owner-group this becomes
+  # root-only, so choosing GameCube as the saved profile crashes the entire
+  # app at startup (even before a ROM is played). Reset directory traverse
+  # permissions explicitly; GNU chmod 0755 *preserves* a directory's setgid
+  # bit, hence the deliberate symbolic g-s. Never make Sys files writable to
+  # all users or alter the original source downloaded into cores/.
+  find dist/AnythingPlays/cores/dolphin-emu -type d \
+    -exec chmod u=rwx,g=rx,o=rx,g-s {} +
+  find dist/AnythingPlays/cores/dolphin-emu -type f \
+    -exec chmod u=rw,g=r,o=r {} +
 fi
 
 # Include project and third-party licensing documentation.
@@ -138,6 +149,31 @@ assert all(not (root/p).exists() for p in EXCLUDED_RELATIVE_FILES)
 assert not list(root.glob("_internal/python3.13/lib-dynload/readline*.so"))
 print("Validated clean Linux installed payload without redundant audio system libraries")
 PY
+# CI and local builds must reject a Debian package that an ordinary user
+# cannot traverse. stat() is enough to check root-owned package mode bits
+# without needing to grant sudo or read any private user files.
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+  python3 - "$AUDIT_DIR/opt/anything-plays-30-preview/cores/dolphin-emu" <<'PY'
+from pathlib import Path
+import stat
+import sys
+root = Path(sys.argv[1])
+directories = [root, *(p for p in root.rglob("*") if p.is_dir())]
+files = [p for p in root.rglob("*") if p.is_file()]
+assert directories and files, "Dolphin Sys missing"
+for path in directories:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert (mode & 0o005) == 0o005, (
+        f"Root-owned Dolphin Sys directory is not public-traversable: {path} {mode:o}"
+    )
+    assert (mode & 0o2000) == 0, f"Unexpected setgid Dolphin Sys dir: {path}"
+for path in files:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    assert mode & 0o004, f"Bundled Sys file cannot be read: {path} {mode:o}"
+assert (root / "Sys" / "codehandler.bin").stat().st_size > 0
+print("Verified installed root-owned Dolphin Sys is readable/traversable")
+PY
+fi
 rm -rf "$AUDIT_DIR"
 trap - EXIT
 echo "Created release/anything-plays-preview_${VERSION}_${ARCH}.deb"
