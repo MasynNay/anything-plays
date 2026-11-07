@@ -53,3 +53,20 @@ source and license audit, clean installation, macOS signing/notarization
 as applicable, and verified download hashes.
 
 The 3.0 preview is **not** a release authorization.
+
+## Enforced clean-assets staging
+
+When 3.0 is actually approved, collect the four signed/validated production
+installers in a separate input directory and run:
+
+\`\`\`bash
+python tools/stage_v30_release_assets.py \
+  --version 3.0.0 --input release/candidates \
+  --output release/public-3.0.0
+\`\`\`
+
+This produces **exactly four installers and SHA256SUMS.txt**. It refuses
+missing, empty, symlinked, stale 2.0 or unexpected extra installer files;
+it deliberately excludes all emulator-pack ZIPs, diagnostics and unrelated
+technical assets. The script **does not publish or authorize** a release.
+The required source/license information is documented and linked separately.
