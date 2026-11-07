@@ -6,11 +6,35 @@ between versions does not lose existing game progress.
 
 import ctypes as C
 import hashlib
+import os
 from pathlib import Path
+import re
+import sys
 
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
 MAX_SAVE_RAM_BYTES = 64 * 1024 * 1024
+
+
+def _user_save_directory():
+    """Use a user-writable data directory, not the application's install."""
+    if sys.platform == "win32":
+        root = os.environ.get("APPDATA")
+        base = Path(root) if root else Path.home() / "AppData" / "Roaming"
+        return base / "AnythingPlays" / "Saves"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "AnythingPlays" / "Saves"
+    root = os.environ.get("XDG_DATA_HOME")
+    base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local" / "share"
+    return base / "anything-plays" / "saves"
+
+
+def _fallback_path(rom_path):
+    rom = Path(rom_path).resolve()
+    key = str(rom).casefold() if sys.platform == "win32" else str(rom)
+    digest = hashlib.sha256(os.fsencode(key)).hexdigest()[:20]
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "_", rom.stem).strip("_")[:48] or "game"
+    return _user_save_directory() / (stem + "-" + digest + ".sav")
 
 
 class SaveRAM:
@@ -18,6 +42,8 @@ class SaveRAM:
 
     def __init__(self, rom_path, get_data, get_size):
         self.path = Path(rom_path).with_suffix(".sav")
+        self.legacy_path = self.path
+        self.fallback_path = _fallback_path(rom_path)
         self.get_data = get_data
         self.get_size = get_size
         # A fixed-size digest prevents unbounded snapshot history and avoids
@@ -35,6 +61,10 @@ class SaveRAM:
 
     def restore(self):
         pointer, size = self._memory()
+        # Once the read-only ROM library has a newer user-owned save,
+        # never replace it by an older legacy file from beside the ROM.
+        if pointer and size and self.fallback_path.is_file():
+            self.path = self.fallback_path
         if pointer and size and self.path.is_file():
             # Read only as much as this core can hold, plus one byte to
             # detect oversized/partial legacy saves. A corrupt multi-GB save
@@ -67,8 +97,33 @@ class SaveRAM:
         digest = hashlib.blake2b(snapshot, digest_size=16).digest()
         if digest == self._last_saved_digest and self.path.is_file():
             return False
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_bytes(snapshot)
-        temporary.replace(self.path)
+        destination = self.path
+        try:
+            self._write_atomic(destination, snapshot,
+                               create_directory=(destination == self.fallback_path))
+        except OSError:
+            if destination == self.fallback_path:
+                raise
+            destination = self.fallback_path
+            self._write_atomic(destination, snapshot, create_directory=True)
+        self.path = destination
         self._last_saved_digest = digest
         return True
+
+    @staticmethod
+    def _write_atomic(destination, snapshot, *, create_directory):
+        if create_directory:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+        elif not destination.parent.is_dir():
+            # Do not accidentally recreate an unplugged removable ROM mount.
+            raise FileNotFoundError("The ROM directory is unavailable")
+        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        try:
+            temporary.write_bytes(snapshot)
+            temporary.replace(destination)
+        finally:
+            # Failure cannot clobber the previous save or leave a partial tmp.
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass

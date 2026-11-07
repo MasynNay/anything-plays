@@ -36,9 +36,12 @@ Linux x64, macOS Intel x64 and macOS Apple Silicon**:
 | Sega Genesis/Mega Drive | Genesis Plus GX | Four-platform workflow `42352993417` |
 | Sega Master System, Game Gear, SG-1000 | Genesis Plus GX | Four-platform workflow `42379035447` |
 | Atari 2600 | Stella 2014 | Four-platform workflow `42349568501` |
+| Atari 7800 | ProSystem | Four-platform workflow `42382893807` |
+| PC Engine (HuCard) | Mednafen PCE Fast | Four-platform workflow `42382893807` |
+| WonderSwan, WonderSwan Color | Mednafen WonderSwan | Four-platform workflow `42382893807` |
 | Nintendo 64 | ParaLLEl-N64, embedded software video | Four-platform workflow `42349568501` |
 
-**11 of 18** profiles have this level of cross-platform original ROM A/V
+**15 of 18** profiles have this level of cross-platform original ROM A/V
 verification. Tests typically last 8–20 seconds per profile. They are
 **not** evidence that every retail game runs, that physical speakers/cameras
 work, that all save formats persist, or that each device stays stable for days.
@@ -46,17 +49,19 @@ Sources are test-only original assembly/code generators under `tools/`.
 Never ship the generated test ROMs to users.
 
 The profiles **without comparable original playback verification on all four
-targets** remain: Atari 7800, PC Engine/TurboGrafx-16 (HuCard), Neo Geo Pocket,
-Neo Geo Pocket Color, WonderSwan, WonderSwan Color, **and GameCube**.
+targets** remain: **Neo Geo Pocket, Neo Geo Pocket Color, and GameCube**.
+The two MIT-licensed NeoPop homebrew tests are pinned and CI-only; workflow
+`42383623857` was queued at the time of this handoff. Do not call them passed
+until their native RGB **and PCM** job-level tests succeed.
 
 ## Longevity and native lifecycle validation
 
-- **120 native Libretro start/stop and console-switch cycles PASS**, all in
-  **one process**, testing ten profiles and five emulator engines. All started
+- **132 native Libretro start/stop and console-switch cycles PASS**, all in
+  **one process**, testing eleven profiles and six emulator engines. All started
   original homebrew and produced a video frame, manual/camera input pulses
   were issued, no stuck Python emulator workers or controller state remained,
-  and RSS grew only **0.94 MiB** after the first full cycle. Workflow
-  `42380030470`, job `native-ten-console-lifecycle-soak`. Runner: Linux.
+  and RSS grew only **0.76 MiB** after the first full cycle. Workflow
+  `42381687786`, job `native-eleven-console-lifecycle-soak`. Runner: Linux.
 - **15-minute synthetic camera/video/Tk GUI endurance PASS** under Xvfb.
   Bounded canvas items, scheduled timers, and RSS growth. Workflow
   `42378515296`, job `gui-15-minute-soak`. This is not physical camera QA.
@@ -111,6 +116,10 @@ experimental CPU-only GameCube renderer.
   CI previews*. **Never represent those artifacts as complete 3.0
   installers.** Only the full-bundle lab represents the intended package
   layout, and those lab binaries are deliberately not published.
+- Legacy `ROM-name.sav` game progress is still supported. On read-only,
+  disconnected or restricted ROM libraries, SRAM saves automatically fall back
+  to a user-owned per-game path, with collision-resistant names and atomic
+  writes. The latest fallback copy wins over a stale legacy save.
 - Main 3.0 UI no longer offers **Download emulator** for missing cores.
   Missing core files are treated as a damaged/incomplete package with repair
   instructions. Approved in-app updates and rollbacks remain separate.
@@ -124,9 +133,8 @@ experimental CPU-only GameCube renderer.
 
 ## Next engineering steps, in order
 
-1. **Close the remaining seven native-playback coverage gaps** with original
-   self-generated legal test ROMs (preferred), rigorous video/audio evidence
-   and cross-platform native cores. Add manual input and save/restore checks
+1. **Close Neo Geo Pocket and Neo Geo Pocket Color cross-platform playback evidence** with original
+   rigorously pinned legal homebrew, real video and PCM on all platforms. Add manual input and save/restore checks
    for each platform, not just test ROM startup.
 2. **Fix/verify GameCube on actual Windows GPU hardware and Intel Mac.** Keep
    test evidence and performance thresholds honest. Add long native soaks
