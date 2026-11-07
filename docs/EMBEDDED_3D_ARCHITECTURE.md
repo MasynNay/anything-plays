@@ -14,9 +14,13 @@ launcher or a controller bridge as though it satisfies this requirement.
   Source, UI and synthetic tests pass. Real ROM startup, Apple Silicon
   compatibility, save integrity, latency and FPS are **not yet verified**.
   The external RetroArch launcher is a temporary fallback.
-- GameCube uses externally rendered Dolphin. The macOS/Linux controller
-  pipe provides experimental camera input but **does not embed game video**.
-  GameCube is **not release-ready** against the stated product requirement.
+- GameCube now has an experimental **in-panel Dolphin Libretro software
+  renderer**. The alpha downloader, build scripts and bundle verifier require
+  the Dolphin native core and its `dolphin-emu/Sys` data on each platform.
+  Its camera/keyboard inputs are routed through Libretro without a second
+  emulator process. **This proves integration code and package presence,
+  not real-game playability or acceptable frame rate.** The external
+  controller pipe is an optional developer fallback, not a release feature.
 
 ## GPU frontend required for hardware-rendered Libretro cores
 
@@ -83,6 +87,8 @@ initialization, game load, frame execution, and shutdown.
 - Dolphin project licensing and current platforms:
   https://dolphin-emu.org/docs/faq/
 
-**Status:** Architecture and acceptance gates are specified. The GPU host
-and in-panel GameCube rendering are not implemented. Source-only checks
-must never be presented as successful real-game hardware validation.
+**Status:** Both 3D consoles have experimental CPU-rendered in-panel
+Libretro paths. Software rendering may be prohibitively slow for GameCube.
+A native GPU host remains the required next architecture if performance or
+compatibility tests fail. No system is marked release-ready based only on
+source tests, native core downloads or successful installer checks.
