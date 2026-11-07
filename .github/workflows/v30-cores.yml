@@ -153,7 +153,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: AnythingPlays-3.0-original-Atari7800-MARIA-TIA-${{ matrix.target }}
+          name: AnythingPlays-3.0-original-Atari7800-MARIA-TIA-${{ matrix.target }}-${{ matrix.target }}
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
