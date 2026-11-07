@@ -616,3 +616,54 @@ Current downloads all correspond to the same QoL source revision:
 Apple Silicon `13583470513`, Intel Mac `13582134993`,
 Windows x64 `13582767985`, Linux x64 `13582509228`.
 They are developer test packages, NOT a GitHub release. Keep 2.0 stable.
+
+
+## November 7, 2026 — Virtual aquarium end-to-end simulated acceptance (NO real fish)
+
+**User context:** User does not currently have fish and requested actual simulation
+rather than being asked to test a physical aquarium.
+
+**Created and committed:**
+- `tests/simulate_aquarium.py` [commit `6cb8580`]: deterministic BGR
+  artificial pink and cyan moving "fish" processed through an actual
+  headless Tk `App` instance (Xvfb), `VirtualCamera.read()`,
+  `GameplayMixin.tick()`, `CameraMixin.draw_camera()`,
+  `Emulator.set_camera_buttons()`, `InputBuffer.before_frame()`
+  and `InputBuffer.state()`, exactly the game core's Libretro input
+  callback entrypoint. No patched/mock tracking decision and no synthetic
+  controller outcomes — the test asserts actual callback states.
+  Uses a temporary home for all preferences and no user files/camera.
+- `.github/workflows/v30-virtual-aquarium.yml` [commit `10db56c`]:
+  independent native Linux Xvfb GUI acceptance job, running on changes
+  to camera, tracking, UI, controller, profile and test sources. Uploads
+  JSON evidence to GitHub Actions for 30 days and fails on any unmet
+  assertion; does not require ROMs or third-party emulator apps.
+
+**Verified CI acceptance:**
+[Run `42402602944`](https://github.com/MasynNay/anything-plays/actions/runs/42402602944)
+at exact commit `10db56cd5b65161efd5f9b897b9b6ca816a2e388` concluded
+**SUCCESS**, with 34/34 actual UI-to-Libretro-callback assertions passed,
+zero exceptions/failures.
+[Download detailed JSON evidence](https://github.com/MasynNay/anything-plays/actions/runs/42402602944/artifacts/13585553166).
+
+Verified behaviors: multi-fish OFF by default (two same-colored fish
+cause only one control); opt-in same-color multi-fish presses A+B
+simultaneously; one shape leaves and B is released; all fish absent
+releases remaining buttons; Color 2 disabled never presses an extra
+button; independent Color 2 sharing Player 1 or controlling Player 2;
+Color 2 disable releases P2; classic pulse lasts exactly two emulated
+frames and expires even when a fish stays visible; held mode coexists
+with manual keyboard input; STOP immediately releases both camera
+controller ports while preserving manual P1 input; simulated camera
+disconnect disarms and clears all camera state; both GameCube and
+Nintendo 64 native input callbacks emit independent opposite-direction
+P1/P2 analog sticks with immediate STOP release; 100 camera simulation
+frames reuse one Tk camera canvas item and keep input queue bounded.
+
+**Scope boundary:** This *does not* use a physical aquarium, webcam driver,
+real fish with reflections/occlusion, real commercial or homebrew multiplayer
+game, real native 3D emulation loop, or physical controller/speaker. The
+Libretro input callback path is tested, but actual two-player *gameplay*
+with real aquarium lighting and camera exposure remains unverified.
+Passing simulation is strong integration evidence, not a substitute for
+physical compatibility QA. Stable 2.0 and main untouched.
