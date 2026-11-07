@@ -92,7 +92,43 @@ class GameplayMixin:
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
             return
         if backend == "libretro" and not self.emu.running:
-            messagebox.showinfo('Emulator required', 'Open a compatible ROM first. No system-wide keyboard fallback is available.')
+            worker = getattr(self.emu, "thread", None)
+            if (getattr(self.emu, "launching", False)
+                    and worker is not None and worker.is_alive()):
+                # A cold N64 boot may take several seconds. The earlier UI
+                # incorrectly said "no emulator" during this valid startup,
+                # misleading people into thinking they had broken the game.
+                if getattr(self, "_pending_object_controls", False):
+                    self.stop_controls()
+                else:
+                    self._pending_object_controls = True
+                    self.action.set(
+                        "Waiting for the game to start. Object controls "
+                        "will enable automatically when it is ready."
+                    )
+                    self.arm_button.config(text="Cancel pending object controls")
+                return
+            detail = getattr(self.emu, "last_error", None)
+            if detail:
+                self.game_status.set("Emulator launch failed: " + detail)
+                messagebox.showwarning(
+                    "Game did not start",
+                    "The emulator stopped during loading.\n\n"
+                    + detail[:350]
+                    + "\n\nUse Restart game to try again, or "
+                      "Restore previous / bundled in Emulator maintenance.",
+                    parent=self.root,
+                )
+            else:
+                self.game_status.set(
+                    "No game running. Open a game ROM or choose Restart game."
+                )
+                messagebox.showinfo(
+                    "Start a game first",
+                    "The selected emulator is not currently running. "
+                    "Open a game ROM, or use Restart game if one is selected.",
+                    parent=self.root,
+                )
             return
         if backend in ("retroarch", "dolphin"):
             process = self.external_process
@@ -107,6 +143,7 @@ class GameplayMixin:
         except (ValueError, tk.TclError):
             messagebox.showerror('Settings', 'Please correct the numeric settings.')
             return
+        self._pending_object_controls = False
         self.armed = True
         self.emu.armed = backend == "libretro"
         self.last_action = time.monotonic()
@@ -118,6 +155,7 @@ class GameplayMixin:
         )
 
     def stop_controls(self):
+        self._pending_object_controls = False
         self.armed = False
         self.emu.disarm()
         if hasattr(self, "_last_camera_pulses"):
@@ -158,9 +196,21 @@ class GameplayMixin:
                 if live or now >= getattr(self, "_static_preview_next_draw", 0):
                     self.draw_camera()
                     self._static_preview_next_draw = now + 0.5
+            # Finish a user-requested arm only when the background native
+            # core is actually ready. No global keyboard injection occurs.
+            if getattr(self, "_pending_object_controls", False):
+                if self.emu.running and self.cap is not None and self.cap.isOpened():
+                    self._pending_object_controls = False
+                    self.toggle()
+                elif not getattr(self.emu, "launching", False):
+                    self.stop_controls()
             # Render game video on its own faster timer, not at camera speed.
             if self.emu.error:
-                self.game_status.set('Emulator error: ' + self.emu.error)
+                self.game_status.set(
+                    'Emulator stopped: ' + self.emu.error
+                    + ' · Select Restart game to recover.'
+                )
+                self._save_warning_until = time.monotonic() + 3600
                 self.stop_controls()
                 self.emu.error = None
             elif self.emu.save_warning:
