@@ -62,10 +62,15 @@ class AuxiliaryPanelsMixin:
         # instead of choosing only the largest contour. Both colors may
         # occupy different control zones at the same time.
         ttk.Checkbutton(
-            fish, text='Track multiple fish of the same color',
+            fish, text='Enable multiple fish per color (multi-input)',
             variable=self.multi_fish_enabled,
             command=self.update_tracking_preferences,
         ).pack(anchor='w', pady=(4, 3))
+        ttk.Label(
+            fish,
+            text='Off (default): one fish per color. On: several matching fish can press different zones at once.',
+            wraplength=415,
+        ).pack(anchor='w', pady=(0, 4))
         dual = ttk.LabelFrame(fish, text='Color 2 · Optional second tracker', padding=7)
         dual.pack(fill='x', pady=(5, 5))
         ttk.Checkbutton(
