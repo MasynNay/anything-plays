@@ -114,10 +114,20 @@ class LayoutMixin:
             command=self.check_emulator_updates,
             style='Compact.TButton',
         ).pack(side='left')
+        ttk.Button(
+            update_row, text='Install approved updates',
+            command=self.install_emulator_updates,
+            style='Compact.TButton',
+        ).pack(side='left', padx=(8, 0))
+        ttk.Button(
+            update_row, text='Restore bundled',
+            command=self.restore_bundled_emulator,
+            style='Compact.TButton',
+        ).pack(side='left', padx=(8, 0))
         ttk.Label(
-            update_row, textvariable=self._emulator_update_status,
-            wraplength=290,
-        ).pack(side='left', padx=(9, 0), fill='x', expand=True)
+            game, textvariable=self._emulator_update_status,
+            wraplength=480,
+        ).pack(fill='x', pady=(4, 0))
         # Embedded emulators use the existing on-canvas software-video renderer.
         self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=350, highlightthickness=0)
         self.game_canvas.pack(fill='both', expand=True, pady=10)

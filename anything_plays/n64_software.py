@@ -31,6 +31,10 @@ class RetroVariable(C.Structure):
 
 def find_parallel_n64_core():
     """Locate a packaged ParaLLEl N64 binary, never download at runtime."""
+    from anything_plays.core_packs import managed_core_path
+    updated = managed_core_path("parallel_n64")
+    if updated is not None:
+        return updated
     filename = "parallel_n64_libretro" + _library_extension()
     for directory in _search_directories():
         candidate = Path(directory) / filename

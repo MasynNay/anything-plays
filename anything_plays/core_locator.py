@@ -51,6 +51,12 @@ def find_core(system="gba"):
     accidentally boot a ROM with the wrong system's emulator.
     """
     core = SYSTEMS[system].core
+    # Verified user-owned core packs take precedence without mutating the
+    # signed/read-only application bundle. Corruption falls back to bundle.
+    from anything_plays.core_packs import managed_core_path
+    updated = managed_core_path(core)
+    if updated is not None:
+        return updated
     extension = _library_extension()
     filenames = (f"{core}_libretro{extension}", f"libretro_{core}{extension}")
     for folder in _search_directories():

@@ -336,6 +336,16 @@ class LibraryMixin:
         self.show_library()
 
     def start_rom(self, path):
+        # Never open a native core while a verified core-pack transaction is
+        # staging or switching its active manifest pointer.
+        if getattr(self, "_core_install_busy", False):
+            messagebox.showwarning(
+                "Emulator updating",
+                "Core updates are being installed. Open the ROM after the "
+                "update finishes.",
+                parent=self.root,
+            )
+            return
         self.deactivate_manual()
         self.stop_controls()
         try:
@@ -346,8 +356,10 @@ class LibraryMixin:
                 # Embedded N64 uses the experimental software video backend.
                 # The external launcher remains available as a user fallback.
                 self.stop_external_emulator()
-                if self.system_key.get() == "n64":
-                    self.emu.core_path = self.emu.find_system_core()
+                # Resolve the selected core on every game launch. A vetted
+                # in-app update or rollback takes effect here without an app
+                # restart; an already-loaded native DLL is never replaced.
+                self.emu.core_path = self.emu.find_system_core()
                 if not self.emu.core_path:
                     raise RuntimeError(
                         'Bundled emulator core is unavailable. '
