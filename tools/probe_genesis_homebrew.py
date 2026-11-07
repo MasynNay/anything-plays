@@ -1,0 +1,160 @@
+"""Real Genesis Plus GX video and PSG audio using original cartridge opcodes."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.genesis_homebrew_fixture import write_genesis_probe
+from tools.probe_nes_homebrew import ObservedAudio
+
+
+def _child(core, rom, seconds, report):
+    import faulthandler
+    faulthandler.enable(all_threads=True)
+    from anything_plays.gba_emulator import Emulator, CoreSession
+    from PIL import Image
+
+    emu = Emulator()
+    emu.system = "genesis"
+    emu.inputs.system = "genesis"
+    emu.core_path = str(core)
+    session = CoreSession(emu, "genesis", rom, str(core))
+    session.audio.close()
+    session.audio = ObservedAudio()
+    original_video = session.video
+    frames, nonblank, fingerprints = 0, 0, set()
+    preview = report.with_name("genesis-homebrew-frame.png")
+
+    def observe(pointer, width, height, pitch):
+        nonlocal frames, nonblank
+        previous = emu.frame_serial
+        original_video(pointer, width, height, pitch)
+        if emu.frame_serial == previous:
+            return
+        frames += 1
+        if frames > 50 and frames % 11 != 1:
+            return
+        with emu.lock:
+            frame = emu.frame
+            if frame is not None and int(frame.max()) > 4 and int(frame.min()) != int(frame.max()):
+                nonblank += 1
+                fingerprints.add(hashlib.sha256(frame.tobytes()).hexdigest()[:16])
+                if nonblank == 1:
+                    Image.fromarray(frame).save(preview)
+    session.video = observe
+
+    timer = threading.Timer(seconds, emu.stop_event.set)
+    timer.daemon = True
+    timer.start()
+    started = time.monotonic()
+    error = None
+    try:
+        session.run()
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        traceback.print_exc()
+    finally:
+        emu.stop_event.set()
+        timer.cancel()
+    elapsed = max(time.monotonic() - started, 0.001)
+    audio = session.audio
+    passed = (error is None and frames >= 30 and frames / elapsed >= 20
+              and nonblank >= 2 and len(fingerprints) >= 2
+              and audio.samples > 1000 and audio.nonzero > 100
+              and audio.sample_rate is not None and audio.peak > 0)
+    data = {
+        "system": "genesis", "source": "original M68000 homebrew",
+        "real_video_frames": frames,
+        "observed_fps": round(frames / elapsed, 2),
+        "nonblank_samples": nonblank, "distinct_rgb_frames": len(fingerprints),
+        "psg_pcm_frames": audio.samples, "nonzero_audio_values": audio.nonzero,
+        "audio_peak": audio.peak, "sample_rate": audio.sample_rate,
+        "real_speakers_tested": False, "passed": passed, "error": error,
+    }
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(data, indent=2) + "\n")
+    print(json.dumps(data, indent=2), flush=True)
+    return 0 if passed else 1
+
+
+def _parent(core, report, seconds):
+    result = {"system": "genesis", "passed": False, "timed_out": False,
+              "native_exit_code": None, "details": None, "error": None}
+    try:
+        if not core.is_file():
+            raise FileNotFoundError("Missing Genesis Plus GX native core")
+        with tempfile.TemporaryDirectory(prefix="anything-plays-genesis-test-") as path:
+            folder = Path(path)
+            rom = folder / "original-genesis-demo.md"
+            result["fixture"] = write_genesis_probe(rom)
+            report_child = folder / "child.json"
+            env = os.environ.copy()
+            env["HOME"] = str(folder)
+            env["XDG_CONFIG_HOME"] = str(folder / "config")
+            command = [
+                sys.executable, str(Path(__file__).resolve()), "--child",
+                "--core", str(core), "--rom", str(rom),
+                "--seconds", str(seconds), "--report", str(report_child)
+            ]
+            try:
+                completed = subprocess.run(
+                    command, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True, check=False,
+                    timeout=seconds + 25, env=env,
+                )
+                result["native_exit_code"] = completed.returncode
+                result["console_tail"] = completed.stdout[-14000:]
+            except subprocess.TimeoutExpired as exc:
+                result["timed_out"] = True
+                raw = exc.stdout or b""
+                result["console_tail"] = (
+                    raw.decode("utf-8", "replace") if isinstance(raw, bytes)
+                    else raw
+                )[-14000:]
+            if report_child.is_file():
+                result["details"] = json.loads(report_child.read_text())
+            result["passed"] = (
+                result["native_exit_code"] == 0
+                and isinstance(result["details"], dict)
+                and result["details"].get("passed") is True
+            )
+            preview = report_child.with_name("genesis-homebrew-frame.png")
+            if preview.is_file():
+                import shutil
+                shutil.copyfile(preview, report.with_name(preview.name))
+    except Exception as exc:
+        result["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps(result, indent=2), flush=True)
+    return 0 if result["passed"] else 1
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--core", required=True, type=Path)
+    p.add_argument("--report", required=True, type=Path)
+    p.add_argument("--rom", type=Path)
+    p.add_argument("--seconds", type=int, default=8)
+    p.add_argument("--child", action="store_true")
+    args = p.parse_args()
+    if args.child:
+        if args.rom is None:
+            p.error("--child requires --rom")
+        return _child(args.core.resolve(), args.rom.resolve(), args.seconds,
+                      args.report.resolve())
+    return _parent(args.core.resolve(), args.report.resolve(), args.seconds)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
