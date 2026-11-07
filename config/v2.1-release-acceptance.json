@@ -1,128 +1,176 @@
 {
   "schema_version": 1,
-  "policy": "Do not publish or request broad user testing until every console has working in-app play, bundled cores, and verified input, audio, saves, and acceptable performance on each supported platform.",
+  "policy": "A small mGBA-only starter installer plus separately approved in-app downloads; release requires each core to install without external applications, display and sound playback, controls, save behavior, stability and complete platform testing.",
   "systems": {
     "gb": {
       "bundled": true,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false
     },
     "gbc": {
       "bundled": true,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false
     },
     "gba": {
       "bundled": true,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false
     },
     "snes": {
-      "bundled": true,
+      "bundled": false,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "nes": {
-      "bundled": true,
+      "bundled": false,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "genesis": {
-      "bundled": true,
+      "bundled": false,
       "in_app_video": true,
       "camera_controls": true,
-      "real_game_verified": false
+      "real_game_verified": false,
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "n64": {
-      "bundled": true,
+      "bundled": false,
       "in_app_video": false,
       "camera_controls": true,
       "real_game_verified": false,
-      "notes": "Experimental bundled software renderer exists; real in-panel gameplay not verified.",
-      "primary_runtime": "embedded-libretro-software"
+      "notes": "Experimental built for internal CI software renderer exists; real in-panel gameplay not verified.",
+      "primary_runtime": "embedded-libretro-software",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "gamecube": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "Dolphin core and Sys data are now staged in test installers; actual gameplay speed and save compatibility have not been validated.",
-      "primary_runtime": "embedded-libretro-software"
+      "notes": "Dolphin core and Sys data are now evaluated in diagnostic builds; actual gameplay speed and save compatibility have not been validated.",
+      "primary_runtime": "embedded-libretro-software",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "mastersystem": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "gamegear": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "sg1000": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "atari2600": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "atari7800": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "pce": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "ngp": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "ngpc": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "ws": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     },
     "wsc": {
       "bundled": false,
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required."
+      "notes": "New in-app 2.1 alpha library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "downloadable": false,
+      "in_app_installation_verified": false
     }
   },
   "platform_validation": {

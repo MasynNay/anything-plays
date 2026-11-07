@@ -1,7 +1,7 @@
 """Fail-closed release gate for Anything Plays 2.1.
 
 A green alpha build verifies that source compiles and an installer packages;
-it does not prove every console is self-contained and playable.
+it does not prove every console can be downloaded, installed and played with sound.
 
 This gate must pass before tagging/publishing a public 2.1 release. Use
 --report-only in the alpha CI workflow to report blockers without preventing
@@ -22,7 +22,10 @@ sys.path.insert(0, str(ROOT))
 from anything_plays.systems import SYSTEMS  # noqa: E402
 
 ACCEPTANCE_FILE = ROOT / "config" / "v2.1-release-acceptance.json"
-SYSTEM_FLAGS = ("bundled", "in_app_video", "camera_controls", "real_game_verified")
+# Playback and audio must work regardless of whether the core is included or
+# delivered as a separate approved in-app download.
+SYSTEM_FLAGS = ("in_app_video", "camera_controls", "real_game_verified", "audio_verified")
+STARTER_CONSOLES = frozenset(("gb", "gbc", "gba"))
 PLATFORM_FLAGS = ("clean_install", "all_consoles_verified", "long_run_verified")
 RELEASE_FLAGS = (
     "third_party_license_audit_complete",
@@ -55,6 +58,14 @@ def release_blockers(policy, systems=None):
         if not isinstance(row, dict):
             blockers.append(f"{key}: no evidence record")
             continue
+        if key in STARTER_CONSOLES:
+            if row.get("bundled") is not True:
+                blockers.append(f"{key}: bundled not verified")
+        else:
+            if row.get("downloadable") is not True:
+                blockers.append(f"{key}: downloadable not verified")
+            if row.get("in_app_installation_verified") is not True:
+                blockers.append(f"{key}: in_app_installation_verified not verified")
         for field in SYSTEM_FLAGS:
             if row.get(field) is not True:
                 blockers.append(f"{key}: {field} not verified")

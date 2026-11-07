@@ -17,7 +17,8 @@ class ReleaseAcceptanceTests(unittest.TestCase):
 
     def test_alpha_is_blocked_until_all_eight_consoles_work_in_one_window(self):
         errors = release_blockers(self.policy)
-        self.assertTrue(any("gamecube: bundled" in error for error in errors))
+        self.assertTrue(any("gamecube: downloadable" in error for error in errors))
+        self.assertTrue(any("gamecube: audio_verified" in error for error in errors))
         self.assertTrue(any("gamecube: in_app_video" in error for error in errors))
         self.assertTrue(any("n64: real_game_verified" in error for error in errors))
         self.assertTrue(any("gamecube: real_game_verified" in error for error in errors))
@@ -49,9 +50,14 @@ class ReleaseAcceptanceTests(unittest.TestCase):
 
     def test_external_gamecube_never_passes_even_if_record_is_prematurely_signed(self):
         policy = copy.deepcopy(self.policy)
-        for row in policy["systems"].values():
+        for key, row in policy["systems"].items():
             for name in SYSTEM_FLAGS:
                 row[name] = True
+            if key in ("gb", "gbc", "gba"):
+                row["bundled"] = True
+            else:
+                row["downloadable"] = True
+                row["in_app_installation_verified"] = True
         for row in policy["platform_validation"].values():
             for name in PLATFORM_FLAGS:
                 row[name] = True
