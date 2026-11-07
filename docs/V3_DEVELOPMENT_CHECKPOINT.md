@@ -1075,3 +1075,28 @@ and saved-GameCube config and native GameCube from read-only DEB.
 **Physical Linux retry not yet confirmed**. Never mark stable 3.0 complete
 or suggest changing the original fish artwork. v2.0 release remains
 untouched. Continue from specific GitHub commits and test reports.
+
+
+### Portfolio integration acceptance — verified
+
+[Coastal-Portfolio `main`](https://github.com/MasynNay/Coastal-Portfolio)
+now includes Anything Plays in the shared project catalog with:
+- Actual desktop UI image from
+  `anythingplays.masynnay.com/assets/anything-plays-desktop-preview.webp`;
+- Project showcase, repository and first-class **Development roadmap** links;
+- Cards in the normal/glass/Mac portfolio, alternate design studies and
+  island portfolio room; `Software` included under the Coding filter.
+- Automated test of the canonical destinations and no fictional browser demo.
+
+[Full Coastal portfolio quality run 42424140839](https://github.com/MasynNay/Coastal-Portfolio/actions/runs/42424140839)
+**SUCCESS**: pinned Prettier check, ESLint, React tests, production build.
+The separate Cloudflare production deployment of `masynnay.com` occurs
+from a `main` push and was not independently observed in its dashboard.
+No assumption that DNS or browser cache has finished propagating.
+
+[Anything Plays GitHub Pages run 42423892320](https://github.com/MasynNay/anything-plays/actions/runs/42423892320)
+**SUCCESS**, source checks
+[42423892070](https://github.com/MasynNay/anything-plays/actions/runs/42423892070)
+**SUCCESS**: four-stage visual roadmap and future proposals are live in
+deployed site content. Public HTTPS reachability from this tool environment
+was not independently verified; GitHub Pages reported a successful deploy.
