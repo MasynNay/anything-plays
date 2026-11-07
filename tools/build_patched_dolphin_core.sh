@@ -24,6 +24,13 @@ git -C "$SOURCE_DIR" submodule update --init --recursive --jobs 4 --depth 1
 # Strict source revision and byte-level source anchor checks; compiler receives
 # the altered C++ file. No runtime monkey-patching or in-place dylib editing.
 python tools/patch_dolphin_software.py "$SOURCE_DIR"
+# Record exactly what native source the compiler receives. Keep this next to
+# the output binary so CI can distinguish the patched build from upstream.
+git -C "$SOURCE_DIR" diff --check
+git -C "$SOURCE_DIR" diff -- Source/Core/DolphinLibretro/Video.h \
+  > "$WORK_DIR/dolphin-video-software.patch"
+sha256sum "$WORK_DIR/dolphin-video-software.patch" \
+  | tee "$WORK_DIR/dolphin-video-patch-sha256.txt"
 
 echo "Configuring GameCube Libretro CPU-rendered native test core"
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -G Ninja \
