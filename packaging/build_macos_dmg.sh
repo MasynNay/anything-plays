@@ -95,7 +95,25 @@ codesign --force --sign - dist/AnythingPlays30Preview.app
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays30Preview.app
 codesign --verify --verbose=2 dist/AnythingPlays30Preview.app
 mkdir -p release
-hdiutil create -volname 'Anything Plays 3.0 Preview' -srcfolder dist/AnythingPlays30Preview.app -ov -format UDZO release/AnythingPlays-3.0.0-alpha.1.dmg
+# CI's shared macOS disk-image service intermittently returns Resource busy
+# after a clean ad-hoc signed bundle. Retry ONLY the DMG mount operation:
+# never suppress a permanent packaging/verification failure.
+DMG="release/AnythingPlays-3.0.0-alpha.1.dmg"
+DMG_READY=0
+for ATTEMPT in 1 2 3 4; do
+  rm -f "$DMG"
+  if hdiutil create -volname 'Anything Plays 3.0 Preview' \
+      -srcfolder dist/AnythingPlays30Preview.app -ov -format UDZO "$DMG"; then
+    DMG_READY=1
+    break
+  fi
+  echo "macOS disk-image service failed on attempt $ATTEMPT"
+  sleep "$((ATTEMPT * 3))"
+done
+[[ "$DMG_READY" == "1" && -s "$DMG" ]] || {
+  echo "DMG packaging failed after four attempts" >&2
+  exit 1
+}
 # Verify bytes after they have been packaged into the actual distributable DMG.
 MOUNT_DIR="$(mktemp -d /tmp/anything-plays-release.XXXXXX)"
 trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/dev/null 2>&1 || true' EXIT
