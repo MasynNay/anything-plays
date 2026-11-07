@@ -440,3 +440,57 @@ failure rather than weakening the sound requirement to get green CI.
 `.github/workflows/v30-ngp.yml` on that exact SHA; the last known native
 full-cartridge flash success is run `42390603019`. All changes above are
 committed, including this append-only durable checkpoint. 
+
+
+## November 7, 2026 — FIRST INSTALLABLE ALL-CONSOLE 3.0 TEST PACKAGE
+
+**User requested a build to try.** The full offline, test-only packaging workflow
+[42391351246](https://github.com/MasynNay/anything-plays/actions/runs/42391351246)
+**completed SUCCESS at exact code SHA `215b9d40c37884239bdf528c48f735d6feb9f0bb`**.
+All FOUR independent GitHub Actions installation jobs succeeded, including:
+Windows x64, Linux x64, macOS Intel x86_64 and macOS Apple Silicon arm64.
+Each test package includes **18 system profiles, 11 Libretro core binaries,
+Dolphin Sys resources, core hash provenance and bundled license notices**;
+`verify_bundle.py --check-native` passed inside the builder on each target.
+No separate RetroArch/Dolphin/emulator installation is required. The preview
+runs separately from public stable 2.0 and contains no ROMs or BIOS.
+
+**Actual authenticated GitHub Actions download artifacts (14-day retention):**
+
+- Apple Silicon / M2 Pro: [Artifact 13581656191](https://github.com/MasynNay/anything-plays/actions/runs/42391351246/artifacts/13581656191),
+  `AnythingPlays-3.0.0-FULL-TEST-ONLY-macos-arm64`;
+- Intel Mac: [Artifact 13581766643](https://github.com/MasynNay/anything-plays/actions/runs/42391351246/artifacts/13581766643),
+  `AnythingPlays-3.0.0-FULL-TEST-ONLY-macos-x64`;
+- Windows x64: [Artifact 13581672063](https://github.com/MasynNay/anything-plays/actions/runs/42391351246/artifacts/13581672063),
+  `AnythingPlays-3.0.0-FULL-TEST-ONLY-windows-x64`;
+- Linux x64: [Artifact 13581642019](https://github.com/MasynNay/anything-plays/actions/runs/42391351246/artifacts/13581642019),
+  `AnythingPlays-3.0.0-FULL-TEST-ONLY-linux-x64`.
+
+Each ZIP contains its native installer, `SHA256SUMS.txt`, and
+`FULL_PREVIEW_INFO.json` declaring code revision and package limitations.
+Artifact ZIP download requires GitHub authentication. The macOS package is
+ad-hoc signed but *not* notarized; for a trusted personal test installation,
+use ordinary macOS user-confirmed Open workflow, never disable Gatekeeper
+globally. Public `v2.0.0` release and `main` are unchanged.
+
+**Important honesty:** A successful offline installer does NOT certify that all
+18 console profiles play all real games. NGP monochrome sound remains unproven
+because the immutable legal calibration fixture produces silence. GameCube
+still needs real Windows GPU/Intel Mac performance proof, and cross-platform
+real-game, physical camera, speaker, long-run and redistribution/signing
+acceptance. The full test package is for testing these remaining failures;
+do NOT promote its label or artifact SHA to a stable `v3.0.0` release.
+
+**Additional build repair:** `01d42a4` added bounded retry of an intermittent
+Intel macOS `hdiutil: Resource busy` (DMG creation only; verification still
+strict). `215b9d4` amended `.github/workflows/v30-full-bundle.yml` to
+retain full offline developer test installers as GitHub Actions artifacts
+instead of discarding them. Prior bundle test
+[42349271993](https://github.com/MasynNay/anything-plays/actions/runs/42349271993)
+had also passed all four install targets but did not upload files.
+
+**Next:** collect user-installed real-world behavior on Apple Silicon,
+especially embedded Dolphin gameplay, device camera/controls, speaker audio,
+game-only display and 30+ minute runtime, without marking unmet public
+release gates complete. Inspect run `42391351246` first if another chat
+stream is lost.
