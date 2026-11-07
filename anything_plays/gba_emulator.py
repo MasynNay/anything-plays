@@ -127,6 +127,7 @@ class CoreSession:
         self.core_path = core_path
         self.native = None
         self.audio = AudioSink()
+        self.audio.set_volume(getattr(emulator, "volume", 0.35))
         # Dolphin SWGfx hands us the CPU-owned RGBA8 texture directly:
         # unlike standard Libretro XRGB8888, the byte order is R,G,B,A.
         # Other consoles retain Libretro's RGB1555 default.
@@ -323,6 +324,9 @@ class CoreSession:
             frames_per_second = (
                 av.timing.fps if 20 < av.timing.fps < 240 else 59.7275
             )
+            # The same AudioSink handles every Libretro console (including
+            # hardware-rendered GameCube), so the game-panel gain is live.
+            self.emulator.audio_sink = self.audio
             self.audio.start(av.timing.sample_rate)
             self.emulator.audio_warning = getattr(self.audio, "output_error", None)
             self.save_ram = SaveRAM(
@@ -375,6 +379,8 @@ class CoreSession:
                     next_frame = time.monotonic()
             self.persist_game_progress()
         finally:
+            if getattr(self.emulator, "audio_sink", None) is self.audio:
+                self.emulator.audio_sink = None
             self.audio.close()
             if self.native is not None:
                 self.native.close()
@@ -397,6 +403,8 @@ class Emulator:
         self.save_warning = None
         self.audio_warning = None
         self.resume_info = None
+        self.volume = 0.35
+        self.audio_sink = None
         self.frame = None
         self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
@@ -431,9 +439,27 @@ class Emulator:
         self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
 
-    def press(self, button, frames=8):
+    def set_volume(self, level):
+        """Adjust only this application's audio, including active games."""
+        try:
+            volume = float(level)
+        except (TypeError, ValueError, OverflowError):
+            volume = 0.35
+        if not 0.0 <= volume <= 1.0:
+            volume = max(0.0, min(1.0, volume)) if volume == volume else 0.35
+        self.volume = volume
+        sink = self.audio_sink
+        if sink is not None:
+            sink.set_volume(volume)
+
+    def set_camera_buttons(self, player_one=(), player_two=()):
+        """Publish one atomic camera snapshot, with independent P1/P2 holds."""
+        if self.running and self.armed:
+            self.inputs.set_camera_buttons(player_one, player_two)
+
+    def press(self, button, frames=8, port=0):
         if self.running and self.armed and self.inputs.id_for(button) is not None:
-            self.inputs.queue_press(button, frames)
+            self.inputs.queue_press(button, frames, port=port)
 
     def set_manual(self, button, down):
         self.inputs.set_manual(button, down)
@@ -443,8 +469,9 @@ class Emulator:
 
     def disarm(self):
         self.armed = False
-        # Commands are drained in the worker on the next frame. Avoid mutating
-        # its held-button dictionary concurrently with native callbacks.
+        # Stop must clear P1/P2 camera holds and queued pulses immediately,
+        # even if the native core is currently blocked in retro_run().
+        self.inputs.disarm()
 
     def stop(self):
         """Request worker shutdown, keeping it tracked if it does not exit."""
