@@ -515,7 +515,7 @@ jobs:
           PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_homebrew.py \
             --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
-            --seconds 20 --cpu-core 5 --debugger \
+            --seconds 20 --cpu-core 5 --exercise-controls --debugger \
             --report test-evidence/gamecube-cached-interpreter.json
       - uses: actions/cache/save@v4
         if: always()

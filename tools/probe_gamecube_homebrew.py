@@ -64,7 +64,8 @@ class SilentProbeAudio:
         return None
 
 
-def _child(rom, core, seconds, report_path, cpu_core=None):
+def _child(rom, core, seconds, report_path, cpu_core=None,
+           exercise_controls=False):
     """Run real native gameplay; parent process enforces an absolute timeout."""
     import faulthandler
 
@@ -155,6 +156,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None):
 
     decoded_frames = 0
     nonblank_frames = 0
+    unique_nonblank_frames = set()
     last_shape = None
     preview = report_path.with_name("gamecube-homebrew-frame.png")
     original_video = session.video
@@ -167,17 +169,40 @@ def _child(rom, core, seconds, report_path, cpu_core=None):
             decoded_frames += 1
             if decoded_frames == 1:
                 stage("first decoded software-video callback")
-            if decoded_frames % 5 == 1:
-                # Inspect real decoded pixels, not merely libretro_run calls.
+            if decoded_frames <= 20 or decoded_frames % 30 == 0:
+                # Sample each early frame: controller-driven screen changes can
+                # be sparse when a Libretro core suppresses duplicate video.
                 with emu.lock:
                     frame = emu.frame
                     if frame is not None:
                         last_shape = list(frame.shape)
                         if int(frame.max()) > 4 and int(frame.min()) != int(frame.max()):
                             nonblank_frames += 1
-                            Image.fromarray(frame).save(preview, format="PNG")
+                            unique_nonblank_frames.add(hashlib.sha256(frame.tobytes()).hexdigest()[:16])
+                            if len(unique_nonblank_frames) == 1:
+                                Image.fromarray(frame).save(preview, format="PNG")
 
     session.video = observe_video
+    control_stop = threading.Event()
+    control_worker = None
+    if exercise_controls:
+        def exercise():
+            # GC-Controller-Test is a mostly static display until a controller
+            # input changes. Change real Libretro input states to distinguish
+            # legitimate duplicate frames from a frozen video pipeline.
+            for button in ("A", "B", "Left", "Right", "Up", "Down",
+                           "X", "Y", "Start"):
+                if control_stop.wait(0.9):
+                    return
+                emu.inputs.set_manual(button, True)
+                if control_stop.wait(0.4):
+                    break
+                emu.inputs.set_manual(button, False)
+            emu.inputs.release_manual()
+        control_worker = threading.Thread(
+            target=exercise, name="gamecube-ci-input-stimulus", daemon=True
+        )
+        control_worker.start()
     timer = threading.Timer(seconds, emu.stop_event.set)
     timer.daemon = True
     timer.start()
@@ -193,6 +218,10 @@ def _child(rom, core, seconds, report_path, cpu_core=None):
     finally:
         emu.stop_event.set()
         timer.cancel()
+        control_stop.set()
+        if control_worker is not None:
+            control_worker.join(timeout=1)
+        emu.inputs.release_manual()
 
     elapsed = round(time.monotonic() - start, 3)
     evidence = evaluate_video_probe(error, decoded_frames, nonblank_frames, elapsed)
@@ -204,6 +233,8 @@ def _child(rom, core, seconds, report_path, cpu_core=None):
         "real_game_loaded": error is None,
         "video_callback_frames": decoded_frames,
         "nonblank_sampled_frames": nonblank_frames,
+        "unique_nonblank_rgb_frames": len(unique_nonblank_frames),
+        "controller_input_exercised": exercise_controls,
         "last_rgb_shape": last_shape,
         "seconds_elapsed": elapsed,
         **evidence,
@@ -218,7 +249,8 @@ def _child(rom, core, seconds, report_path, cpu_core=None):
     return 0 if result["playback_probe_passed"] else 1
 
 
-def _parent(core, seconds, report, debugger=False, cpu_core=None):
+def _parent(core, seconds, report, debugger=False, cpu_core=None,
+            exercise_controls=False):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
@@ -226,6 +258,7 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None):
         "probe": "real-homebrew-cpu-software-frames",
         "packaged_core": str(core),
         "cpu_core_mode": cpu_core or "default",
+        "controller_input_exercised": exercise_controls,
         "seconds_requested": seconds,
         "probe_passed": False,
         "debugger": "gdb" if debugger else None,
@@ -253,6 +286,8 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None):
             ]
             if cpu_core is not None:
                 command.extend(["--cpu-core", str(cpu_core)])
+            if exercise_controls:
+                command.append("--exercise-controls")
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -310,6 +345,8 @@ def main(argv=None):
                         help="Run the native child under gdb and capture C++ backtraces")
     parser.add_argument("--cpu-core", choices=("0", "5"),
                         help="Diagnostic only: 0=interpreter, 5=cached interpreter")
+    parser.add_argument("--exercise-controls", action="store_true",
+                        help="Pulse controller buttons to test changing rendered frames")
     parser.add_argument("--rom", type=Path)
     args = parser.parse_args(argv)
     if not 1 <= args.seconds <= 90:
@@ -320,9 +357,9 @@ def main(argv=None):
         if args.rom is None:
             parser.error("--rom is required for a child process")
         return _child(args.rom.resolve(), core, args.seconds, report,
-                      cpu_core=args.cpu_core)
+                      cpu_core=args.cpu_core, exercise_controls=args.exercise_controls)
     return _parent(core, args.seconds, report, debugger=args.debugger,
-                   cpu_core=args.cpu_core)
+                   cpu_core=args.cpu_core, exercise_controls=args.exercise_controls)
 
 
 if __name__ == "__main__":
