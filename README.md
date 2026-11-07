@@ -8,7 +8,7 @@
 
 Camera-powered games · Local, private controls · Windows, macOS and Linux
 
-[Latest stable release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Version 3.0 development](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
+[Latest stable release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Roadmap](ROADMAP.md) · [3.0 development](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
@@ -17,13 +17,9 @@ Camera-powered games · Local, private controls · Windows, macOS and Linux
 | Version | State | Details |
 | --- | --- | --- |
 | **2.0.0** | Published, stable | Original supported consoles; existing user installations are unchanged |
-| **3.0.0 Preview** | **In development, not a public release** | New console libraries, small starter installer and optional in-app emulator downloads |
+| **3.0.0 Preview** | **In development, not a public release** | 18 console profiles, 11 native cores in complete test installers; manual compatibility and compliance QA still required |
 
-**3.0 preview is not finished.** CI verifies installation and embedded video/audio
-for NES and Atari 2600 across four desktop architectures; N64 homebrew can draw
-real video, but broader compatibility, physical audio and performance have not
-been certified. **GameCube is experimental and not installable from the public
-emulator catalog** until rendering, audio, controls, saves and stability pass.
+**3.0 preview is not finished.** [Complete offline preview packaging](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) has passed on Windows, Linux, Intel Mac and Apple Silicon with **18 console profiles and 11 native emulator cores**. The maintainer has verified N64 ROM switching on Apple Silicon; [native repeated-launch CI](https://github.com/MasynNay/anything-plays/actions/runs/42415242942) passes on four platforms. Physical Windows and Linux QA are next. GameCube real-GPU performance, some console-specific audio coverage, licensing and signing remain release gates. See the [development roadmap](ROADMAP.md).
 
 ## What does Anything Plays do?
 
@@ -35,40 +31,31 @@ camera processing happens locally.
 
 ## How version 3.0 distributes emulators
 
-Install the **small starter application** once. Game Boy, Game Boy Color and
-Game Boy Advance work with the bundled **mGBA** core.
+**Full offline developer preview:** [Four-platform test installers](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
 
-Choose a different console, then click **Download emulator** to install an
-approved platform-specific core **inside Anything Plays**. The app verifies
-GitHub release digests, core identity, package contents and approval records
-before activating it. A downloadable core works offline after installation.
-Shared console families reuse a single core. **No RetroArch or standalone
-Dolphin installation is required for approved supported systems.**
+**Starter application / managed updates:** The smaller application workflow packages mGBA initially. Other cores can be installed or updated through the app only when suitable reviewed packs are available. Both packaging models are intentionally separate: the full test packages demonstrate offline bundle feasibility, not legal approval or compatibility for every existing game.
 
-Some consoles are not yet publicly downloadable because reviewed emulator
-packs have not been published. The app will say so rather than install an
-unreviewed third-party binary. GameCube deliberately shows
-**In development** while its native renderer and matching system assets are
-being validated. Game content and optional firmware are **never supplied**.
+Real-world testing, native-core license/source obligations, physical GPU performance and signing/notarization are tracked in the [roadmap](ROADMAP.md).
 
 ## Console library plan
 
-| Core | Console libraries | 3.0 distribution |
-| --- | --- | --- |
-| mGBA | Game Boy, Game Boy Color, Game Boy Advance | Included with starter |
-| Snes9x | Super Nintendo | Optional, pending pack approval |
-| FCEUmm | NES | Optional; cross-platform audio/video and managed-install tests passed |
-| Genesis Plus GX | Genesis, Master System, Game Gear, SG-1000 | Optional; validation in progress |
-| Stella 2014 | Atari 2600 | Optional; cross-platform audio/video and managed-install tests passed |
-| ProSystem | Atari 7800 | Optional; validation pending |
-| Beetle PCE Fast | TurboGrafx-16 / PC Engine HuCard | Optional; validation pending |
-| Beetle NeoPop | Neo Geo Pocket and Color | Optional; validation pending |
-| Beetle WonderSwan | WonderSwan and Color | Optional; validation pending |
-| ParaLLEl-N64 | Nintendo 64 | Optional; 3D gameplay compatibility still under testing |
-| Dolphin Libretro | GameCube | **Blocked:** engine, Sys bundle and hardware validation incomplete |
+All eleven cores below are included in the **full offline 3.0 developer preview** on the four build targets. This inventory does **not** certify compatibility with every game or authorize public redistribution.
 
-The list describes recognized libraries and development scope, **not
-guaranteed compatibility for every ROM**.
+| Core | Console libraries | Readiness note |
+| --- | --- | --- |
+| mGBA | Game Boy, Game Boy Color, Game Boy Advance | Native gameplay tested; continue physical QA |
+| Snes9x | Super Nintendo | Native gameplay tested; continue physical QA |
+| FCEUmm | NES | Native audio/video verified with homebrew; continue real-device QA |
+| Genesis Plus GX | Genesis, Master System, Game Gear, SG-1000 | Native homebrew acceptance implemented; real-device coverage pending |
+| Stella 2014 | Atari 2600 | Native audio/video tests; real-game coverage pending |
+| ProSystem | Atari 7800 | Native homebrew tests; real-device coverage pending |
+| Beetle PCE Fast | TurboGrafx-16 / PC Engine HuCard | Native homebrew tests; real-device coverage pending |
+| Beetle NeoPop | Neo Geo Pocket and Color | **Monochrome NGP audible-fixture coverage still incomplete** |
+| Beetle WonderSwan | WonderSwan and Color | Native homebrew AV checks; real-device coverage pending |
+| ParaLLEl-N64 | Nintendo 64 | **Repeat-launch fix** passed 3 cycles on four OS builds; owner tested switching on Apple Silicon |
+| Dolphin Libretro | GameCube | Bundled in experimental preview; **GPU performance/real-game acceptance incomplete** |
+
+See [roadmap](ROADMAP.md) and [#24](https://github.com/MasynNay/anything-plays/issues/24) for the distinction between implemented code, native homebrew diagnostics and release approval.
 
 ## Downloading a release
 
@@ -133,6 +120,8 @@ Test builds have independent installation identities and preference
 directories so they cannot overwrite the published 2.0 application.
 
 ## Community and security
+
+See the [public roadmap](ROADMAP.md) and open [3.0 tracking issues](https://github.com/MasynNay/anything-plays/issues) for current work.
 
 See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md),
 [Code of Conduct](CODE_OF_CONDUCT.md),
