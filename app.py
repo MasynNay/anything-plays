@@ -6,10 +6,8 @@ the layout or migrating a user's settings. No OS-level keyboard injection occurs
 """
 
 import copy
-from pathlib import Path
 import sys
 import tkinter as tk
-from PIL import Image, ImageTk
 
 from anything_plays.gba_emulator import Emulator
 from anything_plays.settings_defaults import DEFAULT
@@ -27,11 +25,12 @@ from anything_plays.ui_view import ViewMixin
 from anything_plays.ui_shortcuts import ShortcutsMixin
 from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
+from anything_plays.ui_icon import IconMixin
 
 
 class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
           ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
-          ShortcutsMixin, ExternalBackendMixin, UpdatesMixin):
+          ShortcutsMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
 
     def __init__(self, root):
@@ -158,28 +157,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         if key == 'gamecube':
             return self.gamecube_embedded.get()
         return False
-
-    def set_app_icon(self):
-        """Prefer corrected 2.1 artwork without mutating stable 2.0 assets."""
-        base = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-        artwork = base / 'assets' / 'anything_plays_v21.webp'
-        if artwork.is_file():
-            try:
-                with Image.open(artwork) as source:
-                    icon = source.convert('RGBA')
-                self._app_icon = ImageTk.PhotoImage(icon, master=self.root)
-                self.root.iconphoto(True, self._app_icon)
-                return
-            except (OSError, ValueError, tk.TclError):
-                # Preserve the original PNG for older Pillow/Tk setups.
-                pass
-        original = base / 'assets' / 'anything_plays.png'
-        if original.is_file():
-            try:
-                self._app_icon = tk.PhotoImage(file=str(original))
-                self.root.iconphoto(True, self._app_icon)
-            except tk.TclError:
-                pass
 
     def close(self):
         """Persist settings, release devices, and stop scheduling UI callbacks."""
