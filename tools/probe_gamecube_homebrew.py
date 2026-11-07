@@ -30,6 +30,22 @@ sys.path.insert(0, str(ROOT))
 from tools.gamecube_homebrew_fixture import verified_homebrew
 
 MAX_LOG_CHARS = 24000
+# Merely drawing three frames does not make a GameCube game playable.
+# This is deliberately conservative; full release QA still demands audio,
+# controller, save, camera and long-uptime measurements on physical machines.
+MIN_USABLE_FPS = 20.0
+
+
+def evaluate_video_probe(error, frames, nonblank, elapsed):
+    """Separate basic frame evidence from a minimally usable frame rate."""
+    fps = round(frames / max(elapsed, 0.001), 2)
+    frames_valid = error is None and frames >= 3 and nonblank >= 1
+    return {
+        "frames_valid": frames_valid,
+        "minimum_usable_fps": MIN_USABLE_FPS,
+        "fps_target_met": frames_valid and fps >= MIN_USABLE_FPS,
+        "frames_per_second_observed": fps,
+    }
 
 
 class SilentProbeAudio:
@@ -171,6 +187,7 @@ def _child(rom, core, seconds, report_path):
         timer.cancel()
 
     elapsed = round(time.monotonic() - start, 3)
+    evidence = evaluate_video_probe(error, decoded_frames, nonblank_frames, elapsed)
     result = {
         "system": "gamecube",
         "core": core.name,
@@ -179,11 +196,11 @@ def _child(rom, core, seconds, report_path):
         "video_callback_frames": decoded_frames,
         "nonblank_sampled_frames": nonblank_frames,
         "last_rgb_shape": last_shape,
-        "frames_per_second_observed": round(decoded_frames / max(elapsed, 0.001), 2),
         "seconds_elapsed": elapsed,
+        **evidence,
         "audio_tested": False,
         "camera_actuation_tested": False,
-        "playback_probe_passed": error is None and decoded_frames >= 3 and nonblank_frames >= 1,
+        "playback_probe_passed": evidence["fps_target_met"],
         "error": error,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
