@@ -31,8 +31,12 @@ class WonderSwanOriginalCartridgeTests(unittest.TestCase):
                              0x88, 0x8F, 0x90, 0x91):
                     self.assertIn(bytes((0xE6, port)), code)
                 self.assertIn(bytes.fromhex("F3 AB"), code)
-        self.assertIn(bytes.fromhex("E6 60"),
+        self.assertIn(bytes.fromhex("B0 80 E6 60"),
                       build_wonderswan_probe_rom("wsc")[:2048])
+        self.assertIn(bytes.fromhex("BF 00 20"),
+                      build_wonderswan_probe_rom("wsc")[:2048])
+        self.assertNotIn(bytes.fromhex("B0 20 E6 60"),
+                         build_wonderswan_probe_rom("wsc")[:2048])
 
     def test_writer_creates_only_legal_test_rom_extensions(self):
         with TemporaryDirectory() as folder:

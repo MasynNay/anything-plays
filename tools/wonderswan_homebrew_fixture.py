@@ -54,7 +54,7 @@ def build_wonderswan_probe_rom(system="ws"):
     out(0x14, 0x01)  # LCD ON.
     out(0x07, 0x01)  # BG tilemap in RAM page $0800.
     if system == "wsc":
-        out(0x60, 0x20)  # 2-bitplane Color mode, tile data at $4000.
+        out(0x60, 0x80)  # WSC 2bpp color (0x20 was monochrome mode).
     else:
         out(0x1C, 0xF0)  # Monochrome system grayscale luminance.
         out(0x20, 0x71)  # Palette0 color indexes for two-pixel test.
@@ -64,7 +64,7 @@ def build_wonderswan_probe_rom(system="ws"):
     emit(0x31, 0xC0)       # XOR AX,AX.
     emit(0xF3, 0xAB)       # REP STOSW.
     # First tile graphics: alternating bit 0 on every row, four greys.
-    emit(0xBF, 0x00, 0x40 if system == "wsc" else 0x20)
+    emit(0xBF, 0x00, 0x20)  # 2bpp tile data for both systems: $2000.
     emit(0xB9, 0x08, 0x00)
     emit(0xB8, 0xAA, 0x00)  # 2bpp tile row, plane 0 stripe.
     emit(0xF3, 0xAB)

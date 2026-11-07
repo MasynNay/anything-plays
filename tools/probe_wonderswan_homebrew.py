@@ -57,6 +57,7 @@ def _parent(system, core, report, seconds):
                 result["details"] = json.loads(child.read_text("utf-8"))
             image = child.with_name(f"{system}-frame.png")
             if image.is_file():
+                report.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(image, report.with_name(image.name))
             result["passed"] = (
                 result["native_exit_code"] == 0

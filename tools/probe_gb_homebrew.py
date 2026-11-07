@@ -82,11 +82,14 @@ def _child(system, core, rom, report, seconds):
         and sound.peak>0 and sound.sample_rate is not None
     )
     data={
-        "system":system, "source": (
-            "original ARM7TDMI GBA ROM" if system == "gba"
-            else ("original HuC6280 PC Engine HuCard" if system == "pce"
-                  else "original LR35902 GB/GBC ROM")
-        ),
+        "system":system, "source": {
+            "gb": "original LR35902 GB ROM",
+            "gbc": "original LR35902 GBC ROM",
+            "gba": "original ARM7TDMI GBA ROM",
+            "pce": "original HuC6280 PC Engine HuCard",
+            "ws": "original NEC V30MZ WonderSwan ROM",
+            "wsc": "original NEC V30MZ WonderSwan Color ROM",
+        }.get(system, "original source-generated diagnostic ROM"),
         "native_video_frames":frames, "observed_fps":round(frames/elapsed,2),
         "sampled_nonblank_frames":nonblank,
         "distinct_rgb_frames":len(hashes),
