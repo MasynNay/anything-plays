@@ -34,14 +34,17 @@ class PocketResumeStatusTests(unittest.TestCase):
             ),
             root=SimpleNamespace(after=Mock(return_value=42)),
         )
+        game.tick = lambda: None  # Scheduled callback on real Tk owner.
         GameplayMixin.tick(game)
         self.assertIn("Restored the last verified", status["message"])
         self.assertIsNone(game.emu.resume_info)
         self.assertGreater(game._save_warning_until, time.monotonic())
 
+        game.tick = lambda: None  # Scheduled callback on real Tk owner.
         GameplayMixin.tick(game)
         self.assertIn("Restored the last verified", status["message"])
         game._save_warning_until = 0
+        game.tick = lambda: None  # Scheduled callback on real Tk owner.
         GameplayMixin.tick(game)
         self.assertEqual(status["message"], "Playing StarGunner")
         self.assertEqual(game.root.after.call_count, 3)
@@ -62,6 +65,7 @@ class PocketResumeStatusTests(unittest.TestCase):
             ),
             root=SimpleNamespace(after=Mock()),
         )
+        game.tick = lambda: None  # Scheduled callback on real Tk owner.
         GameplayMixin.tick(game)
         self.assertEqual(status["message"], "Native save failed")
         self.assertEqual(game.emu.resume_info, "Recovered game")
