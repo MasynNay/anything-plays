@@ -1,7 +1,9 @@
 # Anything Plays 2.1 — unified testing build
 
-This branch combines the requested new features **in one test version**. It
-does not modify the public [2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
+This branch combines the requested features **in one engineering test version**.
+Do not request end-user testing or publish 2.1 until all eight consoles are
+playable inside the bundled application without third-party downloads.
+It does not modify the public [2.0.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
 
 ## How to test
 
@@ -79,10 +81,22 @@ and audio still require validation on physical hardware. The software path
 can be significantly slower than an accelerated renderer. Uncheck the option
 to use the existing RetroArch fallback if the bundled core is unsuitable.
 
-The GameCube backend still requires Dolphin and still opens a separate GPU
-window. **GameCube does not yet meet the one-installer, one-window goal.**
-Bundling an externally launched Dolphin without in-panel rendering is not an
-acceptable substitute for the release goal.
+### Experimental GameCube built-in software video
+
+The GameCube backend now has an **experimental in-app Dolphin Libretro path**.
+The alpha build fetches the native Dolphin core and the required
+`dolphin-emu/Sys` files at build time, verifies their hashes, and packages
+them with Anything Plays. It uses Dolphin's CPU-based Software Renderer to
+attempt to draw directly into the same Tk game panel, and sends keyboard and
+camera controls to the Libretro input callbacks. The previous external Dolphin
+launcher remains an optional developer fallback; it is **not** considered an
+acceptable public-release user workflow.
+
+**Not yet release-ready:** no GameCube disc/homebrew image has passed real-game
+startup, audio/video performance, camera latency, save and multi-hour runtime
+tests on the supported OSes. CPU rendering may be too slow; if so, a native
+in-panel GPU surface will be required. CI build success alone does not
+satisfy the release acceptance checklist.
 
 ### Emulator update checks
 
@@ -97,16 +111,17 @@ must be reviewed for compatibility and licensing, built as part of a complete
 signed installer, smoke-tested, and then distributed with an app update.
 The check does not install any other applications or game images.
 
-### External hardware-rendered emulators
+### Optional external hardware-rendered developer fallbacks
 
-| Console | Required separate installation | Behavior |
+| Console | Optional developer-only fallback | Behavior |
 | --- | --- | --- |
 | Nintendo 64 | RetroArch with Mupen64Plus-Next core | Anything Plays scans N64 games and launches RetroArch with the selected native core |
 | Nintendo GameCube | Dolphin Emulator | Anything Plays scans discs and launches Dolphin's own GPU window |
 
-Select the external executable (and, for N64, its RetroArch core) if
-auto-discovery fails. No external emulator binaries or commercial game files
-are bundled or silently downloaded.
+Only developers diagnosing experimental software-renderer performance need
+to select an external executable. For the **in-app** N64 and GameCube modes,
+the alpha installers include the Libretro cores and Dolphin system data
+themselves. Game files are never included.
 
 **New experimental camera and keyboard bridges:**
 
@@ -129,11 +144,13 @@ are bundled or silently downloaded.
 **Do not confuse input integration with GPU video integration.**
 Experimental software-rendered N64 mode draws its frames in the app's game
 panel, but this has not been verified with real games on the target systems.
-The N64 *external fallback* and the GameCube launcher still draw in separate
-GPU windows. Hardware-accelerated Libretro embedding requires an actual GPU
-context, framebuffer ownership and render lifecycle; the existing Tk/software
-frame path cannot provide that by itself. Real-game compatibility, latency,
-save/load and multi-hour reliability still require hardware testing.
+The external developer fallbacks still draw in separate windows. The
+experimental Dolphin software renderer now sends CPU-owned video frames to
+Anything Plays, but **it remains unproven at real-game speeds**. Accelerated
+Libretro graphics embedding would require a native GPU context, framebuffer
+ownership and render lifecycle; the existing Tk/software path cannot provide
+that by itself. Real-game compatibility, latency, saves and multi-hour
+reliability still require hardware testing.
 
 **Security:** RetroArch's Network RetroPad receiver has no authentication.
 Although Anything Plays sends only to localhost, RetroArch may listen on
