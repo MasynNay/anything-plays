@@ -201,6 +201,15 @@ workflow green.
 - `ef7abac`: tested distinct save directories and native Libretro
   environment pointer routing for both NGP and NGPC. The source tests
   do not establish a real cartridge committing and reloading flash.
+- `66e637e`: isolate all NGP native CI save paths in disposable
+  Windows APPDATA / HOME / XDG_DATA_HOME and report actual `.flash` files
+  discovered **after** the core is unloaded, without claiming they represent
+  a completed save/restore cycle.
+- `fc8e09a`: make all eight NGP/NGPC native RGB, PCM and controller
+  playback jobs **blocking CI**, rather than masking a failed native
+  probe with `continue-on-error: true`. The last push intentionally
+  restarts the affected verification run. Inspect job conclusions on
+  the current branch head, not an earlier cancelled run.
 
 **Next verified action:** inspect the *latest* workflow head and all eight
 Neo Geo Pocket native jobs after the final documentation change; review
