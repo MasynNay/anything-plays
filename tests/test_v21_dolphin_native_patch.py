@@ -35,6 +35,11 @@ class DolphinNativePatchTests(unittest.TestCase):
     def test_native_libretro_linker_resolves_dynamic_library_in_archive_order(self):
         result = patched_libretro_cmake_text(LIBRETRO_CMAKE_ORIGINAL)
         self.assertIn("dolphin_libretro_videocontexts", result)
+        self.assertIn(
+            "${CMAKE_SOURCE_DIR}/Source/Core/Common/DynamicLibrary.cpp",
+            result
+        )
+        self.assertEqual(result.count("target_sources(dolphin_libretro"), 1)
         self.assertLess(result.index("dolphin_libretro_videocontexts"),
                         result.index("  common\n"))
         with self.assertRaisesRegex(ValueError, "CMake source changed"):

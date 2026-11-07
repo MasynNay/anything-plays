@@ -73,3 +73,18 @@ provider earlier in the static archive sequence. The source-build-only patch
 now includes the pinned `DolphinLibretro/CMakeLists.txt` and explicitly links
 `common` **after** `dolphin_libretro_videocontexts`. This is a linker-order
 repair, **not yet proven** by a completed native link or playback run.
+
+
+### Follow-up: direct DynamicLibrary object for cyclic static archives
+
+The first archive-order change reached the final link but the remaining
+transitive `dolphin_libretro_videocontexts` archive was scanned after
+`libcommon.a` again. Its `GLContextLR.cpp` unresolved symbols persisted.
+The next native experiment adds upstream
+`Source/Core/Common/DynamicLibrary.cpp` as a directly compiled source of
+the Libretro shared target. That implementation is already part of
+`libcommon.a`; ordinary archive extraction does not pull a duplicate
+object when the shared target's object resolves all its symbols first.
+This deliberately changes only the reviewable build-time patch.
+Neither public v2.0 nor the unmodified upstream source repository is touched.
+A complete native link and homebrew runtime probe are still required.

@@ -37,6 +37,15 @@ LIBRETRO_CMAKE_REPLACEMENT = """target_link_libraries(dolphin_libretro PRIVATE
   # object calls DynamicLibrary::Open/GetSymbolAddress. GNU ld needs the
   # provider archive after this static consumer to resolve those symbols.
   common
+)
+
+# The pinned fork links two mutually dependent static archives. GLContextLR
+# needs Common::DynamicLibrary, but Common links back to Libretro video
+# contexts. Include its small implementation as an explicit shared-library
+# object, independent of archive ordering. GNU ld can then resolve those
+# symbols without --allow-shlib-undefined or an unaudited binary patch.
+target_sources(dolphin_libretro PRIVATE
+  ${CMAKE_SOURCE_DIR}/Source/Core/Common/DynamicLibrary.cpp
 )"""
 
 BOOT_GBP_CONFIG_ORIGINAL = """  if (Libretro::GBPlayer_active)
