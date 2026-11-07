@@ -49,6 +49,9 @@ cp licenses/*.txt dist/AnythingPlays/licenses/
 .build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
+if [[ "${AP_V21_TEST_CORES:-0}" == "1" ]]; then
+  .build-venv/bin/python tools/probe_embedded_3d.py linux dist/AnythingPlays
+fi
 
 PKG="build/deb/anything-plays-test_${VERSION}_${ARCH}"
 rm -rf "$PKG"
