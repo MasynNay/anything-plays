@@ -136,7 +136,7 @@ jobs:
       - name: Build 3.0 macOS DMG with the mGBA starter core
         run: bash packaging/build_macos_dmg.sh
       - name: Inspect staged test app
-        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays30Test.app test-evidence/macos-${{ matrix.arch }}.json
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays30Preview.app test-evidence/macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-3.0.0-alpha1-macOS-${{ matrix.arch }}-TEST

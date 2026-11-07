@@ -59,11 +59,11 @@ The 3.0 preview is **not** a release authorization.
 When 3.0 is actually approved, collect the four signed/validated production
 installers in a separate input directory and run:
 
-\`\`\`bash
+```bash
 python tools/stage_v30_release_assets.py \
   --version 3.0.0 --input release/candidates \
   --output release/public-3.0.0
-\`\`\`
+```
 
 This produces **exactly four installers and SHA256SUMS.txt**. It refuses
 missing, empty, symlinked, stale 2.0 or unexpected extra installer files;
