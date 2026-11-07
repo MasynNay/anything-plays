@@ -116,6 +116,49 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  genesis-original-cross-platform-av:
+    # Original ROM from source opcodes; real Libretro video, PSG PCM and
+    # controls in the embedded CoreSession, not a loaded-library smoke.
+    # No third-party game files, emulator downloads at runtime, or ROM release.
+    # Record each platform separately before approving any 3.0 installer.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Libretro dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install production Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Fetch platform matched Genesis Plus GX Libretro candidate
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
+      - name: Require actual original 68000 video and nonzero PSG stereo PCM
+        run: |
+          python tools/probe_genesis_homebrew.py --core cores/genesis_plus_gx_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/genesis-original-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-Genesis-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
   optional-core-pack-candidates:
     # Independent native-core downloads, NOT shipped inside the small installer.
     # This workflow never marks a candidate as approved or publishes a release.

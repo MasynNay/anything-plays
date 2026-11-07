@@ -27,6 +27,24 @@ class GenesisNativeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(sp % 2, 0)
         self.assertEqual(int.from_bytes(rom[4:8], "big"), 0x200)
 
+    def test_gdb_clean_child_exit_is_not_confused_with_native_crash(self):
+        source = inspect.getsource(probe_genesis_homebrew._parent)
+        self.assertIn("debugger_exit_code", source)
+        self.assertIn("debugger_clean_child_exit", source)
+        self.assertIn("exited normally", source)
+        self.assertIn('not result["native_faulted"]', source)
+
+    def test_original_genesis_audio_video_runs_on_every_desktop_arch(self):
+        workflow = (ROOT / ".github/workflows/v30-cores.yml").read_text("utf-8")
+        case = workflow.split("  genesis-original-cross-platform-av:", 1)[1].split(
+            "  optional-core-pack-candidates:", 1
+        )[0]
+        for target in ("linux-x64", "windows-x64", "macos-arm64", "macos-x64"):
+            self.assertIn(target, case)
+        self.assertIn("probe_genesis_homebrew.py", case)
+        self.assertIn("genesis_plus_gx_libretro.", case)
+        self.assertNotIn("probe_genesis_homebrew.py --debugger", case)
+
     def test_ci_reruns_failed_genesis_under_gdb(self):
         source = (ROOT / ".github/workflows/v30-lab.yml").read_text("utf-8")
         block = source.split("  genesis-original-homebrew-video-audio-experiment:", 1)[1].split(

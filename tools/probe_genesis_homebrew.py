@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -144,6 +145,18 @@ def _parent(core, report, seconds, *, debugger=False, phase="full", smoke_only=F
                         "received signal SIGSEGV" in completed.stdout
                         or "received signal SIGABRT" in completed.stdout
                     )
+                    result["debugger_exit_code"] = completed.returncode
+                    # GDB exits nonzero when the later 'bt'/'info registers'
+                    # commands run after a CLEAN child exit (no stack exists).
+                    # Accept the child-exit evidence, not GDB's postmortem
+                    # command status; never accept a signaled native process.
+                    clean_child_exit = bool(re.search(
+                        r"\[Inferior 1 \(process \d+\) exited normally\]",
+                        completed.stdout,
+                    ))
+                    if clean_child_exit and not result["native_faulted"]:
+                        result["native_exit_code"] = 0
+                    result["debugger_clean_child_exit"] = clean_child_exit
                     marker = completed.stdout.find("received signal")
                     result["native_fault_trace"] = (
                         completed.stdout[max(0, marker - 15):marker + 9500]
