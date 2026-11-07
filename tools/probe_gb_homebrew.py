@@ -1,7 +1,9 @@
 """Isolated real mGBA Game Boy / Game Boy Color video and audio diagnostic.
 
 Test ROMs are assembled from original instructions at test time; no Nintendo
-game, firmware, boot ROM or logo is downloaded or redistributed.
+game, firmware or boot ROM is downloaded or redistributed.
+The source-created cartridge includes the standard GB hardware header signature
+required by mGBA's ROM detector.
 """
 from __future__ import annotations
 import argparse

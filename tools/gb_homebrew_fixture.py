@@ -1,7 +1,9 @@
 """Source-only original GB/GBC video-and-audio test cartridge.
 
 Generates native LR35902 instructions, background scrolling and square-channel
-APU sound without redistributing any commercial ROM, logo or firmware.
+APU sound without redistributing any commercial game or firmware.
+The 48-byte hardware-required GB cartridge header logo marker is format data
+needed for mGBA recognition; no logo artwork is rendered by this test game.
 """
 from __future__ import annotations
 import hashlib
@@ -52,6 +54,15 @@ def build_gb_probe_rom(system="gb"):
 
     rom = bytearray(SIZE)
     rom[0x100:0x104] = bytes((0xc3, 0x50, 0x01, 0x00))
+    # mGBA GBIsROM checks the cartridge logo signature (Pan Docs $0104-
+    # $0133). Unlike the original program below, these are mandatory
+    # interoperable cartridge-format bytes, not game code or a boot ROM.
+    # The diagnostic ROM is generated only inside CI and never shipped.
+    rom[0x104:0x134] = bytes.fromhex(
+        "CE ED 66 66 CC 0D 00 0B 03 73 00 83 00 0C 00 0D "
+        "00 08 11 1F 88 89 00 0E DC CC 6E E6 DD DD D9 99 "
+        "BB BB 67 63 6E 0E EC CC DD DC 99 9F BB B9 33 3E"
+    )
     rom[0x134:0x143] = b"ANYTHINGPLAYSGB"
     rom[0x143] = 0x80 if system == "gbc" else 0
     rom[0x147:0x14a] = b"\x00\x00\x00"
