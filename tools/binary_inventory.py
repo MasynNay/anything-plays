@@ -11,6 +11,8 @@ import json
 import os
 from pathlib import Path
 
+from fetch_mgba_core import core_names_for_build
+
 MAGIC = {
     b"\x7fELF": "ELF",
     b"\xcf\xfa\xed\xfe": "Mach-O",
@@ -95,9 +97,9 @@ def collect_bundle_inventory(bundle, target, source_sha=None):
                 raise ValueError(f"Post-packaging core integrity mismatch: {relative}")
             verified_cores.append({"name": record["name"], "path": relative,
                                    "sha256": observed["sha256"]})
-        expected = {"mgba", "snes9x"}
-        if os.environ.get("AP_V21_TEST_CORES") == "1":
-            expected |= {"fceumm", "genesis_plus_gx", "parallel_n64"}
+        # Reuse the exact downloader-approved core set. Inventories must
+        # fail if a new native system is missing from the signed installer.
+        expected = set(core_names_for_build())
         if {entry["name"] for entry in verified_cores} != expected:
             raise ValueError(f"Unexpected core manifest: expected {sorted(expected)}")
 
