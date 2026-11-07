@@ -1,108 +1,155 @@
-# Anything Plays 3.0 — development checkpoint
+# Anything Plays 3.0 — development handoff and verified release gates
 
-_Last reviewed: 2026-11-07 UTC. Active branch: `feature/v3.0-unified-test`._
+_Last checked: 2026-11-07 UTC. Active branch: `feature/v3.0-unified-test`._
+_This is an engineering checkpoint, NOT a 3.0 release announcement._
 
-This is an engineering handoff, **not** a release announcement or a promise of
-game compatibility. Public stable v2.0 and `main` must remain unchanged until
-the 3.0 release gate has objective evidence.
+## The nonnegotiable product contract
 
-## Product contract
+- **18 console profiles** (GB through GameCube, **no Wii**).
+- **All 11 required native cores**, plus the matching bundled Dolphin `Sys` data,
+  are included in a single, initially **offline** app installer on each target OS.
+  No separate emulator, RetroArch, ROM downloader, BIOS, or first-run emulator
+  download is required. Players supply their own lawful games.
+- Games run in the Anything Plays panel. Embedded GameCube uses Dolphin Libretro
+  hardware acceleration, **not** a separate Dolphin application or game window.
+- Approved *updates* can be installed, verified and rolled back in-app between
+  game sessions, without restarting the application. Updates are not prerequisites
+  to first launch.
+- Preserve the original fish/camera mechanics, per-console ROM shelves, manual
+  keyboard controls, configurable shortcuts, saves, visual themes, game-only
+  viewing, borderless and full-screen modes.
+- Normal use must remain stable after many hours, repeated game switching,
+  camera disconnect/reconnect and idle uptime.
+- Keep public main and the published 2.0 release **unchanged** pending acceptance.
 
-- Support all **18** console profiles from GB through GameCube. **No Wii.**
-- All play in the Anything Plays game panel; hardware-accelerated GameCube
-  uses embedded Dolphin Libretro, *not* a separately installed Dolphin process.
-- One standalone installed package for each OS, containing all **11** required
-  native emulator cores and the matching Dolphin `Sys` assets. A connection
-  must **not** be required for emulator installation or a first ROM launch.
-- Users provide their own lawful game content. Do not distribute ROMs/BIOS.
-- After installation, optional reviewed emulator **updates** happen in-app
-  with integrity checks, rollback, and no need to restart the entire app.
-- Preserve camera controls, console-specific libraries and saves, appearance,
-  configurable controls, windowed/borderless/fullscreen options, and long
-  unattended uptime. Avoid piling unrelated status text onto the game view.
+## Evidence — production-style native A/V in all four OS environments
 
-## Verified work
+The following consoles have **passed original/legal homebrew video and
+nonzero native audio PCM** in production `CoreSession` on **Windows x64,
+Linux x64, macOS Intel x64 and macOS Apple Silicon**:
 
-**Complete offline installer packaging:** GitHub Actions run
-[`42349271993`](https://github.com/MasynNay/anything-plays/actions/runs/42349271993)
-passed Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. The
-internal `v30-full-bundle.yml` lab builds the actual platform packages
-with all 11 native Libretro libraries, representing 18 console associations,
-plus Dolphin's paired `Sys` content. It verifies installed payloads and
-does **not** publish third-party native binaries. A packaging success is NOT
-proof that all games boot or that redistributing the native cores is cleared.
+| Profiles | Native core | Evidence |
+| --- | --- | --- |
+| Game Boy, Game Boy Color, Game Boy Advance | mGBA | Four-platform workflow `42352993417` |
+| NES | FCEUmm | Four-platform workflow `42349568501` |
+| SNES | Snes9x | Four-platform workflow `42379612917` |
+| Sega Genesis/Mega Drive | Genesis Plus GX | Four-platform workflow `42352993417` |
+| Sega Master System, Game Gear, SG-1000 | Genesis Plus GX | Four-platform workflow `42379035447` |
+| Atari 2600 | Stella 2014 | Four-platform workflow `42349568501` |
+| Nintendo 64 | ParaLLEl-N64, embedded software video | Four-platform workflow `42349568501` |
 
-**GameCube:** `tools/gamecube-3d-homebrew/source/main.c` now builds an original,
-noncommercial GameCube GX 3D animation *and* an original stereo DSP tone
-in one executable. `tools/probe_gamecube_app.py` requires continuously moving
-3D frames and nonzero native PCM in the SAME embedded Dolphin session.
+**11 of 18** profiles have this level of cross-platform original ROM A/V
+verification. Tests typically last 8–20 seconds per profile. They are
+**not** evidence that every retail game runs, that physical speakers/cameras
+work, that all save formats persist, or that each device stays stable for days.
+Sources are test-only original assembly/code generators under `tools/`.
+Never ship the generated test ROMs to users.
 
-Observed original-test measurements on the 3D test executable:
-- Linux x64: 434 frame callbacks / ~12.28 s = **35.34 FPS**, nonzero PCM verified
-  in the native callback (not through physical speakers).
-- macOS Apple Silicon: 291 callbacks / ~12.44 s = **23.4 FPS**, nonzero PCM.
-- macOS Intel: 151 callbacks / ~12.42 s = **12.16 FPS**, nonzero PCM. Its
-  20 FPS compatibility threshold **failed**; do not downgrade the threshold
-  merely to make tests green.
-- Windows: native accelerated context/packaging smoke has succeeded, but
-  full original GameCube GX A/V playback is not verified in CI.
-- Across all systems, real retail/homebrew game selection, real speakers,
-  save/load behavior, sustained play, and physical camera control need QA.
-  The software-only GameCube probe has a known native crash; the release
-  runtime is explicitly `embedded-libretro-hardware`.
+The profiles **without comparable original playback verification on all four
+targets** remain: Atari 7800, PC Engine/TurboGrafx-16 (HuCard), Neo Geo Pocket,
+Neo Geo Pocket Color, WonderSwan, WonderSwan Color, **and GameCube**.
 
-**Genesis:** The original generated M68000 cartridge still causes native
-SIGSEGV inside `genesis_plus_gx_libretro.so` `retro_run()`, confirmed via
-gdb and captured in `test-evidence/genesis-original-audio-video.json`.
-Changing its invalid bottom-of-RAM supervisor stack pointer to a valid
-high-RAM address did not resolve the crash; the signal remains. The isolated
-probe now captures the native fault trace and refuses to call a GDB zero exit
-a successful emulation. Investigate core input/video callback ABI and the
-original ROM opcode/VDP initialization with symbolized native debugging;
-do not claim Genesis playback from a green package installer alone.
+## Longevity and native lifecycle validation
 
-**Release acceptance:** `config/v3.0-release-acceptance.json` and
-`tools/check_v30_release.py` now require 18 bundled console cores,
-verified offline payloads for all four platforms, GameCube accelerated
-in-panel hardware runtime, complete real A/V/control/saves/stability QA,
-and reviewed legal permissions. These requirements deliberately fail closed.
+- **120 native Libretro start/stop and console-switch cycles PASS**, all in
+  **one process**, testing ten profiles and five emulator engines. All started
+  original homebrew and produced a video frame, manual/camera input pulses
+  were issued, no stuck Python emulator workers or controller state remained,
+  and RSS grew only **0.94 MiB** after the first full cycle. Workflow
+  `42380030470`, job `native-ten-console-lifecycle-soak`. Runner: Linux.
+- **15-minute synthetic camera/video/Tk GUI endurance PASS** under Xvfb.
+  Bounded canvas items, scheduled timers, and RSS growth. Workflow
+  `42378515296`, job `gui-15-minute-soak`. This is not physical camera QA.
+- **10-minute *native* embedded GameCube endurance PASS on Linux**:
+  29,904 frame callbacks, **49.83 FPS**, moving RGB frames, native controller
+  polls and **57,407,600** nonzero PCM values, with **51.81 MiB** RSS growth
+  after warm-up (limit 192 MiB). Same workflow, job
+  `gamecube-10-minute-native-soak`. Headless runner has no speaker device.
+  This is original PowerPC 3D homebrew, NOT a commercial retail game.
 
-## Important distinction: current test outputs
+The audio engine was corrected after a real Linux headless `PortAudioError`
+when `sounddevice.query_devices(kind="output")` had no default device. It
+now continues with a visible warning rather than terminating the emulator.
+Unusual source sample rates such as **131072 Hz** (GB/GBC) and **65536 Hz**
+(GBA) are converted to supported output device rates with bounded stereo
+PCM queues. Audio output remains explicitly unverified on physical speakers.
 
-- `.github/workflows/v30-app.yml` still creates small **mGBA-only starter
-  preview artifacts** for basic CI. They are *not* the intended 3.0 release.
-- `.github/workflows/v30-full-bundle.yml` builds and inspects **complete
-  offline packages** on all four OS targets, but deliberately does not upload
-  installers or mark binaries redistribution-approved.
-- `.github/workflows/v30-lab.yml` contains exploratory native compatibility
-  jobs; experimental failures can be non-blocking to the lab workflow status.
-  Read **job-level evidence**, not only the overall green workflow result.
-- Changes to the original Genesis test ROM may require updating its
-  deterministic header/unit-test contract.
-- Recent engineering commits include `673a2d1` (combined GameCube A/V),
-  `8bad7dd` (offline release gate and four-platform lab),
-  `4b08619` (macOS combined A/V assertion), `f57239b` and `ebe7b1c`
-  (Genesis native diagnosis), `0595ac1` (valid 68k stack and crash flag),
-  and `ae04869` (update related regression tests).
+## GameCube — important remaining work
 
-## Next unblockers, in order
+The *same* original 3D-and-audio GameCube test runs embedded without a
+separately installed Dolphin process. Results so far:
 
-1. Resolve the native Genesis SIGSEGV. Make a real original VDP/PSG ROM pass
-   in the production embedded game panel and prove native video/PCM.
-2. Measure/fix GameCube performance on Intel Macs and test actual continuous
-   GameCube GX A/V + controller responsiveness on Windows. Validate saves.
-3. Run real game and original/legal homebrew smoke tests across every profile,
-   not just binary presence. Capture video/audio, camera/manual controllers,
-   save/restore, and extended memory-growth/crash evidence across each OS.
-4. Reconcile alpha UI with the no-first-run-download product contract.
-   Missing emulator core in a complete bundle is a packaging defect, not
-   an invitation to install external Dolphin/RetroArch. Approved in-app
-   **updates** are separate from initial installation.
-5. Audit each native core, `Sys` data, Python wheel, corresponding source,
-   attributions, OS code signing/notarization and actual public distributable.
-6. Only after complete release criteria pass, prepare one professional
-   3.0 release per supported OS and retain stable public v2.0 unchanged.
+- Linux EGL: **49.83 FPS over 600 seconds**, real PCM and 51.81 MiB
+  post-warm-up RSS growth, test PASS.
+- macOS Apple Silicon: native original game PPU/GPU and audio demonstrated,
+  with one combined test measuring **25.56 FPS**, passing the 20 FPS threshold.
+  This is not yet an extended native soak on real user hardware.
+- macOS Intel: moving 3D frames, input polls and nonzero PCM are real,
+  but combined playback measured only **10–14 FPS** on hosted runners.
+  Fail the 20 FPS acceptance threshold: DO NOT change the threshold just to
+  make an Action green. GPU readback represented ~6–7% of total runtime, so
+  merely reducing framebuffer readback will not solve this bottleneck.
+- Windows hosted runner: WGL creation failed with
+  `wglCreateContextAttribsARB not found`: runner lacks a graphics
+  driver supporting OpenGL 3.3+. A downloadable package and context smoke
+  are NOT proof of playable Windows GameCube on a real compatible GPU.
 
-If another conversation is required, open this file and inspect the current
-head of `feature/v3.0-unified-test` plus the newest job-level Actions logs
-before making changes. Never equate a green builder with playable games.
+For a public release, verify a normal installed GameCube ROM in the actual
+app panel with controllers, saves, real speakers, and prolonged uptime
+on all four supported targets. Do not silently substitute the crashing
+experimental CPU-only GameCube renderer.
+
+## Installer, source, update and release gating
+
+- `.github/workflows/v30-full-bundle.yml` **successfully built and inspected
+  full offline packages** containing all 11 cores and paired Dolphin `Sys`
+  for Windows x64, Linux x64, macOS Intel and Apple Silicon; workflow
+  `42349271993` passed. This **does not** prove each packaged game plays,
+  that application signing/notarization is complete, or that distribution
+  permission for every third-party native component has been cleared.
+- `.github/workflows/v30-app.yml` still produces *small mGBA-only starter
+  CI previews*. **Never represent those artifacts as complete 3.0
+  installers.** Only the full-bundle lab represents the intended package
+  layout, and those lab binaries are deliberately not published.
+- Main 3.0 UI no longer offers **Download emulator** for missing cores.
+  Missing core files are treated as a damaged/incomplete package with repair
+  instructions. Approved in-app updates and rollbacks remain separate.
+- `config/v3.0-release-acceptance.json` and
+  `tools/check_v30_release.py` fail closed until every profile, legal
+  permission, installed payload, signing and real-world QA requirement
+  is fulfilled. Never bypass these gates to create a cosmetic green result.
+- Real ROMs/BIOS must not be bundled. Audit every native core license,
+  corresponding source and attribution, Python dependencies, Dolphin `Sys`
+  assets, public redistributables, signing/notarization and documentation.
+
+## Next engineering steps, in order
+
+1. **Close the remaining seven native-playback coverage gaps** with original
+   self-generated legal test ROMs (preferred), rigorous video/audio evidence
+   and cross-platform native cores. Add manual input and save/restore checks
+   for each platform, not just test ROM startup.
+2. **Fix/verify GameCube on actual Windows GPU hardware and Intel Mac.** Keep
+   test evidence and performance thresholds honest. Add long native soaks
+   and real in-panel QA for the Mac and Windows hardware paths.
+3. Exercise *all 18* profiles, peripheral/camera input, game-only/
+   borderless/fullscreen rendering, save/restore, core update/rollback,
+   unplugged cameras, disconnected storage and genuine audio devices from
+   clean-installed packages. Perform unattended multi-day physical QA.
+4. Reconcile the final offline installer UX, crash diagnostics, license
+   notices, update integrity verification, Windows code signing, macOS
+   signing/notarization and Linux desktop integration.
+5. Once every release gate is satisfied, publish ONE professional 3.0
+   release with correctly matched per-platform assets, keeping 2.0 stable.
+
+## Continuation rule after a conversation stream error
+
+1. Inspect the **current SHA** of `feature/v3.0-unified-test`, then inspect
+   the newest *job-level* GitHub Actions logs; do not infer success only from
+   the overall workflow status. Some exploratory jobs have
+   `continue-on-error: true`.
+2. Confirm no new commit invalidated earlier evidence; rerun impacted tests.
+3. Continue from the *actual last passing state*. Do not reintroduce
+   first-run core downloads, ship copyrighted game ROMs or remove blockers
+   simply to mark 3.0 ready.
+4. Stable `main` / public 2.0 remain untouched; do not ask the user to test
+   until all intended console profiles and full package requirements are met.
