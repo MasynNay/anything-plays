@@ -16,7 +16,13 @@ class OfflineInstallerLabContractTests(unittest.TestCase):
         self.assertIn("dolphin-emu/Sys/codehandler.bin", text)
         self.assertIn("len(SYSTEMS) == 18", text)
         self.assertIn("len(expected) == 11", text)
-        self.assertNotIn("uses: actions/upload-artifact", text)
+        # GitHub Actions artifacts now let the owner test full installers.
+        # They must remain TEST ONLY, never become public GitHub Releases.
+        self.assertIn("uses: actions/upload-artifact@v4", text)
+        self.assertIn("FULL-TEST-ONLY-", text)
+        self.assertIn("retention-days: 14", text)
+        self.assertIn("AP_RELEASE_BUILD: '0'", text)
+        self.assertNotIn("gh release create", text)
         self.assertNotIn("AP_V30_MINIMAL_CORE_BUILD", text)
 
 
