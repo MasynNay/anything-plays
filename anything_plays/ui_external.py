@@ -37,8 +37,13 @@ class ExternalBackendMixin:
         name = "GameCube" if system == "gamecube" else "N64"
         if self.uses_embedded_emulator():
             self.game_status.set(
-                f"{name} software graphics selected. Choose a ROM "
-                "to try it inside the game panel."
+                (
+                    "GameCube accelerated graphics selected. Choose a ROM "
+                    "to play inside the game panel."
+                    if system == "gamecube" else
+                    f"{name} software graphics selected. Choose a ROM "
+                    "to try it inside the game panel."
+                )
             )
         else:
             program = "Dolphin" if system == "gamecube" else "RetroArch"
@@ -69,7 +74,7 @@ class ExternalBackendMixin:
                 getattr(self, "external_fallback_enabled", False)):
             self.gamecube_mode_row.pack(fill="x", pady=(0, 6))
             self.system_description.configure(
-                text="Nintendo GameCube · Built-in software test"
+                text="Nintendo GameCube · Embedded accelerated graphics"
                 if self.uses_embedded_emulator() else
                 "Nintendo GameCube · Dolphin fallback"
             )

@@ -353,8 +353,9 @@ class LibraryMixin:
                 if not self.start_external_rom(str(path)):
                     return
             else:
-                # Embedded N64 uses the experimental software video backend.
-                # The external launcher remains available as a user fallback.
+                # All normal gameplay, including accelerated GameCube,
+                # stays in the application canvas. External launchers are
+                # only an explicitly enabled developer diagnostic.
                 self.stop_external_emulator()
                 # Resolve the selected core on every game launch. A vetted
                 # in-app update or rollback takes effect here without an app
@@ -363,8 +364,11 @@ class LibraryMixin:
                 if not self.emu.core_path:
                     if self.system_key.get() == 'gamecube':
                         raise RuntimeError(
-                            'GameCube is still under development; native video '
-                            'has not passed real gameplay testing.'
+                            'GameCube emulator is not installed. Select GameCube '
+                            'and click Download emulator to install its '
+                            'verified Dolphin core and required system files '
+                            'inside Anything Plays. If no approved package '
+                            'is available, the download will explain why.'
                         )
                     raise RuntimeError(
                         'Emulator not installed. Choose the console, then '

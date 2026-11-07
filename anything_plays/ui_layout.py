@@ -66,7 +66,7 @@ class LayoutMixin:
         self.gamecube_mode_row = ttk.Frame(game)
         self.gamecube_mode_toggle = ttk.Checkbutton(
             self.gamecube_mode_row,
-            text='Play GameCube in the app (experimental software graphics)',
+            text='Play GameCube in the app (accelerated graphics)',
             variable=self.gamecube_embedded,
             command=self.switch_gamecube_backend,
         )
