@@ -41,6 +41,7 @@ DISALLOWED_GAME_EXTENSIONS = frozenset({
     ".gb", ".gbc", ".gba", ".sfc", ".smc",
     ".nes", ".unf", ".unif", ".n64", ".z64", ".v64", ".rom", ".bios",
     ".smd", ".gen", ".gcm", ".rvz", ".gcz", ".ciso", ".iso",
+    ".dol", ".elf", ".tgc", ".wia", ".m3u",
 })
 
 
