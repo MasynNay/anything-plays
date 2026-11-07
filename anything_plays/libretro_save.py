@@ -39,7 +39,7 @@ def _fallback_path(rom_path):
 
 
 def native_core_save_directory(rom_path, system):
-    """Isolate cores that write their own battery/flash files on game unload.
+    """Provide writable native save paths independent from installed emulator cores.
 
     Beetle NeoPop does not expose its cartridge flash through Libretro SRAM:
     it reads and writes <ROM-stem>.flash under GET_SAVE_DIRECTORY itself.
@@ -48,8 +48,13 @@ def native_core_save_directory(rom_path, system):
     Keep the directory under the user's writable application data folder,
     not next to a ROM on a removable/read-only drive.
     """
+    if system == "gamecube":
+        # Dolphin's virtual memory cards are shared at console level, like
+        # physical GameCube cards; keep them stable across game/core updates.
+        # This must be a user-owned platform data path, not installed Sys.
+        return _user_save_directory() / "native-core" / "gamecube"
     if system not in ("ngp", "ngpc"):
-        raise ValueError("No native flash-save directory defined for this core")
+        raise ValueError("No native save directory defined for this core")
     fallback = _fallback_path(rom_path)
     return fallback.parent / "native-core" / "neo-geo-pocket" / fallback.stem
 
