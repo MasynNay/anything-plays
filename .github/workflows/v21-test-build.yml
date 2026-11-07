@@ -266,6 +266,46 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  n64-homebrew-cross-platform:
+    # Same pinned public-domain homebrew / in-panel software video path on
+    # Windows and both macOS architectures. Still not clean-installed game QA.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            ext: dll
+          - os: macos-15
+            ext: dylib
+          - os: macos-15-intel
+            ext: dylib
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    env:
+      AP_V21_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test dependencies and platform-native bundled N64 core
+        run: |
+          python -m pip install -r requirements.txt
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('parallel_n64')"
+      - name: Verify pinned public-domain N64 homebrew video in embedded core
+        timeout-minutes: 2
+        run: |
+          python -X faulthandler tools/probe_n64_homebrew.py --core cores/parallel_n64_libretro.${{ matrix.ext }} --seconds 20 --report test-evidence/n64-homebrew-playback.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-2.1-N64-${{ matrix.os }}-real-video-evidence
+          path: |
+            test-evidence/n64-homebrew-playback.json
+            test-evidence/n64-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
   gamecube-patched-native-experiment:
     # Compile from GPL source only when a native(dolphin) change is submitted.
     # This is a developer test; it does not add unaudited modified binaries
