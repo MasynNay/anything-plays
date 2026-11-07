@@ -4,6 +4,7 @@ import unittest
 from tempfile import TemporaryDirectory
 
 from PIL import Image, ImageDraw
+import numpy as np
 
 from anything_plays.icon_cleanup import clean_icon_background
 from tools.render_v21_icon import render, SOURCE
@@ -28,8 +29,30 @@ class IconMatteTests(unittest.TestCase):
 
     def test_real_icon_is_transparent_outside_closed_border(self):
         with Image.open(SOURCE) as source:
+            original = source.convert("RGBA")
             fixed = clean_icon_background(source)
             self.assertEqual(fixed.mode, "RGBA")
+            # The approved cute fish artwork is never repainted, redrawn,
+            # recolored, smoothed, or replaced. Every source RGB byte is
+            # immutable, including the face and blue rounded border.
+            before = np.asarray(original)
+            after = np.asarray(fixed)
+            np.testing.assert_array_equal(
+                before[:, :, :3], after[:, :, :3],
+                err_msg="Icon cleaner changed original fish/logo colors!",
+            )
+            self.assertLessEqual(int(np.sum(after[:, :, 3] != before[:, :, 3])),
+                                 original.width * original.height // 2)
+            self.assertTrue(np.all(
+                after[:, :, 3] <= before[:, :, 3]
+            ), "Cleaning must never make original pixels more opaque")
+            # Interior should never change alpha, including dark fish lines.
+            h, w = original.height, original.width
+            np.testing.assert_array_equal(
+                before[h // 4:3*h // 4, w // 4:3*w // 4, 3],
+                after[h // 4:3*h // 4, w // 4:3*w // 4, 3],
+                err_msg="Icon cleaner touched original fish interior!",
+            )
             corners = ((0, 0), (fixed.width - 1, 0),
                        (0, fixed.height - 1),
                        (fixed.width - 1, fixed.height - 1))
@@ -48,6 +71,17 @@ class IconMatteTests(unittest.TestCase):
                         for xy in ((0, 0), (w - 1, 0),
                                    (0, h - 1), (w - 1, h - 1)):
                             self.assertEqual(converted.getpixel(xy)[3], 0)
+
+    def test_artwork_is_still_exact_original_repository_source(self):
+        # A redesigned generated icon must NEVER be substituted into the
+        # build pipeline. Only the pinned original WebP is authoritative.
+        source = Path(__file__).resolve().parents[1] / "assets" / "anything_plays_v21.webp"
+        self.assertEqual(SOURCE, source)
+        self.assertEqual(source.name, "anything_plays_v21.webp")
+        renderer = (source.parents[1] / "tools" / "render_v21_icon.py").read_text("utf-8")
+        tkicon = (source.parents[1] / "anything_plays" / "ui_icon.py").read_text("utf-8")
+        self.assertIn('SOURCE = ROOT / "assets" / "anything_plays_v21.webp"', renderer)
+        self.assertIn('artwork = base / "assets" / "anything_plays_v21.webp"', tkicon)
 
     def test_precleaned_transparent_corner_icon_untouched(self):
         image = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
