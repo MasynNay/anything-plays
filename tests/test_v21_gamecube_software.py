@@ -12,6 +12,7 @@ from anything_plays.gamecube_software import (
 )
 from anything_plays.gba_emulator import CoreSession, Emulator
 from anything_plays.libretro_input import InputBuffer
+from anything_plays.libretro_video import SOFTWARE_RGBA8888
 
 
 class DolphinInPanelTests(unittest.TestCase):
@@ -80,7 +81,7 @@ class DolphinInPanelTests(unittest.TestCase):
             emulator = Emulator()
             with patch("pathlib.Path.home", return_value=home):
                 session = CoreSession(emulator, "gamecube", rom, core)
-            self.assertEqual(session.pixel_format, 1)
+            self.assertEqual(session.pixel_format, SOFTWARE_RGBA8888)
             self.assertIsInstance(session._software_options, DolphinSoftwareOptions)
             system_path = C.c_char_p()
             save_path = C.c_char_p()
