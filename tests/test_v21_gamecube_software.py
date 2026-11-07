@@ -32,6 +32,12 @@ class DolphinInPanelTests(unittest.TestCase):
         self.assertTrue(options.environment(15, C.addressof(resolution)))
         self.assertEqual(resolution.value, b"1")
         self.assertFalse(options.environment(14, None))
+        changed = C.c_bool()
+        self.assertTrue(options.environment(17, C.addressof(changed)))
+        self.assertTrue(changed.value)  # Must populate upstream option cache.
+        self.assertTrue(options.environment(17, C.addressof(changed)))
+        self.assertFalse(changed.value)  # Immutable session does not spam.
+
         # Never call addressof() on an inline temporary: once argument
         # evaluation ends, CPython may free that native structure before
         # the callback dereferences its integer address.
@@ -40,6 +46,17 @@ class DolphinInPanelTests(unittest.TestCase):
         self.assertEqual(version.value, 0)
         unknown = RetroVariable(b"unrecognized", None)
         self.assertFalse(options.environment(15, C.addressof(unknown)))
+
+    def test_each_dolphin_session_has_one_independent_initial_option_refresh(self):
+        first = DolphinSoftwareOptions()
+        second = DolphinSoftwareOptions()
+        flag = C.c_bool()
+        self.assertTrue(first.environment(17, C.addressof(flag)))
+        self.assertTrue(flag.value)
+        self.assertTrue(first.environment(17, C.addressof(flag)))
+        self.assertFalse(flag.value)
+        self.assertTrue(second.environment(17, C.addressof(flag)))
+        self.assertTrue(flag.value)
 
     def test_bundled_core_and_sys_are_required(self):
         with TemporaryDirectory() as tmp:

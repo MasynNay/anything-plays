@@ -118,6 +118,11 @@ class DolphinSoftwareOptions:
     def __init__(self):
         # Keep Python byte strings referenced until the native core unloads.
         self.values = dict(SOFTWARE_OPTIONS)
+        # DolphinLibretro/Common/Options.cpp calls CheckForUpdatedVariables
+        # during its very first retro_init(). Without this first true, its
+        # startup core-option cache is never populated, including requested
+        # CPU mode, graphics renderer, and internal resolution.
+        self._initial_options_pending = True
 
     def environment(self, command, data):
         """Return None when another part of the frontend should handle a call."""
@@ -131,7 +136,10 @@ class DolphinSoftwareOptions:
         if command == 16:  # SET_VARIABLES (core may supply option definitions)
             return True
         if command == 17 and data:  # GET_VARIABLE_UPDATE
-            C.cast(data, C.POINTER(C.c_bool))[0] = False
+            # Report the first startup configuration exactly once, then keep
+            # the immutable native-session options stable until teardown.
+            C.cast(data, C.POINTER(C.c_bool))[0] = self._initial_options_pending
+            self._initial_options_pending = False
             return True
         if command == 52 and data:  # GET_CORE_OPTIONS_VERSION
             # Ask upstream Dolphin for the backward-compatible v0 options.

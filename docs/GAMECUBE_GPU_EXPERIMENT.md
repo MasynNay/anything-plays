@@ -99,3 +99,17 @@ can independently indicate whether emulated video field boundaries occur.
 No native memory pointers are held between calls and samples are short-lived.
 As previous 75-second probes showed no improvement, short targeted CI tests
 are used in this diagnostic instead of repeated long waits.
+
+
+## Libretro core-option startup handshake fix
+
+Review of pinned `DolphinLibretro/Common/Options.cpp` identified an actual
+frontend ABI mistake: Anything Plays previously responded with
+`RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE=false` **even on the initial
+startup call**. Pinned Dolphin's `Options::Init()` invokes
+`CheckForUpdatedVariables()` to populate its option cache, so that false
+suppressed initial graphics/CPU configuration. `DolphinSoftwareOptions`
+now returns true **once per new session** and false thereafter, letting
+Dolphin load its startup option values and avoiding perpetual refreshes.
+A native playback test is still necessary; the fix alone does not certify
+GameCube or allow enabling it for end users.
