@@ -940,3 +940,58 @@ results in #26; do NOT claim pass before user reports it.
 
 **Important:** roadmap's forward-looking ideas are proposals, not committed
 release features. Review statuses only after verified engineering work.
+
+
+## November 7, 2026 — Linux GameCube permission failure (real-device report)
+
+**Physical testing:** User reports **Windows full preview worked with no
+issues in features tried** (partial smoke; not complete console certification).
+On Linux the other previously tested consoles seem functional, but GameCube
+startup fails with:
+
+```
+[Errno 13] Permission denied:
+'/opt/anything-plays-30-preview/cores/dolphin-emu/Sys/codehandler.bin'
+```
+
+**Root cause:** `CoreSession._make_system_directory` previously returned
+the immutable packaged `/opt/.../cores` parent as
+`RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY`. Native Dolphin tries opening
+`dolphin-emu/Sys/codehandler.bin` for write, which cannot work as a normal
+nonroot Linux user after installing a DEB. CI previously exercised a writable
+staging directory rather than a read-only extracted DEB and missed this.
+
+**Implemented on 3.0 development branch, pending CI verification:**
+- `anything_plays/gamecube_sys.py` stages a validated copy of **all** Sys
+  files under `$XDG_DATA_HOME/anything-plays/dolphin-system/<sha256>`
+  (or `~/.local/share/anything-plays/dolphin-system/<sha256>`) on Linux.
+  Cache fingerprint covers each filename, size and SHA-256; it verifies
+  cached bytes, detects tampering, rejects links and oversized payloads,
+  uses an exclusive Linux file lock and atomic replacement. Files in the
+  user copy are owner-writable; the bundled source, core binary and ROMs
+  remain untouched. Other OS paths remain unchanged.
+- `anything_plays/gba_emulator.py` passes this new system root to Dolphin
+  through its existing Libretro environment callback. GameCube save
+  directory remains independently user-writable as before.
+- `tests/test_v30_gamecube_linux_writable_sys.py` checks root-owned-style
+  read-only Sys, real Libretro GET_SYSTEM_DIRECTORY, writable
+  codehandler.bin, unchanged source, save directory separation, cached
+  copy repair, symlink rejection and non-Linux compatibility.
+- `.github/workflows/v30-full-bundle.yml` runs the new tests and now
+  extracts the **actual Linux DEB**, makes the installed tree read-only,
+  then runs the real GPU GameCube homebrew playback probe against that
+  packaged core. This is a release-gating regression; no fake success.
+- GitHub [Linux QA #25](https://github.com/MasynNay/anything-plays/issues/25)
+  documents this physical blocker; [Windows QA #26](https://github.com/MasynNay/anything-plays/issues/26)
+  records positive partial physical testing.
+
+**Verification pending at time of this checkpoint:**
+[full offline build 42418643784](https://github.com/MasynNay/anything-plays/actions/runs/42418643784)
+and [app/source regression 42418643783](https://github.com/MasynNay/anything-plays/actions/runs/42418643783).
+Do NOT claim a completed Linux fix or link an unverified new installer
+until these complete successfully. User should NOT chmod or chown /opt or
+run the GUI as root. Stable main/v2.0 remain unchanged.
+
+If stream fails, inspect current workflow run statuses, fix any CI failures,
+append verified results and give the user the new Linux full offline artifact
+to test on their actual machine.
