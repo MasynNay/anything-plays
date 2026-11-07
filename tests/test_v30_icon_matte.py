@@ -1,5 +1,6 @@
 """Ensure native and Tk icons contain no opaque black exterior halo."""
 from pathlib import Path
+import hashlib
 import unittest
 from tempfile import TemporaryDirectory
 
@@ -78,6 +79,16 @@ class IconMatteTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1] / "assets" / "anything_plays_v21.webp"
         self.assertEqual(SOURCE, source)
         self.assertEqual(source.name, "anything_plays_v21.webp")
+        # Pin the Git blob of the PRE-EXISTING original icon, not a newly
+        # generated fish. This test fails if anybody substitutes artwork.
+        data = source.read_bytes()
+        blob_sha = hashlib.sha1(
+            b"blob " + str(len(data)).encode() + b"\\0" + data
+        ).hexdigest()
+        self.assertEqual(
+            blob_sha, "c620c4154e80768687dfde4c0541f544779af2ff",
+            "Original user-approved fish artwork was replaced!",
+        )
         renderer = (source.parents[1] / "tools" / "render_v21_icon.py").read_text("utf-8")
         tkicon = (source.parents[1] / "anything_plays" / "ui_icon.py").read_text("utf-8")
         self.assertIn('SOURCE = ROOT / "assets" / "anything_plays_v21.webp"', renderer)
