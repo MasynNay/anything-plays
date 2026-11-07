@@ -107,6 +107,29 @@ class LayoutMixin:
         self.shortcuts_button = ttk.Button(view_row, text='Keyboard shortcuts',
                                            command=self.configure_shortcuts)
         self.shortcuts_button.pack(side='right')
+        # Put audio where the player actually watches the game. Gain applies
+        # to ALL native cores, not the host operating system or browser.
+        volume_row = ttk.Frame(game)
+        volume_row.pack(fill='x', pady=(8, 0))
+        ttk.Label(volume_row, text='Game volume').pack(side='left', padx=(0, 8))
+        self.volume_slider = ttk.Scale(
+            volume_row, from_=0, to=100, orient='horizontal',
+            variable=self.volume_percent, command=self.set_game_volume,
+        )
+        self.volume_slider.pack(side='left', fill='x', expand=True)
+        self.volume_slider.bind(
+            '<ButtonRelease-1>', lambda _event: self.set_game_volume(save=True)
+        )
+        self.volume_slider.bind(
+            '<KeyRelease>', lambda _event: self.set_game_volume(save=True)
+        )
+        ttk.Label(volume_row, textvariable=self.volume_label, width=5).pack(
+            side='left', padx=(8, 4)
+        )
+        ttk.Button(
+            volume_row, textvariable=self.mute_button_text,
+            command=self.toggle_game_mute, style='Compact.TButton',
+        ).pack(side='right')
         download_row = ttk.Frame(game)
         download_row.pack(fill='x', pady=(7, 0))
         ttk.Label(download_row, text='Emulator status:').pack(side='left')
