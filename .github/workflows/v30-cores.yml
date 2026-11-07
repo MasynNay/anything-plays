@@ -152,87 +152,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  ngp-mit-homebrew-video-audio:
-    # Third-party MIT homebrew, immutable commit and blob-integrity pinned.
-    # Downloaded only inside disposable CI and never shipped in app installs.
-    # A native NGP/NGPC job failure is a real emulator-verification failure:
-    # require RGB, PCM, manual A and camera B; do not hide red jobs behind
-    # a successful core-download or 'continue-on-error' workflow badge.
-    continue-on-error: false
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngp}
-          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngpc}
-          - {os: windows-2025, target: windows-x64, ext: dll, system: ngp}
-          - {os: windows-2025, target: windows-x64, ext: dll, system: ngpc}
-          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngp}
-          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngpc}
-          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngp}
-          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngpc}
-    runs-on: \${{ matrix.os }}
-    timeout-minutes: 15
-    env:
-      AP_V30_TEST_CORES: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install Linux Libretro runtime dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-      - name: Install Python requirements
-        run: python -m pip install -r requirements.txt
-      - name: Obtain embedded Mednafen NeoPop test core
-        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
-      - name: Require pinned MIT homebrew native LCD and PCM
-        run: |
-          python tools/probe_ngp_mit_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_ngp_libretro.${{ matrix.ext }} --seconds 12 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-mit-video-audio.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: AnythingPlays-3.0-MIT-homebrew-${{ matrix.system }}-AV-${{ matrix.target }}
-          path: test-evidence/
-          if-no-files-found: warn
-          retention-days: 14
-
-  ngpc-cartridge-flash-restart-experiment:
-    # Experimental legal StarGunner flash-save test. A failure is preserved
-    # in native job/artifact evidence, and cannot authorize 3.0 release.
-    # Do NOT call this verified based only on overall workflow success;
-    # this job is exploratory until its actual 3-process persistence gate passes.
-    continue-on-error: true
-    runs-on: ubuntu-24.04
-    timeout-minutes: 18
-    env:
-      AP_V30_TEST_CORES: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install Linux native dependencies
-        run: |
-          sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-      - name: Install Python requirements
-        run: python -m pip install -r requirements.txt
-      - name: Obtain pinned emulator test core
-        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
-      - name: Prove options change persists across THREE native cold starts
-        run: |
-          python tools/probe_ngp_flash_persistence.py --core cores/mednafen_ngp_libretro.so --seconds 12 --report test-evidence/ngpc-flash-three-cold-starts.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: AnythingPlays-3.0-EXPERIMENTAL-NGPC-flash-cold-restart
-          path: test-evidence/
-          if-no-files-found: warn
-          retention-days: 14
+  # NGP/NGPC verification was moved to .github/workflows/v30-ngp.yml.
+  # Its eight native RGB/PCM/control jobs and experimental cold-restart
+  # flash proof run independently, avoiding repeated cancellation behind
+  # the 80+ other emulator jobs in this cross-platform matrix.
 
   wswan-original-screen-psg:
     # Original V30MZ cartridges, no downloaded game assets, source-generated
