@@ -88,6 +88,12 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
             native_init = self.init
             native_load = self.load
             native_run = self.run
+            native_device = self.set_controller_device
+            if native_device is not None:
+                def traced_device(port, device):
+                    stage(f"retro_set_controller_port_device port={port} device={device}")
+                    return native_device(port, device)
+                self.set_controller_device = traced_device
             self._runs = 0
 
             def traced_init():
@@ -140,6 +146,19 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
     emu.core_path = str(core)
     emu.inputs.system = "gamecube"
     emu.armed = False
+    input_callback_calls = 0
+    nonzero_input_samples = 0
+    original_input_state = emu.inputs.state
+
+    def observe_input_state(port, device, index, button_id):
+        nonlocal input_callback_calls, nonzero_input_samples
+        result = original_input_state(port, device, index, button_id)
+        input_callback_calls += 1
+        if result:
+            nonzero_input_samples += 1
+        return result
+
+    emu.inputs.state = observe_input_state
     stage("creating game session")
     session = ProbeSession(emu, "gamecube", rom, str(core))
     stage("game session created")
@@ -241,6 +260,8 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         "nonblank_sampled_frames": nonblank_frames,
         "unique_nonblank_rgb_frames": len(unique_nonblank_frames),
         "controller_input_exercised": exercise_controls,
+        "input_callback_calls": input_callback_calls,
+        "nonzero_gamecube_input_samples": nonzero_input_samples,
         "last_rgb_shape": last_shape,
         "seconds_elapsed": elapsed,
         **evidence,

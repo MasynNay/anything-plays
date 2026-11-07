@@ -3,7 +3,7 @@ import ctypes as C
 import gc
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import unittest
 
 from anything_plays.gamecube_software import (
@@ -130,6 +130,42 @@ class DolphinInPanelTests(unittest.TestCase):
         self.assertLess(state[(5, 0, 0)], 0)   # Left stick X
         self.assertLess(state[(5, 1, 1)], 0)   # C-stick Y
         self.assertEqual(gamecube_state({"Left", "Right"}).get((5, 0, 0), 0), 0)
+
+    def test_gamecube_explicitly_connects_controller_after_core_accepts_rom(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"synthetic")
+            rom = root / "owned.dol"
+            rom.write_bytes(b"synthetic")
+            with patch("pathlib.Path.home", return_value=root):
+                session = CoreSession(Emulator(), "gamecube", rom, core)
+            session.native = Mock()
+            session.native.load.return_value = True
+            session._load_game()
+            session.native.set_controller_device.assert_called_once_with(0, 1)
+            self.assertTrue(session.native.loaded)
+
+    def test_gamecube_no_controller_api_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            sysdir = root / "dolphin-emu" / "Sys"
+            sysdir.mkdir(parents=True)
+            (sysdir / "codehandler.bin").write_bytes(b"synthetic")
+            rom = root / "owned.dol"
+            rom.write_bytes(b"synthetic")
+            with patch("pathlib.Path.home", return_value=root):
+                session = CoreSession(Emulator(), "gamecube", rom, core)
+            session.native = Mock()
+            session.native.load.return_value = True
+            session.native.set_controller_device = None
+            with self.assertRaisesRegex(RuntimeError, "controller-port"):
+                session._load_game()
 
     def test_camera_and_keyboard_input_neutralize_safely_on_stop(self):
         inputs = InputBuffer()

@@ -54,6 +54,15 @@ class NativeCore:
         )
         self.set_poll = self._function("retro_set_input_poll", None, [INPUT_POLL])
         self.set_state = self._function("retro_set_input_state", None, [INPUT_STATE])
+        # The Libretro ABI allows the frontend to choose the device for each
+        # port. Dolphin requires an explicit GameCube pad on port zero: merely
+        # registering an input_state callback leaves its controller unset.
+        self.set_controller_device = getattr(
+            self.library, "retro_set_controller_port_device", None
+        )
+        if self.set_controller_device is not None:
+            self.set_controller_device.argtypes = [C.c_uint, C.c_uint]
+            self.set_controller_device.restype = None
         self.init = self._function("retro_init", None, [])
         self.deinit = self._function("retro_deinit", None, [])
         self.load = self._function("retro_load_game", C.c_bool, [C.POINTER(GameInfo)])
@@ -234,6 +243,15 @@ class CoreSession:
                 "Check the Terminal for details."
             )
         self.native.loaded = True
+        if self.system == "gamecube":
+            # Initialize only after Dolphin has accepted game content and
+            # created its input/serial-interface subsystems. Without this,
+            # a test can advance hundreds of emulated frames while every
+            # camera and manual controller button is disconnected.
+            select_device = getattr(self.native, "set_controller_device", None)
+            if select_device is None:
+                raise RuntimeError("Dolphin Libretro core has no controller-port API")
+            select_device(0, 1)  # Player 1: RETRO_DEVICE_JOYPAD
 
     def persist_game_progress(self):
         """Keep gameplay alive if a removable/network ROM drive stops writing."""

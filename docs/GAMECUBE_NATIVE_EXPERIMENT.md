@@ -119,3 +119,17 @@ segfaults on the separate emulated CPU thread inside executable JIT code
 and separate reports. The interpreter option is test-only; installed-player
 settings and release readiness remain unchanged. These two outcomes will
 help distinguish JIT-specific behavior from the software render path.
+
+## Explicit GameCube controller-port initialization
+
+Dolphin Libretro requires the frontend to select a controller type on port
+zero. Registering an input callback alone can leave the emulator with no
+active GameCube pad. The shared Libretro frontend now calls the exported
+`retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD)` **after** a
+GameCube game is successfully loaded, with no change to non-GameCube
+emulators. The isolated homebrew test records both actual native
+`input_state` callback counts and nonzero input samples while pulsing buttons.
+
+This addresses an input-lifecycle omission; it does not by itself certify
+rendering speed, audio or GameCube compatibility. Keep the release gate closed
+until real updated frames and usable controls are observed.
