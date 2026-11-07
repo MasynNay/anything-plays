@@ -102,6 +102,25 @@ def main():
                     assert not app.arm_button.instate(("disabled",))
                     assert not app.shortcuts_button.instate(("disabled",))
 
+                    # Every 2.1 console must be switchable inside the same
+                    # application, with its own controls and without opening
+                    # an external emulator or losing the Tk game panel.
+                    from anything_plays.systems import SYSTEMS
+                    from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
+                    for console, profile in SYSTEMS.items():
+                        app.system_key.set(console)
+                        app.switch_system()
+                        assert app.system_description.cget("text") == profile.title
+                        assert app.uses_embedded_emulator()
+                        assert not app.external_setup.winfo_manager()
+                        assert app.game_canvas.winfo_exists()
+                        assert all(
+                            name in app.cfg["mapping"]
+                            for name in BUTTONS_BY_SYSTEM[console]
+                        ), console
+                    app.system_key.set("genesis")
+                    app.switch_system()
+
                     # Selecting the wrong ROM directory must not block Tk.
                     roms = Path(temp_home) / "roms"
                     roms.mkdir()
