@@ -95,7 +95,10 @@ def run_paired_core_experiment(report, seconds=12):
             ))
             result["download_verified"] = True
             root_directory = packaged_dolphin_system_directory(core_file)
-            if root_directory != core_file.parent:
+            # On macOS /var is an alias for /private/var. The validated
+            # system directory resolves symlinks, while the temporary file
+            # path may not. Compare canonical paths, never raw strings.
+            if root_directory.resolve() != core_file.parent.resolve():
                 raise AssertionError("Dolphin Sys root is not next to installed core")
             if managed_core_path("dolphin", root=managed) != str(core_file):
                 raise AssertionError("Active managed Dolphin core cannot be resolved")
