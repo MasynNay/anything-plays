@@ -41,7 +41,7 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
 set "CORE_LIST=mgba snes9x"
-if "%AP_V21_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64"
+if "%AP_V21_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin"
 for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
@@ -49,6 +49,16 @@ for %%C in (%CORE_LIST%) do (
 )
 copy /Y "cores\CORE_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
 if errorlevel 1 exit /b 1
+if "%AP_V21_TEST_CORES%"=="1" (
+  if not exist "cores\dolphin-emu\Sys\codehandler.bin" (
+    echo Missing bundled Dolphin Sys resources
+    exit /b 1
+  )
+  xcopy /E /I /Y "cores\dolphin-emu" "dist\AnythingPlays\cores\dolphin-emu" >nul
+  if errorlevel 1 exit /b 1
+  copy /Y "cores\DOLPHIN_SYS_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
+  if errorlevel 1 exit /b 1
+)
 REM Include project and third-party licensing documentation.
 if not exist dist\AnythingPlays\licenses mkdir dist\AnythingPlays\licenses
 copy /Y LICENSE dist\AnythingPlays\licenses\AnythingPlays-MIT.txt >nul
