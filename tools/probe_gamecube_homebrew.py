@@ -209,6 +209,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
     session.video = observe_video
     control_stop = threading.Event()
     control_worker = None
+    exercise_controls = bool(exercise_controls or fast_controls)
     if exercise_controls:
         def exercise():
             # GC-Controller-Test is mostly static until controller state
@@ -309,7 +310,7 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
         "packaged_core": str(core),
         "cpu_core_mode": cpu_core or "default",
         "single_core": single_core,
-        "controller_input_exercised": exercise_controls,
+        "controller_input_exercised": bool(exercise_controls or fast_controls),
         "fast_controller_stimulus": fast_controls,
         "seconds_requested": seconds,
         "probe_passed": False,

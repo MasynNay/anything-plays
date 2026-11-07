@@ -136,6 +136,7 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
                 ), 1)
             saved = json.loads(report.read_text())
             self.assertTrue(saved["fast_controller_stimulus"])
+            self.assertTrue(saved["controller_input_exercised"])
             self.assertFalse(saved["probe_passed"])
 
     def test_synchronous_cpu_gpu_flag_reaches_child_without_installing_dolphin(self):

@@ -134,3 +134,18 @@ This addresses an input-lifecycle omission; it does not by itself certify
 rendering speed, audio or GameCube compatibility. Keep the release gate closed
 until real updated frames and usable controls are observed.
 \n\n## Event-driven homebrew versus actual graphics throughput\n\nThe upstream zlib-licensed GC-Controller-Test DOL primarily redraws in response\nto controller changes, not continuously at 60 Hz. With the repaired\n`retro_set_controller_port_device(0, 1)` lifecycle, cached-interpreter tests\nreached 19 real video callbacks, 10 distinct frames and 680 nonzero controller\nsamples over 20 seconds. This does **not** mean the entire GameCube renderer\nruns at only 0.95 emulated frames/second.\n\nThe native diagnostic now reports `core_emulation_steps` and\n`emulation_steps_per_second` separately from video callbacks, and includes a\nfast controller-input stimulus for an event-driven redraw test. Passing that\nstatic homebrew test is **not** adequate evidence for sustained 3D-game speed.\nReal continuously animated, legally supplied GameCube content, audio, save\nbehavior, Linux/Windows/macOS GPU support and long-running stability must\nall pass before release.\n
+## High-rate controller stress test evidence
+
+CI run 42342251254 (reviewed patched Libretro Dolphin source, Linux, debugger)
+confirmed ~49.69 native `retro_run` iterations per second for the cached
+interpreter, 146 software video callbacks during 20 seconds of rapid button
+pulses, seven sampled distinct RGB frames, 63,840 real native input callback
+requests and 1,908 nonzero controller samples. The 7.28 Hz callback rate on
+this controller-driven mostly static UI is **not** a measured 3D game rendering
+rate. It does verify that simulated GameCube input reaches emulated gameplay
+and produces changing software-renderer pixels inside the application.
+
+The default JIT still faults, and no full-motion commercial game, physical
+audio device, or save game QA passed. Do not ship Dolphin or mark GameCube
+fully supported until the complete GPU path, license provenance and
+cross-platform native runtime pass the release gate.
