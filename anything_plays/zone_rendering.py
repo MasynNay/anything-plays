@@ -41,7 +41,6 @@ def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, 
     # Map the user-facing 75–100 range to visibly distinct alpha levels.
     tint_alpha = round(25 + (opacity - 75) / 25 * 170)
     size = max(8, min(160, int(size)))
-    font = cached_zone_font(size)
     for name, (x1, y1, x2, y2) in zones.items():
         if name == 'Shuffle' and not shuffle_enabled:
             continue
@@ -79,24 +78,39 @@ def render_zone_overlay(frame, zones, mapping, active, *, opacity, size, style, 
             py = box[1] + (box[3] - box[1] - art.height) // 2
             # Keep artwork alpha; overlay opacity controls only zone fills.
             overlay.alpha_composite(art, (px, py))
-        label_box = draw.textbbox((0, 0), name, font=font, stroke_width=1)
-        tw = label_box[2] - label_box[0]
-        th = label_box[3] - label_box[1]
-        if label_position == 'Center':
-            lx = (box[0] + box[2] - tw - 20) // 2
-            ly = (box[1] + box[3] - th - 18) // 2
-        else:
-            lx, ly = box[0] + 5, box[1] + 5
-        lx = min(max(0, lx), max(0, width - tw - 20))
-        ly = min(max(0, ly), max(0, height - th - 18))
-        if style != 'Minimal':
-            draw.rounded_rectangle((lx, ly, lx+tw+20, ly+th+18), radius=7,
-                                   fill=(3, 16, 27, 242) if style == 'Bold' else (3, 21, 30, 225),
-                                   outline=(246, 252, 255, 220) if style == 'Bold' else None,
-                                   width=2)
-        draw.text((lx+10, ly+9-label_box[1]), name, font=font,
-                  fill=(255, 255, 255, 255), stroke_width=2 if style == 'Bold' else 1,
-                  stroke_fill=(0, 0, 0, 255))
+        # Font size is a preference, not permission to cover adjacent zones.
+        # Fit long names (e.g. "C Right") within their own control rectangle.
+        available_w = max(1, box[2] - box[0] - 12)
+        available_h = max(1, box[3] - box[1] - 12)
+        label_size = min(size, max(8, available_h - 18))
+        while True:
+            font = cached_zone_font(label_size)
+            label_box = draw.textbbox((0, 0), name, font=font, stroke_width=2)
+            tw = label_box[2] - label_box[0]
+            th = label_box[3] - label_box[1]
+            if (tw + 20 <= available_w and th + 18 <= available_h) or label_size <= 8:
+                break
+            label_size -= 1
+        # A min-size font may still exceed a very narrow custom-drawn zone.
+        # Skip its text rather than painting across neighboring buttons.
+        if tw + 20 > available_w or th + 18 > available_h:
+            font = None
+        if font is not None:
+            if label_position == 'Center':
+                lx = (box[0] + box[2] - tw - 20) // 2
+                ly = (box[1] + box[3] - th - 18) // 2
+            else:
+                lx, ly = box[0] + 5, box[1] + 5
+            lx = min(max(0, lx), max(0, width - tw - 20))
+            ly = min(max(0, ly), max(0, height - th - 18))
+            if style != 'Minimal':
+                draw.rounded_rectangle((lx, ly, lx+tw+20, ly+th+18), radius=7,
+                                       fill=(3, 16, 27, 242) if style == 'Bold' else (3, 21, 30, 225),
+                                       outline=(246, 252, 255, 220) if style == 'Bold' else None,
+                                       width=2)
+            draw.text((lx+10, ly+9-label_box[1]), name, font=font,
+                      fill=(255, 255, 255, 255), stroke_width=2 if style == 'Bold' else 1,
+                      stroke_fill=(0, 0, 0, 255))
         # Draw the four-sided border LAST, on top of artwork and labels.
         # Keep the entire stroke inside the image, even for edge zones.
         stroke = min(20, border_width + 4) if chosen else (border_width if style != 'Minimal' else 0)

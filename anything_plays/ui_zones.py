@@ -19,6 +19,28 @@ class ZonesMixin:
     and ``LayoutMixin.build``. They are not standalone widgets.
     """
 
+    def set_zone_label_size(self, size):
+        """Apply the camera label size without altering tracking geometry."""
+        self.zone_font_size.set(max(8, min(160, int(size))))
+        self.schedule_zone_label_size_save()
+
+    def schedule_zone_label_size_save(self, _value=None):
+        """Debounce profile writes while a user drags the preview slider."""
+        previous = getattr(self, '_zone_label_save_job', None)
+        if previous is not None:
+            self.root.after_cancel(previous)
+        self._zone_label_save_job = self.root.after(
+            350, self.save_zone_label_size,
+        )
+
+    def save_zone_label_size(self):
+        """Keep the chosen label size in the active console's profile."""
+        self._zone_label_save_job = None
+        if getattr(self, '_closing', False):
+            return
+        self.read_settings()
+        self.profile_store.put(self.system_key.get(), self.cfg)
+
     def choose_zone_art(self):
         path = filedialog.askopenfilename(title='Choose zone artwork',
                                           filetypes=[('PNG images', '*.png')])
