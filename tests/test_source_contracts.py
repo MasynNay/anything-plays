@@ -104,7 +104,7 @@ class SourceContracts(unittest.TestCase):
     def test_linux_verifies_extracted_debian_payload(self):
         script = (ROOT / "packaging/build_linux_deb.sh").read_text(encoding="utf-8")
         self.assertIn('dpkg-deb -x', script)
-        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-21-test"', script)
+        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-30-preview"', script)
 
     def test_ui_boundary_is_explicit(self):
         from app import App

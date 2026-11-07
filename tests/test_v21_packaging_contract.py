@@ -22,7 +22,8 @@ class PackagingContractTests(unittest.TestCase):
         self.assertIn('AnythingPlays30Preview.app', script)
         self.assertIn('com.anythingplays.preview30', script)
         self.assertIn('release/AnythingPlays-3.0.0-alpha.1.dmg', script)
-        self.assertIn('dist/AnythingPlays30Preview.app', ci)
+        self.assertIn('AnythingPlays-3.0.0-alpha1-macOS-', ci)
+        self.assertIn('dist/AnythingPlays30Preview.app', script)
         self.assertIn('release/AnythingPlays-3.0.0-alpha.1.dmg', ci)
 
     def test_linux_alpha_package_is_unique_and_launchable(self):
