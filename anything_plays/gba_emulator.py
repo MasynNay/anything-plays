@@ -19,7 +19,6 @@ import time
 from anything_plays.core_locator import find_core
 from anything_plays.gamecube_software import (
     DolphinSoftwareOptions, find_dolphin_core,
-    packaged_dolphin_system_directory,
 )
 from anything_plays.libretro_abi import (
     AUDIO, AUDIO_BATCH, AVInfo, CoreInfo, ENV, GameInfo, INPUT_POLL,
@@ -170,9 +169,13 @@ class CoreSession:
 
     def _make_system_directory(self):
         if self.system == "gamecube":
-            # Abort before loading a core if the one-click installer omitted
-            # Dolphin's mandatory game-compatibility system files.
-            folder = packaged_dolphin_system_directory(self.core_path)
+            # Dolphin opens Sys/codehandler.bin with write access. The Linux
+            # DEB installs cores under root-owned /opt, so pointing Libretro
+            # at the immutable packaged Sys causes EACCES on real desktops.
+            # Stage a verified, user-writable XDG copy (Linux only); preserve
+            # the bundled Sys, other OS paths, and existing save locations.
+            from anything_plays.gamecube_sys import writable_dolphin_system_directory
+            folder = writable_dolphin_system_directory(self.core_path)
         elif sys.platform == "darwin":
             folder = Path.home() / "Library" / "Application Support" / "AnythingPlays"
         else:
