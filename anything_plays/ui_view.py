@@ -67,6 +67,28 @@ class ViewMixin:
                            highlightthickness=0, takefocus=1)
         self._game_only_canvas = canvas
         canvas.pack(fill="both", expand=True)
+        # Game-only mode still needs a mouse-accessible sound control.
+        # Keep a compact overlay at the bottom instead of leaving the game
+        # entirely to access volume or change OS master volume.
+        sound = ttk.Frame(popup)
+        sound.place(relx=0.5, rely=1.0, anchor="s", y=-12)
+        ttk.Label(sound, text="Game audio").pack(side="left", padx=(8, 5))
+        sound_scale = ttk.Scale(
+            sound, from_=0, to=100, orient="horizontal",
+            length=170, variable=self.volume_percent,
+            command=self.set_game_volume,
+        )
+        sound_scale.pack(side="left", padx=(2, 6), pady=5)
+        sound_scale.bind(
+            "<ButtonRelease-1>", lambda _: self.set_game_volume(save=True)
+        )
+        ttk.Label(sound, textvariable=self.volume_label, width=5).pack(
+            side="left"
+        )
+        ttk.Button(
+            sound, textvariable=self.mute_button_text,
+            command=self.toggle_game_mute,
+        ).pack(side="left", padx=(4, 8))
         canvas.bind("<Button-1>", self.activate_manual)
         canvas.bind("<KeyPress>", self.manual_key_down)
         canvas.bind("<KeyRelease>", self.manual_key_up)
