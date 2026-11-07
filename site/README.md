@@ -25,3 +25,7 @@ To add this project to the main `masynnay.com` portfolio, add a project tile lin
 4. Use the custom domain only after Pages deployment has finished. The successful DNS check alone does not publish the website.
 
 The desktop app's source, runtime, installation and release workflows are unchanged by portfolio deployment.
+
+## Screenshot provenance
+
+`assets/anything-plays-desktop-preview.webp` is a real capture of the **packaged 3.0 Linux preview** running in a clean virtual X11 display, cropped to the Tk app window. No commercial ROM, personal webcam data or synthetic game footage appears in it. It is a UI reference, not a compatibility guarantee for 3.0.

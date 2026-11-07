@@ -37,6 +37,7 @@ jobs:
           test -f site/CNAME
           test -f site/.nojekyll
           test -f site/assets/anything-plays-original.webp
+          test -f site/assets/anything-plays-desktop-preview.webp
           grep -qx 'anythingplays.masynnay.com' site/CNAME
           grep -q 'id="studio"' site/index.html
           grep -q 'id="roadmap"' site/index.html
