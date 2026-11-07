@@ -246,4 +246,9 @@ def main():
 
 
 if __name__ == '__main__':
+    # PyInstaller/macOS child processes use --multiprocessing-fork.
+    # Intercept those launches BEFORE Tk initializes or a second app window
+    # appears while isolating N64's native core per ROM.
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()
