@@ -232,7 +232,7 @@ jobs:
     # Compile from GPL source only when a native(dolphin) change is submitted.
     # This is a developer test; it does not add unaudited modified binaries
     # to any public Anything Plays installer.
-    if: ${{ contains(github.event.head_commit.message, 'native(dolphin)') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(dolphin)') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
