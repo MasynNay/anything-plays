@@ -64,6 +64,9 @@ jobs:
           python -X faulthandler -m unittest discover -s tests -v
       - name: Report 2.1 release blockers (development builds may proceed)
         run: python tools/check_v21_release.py --report-only
+      - name: Review GameCube open-source homebrew fixture checksum (candidate only)
+        continue-on-error: true
+        run: python tools/gamecube_homebrew_fixture.py --inspect
       - name: Tk startup, view controls and shutdown smoke test
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
       - name: 30-second sustained camera and game redraw soak
