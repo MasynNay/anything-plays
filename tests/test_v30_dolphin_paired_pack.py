@@ -165,7 +165,7 @@ class GameCubePairedPackTests(unittest.TestCase):
             sysfile.write_bytes(b"tampered")
             self.assertIsNone(core_packs.managed_core_path("dolphin", root=managed))
             # Reusing a corrupt immutable object must not reactivate it.
-            with self.assertRaisesRegex(ValueError, "integrity verification"):
+            with self.assertRaisesRegex(ValueError, "installed-file verification"):
                 core_packs.install_core_pack(
                     item_for(result), root=managed,
                     opener=lambda req, timeout: Response(Path(result["file"]).read_bytes())
