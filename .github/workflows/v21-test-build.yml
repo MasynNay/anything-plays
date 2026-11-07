@@ -248,7 +248,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config git gdb xvfb \
-            libgl1-mesa-dev libegl1-mesa-dev libx11-dev libxi-dev \
+            libgl1-mesa-dev libegl1-mesa-dev libx11-dev libxi-dev libxrandr-dev \
             libudev-dev libusb-1.0-0-dev libcurl4-openssl-dev \
             liblzma-dev zlib1g-dev libportaudio2
           python -m pip install -r requirements.txt
