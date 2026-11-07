@@ -136,6 +136,15 @@ jobs:
         run: |
           python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
           python tools/fetch_dolphin_sys.py cores > test-evidence/gc-opengl-sys-source.json
+      - name: Validate actual in-app GameCube GPU session with native PCM
+        id: gamecube_in_app
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so --seconds 15 \
+            --report test-evidence/gamecube-production-embedded.json
       - name: Probe accelerated Dolphin homebrew with default JIT
         id: accelerated_jit
         continue-on-error: true
@@ -210,6 +219,8 @@ jobs:
             test-evidence/gamecube-opengl-frame-*.png
             test-evidence/gamecube-opengl-first-*.png
             test-evidence/gc-opengl-sys-source.json
+            test-evidence/gamecube-production-embedded.json
+            test-evidence/gamecube-app-accelerated-frame.png
           if-no-files-found: warn
           retention-days: 14
 
