@@ -31,7 +31,8 @@ from tools.gamecube_homebrew_fixture import verified_homebrew
 MAX_LOG = 15000
 
 
-def _child(core, rom, report, seconds):
+def _child(core, rom, report, seconds, require_audio=False,
+           require_animated=False):
     import faulthandler
     faulthandler.enable(all_threads=True)
     import ctypes as C
@@ -150,10 +151,22 @@ def _child(core, rom, report, seconds):
         controller.join(timeout=2)
         emu.inputs.release_manual()
     elapsed = max(time.monotonic() - start, 0.001)
-    passed = (
+    core_visual_ok = (
         error is None and frame_callbacks >= 12 and sampled_nonblank >= 6
         and len(unique_frames) >= 3 and polls >= 100 and nonzero_polls >= 10
         and session.audio.pcm_frames >= 1000
+    )
+    continuous_video_ok = (
+        frame_callbacks / elapsed >= 20 and len(unique_frames) >= 8
+    )
+    real_audio_ok = (
+        session.audio.pcm_nonzero >= 200
+        and 8000 <= (session.audio.sample_rate or 0) <= 192000
+    )
+    passed = (
+        core_visual_ok
+        and (not require_animated or continuous_video_ok)
+        and (not require_audio or real_audio_ok)
     )
     evidence = {
         "system": "gamecube",
@@ -170,6 +183,11 @@ def _child(core, rom, report, seconds):
         "nonzero_controller_polls": nonzero_polls,
         "native_pcm_frame_samples": session.audio.pcm_frames,
         "native_pcm_nonzero_values": session.audio.pcm_nonzero,
+        "continuous_render_fps": round(frame_callbacks / elapsed, 2),
+        "continuous_video_20fps_requirement_met": continuous_video_ok,
+        "native_nonzero_pcm_requirement_met": real_audio_ok,
+        "continuous_animated_video_required": require_animated,
+        "nonzero_gamecube_audio_required": require_audio,
         "native_pcm_sample_rate": session.audio.sample_rate,
         "native_gpu_requests": session.hardware_requests,
         "requested_cpu_core": session._software_options.values.get(
@@ -189,7 +207,8 @@ def _child(core, rom, report, seconds):
     return 0 if passed else 1
 
 
-def _parent(core, report, seconds):
+def _parent(core, report, seconds, rom_override=None,
+            require_audio=False, require_animated=False):
     outcome = {
         "probe": "production embedded GameCube rendering / native sound",
         "passed": False, "native_exit_code": None,
@@ -202,13 +221,27 @@ def _parent(core, report, seconds):
             raise FileNotFoundError("Missing native Dolphin core")
         with tempfile.TemporaryDirectory(prefix="ap-v30-gamecube-app-") as tmp:
             root = Path(tmp)
-            rom = verified_homebrew(root / "GC-Controller-Test.dol")
+            if rom_override is not None:
+                own = Path(rom_override).resolve()
+                if (own.suffix.lower() != ".dol" or not own.is_file()
+                        or not 100 <= own.stat().st_size <= 4 * 1024 * 1024):
+                    raise ValueError("Expected an original bounded GameCube .dol")
+                rom = root / "AnythingPlays-Original-AV.dol"
+                shutil.copyfile(own, rom)
+                outcome["original_av_dol_sha256"] = hashlib.sha256(
+                    rom.read_bytes()).hexdigest()
+            else:
+                rom = verified_homebrew(root / "GC-Controller-Test.dol")
             child_report = root / "child.json"
             command = [
                 sys.executable, str(Path(__file__).resolve()), "--child",
                 "--core", str(core), "--rom", str(rom),
                 "--report", str(child_report), "--seconds", str(seconds),
             ]
+            if require_audio:
+                command.append("--require-audio")
+            if require_animated:
+                command.append("--require-animated")
             env = os.environ.copy()
             env["HOME"] = str(root)
             env["XDG_CONFIG_HOME"] = str(root / "config")
@@ -250,6 +283,10 @@ def main():
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--seconds", type=int, default=15)
     parser.add_argument("--rom", type=Path)
+    parser.add_argument("--require-audio", action="store_true",
+                        help="Require actual nonzero GameCube PCM samples")
+    parser.add_argument("--require-animated", action="store_true",
+                        help="Require continuously changing frames at >=20fps")
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args()
     if not 2 <= args.seconds <= 60:
@@ -259,9 +296,15 @@ def main():
             parser.error("--rom is required for child")
         return _child(
             args.core.resolve(), args.rom.resolve(),
-            args.report.resolve(), args.seconds
+            args.report.resolve(), args.seconds,
+            require_audio=args.require_audio,
+            require_animated=args.require_animated
         )
-    return _parent(args.core.resolve(), args.report.resolve(), args.seconds)
+    return _parent(
+        args.core.resolve(), args.report.resolve(), args.seconds,
+        rom_override=args.rom, require_audio=args.require_audio,
+        require_animated=args.require_animated
+    )
 
 
 if __name__ == "__main__":

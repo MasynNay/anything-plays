@@ -473,3 +473,50 @@ jobs:
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
+
+  gamecube-original-animated-video-and-dsp-tone:
+    # CI-only original homebrew, built from C source using devkitPPC.
+    # A static controller screen cannot verify continuous gameplay or audio.
+    # This gate demands nonzero *actual* native stereo PCM and >=20fps
+    # changing frames before GameCube sound is described as verified.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics and native audio dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Build original GameCube animated-and-audio homebrew (not distributed)
+        run: |
+          docker run --rm -v "$PWD/tools/gamecube-av-homebrew:/project" \
+            -w /project -e TARGET_CONSOLE=gamecube \
+            -u "$(id -u):$(id -g)" devkitpro/devkitppc make
+          test -s tools/gamecube-av-homebrew/anythingplays-gc-av-gamecube.dol
+      - name: Fetch native Dolphin and required Sys assets for CI
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Demand real continuously moving frames and audible-content PCM
+        run: |
+          mkdir -p test-evidence
+          xvfb-run -a python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so \
+            --rom tools/gamecube-av-homebrew/anythingplays-gc-av-gamecube.dol \
+            --require-animated --require-audio --seconds 12 \
+            --report test-evidence/gamecube-original-av-dsp.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-original-moving-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
