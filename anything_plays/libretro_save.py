@@ -37,6 +37,23 @@ def _fallback_path(rom_path):
     return _user_save_directory() / (stem + "-" + digest + ".sav")
 
 
+
+def native_core_save_directory(rom_path, system):
+    """Isolate cores that write their own battery/flash files on game unload.
+
+    Beetle NeoPop does not expose its cartridge flash through Libretro SRAM:
+    it reads and writes <ROM-stem>.flash under GET_SAVE_DIRECTORY itself.
+    Reusing a global save directory would make games in different ROM
+    libraries with the same filename overwrite each other's progress.
+    Keep the directory under the user's writable application data folder,
+    not next to a ROM on a removable/read-only drive.
+    """
+    if system not in ("ngp", "ngpc"):
+        raise ValueError("No native flash-save directory defined for this core")
+    fallback = _fallback_path(rom_path)
+    return fallback.parent / "native-core" / "neo-geo-pocket" / fallback.stem
+
+
 class SaveRAM:
     """Read and write memory type 0 (RETRO_MEMORY_SAVE_RAM)."""
 
