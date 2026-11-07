@@ -212,18 +212,58 @@ jobs:
       - name: Prepare exact test cores and Dolphin Sys data
         run: python fetch_mgba_core.py
       - name: Boot licensed GameCube homebrew inside Dolphin and capture native backtrace
+        id: dolphin_default
+        continue-on-error: true
         timeout-minutes: 3
         run: |
           PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_homebrew.py \
             --core cores/dolphin_libretro.so --seconds 12 \
             --debugger --report test-evidence/gamecube-homebrew-gdb.json
+      - name: Compare cached interpreter against default crash
+        id: dolphin_cached
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core cores/dolphin_libretro.so --seconds 12 --cpu-core 5 \
+            --debugger --report test-evidence/gamecube-homebrew-cached-gdb.json
+      - name: Require actual playable GameCube output
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          candidates = [
+              Path("test-evidence/gamecube-homebrew-gdb.json"),
+              Path("test-evidence/gamecube-homebrew-cached-gdb.json"),
+          ]
+          for candidate in candidates:
+              if not candidate.is_file():
+                  print("Missing GameCube native diagnostic:", candidate)
+                  continue
+              evidence = json.loads(candidate.read_text())
+              details = evidence.get("details") or {}
+              print(candidate.name, "exit=", evidence.get("child_returncode"),
+                    "timeout=", evidence.get("timed_out"),
+                    "frames=", details.get("video_callback_frames"),
+                    "nonblank=", details.get("nonblank_sampled_frames"),
+                    "fps=", details.get("frames_per_second_observed"),
+                    "pass=", evidence.get("probe_passed"))
+          if not any(
+              json.loads(candidate.read_text()).get("probe_passed") is True
+              for candidate in candidates if candidate.is_file()
+          ):
+              raise SystemExit("Dolphin GameCube native playback remains unverified")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: AnythingPlays-2.1-GameCube-native-debug-evidence
           path: |
             test-evidence/gamecube-homebrew-gdb.json
+            test-evidence/gamecube-homebrew-cached-gdb.json
             test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: warn
           retention-days: 21
