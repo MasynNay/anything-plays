@@ -22,6 +22,19 @@ class ProductionGameCubeProbeTests(TestCase):
                       "gpu_readback_fraction_elapsed"):
             self.assertIn(field, diagnostic)
 
+    def test_endurance_probe_reports_real_native_rss_growth(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "tools/probe_gamecube_app.py").read_text("utf-8")
+        for value in ("linux_rss_mb", "native_rss_growth_mb",
+                      "native_rss_growth_verified", "and memory_ok",
+                      "--max-growth-mb"):
+            self.assertIn(value, source)
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github/workflows/v30-endurance.yml").read_text("utf-8")
+        self.assertIn("--seconds 600", workflow)
+        self.assertIn("--max-growth-mb 192", workflow)
+        self.assertIn("--seconds 900", workflow)
+
     def test_native_crash_is_reported_without_marking_embedded_playback_ready(self):
         with TemporaryDirectory() as root:
             folder = Path(root)

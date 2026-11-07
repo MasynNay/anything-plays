@@ -30,9 +30,20 @@ from tools.gamecube_homebrew_fixture import verified_homebrew
 
 MAX_LOG = 15000
 
+def linux_rss_mb():
+    """Sample the actual native Dolphin worker's resident memory."""
+    if not sys.platform.startswith("linux"):
+        return None
+    try:
+        pages = int(Path("/proc/self/statm").read_text("ascii").split()[1])
+        return pages * os.sysconf("SC_PAGE_SIZE") / 1048576
+    except (OSError, IndexError, ValueError):
+        return None
+
+
 
 def _child(core, rom, report, seconds, require_audio=False,
-           require_animated=False):
+           require_animated=False, max_growth_mb=None):
     import faulthandler
     faulthandler.enable(all_threads=True)
     import ctypes as C
@@ -78,6 +89,7 @@ def _child(core, rom, report, seconds, require_audio=False,
     session.audio = ObservedActualAudioSink()
     original_video = session.video
     unique_frames = set()
+    rss_samples = []
     frame_callbacks = 0
     sampled_nonblank = 0
     preview = report.with_name("gamecube-app-accelerated-frame.png")
@@ -89,6 +101,10 @@ def _child(core, rom, report, seconds, require_audio=False,
         if emu.frame_serial == before:
             return
         frame_callbacks += 1
+        if frame_callbacks % 120 == 0:
+            resident = linux_rss_mb()
+            if resident is not None:
+                rss_samples.append((time.monotonic(), resident))
         if frame_callbacks <= 65 or frame_callbacks % 31 == 1:
             with emu.lock:
                 frame = emu.frame
@@ -163,10 +179,16 @@ def _child(core, rom, report, seconds, require_audio=False,
         session.audio.pcm_nonzero >= 200
         and 8000 <= (session.audio.sample_rate or 0) <= 192000
     )
+    warmup = min(90.0, max(5.0, seconds * 0.15))
+    stable = [v for when, v in rss_samples if when - start >= warmup]
+    growth = max(0.0, max(stable) - stable[0]) if stable else None
+    memory_ok = (max_growth_mb is None or
+                 (growth is not None and growth <= max_growth_mb))
     passed = (
         core_visual_ok
         and (not require_animated or continuous_video_ok)
         and (not require_audio or real_audio_ok)
+        and memory_ok
     )
     evidence = {
         "system": "gamecube",
@@ -193,6 +215,11 @@ def _child(core, rom, report, seconds, require_audio=False,
             1000.0 * session.gpu_readback_max_seconds, 3),
         "gpu_readback_fraction_elapsed": round(
             session.gpu_readback_seconds / elapsed, 4),
+        "rss_sample_count": len(rss_samples),
+        "rss_warmup_seconds": warmup,
+        "native_rss_growth_mb": None if growth is None else round(growth, 2),
+        "native_rss_growth_limit_mb": max_growth_mb,
+        "native_rss_growth_verified": memory_ok,
         "continuous_video_20fps_requirement_met": continuous_video_ok,
         "native_nonzero_pcm_requirement_met": real_audio_ok,
         "continuous_animated_video_required": require_animated,
@@ -217,7 +244,8 @@ def _child(core, rom, report, seconds, require_audio=False,
 
 
 def _parent(core, report, seconds, rom_override=None,
-            require_audio=False, require_animated=False):
+            require_audio=False, require_animated=False,
+            max_growth_mb=None):
     outcome = {
         "probe": "production embedded GameCube rendering / native sound",
         "passed": False, "native_exit_code": None,
@@ -251,6 +279,8 @@ def _parent(core, report, seconds, rom_override=None,
                 command.append("--require-audio")
             if require_animated:
                 command.append("--require-animated")
+            if max_growth_mb is not None:
+                command.extend(["--max-growth-mb", str(max_growth_mb)])
             env = os.environ.copy()
             env["HOME"] = str(root)
             env["XDG_CONFIG_HOME"] = str(root / "config")
@@ -296,10 +326,14 @@ def main():
                         help="Require actual nonzero GameCube PCM samples")
     parser.add_argument("--require-animated", action="store_true",
                         help="Require continuously changing frames at >=20fps")
+    parser.add_argument("--max-growth-mb", type=float,
+                        help="Bound RSS growth after warm-up, on Linux")
     parser.add_argument("--child", action="store_true")
     args = parser.parse_args()
-    if not 2 <= args.seconds <= 60:
-        parser.error("--seconds must be 2..60")
+    if not 2 <= args.seconds <= 1800:
+        parser.error("--seconds must be 2..1800")
+    if args.max_growth_mb is not None and not 0 <= args.max_growth_mb <= 4096:
+        parser.error("--max-growth-mb must be 0..4096")
     if args.child:
         if args.rom is None:
             parser.error("--rom is required for child")
@@ -307,12 +341,14 @@ def main():
             args.core.resolve(), args.rom.resolve(),
             args.report.resolve(), args.seconds,
             require_audio=args.require_audio,
-            require_animated=args.require_animated
+            require_animated=args.require_animated,
+            max_growth_mb=args.max_growth_mb,
         )
     return _parent(
         args.core.resolve(), args.report.resolve(), args.seconds,
         rom_override=args.rom, require_audio=args.require_audio,
-        require_animated=args.require_animated
+        require_animated=args.require_animated,
+        max_growth_mb=args.max_growth_mb,
     )
 
 
