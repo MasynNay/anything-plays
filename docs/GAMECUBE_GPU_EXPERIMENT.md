@@ -80,3 +80,22 @@ with one emulated CPU thread it instead executes `RunSingleFrame`.
 This can narrow down whether frontend frame stepping and GPU thread
 synchronization are preventing presentation. Neither option is applied to
 installed apps without usable frames and full QA.
+
+
+## CI #297: single-core also fails, so measure emulated progress
+
+[Run #297](https://github.com/MasynNay/anything-plays/actions/runs/42336706577)
+returned exactly two blank framebuffer callbacks in *all four* configurations:
+dual/single core × JIT/cached interpreter. A 25-second single-core JIT
+run issued 1,238 successful native calls and no OpenGL errors but generated
+zero nonblack samples. Disabling dual-core alone does not address the root
+cause.
+
+New isolated probes count audio sample batches and safely sample up to 8 MiB
+of Libretro-exposed emulated RAM at regular intervals. The bounded RAM digest
+is a **diagnostic only**: change means the CPU/memory system is advancing;
+unchanged data does not conclusively prove a stall. Audio sample batches
+can independently indicate whether emulated video field boundaries occur.
+No native memory pointers are held between calls and samples are short-lived.
+As previous 75-second probes showed no improvement, short targeted CI tests
+are used in this diagnostic instead of repeated long waits.

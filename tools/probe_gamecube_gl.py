@@ -34,17 +34,54 @@ MAX_CAPTURE_LOG = 26000
 
 
 class SilentAudio:
+    """Count native audio output without requiring an OS sound device."""
+    def __init__(self):
+        self.batch_calls = 0
+        self.sample_frames = 0
+        self.sample_rate = None
+
     def sample(self, left, right):
-        return None
+        self.sample_frames += 1
 
     def batch(self, pointer, frames):
+        self.batch_calls += 1
+        self.sample_frames += int(frames)
         return int(frames)
 
     def start(self, rate):
-        return None
+        self.sample_rate = rate
 
     def close(self):
         return None
+
+
+class RamProgress:
+    """Bounded digest sampling to distinguish paused CPU from missing video."""
+    def __init__(self):
+        self.digests = set()
+        self.samples = 0
+        self.bytes_per_sample = 0
+        self.error = None
+
+    def sample(self, core):
+        import ctypes as C
+        try:
+            size = int(core.memory_size(2))  # RETRO_MEMORY_SYSTEM_RAM
+            ptr = core.memory_data(2)
+            if not ptr or not 1024 <= size <= 64 * 1024 * 1024:
+                self.error = "Core did not expose a bounded system RAM pointer"
+                return
+            length = min(size, 8 * 1024 * 1024)
+            digest = hashlib.sha256(C.string_at(ptr, length)).hexdigest()[:16]
+            self.digests.add(digest)
+            self.samples += 1
+            self.bytes_per_sample = length
+        except (OSError, ValueError, OverflowError) as exc:
+            self.error = f"{type(exc).__name__}: {exc}"
+
+    @property
+    def changed(self):
+        return len(self.digests) > 1
 
 
 class GLCoreSession(CoreSession):
@@ -126,6 +163,7 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
             wrapped_run = self.run
             self.run_calls = 0
             self.slowest_call_s = 0.0
+            self.ram_progress = RamProgress()
 
             def timed_run():
                 started = time.monotonic()
@@ -135,6 +173,8 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
                     elapsed = time.monotonic() - started
                     self.run_calls += 1
                     self.slowest_call_s = max(self.slowest_call_s, elapsed)
+                    if self.run_calls == 1 or self.run_calls % 180 == 0:
+                        self.ram_progress.sample(self)
                     if self.run_calls <= 5 or self.run_calls % 60 == 0:
                         print("GL-PROBE: retro_run", self.run_calls,
                               "seconds", round(elapsed, 3), flush=True)
@@ -219,6 +259,16 @@ def _child(core, rom, seconds, report, cpu_core, single_core=False):
         "slowest_native_retro_run_seconds": round(
             getattr(session.native, "slowest_call_s", 0), 3
         ),
+        "native_audio_batch_calls": session.audio.batch_calls,
+        "native_audio_sample_frames": session.audio.sample_frames,
+        "native_audio_sample_rate": session.audio.sample_rate,
+        "ram_digest_samples": getattr(session.native.ram_progress, "samples", 0),
+        "ram_digest_distinct": len(
+            getattr(session.native.ram_progress, "digests", ())
+        ),
+        "ram_progress_observed": session.native.ram_progress.changed,
+        "ram_sample_bytes": session.native.ram_progress.bytes_per_sample,
+        "ram_sample_error": session.native.ram_progress.error,
         "gl_version": session.opengl_version,
         "gl_vendor": session.opengl_vendor,
         "gl_renderer": session.opengl_renderer,

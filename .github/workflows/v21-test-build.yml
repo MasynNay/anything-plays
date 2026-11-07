@@ -177,7 +177,7 @@ jobs:
           PYTHONUNBUFFERED=1 xvfb-run -a .build-venv/bin/python -X faulthandler \
             tools/probe_gamecube_homebrew.py \
             --core dist/AnythingPlays/cores/dolphin_libretro.so \
-            --seconds 25 --report test-evidence/gamecube-homebrew-playback.json
+            --seconds 20 --report test-evidence/gamecube-homebrew-playback.json
       - uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-2.1.0-alpha1-Linux-x64-TEST
@@ -343,7 +343,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --seconds 75 \
+            --core cores/dolphin_libretro.so --seconds 20 \
             --report test-evidence/gamecube-opengl-jit.json
       - name: Probe accelerated Dolphin with cached interpreter (diagnostic)
         id: accelerated_interpreter
@@ -353,7 +353,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 35 \
+            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 15 \
             --report test-evidence/gamecube-opengl-cached.json
       - name: Diagnose frame-step synchronization with single-core JIT
         id: accelerated_single_jit
@@ -362,7 +362,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --single-core --seconds 25 \
+            --core cores/dolphin_libretro.so --single-core --seconds 20 \
             --report test-evidence/gamecube-opengl-single-jit.json
       - name: Diagnose single-core cached interpreter as fallback
         id: accelerated_single_cached
@@ -371,7 +371,7 @@ jobs:
         run: |
           PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
             tools/probe_gamecube_gl.py \
-            --core cores/dolphin_libretro.so --single-core --cpu-core 5 --seconds 25 \
+            --core cores/dolphin_libretro.so --single-core --cpu-core 5 --seconds 20 \
             --report test-evidence/gamecube-opengl-single-cached.json
       - name: Require real nonblank playable-speed GameCube frames
         if: always()
