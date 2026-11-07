@@ -100,7 +100,7 @@ def verify_dolphin_sys(cores, main_manifest):
         if expected_file.is_symlink() or not expected_file.is_file():
             raise ValueError(f"Missing Dolphin Sys file: {relative}")
         length = identity.get("size_bytes")
-        if not isinstance(length, int) or length < 1:
+        if not isinstance(length, int) or length < 0:
             raise ValueError(f"Invalid Dolphin Sys length: {relative}")
         cumulative += length
         if cumulative > MAX_EXTRACTED_BYTES:
