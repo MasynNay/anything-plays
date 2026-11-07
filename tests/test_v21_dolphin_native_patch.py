@@ -9,6 +9,7 @@ from tools.patch_dolphin_software import (
     BACKEND_SOURCE, BACKEND_INCLUDE, BACKEND_ORIGINAL, patched_backend_text,
     BOOT_SOURCE, BOOT_GBP_CONFIG_ORIGINAL, BOOT_SPECIAL_ANCHOR,
     LIBRETRO_CMAKE, LIBRETRO_CMAKE_ORIGINAL, patched_libretro_cmake_text,
+    LIBRETRO_MAIN, LIBRETRO_MAIN_ORIGINAL, patched_main_text,
     patched_boot_text, patch_source_checkout,
 )
 
@@ -31,6 +32,15 @@ class DolphinNativePatchTests(unittest.TestCase):
         self.assertIn("std::move(gfx)", result)
         # Non-Libretro builds retain their normal upstream window path.
         self.assertIn("SWOGLWindow::Create(wsi)", result)
+
+    def test_libretro_software_backend_is_initialized_before_gpu_fifo(self):
+        result = patched_main_text(LIBRETRO_MAIN_ORIGINAL)
+        self.assertIn("Libretro::Video::ContextReset();", result)
+        self.assertNotIn("g_gfx.reset();", result)
+        self.assertIn('backend == "Software Renderer"', result)
+        self.assertIn('backend == "Null"', result)
+        with self.assertRaisesRegex(ValueError, "Main.cpp source changed"):
+            patched_main_text("upstream changed without review")
 
     def test_native_libretro_linker_resolves_dynamic_library_in_archive_order(self):
         result = patched_libretro_cmake_text(LIBRETRO_CMAKE_ORIGINAL)
@@ -85,6 +95,8 @@ class DolphinNativePatchTests(unittest.TestCase):
                             encoding="utf-8")
             cmake = source / LIBRETRO_CMAKE
             cmake.write_text(LIBRETRO_CMAKE_ORIGINAL, encoding="utf-8")
+            main = source / LIBRETRO_MAIN
+            main.write_text(LIBRETRO_MAIN_ORIGINAL, encoding="utf-8")
             with patch("tools.patch_dolphin_software.subprocess.check_output",
                        return_value="another-revision"):
                 with self.assertRaisesRegex(ValueError, "Unreviewed"):
@@ -99,6 +111,7 @@ class DolphinNativePatchTests(unittest.TestCase):
             self.assertIn("#ifdef __LIBRETRO__", backend.read_text())
             self.assertIn("#ifdef HAS_LIBMGBA", boot.read_text())
             self.assertIn("  common", cmake.read_text())
+            self.assertIn("Video::ContextReset()", main.read_text())
 
 
 if __name__ == "__main__":

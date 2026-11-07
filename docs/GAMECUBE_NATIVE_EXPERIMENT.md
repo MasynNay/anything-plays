@@ -88,3 +88,21 @@ object when the shared target's object resolves all its symbols first.
 This deliberately changes only the reviewable build-time patch.
 Neither public v2.0 nor the unmodified upstream source repository is touched.
 A complete native link and homebrew runtime probe are still required.
+
+
+## First-frame software GPU FIFO crash (runtime diagnostic)
+
+After native compilation and linking succeeded, the pinned homebrew loaded
+and the first `retro_run()` crashed at
+`VertexManagerBase::Flush()` called by `Fifo::FifoManager::RunGpuLoop()`.
+The pinned `Core::EmuThread` deliberately skips native video backend
+initialization for Libretro, expecting frontend hardware `ContextReset()`.
+The software renderer has no hardware context callback; the upstream
+`Main.cpp` only allocated a bare `g_gfx` rather than the vertex manager
+and other backend resources. The reviewed source patch replaces that manual
+allocation with `Libretro::Video::ContextReset()` for software and null
+backend startup, causing the already-patched `VideoSoftware::Initialize`
+to create the complete renderer before the frontend processes the FIFO.
+This is a hypothesis grounded in the first-frame native backtrace and
+upstream lifecycle, not an assertion of working gameplay. A new native
+homebrew runtime probe must verify it.

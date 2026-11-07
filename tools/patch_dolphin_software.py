@@ -26,6 +26,28 @@ HEADER = Path("Source/Core/DolphinLibretro/Video.h")
 BACKEND_SOURCE = Path("Source/Core/VideoBackends/Software/SWmain.cpp")
 BOOT_SOURCE = Path("Source/Core/DolphinLibretro/Boot.cpp")
 LIBRETRO_CMAKE = Path("Source/Core/DolphinLibretro/CMakeLists.txt")
+LIBRETRO_MAIN = Path("Source/Core/DolphinLibretro/Main.cpp")
+LIBRETRO_MAIN_ORIGINAL = """    if(Config::Get(Config::MAIN_GFX_BACKEND) == "Software Renderer")
+    {
+      g_gfx.reset();
+      g_gfx = std::make_unique<Libretro::Video::SWGfx>();
+    }
+    else if (Config::Get(Config::MAIN_GFX_BACKEND) == "Null")
+    {
+      g_gfx.reset();
+      g_gfx = std::make_unique<Libretro::Video::NullGfx>();
+    }"""
+LIBRETRO_MAIN_REPLACEMENT = """    const auto backend = Config::Get(Config::MAIN_GFX_BACKEND);
+    if (backend == "Software Renderer" || backend == "Null")
+    {
+      // Core::EmuThread skips backend initialization in Libretro. Unlike
+      // accelerated graphics there is no frontend hardware context-reset
+      // callback for CPU video, so its VertexManager remained null and the
+      // first Fifo::RunGpuLoop() dereferenced it. Initialize ALL renderer
+      // resources before running the frontend's first GPU loop.
+      Libretro::Video::ContextReset();
+    }"""
+
 LIBRETRO_CMAKE_ORIGINAL = """target_link_libraries(dolphin_libretro PRIVATE
   dolphin_libretro_common
   dolphin_libretro_videocontexts
@@ -196,6 +218,13 @@ def patched_libretro_cmake_text(source):
     return source.replace(LIBRETRO_CMAKE_ORIGINAL, LIBRETRO_CMAKE_REPLACEMENT, 1)
 
 
+def patched_main_text(source):
+    """Initialize complete software video backend before the first FIFO flush."""
+    if source.count(LIBRETRO_MAIN_ORIGINAL) != 1:
+        raise ValueError("Upstream Dolphin Libretro Main.cpp source changed; review native patch")
+    return source.replace(LIBRETRO_MAIN_ORIGINAL, LIBRETRO_MAIN_REPLACEMENT, 1)
+
+
 def patch_source_checkout(root):
     """Verify the exact reviewed source revision before modifying its header."""
     root = Path(root).resolve()
@@ -210,19 +239,23 @@ def patch_source_checkout(root):
     backend = root / BACKEND_SOURCE
     boot = root / BOOT_SOURCE
     cmake = root / LIBRETRO_CMAKE
-    # Validate all pinned source anchors before touching any of the files.
+    main = root / LIBRETRO_MAIN
+    # Validate every pinned source anchor before touching any of the files.
     patched_header = patched_text(header.read_text(encoding="utf-8"))
     patched_backend = patched_backend_text(backend.read_text(encoding="utf-8"))
     patched_boot = patched_boot_text(boot.read_text(encoding="utf-8"))
     patched_cmake = patched_libretro_cmake_text(cmake.read_text(encoding="utf-8"))
+    patched_main = patched_main_text(main.read_text(encoding="utf-8"))
     header.write_text(patched_header, encoding="utf-8")
     backend.write_text(patched_backend, encoding="utf-8")
     boot.write_text(patched_boot, encoding="utf-8")
     cmake.write_text(patched_cmake, encoding="utf-8")
+    main.write_text(patched_main, encoding="utf-8")
     print(f"Patched embedded GameCube CPU renderer: {header}", flush=True)
     print(f"Patched Dolphin software backend initialization: {backend}", flush=True)
     print(f"Disabled unsupported Game Boy Player-only config: {boot}", flush=True)
     print(f"Patched Dolphin Libretro static archive order: {cmake}", flush=True)
+    print(f"Initialized Libretro CPU video backend before GPU FIFO: {main}", flush=True)
 
 
 if __name__ == "__main__":
