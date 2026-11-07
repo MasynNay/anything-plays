@@ -173,7 +173,11 @@ class CoreSession:
                 f"interface ({size:,} bytes). Select a compatible game or "
                 "a core that supports loading from a file path."
             )
-        rom_bytes = self.rom.read_bytes()
+        # A ROM on removable/network storage can grow after stat(). Never
+        # call read_bytes() here: it can allocate unbounded memory before
+        # a post-read size check has a chance to reject the file.
+        with self.rom.open("rb") as stream:
+            rom_bytes = stream.read(MAX_IN_MEMORY_ROM_BYTES + 1)
         if len(rom_bytes) > MAX_IN_MEMORY_ROM_BYTES:
             raise ValueError("ROM changed size while loading; refusing oversized buffer")
         buffer = C.create_string_buffer(rom_bytes)
