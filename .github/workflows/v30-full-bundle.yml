@@ -144,7 +144,10 @@ jobs:
               --executable /usr/bin/anything-plays-30-preview \
               --report "$smoke_home/installed-boot.json"
           mkdir -p test-evidence
-          cp "$smoke_home/installed-boot.json" test-evidence/linux-installed-gui-boot.json
+          # The nonroot user's test HOME is deliberately 0700; copy its
+          # evidence with sudo, then hand ownership back to the CI runner.
+          sudo cp "$smoke_home/installed-boot.json" test-evidence/linux-installed-gui-boot.json
+          sudo chown "$(id -u):$(id -g)" test-evidence/linux-installed-gui-boot.json
       - name: Real GameCube playback from a read-only extracted Linux DEB
         if: runner.os == 'Linux'
         shell: bash
