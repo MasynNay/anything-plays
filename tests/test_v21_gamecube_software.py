@@ -3,7 +3,7 @@ import ctypes as C
 import gc
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 import unittest
 
 from anything_plays.gamecube_software import (
@@ -174,7 +174,10 @@ class DolphinInPanelTests(unittest.TestCase):
             session.native = Mock()
             session.native.load.return_value = True
             session._load_game()
-            session.native.set_controller_device.assert_called_once_with(0, 1)
+            self.assertEqual(
+                session.native.set_controller_device.call_args_list,
+                [call(0, 1), call(1, 1)],
+            )
             self.assertTrue(session.native.loaded)
 
     def test_gamecube_no_controller_api_fails_closed(self):
