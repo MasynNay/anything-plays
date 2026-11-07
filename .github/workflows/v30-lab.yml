@@ -623,3 +623,58 @@ jobs:
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
+      - name: Save original GX cube DOL for native macOS tests
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+          if-no-files-found: warn
+          retention-days: 3
+
+
+  gamecube-original-gx3d-macos:
+    # Cross-platform native GX transforms, vertex colors, and depth path.
+    # Uses the exact original GameCube GX binary from Linux devkitPPC CI.
+    needs: gamecube-original-gx3d-gpu-playback
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native GPU and audio packages
+        run: python -m pip install -r requirements.txt
+      - name: Download identical original GX homebrew program
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: original-gx3d
+      - name: Fetch test Dolphin core and matching Sys
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Require moving actual GameCube GX 3D graphics inside the app
+        run: |
+          python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.dylib \
+            --rom original-gx3d/anythingplays-gc-gx-gamecube.dol \
+            --require-animated --seconds 12 \
+            --report test-evidence/gamecube-original-gx3d-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GX3D-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
