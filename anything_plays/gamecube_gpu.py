@@ -21,6 +21,7 @@ import time
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
+from anything_plays.gamecube_preview import should_capture, DEFAULT_PREVIEW_MODE
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
 
@@ -52,6 +53,8 @@ class GameCubeHardwareSession(CoreSession):
         self.gpu_readback_seconds = 0.0
         self.gpu_readback_max_seconds = 0.0
         self.gpu_readback_calls = 0
+        self.preview_readback_skips = 0
+        self._last_preview_capture = None
         self.raw_video_callbacks = 0
         self.null_video_callbacks = 0
         self.opengl_error = None
@@ -96,6 +99,16 @@ class GameCubeHardwareSession(CoreSession):
             self.null_video_callbacks += 1
             return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
+            # glReadPixels blocks on GPU/CPU synchronization. Copy only as
+            # fast as the selected preview rate, but NEVER skip retro_run()
+            # frames, audio, controller updates, or internal Dolphin work.
+            now = time.monotonic()
+            mode = getattr(
+                self.emulator, "gamecube_preview_mode", DEFAULT_PREVIEW_MODE
+            )
+            if not should_capture(self._last_preview_capture, now, mode):
+                self.preview_readback_skips += 1
+                return
             begun = time.perf_counter()
             try:
                 rgb = self.host.read_frame(width, height)
@@ -109,6 +122,7 @@ class GameCubeHardwareSession(CoreSession):
             self.gpu_readback_seconds += duration
             self.gpu_readback_max_seconds = max(self.gpu_readback_max_seconds, duration)
             self.gpu_readback_calls += 1
+            self._last_preview_capture = now
             with self.emulator.lock:
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
