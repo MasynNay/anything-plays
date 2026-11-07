@@ -12,6 +12,11 @@ import numpy as np
 RGB1555 = 0
 XRGB8888 = 1
 RGB565 = 2
+# This is a private frontend-only marker, NOT a Libretro pixel-format value.
+# Dolphin's software SWTexture is explicitly struct Pixel {r,g,b,a} and
+# retro_video_refresh receives those bytes directly without a libretro
+# SET_PIXEL_FORMAT request. Decoding it as XRGB8888 swaps red and blue.
+SOFTWARE_RGBA8888 = 3
 SUPPORTED_FORMATS = (RGB1555, XRGB8888, RGB565)
 MAX_FRAME_BYTES = 64 * 1024 * 1024  # Bound a malformed core's frame allocation.
 
@@ -24,9 +29,11 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
     """
     if not buffer or width <= 0 or height <= 0:
         return None
-    if pixel_format not in SUPPORTED_FORMATS:
+    if pixel_format not in (*SUPPORTED_FORMATS, SOFTWARE_RGBA8888):
         raise ValueError(f"Unsupported Libretro pixel format: {pixel_format}")
-    bytes_per_pixel = 4 if pixel_format == XRGB8888 else 2
+    bytes_per_pixel = (
+        4 if pixel_format in (XRGB8888, SOFTWARE_RGBA8888) else 2
+    )
     if pitch < width * bytes_per_pixel:
         raise ValueError("Video pitch is shorter than the image row")
     if width > 4096 or height > 4096 or pitch > 65536:
@@ -35,6 +42,13 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
         raise ValueError("Libretro video frame exceeds safe memory budget")
 
     raw = C.string_at(buffer, pitch * height)
+    if pixel_format == SOFTWARE_RGBA8888:
+        pixels = np.ndarray(
+            (height, width, 4), dtype=np.uint8,
+            buffer=raw, strides=(pitch, 4, 1),
+        )
+        # Owned storage is mandatory: Dolphin reuses its native texture.
+        return pixels[:, :, :3].copy()
     if pixel_format == XRGB8888:
         pixels = np.ndarray(
             (height, width), dtype="<u4", buffer=raw, strides=(pitch, 4)
