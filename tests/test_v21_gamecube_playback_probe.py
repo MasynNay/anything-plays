@@ -117,6 +117,27 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
             self.assertEqual(saved["cpu_core_mode"], "5")
             self.assertFalse(saved["probe_passed"])
 
+    def test_fast_controller_stimulus_is_an_isolated_probe_option(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            core = root / "dolphin_libretro.so"
+            core.write_bytes(b"synthetic")
+            report = root / "report.json"
+            def check_command(args, **kwargs):
+                self.assertIn("--fast-controls", args)
+                self.assertIn("--exercise-controls", args)
+                return CompletedProcess(args, -11, stdout="simulated native failure")
+            with patch("tools.probe_gamecube_homebrew.verified_homebrew",
+                       side_effect=make_fixture), patch(
+                           "tools.probe_gamecube_homebrew.subprocess.run",
+                           side_effect=check_command):
+                self.assertEqual(_parent(
+                    core, 1, report, cpu_core="5", fast_controls=True
+                ), 1)
+            saved = json.loads(report.read_text())
+            self.assertTrue(saved["fast_controller_stimulus"])
+            self.assertFalse(saved["probe_passed"])
+
     def test_synchronous_cpu_gpu_flag_reaches_child_without_installing_dolphin(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)

@@ -530,6 +530,15 @@ jobs:
             --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
             --seconds 20 --cpu-core 5 --single-core --exercise-controls --debugger \
             --report test-evidence/gamecube-singlecore-cached.json
+      - name: Stress software renderer with rapid real GameCube input
+        if: always() && steps.build_dolphin.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --cpu-core 5 --fast-controls --debugger \
+            --report test-evidence/gamecube-fast-controller-rendering.json
       - uses: actions/cache/save@v4
         if: always()
         continue-on-error: true
@@ -545,6 +554,7 @@ jobs:
             test-evidence/gamecube-patched-homebrew.json
             test-evidence/gamecube-cached-interpreter.json
             test-evidence/gamecube-singlecore-cached.json
+            test-evidence/gamecube-fast-controller-rendering.json
             test-evidence/gamecube-homebrew-frame.png
             ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
           if-no-files-found: warn

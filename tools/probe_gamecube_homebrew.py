@@ -65,7 +65,7 @@ class SilentProbeAudio:
 
 
 def _child(rom, core, seconds, report_path, cpu_core=None,
-           exercise_controls=False, single_core=False):
+           exercise_controls=False, single_core=False, fast_controls=False):
     """Run real native gameplay; parent process enforces an absolute timeout."""
     import faulthandler
 
@@ -211,17 +211,30 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
     control_worker = None
     if exercise_controls:
         def exercise():
-            # GC-Controller-Test is a mostly static display until a controller
-            # input changes. Change real Libretro input states to distinguish
-            # legitimate duplicate frames from a frozen video pipeline.
-            for button in ("A", "B", "Left", "Right", "Up", "Down",
-                           "X", "Y", "Start"):
-                if control_stop.wait(0.9):
-                    return
-                emu.inputs.set_manual(button, True)
-                if control_stop.wait(0.4):
-                    break
-                emu.inputs.set_manual(button, False)
+            # GC-Controller-Test is mostly static until controller state
+            # changes. Two speeds let us distinguish a game-driven redraw
+            # from a broken GPU or a bad input callback.
+            buttons = ("A", "B", "Left", "Right", "Up", "Down",
+                       "X", "Y", "Start")
+            if fast_controls:
+                i = 0
+                while not control_stop.is_set():
+                    button = buttons[i % len(buttons)]
+                    emu.inputs.set_manual(button, True)
+                    if control_stop.wait(0.028):
+                        break
+                    emu.inputs.set_manual(button, False)
+                    if control_stop.wait(0.028):
+                        break
+                    i += 1
+            else:
+                for button in buttons:
+                    if control_stop.wait(0.9):
+                        break
+                    emu.inputs.set_manual(button, True)
+                    if control_stop.wait(0.4):
+                        break
+                    emu.inputs.set_manual(button, False)
             emu.inputs.release_manual()
         control_worker = threading.Thread(
             target=exercise, name="gamecube-ci-input-stimulus", daemon=True
@@ -249,6 +262,12 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
 
     elapsed = round(time.monotonic() - start, 3)
     evidence = evaluate_video_probe(error, decoded_frames, nonblank_frames, elapsed)
+    native_steps = getattr(session.native, "_runs", 0)
+    interactive_valid = (
+        error is None and exercise_controls and decoded_frames >= 3
+        and len(unique_nonblank_frames) >= 3 and input_callback_calls >= 100
+        and nonzero_input_samples >= 10 and native_steps >= 100
+    )
     result = {
         "system": "gamecube",
         "cpu_core_mode": cpu_core or "default",
@@ -260,6 +279,10 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         "nonblank_sampled_frames": nonblank_frames,
         "unique_nonblank_rgb_frames": len(unique_nonblank_frames),
         "controller_input_exercised": exercise_controls,
+        "fast_controller_stimulus": fast_controls,
+        "core_emulation_steps": native_steps,
+        "emulation_steps_per_second": round(native_steps / max(elapsed, 0.001), 2),
+        "static_homebrew_interactive_passed": interactive_valid,
         "input_callback_calls": input_callback_calls,
         "nonzero_gamecube_input_samples": nonzero_input_samples,
         "last_rgb_shape": last_shape,
@@ -277,7 +300,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
 
 
 def _parent(core, seconds, report, debugger=False, cpu_core=None,
-            exercise_controls=False, single_core=False):
+            exercise_controls=False, single_core=False, fast_controls=False):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
@@ -287,6 +310,7 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
         "cpu_core_mode": cpu_core or "default",
         "single_core": single_core,
         "controller_input_exercised": exercise_controls,
+        "fast_controller_stimulus": fast_controls,
         "seconds_requested": seconds,
         "probe_passed": False,
         "debugger": "gdb" if debugger else None,
@@ -318,6 +342,8 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
                 command.append("--exercise-controls")
             if single_core:
                 command.append("--single-core")
+            if fast_controls:
+                command.extend(["--fast-controls", "--exercise-controls"])
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -379,6 +405,8 @@ def main(argv=None):
                         help="Pulse controller buttons to test changing rendered frames")
     parser.add_argument("--single-core", action="store_true",
                         help="Disable Dolphin's dual-core CPU thread for software renderer diagnosis")
+    parser.add_argument("--fast-controls", action="store_true",
+                        help="Stress controller-driven video callbacks on event-driven homebrew")
     parser.add_argument("--rom", type=Path)
     args = parser.parse_args(argv)
     if not 1 <= args.seconds <= 90:
@@ -390,10 +418,10 @@ def main(argv=None):
             parser.error("--rom is required for a child process")
         return _child(args.rom.resolve(), core, args.seconds, report,
                       cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
-                      single_core=args.single_core)
+                      single_core=args.single_core, fast_controls=args.fast_controls)
     return _parent(core, args.seconds, report, debugger=args.debugger,
                    cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
-                   single_core=args.single_core)
+                   single_core=args.single_core, fast_controls=args.fast_controls)
 
 
 if __name__ == "__main__":
