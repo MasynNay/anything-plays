@@ -6,11 +6,39 @@ import unittest
 
 from tools.probe_ngp_flash_persistence import (
     COMMON_SEQUENCE, MODIFY_SEQUENCE, ROI, STOP_FRAME, SNAPSHOT_FRAME,
-    _flash_entries,
+    _flash_entries, stage_homebrew_cartridge_size,
 )
 
 
 class NeoGeoPocketFlashRestartExperimentTests(unittest.TestCase):
+    def test_staged_mit_demo_fills_only_unused_cartridge_bytes(self):
+        with TemporaryDirectory() as root:
+            rom = Path(root) / "MIT-demo.ngc"
+            original = bytes(range(64))
+            rom.write_bytes(original)
+            info = stage_homebrew_cartridge_size(rom, capacity=4096)
+            self.assertEqual(rom.stat().st_size, 4096)
+            self.assertEqual(rom.read_bytes()[:64], original)
+            self.assertEqual(rom.read_bytes()[64:], b"\\xff" * (4096 - 64))
+            self.assertEqual(info["original_bytes"], 64)
+            self.assertEqual(info["staged_bytes"], 4096)
+            self.assertFalse(info["ships_with_app"])
+            self.assertEqual(
+                info["original_sha256"], hashlib.sha256(original).hexdigest()
+            )
+            self.assertEqual(
+                info["staged_sha256"],
+                hashlib.sha256(rom.read_bytes()).hexdigest(),
+            )
+
+    def test_staging_rejects_unbounded_cartridge_sizes(self):
+        with TemporaryDirectory() as root:
+            rom = Path(root) / "too-large.ngc"
+            rom.write_bytes(b"abcdef")
+            with self.assertRaises(ValueError):
+                stage_homebrew_cartridge_size(rom, capacity=5)
+            self.assertEqual(rom.read_bytes(), b"abcdef")
+
     def test_three_sessions_use_real_game_options_controls(self):
         self.assertEqual(COMMON_SEQUENCE, (
             (55, "A"), (100, "Down"), (145, "A")
