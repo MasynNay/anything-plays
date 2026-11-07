@@ -5,6 +5,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+from anything_plays.atomic_storage import write_json_atomically
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import (BUTTONS_BY_SYSTEM, DISABLED_MAPPING,
                              default_for, normalize)
@@ -57,8 +58,7 @@ class ProfilesMixin:
             paths[self.system_key.get()] = core_path
             prefs['core_paths'] = paths
         try:
-            self.preferences_path.parent.mkdir(parents=True, exist_ok=True)
-            self.preferences_path.write_text(json.dumps(prefs, indent=2), encoding='utf-8')
+            write_json_atomically(self.preferences_path, prefs)
         except OSError as exc:
             messagebox.showwarning('Preferences', f'Could not save preferences: {exc}')
 
