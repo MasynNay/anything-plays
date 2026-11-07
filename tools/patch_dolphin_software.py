@@ -25,6 +25,20 @@ UPSTREAM_REVISION = "32c61f9d0e933331bb7087ba57e96883241b4960"
 HEADER = Path("Source/Core/DolphinLibretro/Video.h")
 BACKEND_SOURCE = Path("Source/Core/VideoBackends/Software/SWmain.cpp")
 BOOT_SOURCE = Path("Source/Core/DolphinLibretro/Boot.cpp")
+LIBRETRO_CMAKE = Path("Source/Core/DolphinLibretro/CMakeLists.txt")
+LIBRETRO_CMAKE_ORIGINAL = """target_link_libraries(dolphin_libretro PRIVATE
+  dolphin_libretro_common
+  dolphin_libretro_videocontexts
+)"""
+LIBRETRO_CMAKE_REPLACEMENT = """target_link_libraries(dolphin_libretro PRIVATE
+  dolphin_libretro_common
+  dolphin_libretro_videocontexts
+  # Keep Common after the Libretro video-context archive: its GLContextLR
+  # object calls DynamicLibrary::Open/GetSymbolAddress. GNU ld needs the
+  # provider archive after this static consumer to resolve those symbols.
+  common
+)"""
+
 BOOT_GBP_CONFIG_ORIGINAL = """  if (Libretro::GBPlayer_active)
   {
     Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], Libretro::GBPlayer_rom_path);
@@ -166,6 +180,13 @@ def patched_boot_text(source):
     ).replace(BOOT_SPECIAL_ANCHOR, BOOT_SPECIAL_GUARD, 1))
 
 
+def patched_libretro_cmake_text(source):
+    """Keep the static Common provider after its Libretro video-context consumer."""
+    if source.count(LIBRETRO_CMAKE_ORIGINAL) != 1:
+        raise ValueError("Upstream Dolphin Libretro CMake source changed; review native patch")
+    return source.replace(LIBRETRO_CMAKE_ORIGINAL, LIBRETRO_CMAKE_REPLACEMENT, 1)
+
+
 def patch_source_checkout(root):
     """Verify the exact reviewed source revision before modifying its header."""
     root = Path(root).resolve()
@@ -179,16 +200,20 @@ def patch_source_checkout(root):
     header = root / HEADER
     backend = root / BACKEND_SOURCE
     boot = root / BOOT_SOURCE
+    cmake = root / LIBRETRO_CMAKE
     # Validate all pinned source anchors before touching any of the files.
     patched_header = patched_text(header.read_text(encoding="utf-8"))
     patched_backend = patched_backend_text(backend.read_text(encoding="utf-8"))
     patched_boot = patched_boot_text(boot.read_text(encoding="utf-8"))
+    patched_cmake = patched_libretro_cmake_text(cmake.read_text(encoding="utf-8"))
     header.write_text(patched_header, encoding="utf-8")
     backend.write_text(patched_backend, encoding="utf-8")
     boot.write_text(patched_boot, encoding="utf-8")
+    cmake.write_text(patched_cmake, encoding="utf-8")
     print(f"Patched embedded GameCube CPU renderer: {header}", flush=True)
     print(f"Patched Dolphin software backend initialization: {backend}", flush=True)
     print(f"Disabled unsupported Game Boy Player-only config: {boot}", flush=True)
+    print(f"Patched Dolphin Libretro static archive order: {cmake}", flush=True)
 
 
 if __name__ == "__main__":

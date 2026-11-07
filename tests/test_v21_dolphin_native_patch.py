@@ -8,6 +8,7 @@ from tools.patch_dolphin_software import (
     HEADER, ORIGINAL, UPSTREAM_REVISION, patched_text,
     BACKEND_SOURCE, BACKEND_INCLUDE, BACKEND_ORIGINAL, patched_backend_text,
     BOOT_SOURCE, BOOT_GBP_CONFIG_ORIGINAL, BOOT_SPECIAL_ANCHOR,
+    LIBRETRO_CMAKE, LIBRETRO_CMAKE_ORIGINAL, patched_libretro_cmake_text,
     patched_boot_text, patch_source_checkout,
 )
 
@@ -30,6 +31,14 @@ class DolphinNativePatchTests(unittest.TestCase):
         self.assertIn("std::move(gfx)", result)
         # Non-Libretro builds retain their normal upstream window path.
         self.assertIn("SWOGLWindow::Create(wsi)", result)
+
+    def test_native_libretro_linker_resolves_dynamic_library_in_archive_order(self):
+        result = patched_libretro_cmake_text(LIBRETRO_CMAKE_ORIGINAL)
+        self.assertIn("dolphin_libretro_videocontexts", result)
+        self.assertLess(result.index("dolphin_libretro_videocontexts"),
+                        result.index("  common\n"))
+        with self.assertRaisesRegex(ValueError, "CMake source changed"):
+            patched_libretro_cmake_text("unrelated CMake configuration")
 
     def test_optional_gbplayer_settings_are_disabled_when_mgba_is_not_built(self):
         result = patched_boot_text(BOOT_SPECIAL_ANCHOR + BOOT_GBP_CONFIG_ORIGINAL)
@@ -69,6 +78,8 @@ class DolphinNativePatchTests(unittest.TestCase):
             boot = source / BOOT_SOURCE
             boot.write_text(BOOT_SPECIAL_ANCHOR + BOOT_GBP_CONFIG_ORIGINAL,
                             encoding="utf-8")
+            cmake = source / LIBRETRO_CMAKE
+            cmake.write_text(LIBRETRO_CMAKE_ORIGINAL, encoding="utf-8")
             with patch("tools.patch_dolphin_software.subprocess.check_output",
                        return_value="another-revision"):
                 with self.assertRaisesRegex(ValueError, "Unreviewed"):
@@ -82,6 +93,7 @@ class DolphinNativePatchTests(unittest.TestCase):
             self.assertIn("Libretro::Video::SWGfx", backend.read_text())
             self.assertIn("#ifdef __LIBRETRO__", backend.read_text())
             self.assertIn("#ifdef HAS_LIBMGBA", boot.read_text())
+            self.assertIn("  common", cmake.read_text())
 
 
 if __name__ == "__main__":

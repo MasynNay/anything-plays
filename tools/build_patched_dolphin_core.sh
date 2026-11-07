@@ -30,6 +30,7 @@ git -C "$SOURCE_DIR" diff --check
 git -C "$SOURCE_DIR" diff -- \
   Source/Core/DolphinLibretro/Video.h \
   Source/Core/DolphinLibretro/Boot.cpp \
+  Source/Core/DolphinLibretro/CMakeLists.txt \
   Source/Core/VideoBackends/Software/SWmain.cpp \
   > "$WORK_DIR/dolphin-video-software.patch"
 sha256sum "$WORK_DIR/dolphin-video-software.patch" \

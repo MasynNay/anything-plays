@@ -60,3 +60,16 @@ Game Boy Player-only settings and rejects `retro_load_game_special` when
 mGBA is unavailable, without altering normal GameCube disc/homebrew boot.
 The three-file source diff is retained and hashed. This is a compile fix,
 not evidence that Dolphin now renders playable frames.
+
+
+## Pinned static linker compatibility fix
+
+The full Linux native C++ compile progressed through all 1,274 objects and
+then exposed GNU ld unresolved references to
+`Common::DynamicLibrary::Open/GetSymbolAddress` from the
+`dolphin_libretro_videocontexts` static archive. The functions exist in the
+`common` archive, but the original Libretro final link placed that
+provider earlier in the static archive sequence. The source-build-only patch
+now includes the pinned `DolphinLibretro/CMakeLists.txt` and explicitly links
+`common` **after** `dolphin_libretro_videocontexts`. This is a linker-order
+repair, **not yet proven** by a completed native link or playback run.
