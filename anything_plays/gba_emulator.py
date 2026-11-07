@@ -28,6 +28,7 @@ from anything_plays.libretro_abi import (
 from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_input import BUTTONS, IDS, InputBuffer
 from anything_plays.libretro_save import SaveRAM, native_core_save_directory
+from anything_plays.libretro_state import LibretroRecoveryState
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
 from anything_plays.libretro_video import (
     SUPPORTED_FORMATS, SOFTWARE_RGBA8888, decode_frame,
@@ -134,6 +135,11 @@ class CoreSession:
             DolphinSoftwareOptions() if system == "gamecube" else None
         )
         self.save_ram = None
+        self.recovery_state = None
+        # The native cartridge .flash remains independent. A verified
+        # checkpoint can recover if the native core fails to apply flash
+        # on a later cold start. Native-flash-only labs disable this.
+        self.enable_state_resume = True
         self._rom_buffers = []
         self._rom_path_bytes = os.fsencode(str(self.rom))
         self._system_dir_buffer = self._make_system_directory()
@@ -262,16 +268,23 @@ class CoreSession:
             select_device(0, 1)  # Player 1: RETRO_DEVICE_JOYPAD
 
     def persist_game_progress(self):
-        """Keep gameplay alive if a removable/network ROM drive stops writing."""
-        try:
-            return self.save_ram.persist()
-        except (OSError, ValueError, MemoryError) as exc:
-            # A broken save path or absurd native SRAM size must not kill
-            # the emulation worker. The user can still play or fix storage.
-            self.emulator.save_warning = (
-                "Save failed; game is still running: " + str(exc)[:140]
-            )
-            return False
+        """Persist battery SRAM AND safe NGP recovery without killing gameplay."""
+        written = False
+        if self.save_ram is not None:
+            try:
+                written = bool(self.save_ram.persist())
+            except (OSError, ValueError, MemoryError) as exc:
+                self.emulator.save_warning = (
+                    "Battery save failed; game is still running: " + str(exc)[:140]
+                )
+        if self.recovery_state is not None:
+            try:
+                written = bool(self.recovery_state.persist()) or written
+            except (OSError, ValueError, RuntimeError, MemoryError) as exc:
+                self.emulator.save_warning = (
+                    "Recovery save failed; game is still running: " + str(exc)[:140]
+                )
+        return written
 
     def run(self):
         if not self.core_path or not Path(self.core_path).is_file():
@@ -307,6 +320,25 @@ class CoreSession:
                 self.emulator.save_warning = (
                     "Could not restore saved game: " + str(exc)[:140]
                 )
+            if self.system in ("ngp", "ngpc") and self.enable_state_resume:
+                # The core's own .flash read occurs inside _load_game.
+                # An independent, correctly fingerprinted state is a
+                # last-session recovery layer, not a replacement for flash.
+                try:
+                    self.recovery_state = LibretroRecoveryState(
+                        self.rom, self.system, self.core_path, self.native)
+                    if self.recovery_state.restore():
+                        self.emulator.resume_info = (
+                            "Restored the last verified Neo Geo Pocket session."
+                        )
+                except (OSError, ValueError, RuntimeError, MemoryError) as exc:
+                    # Preserve a corrupt/incompatible checkpoint for manual
+                    # recovery rather than deleting it or crashing gameplay.
+                    self.recovery_state = None
+                    self.emulator.save_warning = (
+                        "Native resume unavailable; started game normally: "
+                        + str(exc)[:140]
+                    )
             self.emulator.running = True
 
             frame_number = 0
@@ -348,6 +380,7 @@ class Emulator:
         self.error = None
         self.save_warning = None
         self.audio_warning = None
+        self.resume_info = None
         self.frame = None
         self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
@@ -374,6 +407,7 @@ class Emulator:
         self.error = None
         self.save_warning = None
         self.audio_warning = None
+        self.resume_info = None
         self.stop_event.clear()
         with self.lock:
             self.frame = None
