@@ -1,0 +1,180 @@
+name: Anything Plays 3.0 | Application builds
+
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  AP_RELEASE_BUILD: '0'
+
+jobs:
+  cancel-superseded-v30-builds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel only earlier 3.0 preview workflow runs on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          repo = os.environ["GITHUB_REPOSITORY"]
+          current = os.environ["GITHUB_RUN_ID"]
+          current_number = int(os.environ["GITHUB_RUN_NUMBER"])
+          url = f"repos/{repo}/actions/runs?branch=feature/v3.0-unified-test&per_page=100"
+          runs = json.loads(subprocess.check_output(["gh", "api", url], text=True))["workflow_runs"]
+          for run in runs:
+              if (run["name"] == "Anything Plays 3.0 | Application builds"
+                  and str(run["id"]) != current
+                  # Previous runs only. A delayed old job must NEVER cancel
+                  # a newer commit's test run just because it launched late.
+                  and int(run.get("run_number", 0)) < current_number
+                  and run["status"] in ("queued", "in_progress", "waiting", "requested")):
+                  message = ((run.get("head_commit") or {}).get("message") or "")
+                  if message.startswith("native(dolphin)"):
+                      print("Preserving long GameCube native experiment", run["id"])
+                      continue
+                  subprocess.run(
+                      ["gh", "api", "-X", "POST",
+                       f"repos/{repo}/actions/runs/{run['id']}/cancel"],
+                      check=False,
+                  )
+                  print("Cancelled superseded test run", run["id"])
+          PY
+  source-and-gui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test desktop dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb pulseaudio
+          python -m pip install -r requirements.txt
+      - name: Compile all source
+        run: python -m compileall -q app.py anything_plays tests fetch_mgba_core.py verify_bundle.py
+      - name: Run full regression tests
+        run: |
+          pulseaudio --start --exit-idle-time=-1 || true
+          # Preserve Python frame stacks if a native extension segfaults.
+          python -X faulthandler -m unittest discover -s tests -v
+      - name: Report 3.0 release blockers (development builds may proceed)
+        run: python tools/check_v30_release.py --report-only
+      - name: Review GameCube open-source homebrew fixture checksum (candidate only)
+        continue-on-error: true
+        run: python tools/gamecube_homebrew_fixture.py --inspect
+      - name: Tk startup, view controls and shutdown smoke test
+        run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+      - name: 30-second sustained camera and game redraw soak
+        timeout-minutes: 3
+        run: |
+          PYTHONPATH=. xvfb-run -a python tests/soak_gui.py \
+            --seconds 30 --max-growth-mb 96 \
+            --report test-evidence/soak-gui-30s.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0.0-alpha1-UI-soak-evidence
+          path: test-evidence/soak-gui-30s.json
+          if-no-files-found: warn
+          retention-days: 21
+
+  windows-test-installer:
+    env:
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build 3.0 Windows installer with the mGBA starter core
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Inspect exact mGBA-only starter bundle
+        run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays test-evidence/windows-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-alpha1-Windows-x64-TEST
+          path: |
+            release/AnythingPlaysSetup-3.0.0-alpha.1.exe
+            test-evidence/windows-x86_64.json
+          if-no-files-found: error
+          retention-days: 21
+
+  macos-test-installer:
+    env:
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build 3.0 macOS DMG with the mGBA starter core
+        run: bash packaging/build_macos_dmg.sh
+      - name: Inspect staged test app
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays30Test.app test-evidence/macos-${{ matrix.arch }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-alpha1-macOS-${{ matrix.arch }}-TEST
+          path: |
+            release/AnythingPlays-3.0.0-alpha.1.dmg
+            test-evidence/macos-${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 21
+
+  linux-test-installer:
+    env:
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux build requirements
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Build 3.0 Debian package with the mGBA starter core
+        run: bash packaging/build_linux_deb.sh
+      - name: Verify alpha DEB package identity and launch entry
+        run: |
+          test "$(dpkg-deb -f 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' Package)" = 'anything-plays-preview'
+          dpkg-deb -c 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' | grep -F '/usr/bin/anything-plays-30-preview'
+          dpkg-deb -c 'release/anything-plays-preview_3.0.0~alpha1_amd64.deb' | grep -F '/usr/share/applications/anything-plays-preview.desktop'
+      - name: Inspect Linux test installation
+        run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays test-evidence/linux-x86_64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-alpha1-Linux-x64-TEST
+          path: |
+            release/anything-plays-preview_3.0.0~alpha1_amd64.deb
+            test-evidence/linux-x86_64.json
+          if-no-files-found: error
+          retention-days: 21
+

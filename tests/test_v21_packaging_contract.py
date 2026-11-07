@@ -18,7 +18,7 @@ class PackagingContractTests(unittest.TestCase):
 
     def test_macos_alpha_has_separate_app_and_dmg(self):
         script = self.source("packaging/build_macos_dmg.sh")
-        ci = self.source(".github/workflows/v30-test-build.yml")
+        ci = self.source(".github/workflows/v30-app.yml")
         self.assertIn('AnythingPlays30Preview.app', script)
         self.assertIn('com.anythingplays.preview30', script)
         self.assertIn('release/AnythingPlays-3.0.0-alpha.1.dmg', script)
@@ -27,7 +27,7 @@ class PackagingContractTests(unittest.TestCase):
 
     def test_linux_alpha_package_is_unique_and_launchable(self):
         script = self.source("packaging/build_linux_deb.sh")
-        ci = self.source(".github/workflows/v30-test-build.yml")
+        ci = self.source(".github/workflows/v30-app.yml")
         self.assertIn('Package: anything-plays-preview', script)
         self.assertIn('Name=Anything Plays 3.0 Preview', script)
         self.assertIn('Exec=anything-plays-30-preview', script)
