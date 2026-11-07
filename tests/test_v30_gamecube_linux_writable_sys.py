@@ -10,6 +10,7 @@ import ctypes as C
 import os
 from pathlib import Path
 import stat
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -35,6 +36,7 @@ def fixture(root):
 
 
 class LinuxDolphinWritableSystemTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux-only native file lock")
     def test_linux_core_receives_user_writable_sys_not_opt(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -75,6 +77,7 @@ class LinuxDolphinWritableSystemTests(unittest.TestCase):
                 finally:
                     session.audio.close()
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux-only native file lock")
     def test_cached_sys_is_reused_and_tampering_repaired(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -94,6 +97,7 @@ class LinuxDolphinWritableSystemTests(unittest.TestCase):
                 self.assertEqual(sorted(p.name for p in first.parent.iterdir()
                                         if p.is_dir()), [first.name])
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux-only native file lock")
     def test_missing_and_symlinked_sys_fail_closed(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
