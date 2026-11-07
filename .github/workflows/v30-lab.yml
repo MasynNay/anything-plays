@@ -429,3 +429,47 @@ jobs:
           path: test-evidence/
           if-no-files-found: warn
           retention-days: 14
+
+  gamecube-real-paired-pack-playback:
+    # Ephemeral license-reviewed-shaped package fixture. This is NOT a
+    # published, redistribution-approved native Dolphin release.
+    # Verifies the identical native in-app install/launch/rollback path.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64}
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics runtime and virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+      - name: Install GameCube test runtime and native audio
+        run: python -m pip install -r requirements.txt
+      - name: Install, play, and roll back actual Linux Dolphin+Sys package
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a python tools/probe_dolphin_package.py --seconds 12 --report test-evidence/gamecube-paired-pack-${{ matrix.target }}.json
+      - name: Install, play, and roll back actual macOS Dolphin+Sys package
+        if: runner.os == 'macOS'
+        run: python tools/probe_dolphin_package.py --seconds 12 --report test-evidence/gamecube-paired-pack-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-OptionalPack-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
