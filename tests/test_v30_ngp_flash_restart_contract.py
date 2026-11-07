@@ -19,7 +19,7 @@ class NeoGeoPocketFlashRestartExperimentTests(unittest.TestCase):
             info = stage_homebrew_cartridge_size(rom, capacity=4096)
             self.assertEqual(rom.stat().st_size, 4096)
             self.assertEqual(rom.read_bytes()[:64], original)
-            self.assertEqual(rom.read_bytes()[64:], b"\\xff" * (4096 - 64))
+            self.assertEqual(rom.read_bytes()[64:], b"\xff" * (4096 - 64))
             self.assertEqual(info["original_bytes"], 64)
             self.assertEqual(info["staged_bytes"], 4096)
             self.assertFalse(info["ships_with_app"])
