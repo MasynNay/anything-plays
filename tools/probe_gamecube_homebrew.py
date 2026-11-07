@@ -65,7 +65,7 @@ class SilentProbeAudio:
 
 
 def _child(rom, core, seconds, report_path, cpu_core=None,
-           exercise_controls=False):
+           exercise_controls=False, single_core=False):
     """Run real native gameplay; parent process enforces an absolute timeout."""
     import faulthandler
 
@@ -151,6 +151,11 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
             str(cpu_core).encode("ascii")
         )
         stage("CPU emulation core override: " + str(cpu_core))
+    if single_core:
+        # Test Dolphin's synchronous CPU/GPU execution as an alternative to
+        # the dual-thread FIFO rendezvous that otherwise stalls presentation.
+        session._software_options.values[b"dolphin_main_cpu_thread"] = b"disabled"
+        stage("Single-core synchronous CPU/GPU emulation requested")
     session.audio.close()
     session.audio = SilentProbeAudio()
 
@@ -228,6 +233,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
     result = {
         "system": "gamecube",
         "cpu_core_mode": cpu_core or "default",
+        "single_core": single_core,
         "core": core.name,
         "source": "pinned open-source GC-Controller-Test homebrew",
         "real_game_loaded": error is None,
@@ -250,7 +256,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
 
 
 def _parent(core, seconds, report, debugger=False, cpu_core=None,
-            exercise_controls=False):
+            exercise_controls=False, single_core=False):
     """Keep a useful artifact even when native code segfaults or deadlocks."""
     started = time.monotonic()
     result = {
@@ -258,6 +264,7 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
         "probe": "real-homebrew-cpu-software-frames",
         "packaged_core": str(core),
         "cpu_core_mode": cpu_core or "default",
+        "single_core": single_core,
         "controller_input_exercised": exercise_controls,
         "seconds_requested": seconds,
         "probe_passed": False,
@@ -288,6 +295,8 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
                 command.extend(["--cpu-core", str(cpu_core)])
             if exercise_controls:
                 command.append("--exercise-controls")
+            if single_core:
+                command.append("--single-core")
             if debugger:
                 gdb = shutil.which("gdb")
                 if gdb is None:
@@ -347,6 +356,8 @@ def main(argv=None):
                         help="Diagnostic only: 0=interpreter, 5=cached interpreter")
     parser.add_argument("--exercise-controls", action="store_true",
                         help="Pulse controller buttons to test changing rendered frames")
+    parser.add_argument("--single-core", action="store_true",
+                        help="Disable Dolphin's dual-core CPU thread for software renderer diagnosis")
     parser.add_argument("--rom", type=Path)
     args = parser.parse_args(argv)
     if not 1 <= args.seconds <= 90:
@@ -357,9 +368,11 @@ def main(argv=None):
         if args.rom is None:
             parser.error("--rom is required for a child process")
         return _child(args.rom.resolve(), core, args.seconds, report,
-                      cpu_core=args.cpu_core, exercise_controls=args.exercise_controls)
+                      cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
+                      single_core=args.single_core)
     return _parent(core, args.seconds, report, debugger=args.debugger,
-                   cpu_core=args.cpu_core, exercise_controls=args.exercise_controls)
+                   cpu_core=args.cpu_core, exercise_controls=args.exercise_controls,
+                   single_core=args.single_core)
 
 
 if __name__ == "__main__":
