@@ -10,6 +10,9 @@ on:
       - 'tools/stage_v30_eight_source_inputs.py'
       - 'tools/capture_v30_2d_five_source_build.py'
       - 'tests/test_v30_eight_source_staging.py'
+      - 'tests/test_v30_real_frozen_startup.py'
+      - 'tools/probe_v30_installed_desktop_window.py'
+      - 'app.py'
       - 'tools/stage_v30_gpl_trial_inputs.py'
       - 'tools/v30_pce_candidate.py'
       - 'config/v3.0-pce-pinned-source-candidates.json'
@@ -211,6 +214,27 @@ jobs:
                        "camera_hardware_tested","physical_qa_approved"):
             assert item[flag] is False, flag
           print("ACTUAL FROZEN APP Tk UI WINDOW LAUNCHED ON",item["target"],"; public/QA flags FALSE")
+          PY
+      - name: Open actual frozen Anything Plays desktop window and run Tk App startup on each OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.probe_v30_installed_desktop_window \
+            --platform "$TARGET" \
+            --report "test-evidence/ACTUAL_FROZEN_DESKTOP_UI_LAUNCH_UNAPPROVED.json" \
+            --timeout 65
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("test-evidence/ACTUAL_FROZEN_DESKTOP_UI_LAUNCH_UNAPPROVED.json").read_text("utf-8"))
+          assert report["passed"] is True and report["actual_tk_window_started"] is True
+          assert report["actual_app_initialized"] is True and report["actual_tk_mainloop_ran"] is True
+          assert report["console_profile_count"]==18 and report["frozen_binary"] is True
+          assert report["camera_hardware_tested"] is False
+          assert report["gameplay_hardware_tested"] is False
+          assert report["physical_qa_approved"] is False
+          assert report["public_distribution_approved"] is False
+          print("Real packaged executable spawned and actual Tk App user interface entered event loop")
           PY
       - name: Check all 18 profiles, 11 REAL embedded native images, source pins and absent noncommercial binaries
         shell: bash
