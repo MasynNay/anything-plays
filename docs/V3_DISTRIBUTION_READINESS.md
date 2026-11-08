@@ -14,6 +14,28 @@ This is the 3.0-specific audit trail. The earlier [v2.0 distribution decision](R
 - The maintainer separately reports Dolphin/GameCube now works on a physical Linux system. The precise tested installer SHA, 30-minute endurance and full control/save matrix remain unrecorded.
 - The camera-side label-size slider, persistent size preference and zone-constrained rendering are merged. Their source checks and the complete offline installer lab passed.
 
+## Four-platform immutable candidate lock, not a license clearance
+
+The successful [full offline CI run 42437133733](https://github.com/MasynNay/anything-plays/actions/runs/42437133733)
+retained **48 original native inputs**: 11 platform-specific core ZIPs and the
+upstream Dolphin system ZIP on each of Windows x64, Linux x64, Mac Intel and
+Mac Apple Silicon. Those archives were independently hashed against each
+`PRESERVED_NATIVE_INPUTS.json` record; all matched.
+
+`tools/create_v30_candidate_lock.py` checks the original outer CI archive,
+each nested ZIP and each extracted native library, and requires exactly the
+18-profile / 11-core lineup. It emits a four-platform **unapproved**
+fingerprint manifest containing native and original-ZIP SHA-256, byte sizes,
+reported versions, upstream source repositories and Dolphin Sys hashes.
+
+To repeat the process without manually reconstructing the manifest, dispatch
+the GitHub workflow `Anything Plays 3.0 | Freeze original native candidate
+inputs`, provide the successful offline lab run ID, and retrieve the
+`NATIVE-LOCK-UNAPPROVED` artifact. This workflow does **not** publish
+installers, grant redistribution rights, resolve noncommercial/GPL linking
+compatibility, or claim independently reproducible native binaries. Missing
+source attribution (notably Beetle PCE Fast) still requires investigation.
+
 ## Native core redistribution review matrix
 
 | Core packaged in the complete preview | Upstream source | Public binary approval |
