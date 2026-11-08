@@ -89,13 +89,13 @@ def validate_installed_map(folder, extension, *, verify_native=True):
     return info
 
 
-def enable_windows_offline_runtime(folder):
-    """Verify actual bundled DLL bytes and register the OS directory only once."""
+def enable_windows_offline_runtime(folder, *, verify_native=True):
+    """Verify bundled DLL and register once, before or after extracting cores."""
     if os.name != "nt":
         return
     root = Path(folder)
     from anything_plays.v30_gpl_trial import _verify_runtime_dependency
-    info = validate_installed_map(root, ".dll")
+    info = validate_installed_map(root, ".dll", verify_native=verify_native)
     _verify_runtime_dependency(root, info, ".dll")
     _register_windows_runtime_directory(root, info)
 
