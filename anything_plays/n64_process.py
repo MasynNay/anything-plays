@@ -32,9 +32,9 @@ N64_CAPTURE_INTERVAL = 1 / 30.0
 class SharedN64Inputs:
     """Libretro callback in child reads the parent's current controls."""
 
-    def __init__(self, values):
+    def __init__(self, values, system="n64"):
         self.values = values
-        self.system = "n64"
+        self.system = system
 
     def state(self, port, device, index, button):
         if port not in (0, 1):
@@ -57,8 +57,8 @@ class SharedN64Inputs:
 class ChildEmulator:
     """Minimal CoreSession interface, entirely inside the game subprocess."""
 
-    def __init__(self, control, stopped, state, gain):
-        self.inputs = SharedN64Inputs(control)
+    def __init__(self, control, stopped, state, gain, system="n64"):
+        self.inputs = SharedN64Inputs(control, system)
         self.stop_event = stopped
         self._state = state
         self._gain = gain
@@ -85,14 +85,14 @@ class ChildEmulator:
 
 
 def _child_main(rom, core, control, stopped, state, gain,
-                pixels, width, height, serial, guard, error_pipe):
+                pixels, width, height, serial, guard, error_pipe, system="n64"):
     import faulthandler
     faulthandler.enable(all_threads=True)
     from anything_plays.gba_emulator import CoreSession
 
-    emulator = ChildEmulator(control, stopped, state, gain)
+    emulator = ChildEmulator(control, stopped, state, gain, system)
     try:
-        session = CoreSession(emulator, "n64", rom, core)
+        session = CoreSession(emulator, system, rom, core)
         # The N64 child is a one-game OS process; CoreSession MUST NOT
         # call dlclose on macOS. Exiting this subprocess discards all
         # native global state without running dyld unload destructors.
@@ -157,6 +157,7 @@ class MacN64ProcessSession:
 
     def __init__(self, emulator, rom, core_path):
         self.emulator = emulator
+        self.system = "n64"
         self.rom = str(Path(rom).resolve())
         self.core = str(Path(core_path).resolve())
 
@@ -175,8 +176,8 @@ class MacN64ProcessSession:
         process = ctx.Process(
             target=_child_main,
             args=(self.rom, self.core, control, stopped, state, gain,
-                  pixels, width, height, serial, guard, child),
-            name="AnythingPlays-N64-isolated",
+                  pixels, width, height, serial, guard, child, self.system),
+            name=f"AnythingPlays-{self.system}-isolated",
             daemon=True,
         )
         # The shared memory is bounded and is never exposed to the Tk thread.
@@ -184,9 +185,11 @@ class MacN64ProcessSession:
         last_capture = 0.0
         last_message = None
         started = False
+        spawned = False
         try:
-            self.emulator.inputs.system = "n64"
+            self.emulator.inputs.system = self.system
             process.start()
+            spawned = True
             child.close()
             while not self.emulator.stop_event.is_set():
                 if state.value == 1:
@@ -194,7 +197,10 @@ class MacN64ProcessSession:
                     self.emulator.running = True
                     self.emulator.launching = False
                 if parent.poll():
-                    kind, message = parent.recv()
+                    try:
+                        kind, message = parent.recv()
+                    except EOFError:
+                        kind, message = "error", "isolated worker closed its status channel"
                     if kind == "error":
                         last_message = message.splitlines()[0]
                     elif kind == "save-warning":
@@ -242,23 +248,24 @@ class MacN64ProcessSession:
             if not self.emulator.stop_event.is_set():
                 if not started:
                     raise RuntimeError(
-                        "N64 subprocess ended before gameplay began: "
+                        f"{self.system} subprocess ended before gameplay began: "
                         + (last_message or f"exit code {process.exitcode}")
                     )
                 if process.exitcode not in (0, None) or state.value == 3:
                     raise RuntimeError(
-                        "N64 subprocess stopped unexpectedly: "
+                        f"{self.system} subprocess stopped unexpectedly: "
                         + (last_message or f"exit code {process.exitcode}")
                     )
         finally:
             stopped.set()
-            process.join(timeout=5)
-            if process.is_alive():
-                process.terminate()
-                process.join(timeout=3)
+            if spawned:
+                process.join(timeout=5)
                 if process.is_alive():
-                    process.kill()
-                    process.join(timeout=2)
+                    process.terminate()
+                    process.join(timeout=3)
+                    if process.is_alive():
+                        process.kill()
+                        process.join(timeout=2)
             parent.close()
             try:
                 child.close()
@@ -267,3 +274,23 @@ class MacN64ProcessSession:
             self.emulator.inputs.disarm()
             self.emulator.running = False
             self.emulator.launching = False
+
+
+class ExperimentalSoftwareCoreProcessSession(MacN64ProcessSession):
+    """Opt-in research bridge for 2D Libretro cores, never a default app runtime.
+
+    Uses the existing bounded shared-memory frame/input transport, core-owned
+    audio and save lifecycle. Each game starts a fresh child process; no ROMs,
+    audio, screenshots or personal data are uploaded. Does NOT support the
+    Dolphin hardware-framebuffer path or replace its native integration.
+    Process separation does NOT determine redistribution license compliance.
+    """
+
+    def __init__(self, emulator, system, rom, core_path):
+        from anything_plays.systems import SYSTEMS
+
+        if (system not in SYSTEMS or system in ("n64", "gamecube")
+                or SYSTEMS[system].backend != "libretro"):
+            raise ValueError("Experimental process bridge supports only 2D Libretro profiles")
+        super().__init__(emulator, rom, core_path)
+        self.system = system
