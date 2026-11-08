@@ -23,6 +23,7 @@ This directory is the index for technical and release evidence. The [repository 
 | Neo Geo Pocket test ROM license evidence | [NGP test license](V3_NGP_TEST_LICENSE.md) |
 | Exact recovery checkpoint | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |
 | Release acceptance flags and evidence | [Acceptance data](../config/v3.0-release-acceptance.json) |
+| Controlled stable-release publication | [3.0 publication runbook](V3_PUBLICATION_RUNBOOK.md) |
 
 The complete offline **3.0 preview** has passed four-platform packaging checks. It is not yet an approved public binary release. The [current stable release is 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
 
