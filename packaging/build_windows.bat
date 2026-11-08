@@ -68,6 +68,14 @@ if "%AP_V30_MINIMAL_CORE_BUILD%"=="1" (
 ) else (
   if "%AP_FULL_CORE_BUILD%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
 )
+REM The only alternate 3.0 test lane is explicitly unapproved and
+REM preserves all 11 native core slots with source-authentic core names.
+if "%AP_V30_GPL_TRIAL%"=="1" (
+  if not "%AP_V30_TEST_CORES%"=="1" exit /b 1
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  set "CORE_LIST=mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
+)
 for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
@@ -75,6 +83,14 @@ for %%C in (%CORE_LIST%) do (
 )
 copy /Y "cores\CORE_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
 if errorlevel 1 exit /b 1
+if "%AP_V30_GPL_TRIAL%"=="1" (
+  copy /Y "cores\V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json" "dist\AnythingPlays\cores\" >nul
+  if errorlevel 1 exit /b 1
+  REM The source-built Windows research cores link libwinpthread; bundle the
+  REM exact original SHA-verified DLL rather than assuming MSYS2 is installed.
+  copy /Y "cores\libwinpthread-1.dll" "dist\AnythingPlays\cores\" >nul
+  if errorlevel 1 exit /b 1
+)
 if "%AP_FULL_CORE_BUILD%"=="1" (
   if not exist "cores\dolphin-emu\Sys\codehandler.bin" (
     echo Missing bundled Dolphin Sys resources
@@ -97,6 +113,12 @@ copy /Y docs\THIRD_PARTY_COMPONENTS.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
+if "%AP_V30_GPL_TRIAL%"=="1" (
+  copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-Supafaust-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+  if errorlevel 1 exit /b 1
+  copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-BlastEm-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+  if errorlevel 1 exit /b 1
+)
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
 

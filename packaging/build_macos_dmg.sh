@@ -75,6 +75,12 @@ if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
 elif [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
+# Lab-only full offline 11-slot variant: use genuinely differently named
+# pinned-source GPL binaries, not renamed noncommercial Snes9x/Genesis GX.
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  [[ "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" ]] || exit 1
+  CORE_LIST=(mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
+fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
@@ -82,6 +88,9 @@ for name in "${CORE_LIST[@]}"; do
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
 cp cores/CORE_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  cp cores/V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json "$APP_BUNDLE/Contents/Resources/cores/"
+fi
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   # Dolphin's self-contained core needs compatibility tables under Sys/.
   # Ship them with the signed app; never ask the player to download them.
@@ -109,6 +118,10 @@ cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" "$LICENSE_DIR/"
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" "$LICENSE_DIR/"
+fi
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos "$APP_BUNDLE"

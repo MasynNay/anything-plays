@@ -25,6 +25,7 @@ This directory is the index for technical and release evidence. The [repository 
 | Draft messages seeking clarification from noncommercial rights holders (not sent) | [Portfolio permission requests](V3_PORTFOLIO_PERMISSION_REQUESTS.md) |
 | Experimental disposable 2D Libretro worker technical feasibility (not release-approved) | [Isolated core research](V3_ISOLATED_CORE_RESEARCH.md) |
 | Source-built GPL-alternative SNES + four Sega consoles, real four-platform repeated switching (unapproved) | [28-cycle native switching research](V3_GPL_ALTERNATIVE_SWITCH_RESEARCH.md) |
+| Full 18-profile/11-core, source-built GPL-alternative offline installer research (never published) | [Offline installer trial](V3_GPL_OFFLINE_INSTALLER_TRIAL.md) |
 | Draft release text (not published) | [3.0 release notes](V3_RELEASE_NOTES_DRAFT.md) |
 | Neo Geo Pocket test ROM license evidence | [NGP test license](V3_NGP_TEST_LICENSE.md) |
 | Exact recovery checkpoint | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |

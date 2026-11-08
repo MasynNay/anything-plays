@@ -57,6 +57,18 @@ def find_core(system="gba"):
     accidentally boot a ROM with the wrong system's emulator.
     """
     core = SYSTEMS[system].core
+    # Research-only complete offline preview, never the public stable build:
+    # a marker and exact source-built GPL images must be present in the
+    # installed bundle. No implicit downloads and no fallback to NC cores.
+    from anything_plays.v30_gpl_trial import find_trial_core
+    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000"):
+        try:
+            trial, trial_path = find_trial_core(
+                _search_directories(), system, _library_extension())
+        except (OSError, ValueError, TypeError):
+            return None
+        if trial:
+            return trial_path
     # Verified user-owned core packs take precedence without mutating the
     # signed/read-only application bundle. Corruption falls back to bundle.
     from anything_plays.core_packs import managed_core_path

@@ -41,12 +41,21 @@ if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
 elif [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
+# Lab-only full offline 11-slot variant: use genuinely differently named
+# pinned-source GPL binaries, not renamed noncommercial Snes9x/Genesis GX.
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  [[ "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" ]] || exit 1
+  CORE_LIST=(mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
+fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.so"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  cp cores/V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json dist/AnythingPlays/cores/
+fi
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
   cp -R cores/dolphin-emu dist/AnythingPlays/cores/
@@ -71,6 +80,10 @@ cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
+if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" dist/AnythingPlays/licenses/
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" dist/AnythingPlays/licenses/
+fi
 .build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
