@@ -52,7 +52,7 @@ class DolphinSubmoduleAuditTests(unittest.TestCase):
         self.assertEqual(verify_upstream(self.index, tree, modules), 34)
         wrong_tree = copy.deepcopy(tree)
         wrong_tree["tree"][0]["sha"] = "f" * 40
-        with self.assertRaisesRegex(ValueError, "Gitlink or URL mismatch"):
+        with self.assertRaisesRegex(ValueError, "gitlink or URL mismatch"):
             verify_upstream(self.index, wrong_tree, modules)
         wrong_tree["tree"] = tree["tree"]
         wrong_tree["truncated"] = True
