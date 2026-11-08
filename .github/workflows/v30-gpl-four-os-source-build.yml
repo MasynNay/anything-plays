@@ -10,6 +10,7 @@ on:
       - 'tools/capture_v30_gpl_alternative_source_build.py'
       - 'tools/probe_v30_blastem_genesis_variant.py'
       - 'tools/bsnes_mingw_vasprintf_compat.h'
+      - 'tools/v30_windows_gpl_lab/sitecustomize.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -143,6 +144,19 @@ jobs:
           (cd "test-evidence/$V30_CANDIDATE-$V30_TARGET" && sha256sum -c SHA256SUMS.txt)
       - name: Install frontend and original homebrew audio/video dependencies
         run: python -m pip install -r requirements.txt
+      - name: Register test-only MSYS2 DLL directory inside every Windows Python native probe
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f /c/msys64/mingw64/bin/libstdc++-6.dll
+          # Python 3.8+ DLL loading ignores ordinary PATH for nested
+          # ctypes dependencies. Parent probes start a fresh child process.
+          # Isolated sitecustomize registers the directory in EVERY child,
+          # keeping the os.add_dll_directory handle alive for its lifetime.
+          # Do not copy these system toolchain DLLs to installers or release.
+          echo "AP_V30_MINGW_CI_DLL_DIR=C:/msys64/mingw64/bin" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/tools/v30_windows_gpl_lab" >> "$GITHUB_ENV"
       - name: Test original SNES source-generated PPU/SPC gameplay with freshly built bsnes
         if: matrix.candidate == 'bsnes'
         shell: bash
