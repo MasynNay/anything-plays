@@ -114,6 +114,15 @@ class AuthenticMonoAVTests(unittest.TestCase):
                 {x.name for x in (p/"results").iterdir()},
                 {"NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json", "SHA256SUMS.txt"},
             )
+            checksum = (p/"results"/"SHA256SUMS.txt").read_bytes()
+            self.assertNotIn(b"\r", checksum)
+            self.assertEqual(checksum.count(b"\n"), 1)
+            report_bytes = (p/"results"/"NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json").read_bytes()
+            expected_line = (
+                hashlib.sha256(report_bytes).hexdigest()
+                + "  NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json\n"
+            ).encode("ascii")
+            self.assertEqual(checksum, expected_line)
 
     def test_no_real_signal_means_no_native_release_pass(self):
         with TemporaryDirectory() as td:
