@@ -51,3 +51,25 @@ The full public release remains blocked by
 `config/v3.0-release-acceptance.json` and
 `tools/check_v30_release.py`. Neither preview builds nor experimental
 diagnostics may override those gates.
+
+### Corrected NGP cartridge-header acceptance (November 8, 2026)
+
+**Important source-fixture correction:** the previously pinned MIT file
+`hw_calibration/a_align_calib_v12.ngp` has actual header byte
+`0x23 = 0x10` (**color-compatible**), despite its `.ngp` extension.
+An independent review of **all fourteen** sibling `.ngp` calibration
+blobs at the pinned `Tixul/Ngpcraft_emulator` Git commit showed
+**14/14 color-mode headers, 0/14 genuine mono-mode `0x00`**.
+The [real native 14-ROM test](https://github.com/MasynNay/anything-plays/actions/runs/42448817220)
+recorded **0/14 nonzero PCM**. The separate original-generated true
+mono 0x00 PSG test also recorded **0/4 nonzero PCM and 0/4 changing
+video** in [run 42449197364](https://github.com/MasynNay/anything-plays/actions/runs/42449197364).
+This is not sufficient to conclude a genuine native audio defect.
+
+`tools/ngp_mit_fixtures.py` now checks immutable Git blob + the real
+cartridge header, and the main `tools/probe_ngp_mit_homebrew.py` parent
+**rejects even a native-positive report for a color-header `.ngp`**
+when testing the real mono target. The fourteen-ROM research workflow
+remains diagnostic only and **explicitly reports zero genuine mono
+candidates**. The genuine mono blocker in issue #41 remains OPEN;
+NGPC color acceptance continues separately and is not demoted.
