@@ -26,9 +26,11 @@ virtual environment; do not commit `.venv`, `cores/`, `dist/`, or `release/`.
 - Never add global keyboard injection or silently download native code at app
   runtime.
 - Preserve the legacy settings location and per-console profile migration.
-- Keep all four consoles and all 16 themes working. Changes to button IDs,
+- Preserve the 18 existing 3.0 console profiles, 11 bundled native core integrations and all 16 themes. Changes to button IDs,
   cartridge art, grid geometry, and saved layouts require regression tests.
-- Preserve bundled core checks in all three platform packaging scripts.
+- Preserve complete offline core and Dolphin Sys verification in all three platform packaging scripts.
+- Keep downloaded third-party emulator cores, installer outputs and game ROMs out of Git; repository hygiene is enforced by CI.
+- Do not declare a public release complete until the exact-core source/license compatibility and real-device acceptance gates pass.
 
 ## Test before opening a pull request
 

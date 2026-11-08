@@ -51,6 +51,28 @@ class CleanReleaseAssetContract(unittest.TestCase):
                 stage_application_assets(source, output, version="3.0.0")
             self.assertFalse(output.exists())
 
+    def test_symlinked_release_input_and_output_are_rejected(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            source.mkdir()
+            for name in expected_installers("3.0.0"):
+                (source / name).write_bytes(b"synthetic")
+            alias_in = root / "source-link"
+            alias_out = root / "output-link"
+            output_target = root / "output-target"
+            output_target.mkdir()
+            try:
+                alias_in.symlink_to(source, target_is_directory=True)
+                alias_out.symlink_to(output_target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlinks unavailable on this platform")
+            with self.assertRaisesRegex(ValueError, "cannot be symlinks"):
+                stage_application_assets(alias_in, root / "unused", version="3.0.0")
+            with self.assertRaisesRegex(ValueError, "cannot be symlinks"):
+                stage_application_assets(source, alias_out, version="3.0.0")
+            self.assertEqual(list(output_target.iterdir()), [])
+
     def test_reject_preview_as_stable_and_preexisting_staging(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

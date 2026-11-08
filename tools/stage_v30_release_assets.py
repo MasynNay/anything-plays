@@ -36,8 +36,15 @@ def expected_installers(version):
 def stage_application_assets(input_dir, output_dir, *, version, strict=True):
     """Check *all* inputs before creating/mutating an output directory."""
     names = expected_installers(version)
-    input_dir = Path(input_dir).resolve()
-    output_dir = Path(output_dir).resolve()
+    # Check the original paths before resolving. Path.resolve() follows
+    # symlinks; checking is_symlink() afterward would miss a redirected
+    # output destination and could put release files in an unexpected folder.
+    input_path = Path(input_dir).expanduser()
+    output_path = Path(output_dir).expanduser()
+    if input_path.is_symlink() or output_path.is_symlink():
+        raise ValueError("Release source and destination cannot be symlinks")
+    input_dir = input_path.resolve()
+    output_dir = output_path.resolve()
     if not input_dir.is_dir():
         raise FileNotFoundError("No application build directory")
     if input_dir == output_dir or input_dir in output_dir.parents or output_dir in input_dir.parents:
@@ -45,8 +52,6 @@ def stage_application_assets(input_dir, output_dir, *, version, strict=True):
     if output_dir.exists():
         if any(output_dir.iterdir()):
             raise ValueError("Release staging directory must be new or empty")
-        if output_dir.is_symlink():
-            raise ValueError("Release staging directory cannot be a symlink")
     candidates = {}
     for name in names:
         path = input_dir / name
