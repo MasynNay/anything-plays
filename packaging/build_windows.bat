@@ -136,6 +136,14 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
     if errorlevel 1 exit /b 1
   )
 )
+if "%AP_V30_APPROVED_RELEASE%"=="1" if exist "cores\V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json" (
+  copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-Supafaust-COPYING.txt" "dist\AnythingPlays\licenses\Supafaust-COPYING.txt" >nul
+  if errorlevel 1 exit /b 1
+  copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-BlastEm-COPYING.txt" "dist\AnythingPlays\licenses\BlastEm-COPYING.txt" >nul
+  if errorlevel 1 exit /b 1
+  copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\PCE-COPYING.txt" >nul
+  if errorlevel 1 exit /b 1
+)
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
 
