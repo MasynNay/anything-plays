@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/v30-supafaust-four-os-source.yml'
       - 'tools/capture_v30_supafaust_source.py'
+      - 'tools/patch_v30_supafaust_macos_semaphore.py'
       - 'tests/test_v30_supafaust_four_os_source.py'
   workflow_dispatch:
 
@@ -77,7 +78,17 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: make -C research/supafaust-src -j 3 platform=unix
-      - name: Compile immutable source-built macOS Intel / ARM SNES libretro core
+      - name: Apply the EXACT documented macOS-only GPL source compatibility patch
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Upstream config.h mistakenly claims macOS has sem_timedwait.
+          # Its original MThreading_POSIX.cpp already contains a pthread
+          # condition-variable semaphore fallback. Only change one guard.
+          python -m tools.patch_v30_supafaust_macos_semaphore --source "$SUPA_SRC"
+          test "$(git -C "$SUPA_SRC" diff --name-only)" = "mednafen/config.h"
+      - name: Compile source-built macOS Intel / ARM SNES libretro core with archived exact one-file patch
         if: runner.os == 'macOS'
         shell: bash
         run: make -C research/supafaust-src -j 3 platform=osx
