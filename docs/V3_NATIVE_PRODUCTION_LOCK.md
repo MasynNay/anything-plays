@@ -55,6 +55,39 @@ completed with source and license evidence, and reviewed before it can be
 proposed for the approved production path. Its automatically produced flags
 are deliberately **all false**.
 
+## Source-built PCE Fast integrated preview trial (no release approval)
+
+The separate [four-platform PCE source-build lab](https://github.com/MasynNay/anything-plays/actions/runs/42444367068)
+passed authentic native video and nonzero PSG audio on all four targets.
+The new pinned-source binary is tied to the original upstream GPL-2.0 Git
+commit `2de1ce1c3f237b161c126c54ba407990bb86d1e9`. Windows has a
+different Git-source archive SHA-256 because of checkout line endings;
+its exact per-target archive identity is recorded separately.
+
+The frozen **unapproved** source-built candidate identity file is
+[config/v3.0-pce-pinned-source-candidates.json](../config/v3.0-pce-pinned-source-candidates.json).
+[tools/v30_pce_candidate.py](../tools/v30_pce_candidate.py) verifies the
+original test artifact's native core bytes, corresponding source archive,
+GPL notice, platform magic and real native audio/video report.
+[tools/stage_v30_pce_trial_inputs.py](../tools/stage_v30_pce_trial_inputs.py)
+checks all **12** original stored ZIPs (11 cores plus Dolphin Sys), retains
+**10** unchanged native core ZIPs and unchanged Dolphin Sys, and substitutes
+only a new deterministic ZIP containing the source-built PCE binary. Only
+unapproved 3.0 preview mode is accepted; it never touches the real 3.0 core
+lock, production inputs, or the existing successful preview installers.
+
+The separate four-target workflow
+`.github/workflows/v30-pce-offline-integration.yml` builds complete
+18-profile, 11-core test previews using those strictly verified local
+archives and executes the original HuCard native PSG/video probe against
+the newly integrated PCE core. The workflow retains **evidence only**, not
+unapproved installer binaries. Approval fields remain false.
+
+**No public GPL/noncommercial mixed-license redistribution approval or full
+retail-game/hardware acceptance is implied.** The technical core swap is
+evaluated in isolation and may be adopted for a future reviewed release
+only after independent evidence and rights decisions.
+
 ## Distinct release and development modes
 
 | Mode | Build environment | Effect |

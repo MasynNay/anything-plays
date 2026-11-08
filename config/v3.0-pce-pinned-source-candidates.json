@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "status": "UNAPPROVED-SOURCE-BUILT-PCE-3.0-FOUR-TARGET-CANDIDATE",
+  "original_run_id": 42444367068,
+  "upstream_source_repository": "https://github.com/libretro/beetle-pce-fast-libretro",
+  "pinned_source_commit": "2de1ce1c3f237b161c126c54ba407990bb86d1e9",
+  "source_archive_name": "pce-fast-2de1ce1c3f237b161c126c54ba407990bb86d1e9-SOURCE.tar.gz",
+  "source_license": "GPL-2.0",
+  "new_binaries_built_from_pinned_source": true,
+  "source_equivalence_to_existing_buildbot_core_verified": false,
+  "added_to_existing_preview": false,
+  "approved_for_public_binary_distribution": false,
+  "mixed_license_combined_distribution_reviewed": false,
+  "full_real_game_acceptance_verified": false,
+  "targets": {
+    "linux-x64": {
+      "artifact_id": 13603061481,
+      "core_filename": "mednafen_pce_fast_libretro.so",
+      "native_sha256": "7adb1a08b9cb6680354ac871c979236fe579f67e3b08059903bf07288a706422",
+      "native_bytes": 4640768,
+      "native_report_sha256": "c193cfd707c17a8a11c004e62fd0045dfeeee5edbbafabffee909092a9751c11",
+      "native_video_frames": 718,
+      "native_nonzero_pcm_values": 1054139,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_bytes": 1190870
+    },
+    "macos-arm64": {
+      "artifact_id": 13603390034,
+      "core_filename": "mednafen_pce_fast_libretro.dylib",
+      "native_sha256": "093b5af4f7db4a36dba7e43fa2a10b384d14c38199b8e8401f5b97110a84bcaa",
+      "native_bytes": 3869984,
+      "native_report_sha256": "e4b4c96812046f9737c1aea9f814dfc61cc5e6eefd09eb9f3caa8addb7d651a4",
+      "native_video_frames": 725,
+      "native_nonzero_pcm_values": 1064421,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_bytes": 1190870
+    },
+    "macos-x64": {
+      "artifact_id": 13602813636,
+      "core_filename": "mednafen_pce_fast_libretro.dylib",
+      "native_sha256": "6706cd61515755eb1039cff4f8cd50f2aae8c458d767e616c5ed01a5f9059643",
+      "native_bytes": 3887896,
+      "native_report_sha256": "a27446571dbf01188bede60d5e5874f10ede8052023889611ef7a0447e048f6c",
+      "native_video_frames": 720,
+      "native_nonzero_pcm_values": 1057077,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_bytes": 1190870
+    },
+    "windows-x64": {
+      "artifact_id": 13603260566,
+      "core_filename": "mednafen_pce_fast_libretro.dll",
+      "native_sha256": "58c495574383e4daa3f8c281b4befa45b2f14ad104fddf461c8221e9ac2b97c0",
+      "native_bytes": 4225255,
+      "native_report_sha256": "a79ef80eb901ce158ecee3b5bf642f62eae5140bb98a8df4d26ee3c349061a53",
+      "native_video_frames": 717,
+      "native_nonzero_pcm_values": 1052671,
+      "source_archive_sha256": "140ca883a2a43b404d879dead4793810d73fac06bdff7ab90228688a8c7072e5",
+      "source_archive_bytes": 1200909
+    }
+  },
+  "note": "Per-target digests rechecked against downloaded original GitHub Actions artifacts. Windows Git source tar differs by checkout line endings; preserve exact per-platform archive hashes. No ROMs or native binaries committed."
+}
