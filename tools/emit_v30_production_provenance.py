@@ -50,6 +50,16 @@ def validate_source_inventory(lock, inventory):
         raise ValueError("Missing approved 3.0 corresponding-source inventory")
     if inventory.get("native_core_count") != 11:
         raise ValueError("Source inventory does not cover eleven native cores")
+    # A filename, Git commit and SHA-256 digest alone do NOT establish that
+    # the source supplied is the code used to create an existing buildbot
+    # binary. Require an explicitly reviewed binary-to-source decision for
+    # the complete 44-binary set, in addition to per-core verified evidence.
+    if inventory.get("independent_binary_to_source_match_proven") is not True:
+        raise ValueError("Independent 11-core/four-platform source-to-binary audit missing")
+    revision = lock.get("source_commit")
+    if (not isinstance(revision, str) or not COMMIT.fullmatch(revision)
+            or inventory.get("source_commit") != revision):
+        raise ValueError("Corresponding-source inventory is not for the locked build commit")
     rows = inventory.get("targets")
     if not isinstance(rows, dict) or set(rows) != NATIVE_TARGETS:
         raise ValueError("Source inventory must cover all four target architectures")
@@ -62,21 +72,43 @@ def validate_source_inventory(lock, inventory):
             evidence = cores[name]
             if not isinstance(evidence, dict):
                 raise ValueError(f"Missing verified corresponding source: {target}/{name}")
+            # Check BOTH native library bytes and the exact original
+            # distributed Libretro ZIP identity. Archive-only evidence can
+            # otherwise be combined with a different payload at release time.
             for field, expected in (
                 ("source_commit_sha", approved[name]["source_commit_sha"]),
                 ("native_sha256", approved[name]["native_sha256"]),
+                ("original_native_archive_sha256", approved[name]["original_archive_sha256"]),
+                ("source_repository", approved[name]["upstream_source_repository"]),
             ):
                 if evidence.get(field) != expected:
                     raise ValueError(f"Source inventory does not match pinned core: {target}/{name}/{field}")
-            if not isinstance(evidence.get("source_archive_sha256"), str) or not SHA256.fullmatch(evidence["source_archive_sha256"]):
+            if (not isinstance(evidence.get("source_archive_sha256"), str)
+                    or not SHA256.fullmatch(evidence["source_archive_sha256"])):
                 raise ValueError(f"Missing source archive hash: {target}/{name}")
-            if evidence.get("source_build_dependencies_reviewed") is not True:
-                raise ValueError(f"Unreviewed source build dependencies: {target}/{name}")
+            if (type(evidence.get("source_archive_size_bytes")) is not int
+                    or evidence["source_archive_size_bytes"] <= 0):
+                raise ValueError(f"Missing source archive size: {target}/{name}")
+            # Critically, existing research manifests mark ALL THREE false.
+            # A reviewer must examine binary/source equivalence and actual
+            # redistribution restrictions, not just attest that an upstream
+            # source archive exists. These are not set by CI automatically.
+            for field in (
+                "source_build_dependencies_reviewed",
+                "source_to_binary_verified",
+                "redistribution_license_reviewed",
+            ):
+                if evidence.get(field) is not True:
+                    raise ValueError(f"Unapproved per-core source/rights field: {target}/{name}/{field}")
         sys_record = rows[target].get("dolphin_sys")
+        sys_locked = lock["targets"][target]["dolphin_sys"]
         if (not isinstance(sys_record, dict)
-                or sys_record.get("original_archive_sha256") != lock["targets"][target]["dolphin_sys"]["original_archive_sha256"]
-                or sys_record.get("source_and_license_reviewed") is not True):
-            raise ValueError(f"Unreviewed Dolphin system source: {target}")
+                or sys_record.get("original_archive_sha256") != sys_locked["original_archive_sha256"]
+                or sys_record.get("original_archive_size_bytes") != sys_locked["original_archive_size_bytes"]
+                or sys_record.get("source_and_license_reviewed") is not True
+                or sys_record.get("source_correspondence_verified") is not True
+                or sys_record.get("redistribution_approved") is not True):
+            raise ValueError(f"Unreviewed Dolphin system source/rights or archive mismatch: {target}")
     return True
 
 

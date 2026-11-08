@@ -83,6 +83,10 @@ jobs:
           test -s config/v3.0-corresponding-source-inventory.json
           test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
           test -s docs/V3_RELEASE_NOTES_APPROVED.md
+          # Preflight the *contents*, not mere existence, of the 44-core
+          # matching source inventory and each core's redistribution review.
+          # This fails before expensive installer builders ever run.
+          python -m tools.check_v30_source_gate
           run_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
           run_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
           if [[ "$run_name" != "Anything Plays 3.0 | Complete offline installer lab" || "$run_status" != success ]]; then

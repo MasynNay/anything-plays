@@ -12,6 +12,7 @@ import unittest
 from tools.emit_v30_production_provenance import (
     NATIVE_MAP, prepare_production_artifact, validate_source_inventory,
 )
+from tools.check_v30_source_gate import check_approved_source_package
 from tools.stage_v30_release_assets import expected_installers
 from tools.v30_release_lock import CORE_NAMES, TARGETS as NATIVE_TARGETS
 
@@ -44,8 +45,13 @@ def synthetic_evidence():
             source_cores[name] = {
                 "source_commit_sha": cores[name]["source_commit_sha"],
                 "native_sha256": core_sha,
+                "original_native_archive_sha256": cores[name]["original_archive_sha256"],
+                "source_repository": cores[name]["upstream_source_repository"],
                 "source_archive_sha256": digest((name + "source").encode()),
+                "source_archive_size_bytes": 900,
                 "source_build_dependencies_reviewed": True,
+                "source_to_binary_verified": True,
+                "redistribution_license_reviewed": True,
             }
         sys_sha = digest((target + "Sys").encode("utf-8"))
         targets[target] = {
@@ -62,11 +68,15 @@ def synthetic_evidence():
             "cores": source_cores,
             "dolphin_sys": {
                 "original_archive_sha256": sys_sha,
+                "original_archive_size_bytes": 100,
                 "source_and_license_reviewed": True,
+                "source_correspondence_verified": True,
+                "redistribution_approved": True,
             },
         }
     lock = {
         "schema_version": 1,
+        "source_commit": "b" * 40,
         "approved_for_binary_distribution": True,
         "license_compatibility_reviewed": True,
         "corresponding_source_inventory_verified": True,
@@ -76,9 +86,11 @@ def synthetic_evidence():
     }
     inventory = {
         "schema_version": 1,
+        "source_commit": "b" * 40,
         "native_core_count": 11,
         "approved_for_public_binary_distribution": True,
         "corresponding_source_inventory_verified": True,
+        "independent_binary_to_source_match_proven": True,
         "targets": source_targets,
     }
     return lock, inventory
@@ -143,8 +155,102 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
         source["targets"]["linux-x86_64"]["cores"]["mgba"][
             "source_build_dependencies_reviewed"
         ] = False
-        with self.assertRaisesRegex(ValueError, "Unreviewed source"):
+        with self.assertRaisesRegex(ValueError, "source_build_dependencies_reviewed"):
             validate_source_inventory(lock, source)
+
+    def test_requires_explicit_independent_match_for_all_44_native_binaries(self):
+        lock, source = synthetic_evidence()
+        self.assertTrue(validate_source_inventory(lock, source))
+        source["independent_binary_to_source_match_proven"] = False
+        with self.assertRaisesRegex(ValueError, "Independent"):
+            validate_source_inventory(lock, source)
+
+    def test_fails_when_a_single_core_correspondence_or_rights_review_is_missing(self):
+        for missing in ("source_to_binary_verified",
+                        "redistribution_license_reviewed",
+                        "source_build_dependencies_reviewed"):
+            with self.subTest(missing=missing):
+                lock, source = synthetic_evidence()
+                # The validator must cover *every* target and *every* core:
+                # not just Linux or the first entry in the lock.
+                source["targets"]["macos-x86_64"]["cores"]["snes9x"][missing] = False
+                with self.assertRaisesRegex(ValueError, missing):
+                    validate_source_inventory(lock, source)
+
+    def test_requires_archive_identity_and_real_source_offer_metadata(self):
+        for field, value in (
+            ("original_native_archive_sha256", "0" * 64),
+            ("source_repository", "https://example.invalid/false-source"),
+            ("source_archive_size_bytes", 0),
+            ("source_archive_sha256", "not-a-digest"),
+        ):
+            with self.subTest(field=field):
+                lock, source = synthetic_evidence()
+                source["targets"]["windows-x86_64"]["cores"]["dolphin"][field] = value
+                with self.assertRaisesRegex(ValueError, "archive|source|pinned"):
+                    validate_source_inventory(lock, source)
+
+    def test_dolphin_sys_needs_both_correspondence_and_rights_review(self):
+        for field in ("source_correspondence_verified",
+                      "redistribution_approved", "source_and_license_reviewed"):
+            with self.subTest(field=field):
+                lock, source = synthetic_evidence()
+                source["targets"]["macos-arm64"]["dolphin_sys"][field] = False
+                with self.assertRaisesRegex(ValueError, "Dolphin"):
+                    validate_source_inventory(lock, source)
+        lock, source = synthetic_evidence()
+        source["targets"]["linux-x86_64"]["dolphin_sys"]["original_archive_size_bytes"] += 1
+        with self.assertRaisesRegex(ValueError, "Dolphin"):
+            validate_source_inventory(lock, source)
+
+    def test_source_record_must_match_exact_native_candidate_build_revision(self):
+        lock, source = synthetic_evidence()
+        source["source_commit"] = "a" * 40
+        with self.assertRaisesRegex(ValueError, "locked build commit"):
+            validate_source_inventory(lock, source)
+
+    def test_preflight_checks_documents_and_every_core_before_expensive_build(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lock_file = folder / "lock.json"
+            inventory_file = folder / "source.json"
+            review_file = folder / "rights.md"
+            def write():
+                lock_file.write_text(json.dumps(lock), "utf-8")
+                inventory_file.write_text(json.dumps(source), "utf-8")
+            write()
+            text = "APPROVED-3.0-DISTRIBUTION " + "THIS IS A SYNTHETIC TEST ONLY. " * 20
+            review_file.write_text(text, "utf-8")
+            kw = dict(lock_path=lock_file, inventory_path=inventory_file,
+                      license_review_path=review_file)
+            result = check_approved_source_package(**kw)
+            self.assertEqual(result["native_binaries_source_reviewed"], 44)
+            self.assertEqual(result["dolphin_sys_archives_reviewed"], 4)
+            self.assertFalse(result["public_release_approval_automatically_granted"])
+            source["targets"]["linux-x86_64"]["cores"]["genesis_plus_gx"][
+                "redistribution_license_reviewed"] = False
+            write()
+            with self.assertRaisesRegex(ValueError, "redistribution_license_reviewed"):
+                check_approved_source_package(**kw)
+            source["targets"]["linux-x86_64"]["cores"]["genesis_plus_gx"][
+                "redistribution_license_reviewed"] = True
+            write()
+            review_file.write_text("not reviewed", "utf-8")
+            with self.assertRaisesRegex(ValueError, "distribution decision"):
+                check_approved_source_package(**kw)
+
+    def test_preflight_does_not_bootstrap_unapproved_real_lock_or_rights(self):
+        from tools.v30_release_lock import LOCK_PATH
+        lock = json.loads(LOCK_PATH.read_text("utf-8"))
+        if lock["approved_for_binary_distribution"] is not True:
+            # Standard development mode is required to be blocked. In a
+            # future independently approved main release, this test still
+            # remains valid and needn't assert that approval is forever false.
+            with self.assertRaisesRegex(ValueError, "blocked|not approved"):
+                check_approved_source_package()
+        self.assertEqual(len(CORE_NAMES), 11)
+        self.assertEqual(len(NATIVE_TARGETS), 4)
 
     def test_rejects_wrong_architecture_and_unapproved_review(self):
         lock, source = synthetic_evidence()
