@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 MARKER = "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json"
@@ -29,6 +30,45 @@ ALTERNATIVE_PROFILES = 5
 ALTERNATIVE_CORES = 2
 EXPECTED_PROFILES = 18
 EXPECTED_CORES = 11
+WINDOWS_RUNTIME = "libwinpthread-1.dll"
+# Keep os.add_dll_directory handles alive for the loaded native cores.
+_WINDOWS_NATIVE_DLL_HANDLES = []
+
+
+def _verify_runtime_dependency(root, info, extension):
+    deps = info.get("runtime_dependencies")
+    if extension != ".dll":
+        if deps != {}:
+            raise ValueError("Unexpected Windows runtime in non-Windows trial")
+        return
+    if not isinstance(deps, dict) or set(deps) != {WINDOWS_RUNTIME}:
+        raise ValueError("Windows GPL trial is missing its offline native runtime")
+    digest = deps[WINDOWS_RUNTIME]
+    if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        raise ValueError("Unverified Windows runtime dependency SHA")
+    runtime = Path(root) / WINDOWS_RUNTIME
+    if runtime.is_symlink() or not runtime.is_file() or not 10000 < runtime.stat().st_size < 8 * 1024 * 1024:
+        raise ValueError("Missing unsafe Windows native dependency")
+    if hashlib.sha256(runtime.read_bytes()).hexdigest() != digest:
+        raise ValueError("Windows native runtime dependency was modified")
+
+
+def enable_windows_trial_runtime(folder):
+    """Register only the exact SHA-verified core directory on Windows.
+
+    Python 3.8+ does not use normal PATH for ctypes dependency resolution.
+    The packaged MinGW libwinpthread runtime MUST be present, without
+    dependence on any globally installed MSYS2/RetroArch program.
+    """
+    if os.name != "nt":
+        return
+    root = Path(folder)
+    marker = root / MARKER
+    if marker.is_symlink() or not marker.is_file():
+        raise ValueError("Missing Windows original source-built trial marker")
+    info = json.loads(marker.read_text("utf-8"))
+    _verify_runtime_dependency(root, info, ".dll")
+    _WINDOWS_NATIVE_DLL_HANDLES.append(os.add_dll_directory(str(root.resolve())))
 
 
 def validate_trial_core_directory(folder, extension, *, verify_native=True):
@@ -75,6 +115,7 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
             sha = hashlib.sha256(native.read_bytes()).hexdigest()
             if sha != digest:
                 raise ValueError(f"Tampered GPL alternative native binary: {name}")
+    _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):
         if (root / f"{forbidden}_libretro{extension}").exists():
@@ -98,6 +139,7 @@ def find_trial_core(directories, system, extension):
             raise ValueError("Symlinked GPL trial manifest")
         if marker.exists():
             info = validate_trial_core_directory(root, extension)
+            enable_windows_trial_runtime(root)
             name = PROFILE_TO_CORE[system]
             return True, str(root / info["alternatives"][name]["native_filename"])
     return False, None
