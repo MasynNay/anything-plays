@@ -24,6 +24,21 @@ class V30SourceArchiveTests(unittest.TestCase):
             (root / "config/v3.0-preview-candidate-integrity.json").read_text("utf-8")
         )
 
+    def test_direct_command_line_entrypoint_resolves_root_imports(self):
+        import subprocess
+        import sys
+        root = Path(__file__).resolve().parents[1]
+        cmd = [
+            sys.executable,
+            str(root / "tools/capture_v30_source_snapshots.py"),
+            "--help",
+        ]
+        result = subprocess.run(
+            cmd, cwd=root, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--output", result.stdout)
+
     def test_reported_full_commits_are_exactly_ten_and_rights_unapproved(self):
         plan = source_plan(self.manifest["linux_native_cores"])
         self.assertEqual(len(plan), 11)
