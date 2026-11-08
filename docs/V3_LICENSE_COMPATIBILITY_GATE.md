@@ -36,6 +36,12 @@ interact and the precise upstream permissions. It is a **material release
 question**, because a noncommercial restriction is not automatically
 compatible with GPL permissions if both licenses apply to one combined work.
 
+### Clarification for a free educational hiring portfolio
+
+The project's author confirms that the intended 3.0 showcase is free, educational and **not a revenue-generating product**. The fact that the source is shown to prospective employers should be disclosed as a use case; it should not be automatically classified as commercial, nor assumed to satisfy all custom noncommercial grants without checking the relevant wording. Snes9x's custom text refers to both noncommercial permission and personal/promotional examples; Genesis Plus GX's original text restricts commercial products/activities. For a per-core 11-family action matrix, required source/notices and the **real remaining decisions**, see [portfolio license clearance](V3_PORTFOLIO_LICENSE_CLEARANCE.md). The [Snes9x/Genesis Plus GX requests](V3_PORTFOLIO_PERMISSION_REQUESTS.md) are **drafts, not sent letters or received permissions**.
+
+Do not claim that the recent shared-memory 2D isolated worker prototype fixes copyleft linking by itself. GNU's GPL FAQ explicitly warns shared memory with complex interoperation may amount to a combined program. Independent, qualified license/architecture review still decides whether an approved 3.0 offline installer can be shipped in its current form.
+
 ### Required decision and evidence before public 3.0 binary publication
 
 1. Review the exact Snes9x and Genesis Plus GX permissions and any artwork
