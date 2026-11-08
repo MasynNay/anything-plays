@@ -1,0 +1,85 @@
+name: Anything Plays 3.0 | Audit pinned Dolphin submodule source archives
+
+# Source candidates only. Never releases a binary or marks GPL rights as cleared.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-submodule-sources.yml'
+      - 'tools/capture_v30_dolphin_submodule_sources.py'
+      - 'tools/check_v30_dolphin_submodules.py'
+      - 'tools/capture_v30_source_snapshots.py'
+      - 'tests/test_v30_dolphin_submodule_source_capture.py'
+      - 'config/v3.0-dolphin-submodule-candidates.json'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-submodule-sources.yml'
+      - 'tools/capture_v30_dolphin_submodule_sources.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-dolphin-submodule-sources-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-archive-shard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check exact frozen Gitlinks, shard coverage and falsified approvals
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_dolphin_submodule_audit.py' -v
+          python -m unittest discover -s tests -p 'test_v30_dolphin_submodule_source_capture.py' -v
+      - name: Capture this shard from only the original pinned Dolphin Gitlink revisions
+        run: |
+          python -m tools.capture_v30_dolphin_submodule_sources \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 6 \
+            --output source-review
+      - name: Verify exact archive SHA256 and reject spurious release approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd source-review && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('source-review/DOLPHIN_SUBMODULE_SOURCE_CANDIDATES_UNAPPROVED.json')
+          r = json.loads(p.read_text('utf-8'))
+          assert r['status'] == 'UNAPPROVED-DOLPHIN-PINNED-SUBMODULE-SOURCE-CANDIDATES'
+          assert r['complete_shard'] is True
+          assert r['total_pinned_gitlinks'] == 34
+          assert len(r['submodules']) == r['expected_archive_count_this_shard']
+          assert all(r[name] is False for name in (
+              'approved_for_binary_distribution',
+              'source_to_shipped_binary_correspondence_verified',
+              'complete_corresponding_source_and_build_dependencies_verified',
+              'independent_license_review_complete',
+          ))
+          assert all(not item['corresponding_shipped_binary_verified']
+                     and not item['license_reviewed']
+                     and not item['recursive_dependencies_verified']
+                     for item in r['submodules'].values())
+          print('Original pinned Dolphin source snapshots verified; NOT public-release approval')
+          PY
+      - name: Retain only review candidates with SHA256 integrity report (not a public release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-DOLPHIN-SOURCE-UNAPPROVED-shard-${{ matrix.shard }}
+          path: source-review/*
+          if-no-files-found: error
+          retention-days: 45
