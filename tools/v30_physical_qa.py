@@ -142,7 +142,7 @@ def validate_report(report):
     name = report.get("installer_filename")
     if (not isinstance(name, str)
             or len(name) > 180
-            or not re.fullmatch(r"[A-Za-z0-9_.() -]+\.(?:exe|deb|dmg)", name)
+            or not re.fullmatch(r"[A-Za-z0-9_.() ~-]+\.(?:exe|deb|dmg)", name)
             or name in (".", "..")):
         raise ValueError("Physical QA installer name must be a private-safe basename")
     expected_ext = (".exe" if report.get("target") == "windows-x64" else
