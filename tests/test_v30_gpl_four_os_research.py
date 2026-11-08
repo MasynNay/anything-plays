@@ -44,6 +44,35 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
         self.assertNotIn("APPROVED-3.0-DISTRIBUTION",text)
         self.assertNotIn("AP_V30_APPROVED_RELEASE: '1'",text)
 
+    def test_cross_platform_build_compatibility_does_not_edit_pinned_upstream_tree(self):
+        root=Path(__file__).resolve().parents[1]
+        workflow=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        header=(root/"tools/bsnes_mingw_vasprintf_compat.h").read_text("utf-8")
+        self.assertIn("mingw-w64-x86_64-python",workflow)
+        self.assertIn('EXTRA_INCLUDES="-include $(pwd)/tools/bsnes_mingw_vasprintf_compat.h"',workflow)
+        self.assertIn('EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE"',workflow)
+        self.assertIn("#if defined(_WIN32) && !defined(__cplusplus)",header)
+        self.assertIn("#define vasprintf ap_v30_bsnes_mingw_vasprintf",header)
+        self.assertIn("va_copy(render, original)",header)
+        self.assertIn("va_end(render)",header)
+        self.assertNotIn("git apply",workflow)
+        self.assertNotIn("sed -i",workflow)
+        self.assertNotIn("continue-on-error: true",workflow)
+        self.assertNotIn("AP_V30_APPROVED_RELEASE",workflow)
+
+    def test_all_four_original_sega_results_must_be_reconciled(self):
+        root=Path(__file__).resolve().parents[1]
+        workflow=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        for name in (
+            "GENESIS_AV_UNAPPROVED.json",
+            "mastersystem-AV_UNAPPROVED.json",
+            "gamegear-AV_UNAPPROVED.json",
+            "sg1000-AV_UNAPPROVED.json",
+        ):
+            self.assertIn(name,workflow)
+        self.assertIn("all(p.is_file() for p in reports)",workflow)
+        self.assertNotIn("where.glob('*_AV_UNAPPROVED.json')",workflow)
+
     def test_genesis_variant_must_be_platform_native_not_elf_on_windows(self):
         root=Path(__file__).resolve().parents[1]
         text=(root/"tools/probe_v30_blastem_genesis_variant.py").read_text("utf-8")
