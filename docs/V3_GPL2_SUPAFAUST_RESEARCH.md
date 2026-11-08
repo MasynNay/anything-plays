@@ -68,3 +68,36 @@ SNES saves, gamepad/camera controls and ROM switching, and pass sustained
 real installed-game compatibility testing. Independent corresponding
 source and legally reviewed combined-program distribution decisions remain
 mandatory. See [release blocker #28](https://github.com/MasynNay/anything-plays/issues/28).
+
+## Four-platform source-built follow-up (separate research gate)
+
+The second independent research lab,
+`.github/workflows/v30-supafaust-four-os-source.yml`, runs **four**
+freshly compiled, immutable upstream native candidates from the SAME
+GPLv2-or-later source commit on different actual operating systems:
+
+| Native target | Real GitHub runner | Expected original core |
+| --- | --- | --- |
+| Windows x64 | `windows-2025` with MSYS2 MINGW64 | `mednafen_supafaust_libretro.dll` |
+| Linux x64 | `ubuntu-24.04` | `mednafen_supafaust_libretro.so` |
+| Apple Silicon | `macos-15` | `mednafen_supafaust_libretro.dylib` |
+| Intel Mac | `macos-15-intel` | `mednafen_supafaust_libretro.dylib` |
+
+The `capture_v30_supafaust_source` utility now validates native file
+name **and platform-specific PE/ELF/Mach-O header**, immutable Git source
+commit, unchanged upstream tracked source, exact original GPL license
+text/grant and archive hash. It records the actual new native bytes and
+an original source snapshot for *each OS*, with distinct architecture
+metadata and all public distribution and substitution approvals FALSE.
+The source-only regression uses each OS binary signature plus a real
+source archive and SHA256SUMS; the actual workflow requires authentic
+moving SNES PPU video and nonzero SPC audio in the same Libretro frontend
+on the runner, not just that a library was built.
+
+This cross-platform lab may require compiler compatibility fixes on
+modern Apple and MSYS2 runners. Such fixes must not silently alter
+upstream GPL source, suppress a failing platform, skip playback or
+relabel research-only binaries as approved shipping emulator cores.
+Passing the lab is **not** evidence of real keyboard/camera/save, physical
+speaker, retail game compatibility, or the legal compatibility of the
+entire combined 11-core 3.0 installer. Research only.
