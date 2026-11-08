@@ -15,9 +15,11 @@ class ReleaseAcceptanceTests(unittest.TestCase):
     def setUpClass(cls):
         cls.policy = json.loads(ACCEPTANCE_FILE.read_text(encoding="utf-8"))
 
-    def test_alpha_is_blocked_until_all_eighteen_consoles_ship_offline_and_play(self):
+    def test_alpha_is_blocked_until_all_eighteen_consoles_are_verified_playable(self):
         errors = release_blockers(self.policy)
-        self.assertTrue(any("gamecube: bundled" in error for error in errors))
+        # Bundling was proven in the four-platform full offline CI; audio,
+        # real-game and embedded-video acceptance remain outstanding.
+        self.assertFalse(any("gamecube: bundled" in error for error in errors))
         self.assertTrue(any("gamecube: audio_verified" in error for error in errors))
         self.assertTrue(any("gamecube: in_app_video" in error for error in errors))
         self.assertTrue(any("n64: real_game_verified" in error for error in errors))
