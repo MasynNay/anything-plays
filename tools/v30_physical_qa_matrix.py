@@ -24,7 +24,7 @@ SUMMARY_STATUS = "FOUR-OS-OWNER-QA-RECONCILED-UNREVIEWED"
 REPORT_NAME = "V30_PHYSICAL_QA_OWNER_REPORTED_UNREVIEWED.json"
 SUMMARY_NAME = "V30_FOUR_OS_PHYSICAL_QA_REVIEW_UNAPPROVED.json"
 HASHFILE = "SHA256SUMS.txt"
-CLEAN_NAME = re.compile(r"[A-Za-z0-9_.() -]+\.(?:exe|deb|dmg)\Z")
+CLEAN_NAME = re.compile(r"[A-Za-z0-9_.() ~-]+\.(?:exe|deb|dmg)\Z")
 TARGET_SUFFIX = {
     "windows-x64": ".exe",
     "linux-x64": ".deb",
