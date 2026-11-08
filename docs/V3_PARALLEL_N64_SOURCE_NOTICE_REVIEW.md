@@ -101,3 +101,36 @@ All source/rights flags stay **false**. A green research job must not
 change `config/v3.0-core-lock.json` or
 `config/v3.0-release-acceptance.json`, nor be used to publish 3.0
 test installers as stable binaries.
+
+## Verified original archived-source run — November 8, 2026 UTC
+
+[PR #71](https://github.com/MasynNay/anything-plays/pull/71)
+**merged** at `4937a4cc1e38e4b5daa7c52fdd0b8c1ca93cefb4`
+after [source regression CI 42454235141](https://github.com/MasynNay/anything-plays/actions/runs/42454235141)
+**SUCCESS** and [real original N64 source/archive audit CI
+42454235212](https://github.com/MasynNay/anything-plays/actions/runs/42454235212)
+**SUCCESS** on reviewed PR commit
+`b0339f9c659cf1af23e67110d1e26ddea0e5af0b`.
+Source regressions were Python 3.12, Python 3.13 and native mGBA
+success; unaffected platform packaging checks correctly skipped.
+The real source workflow downloaded the original 6,877,459-byte
+TAR from source capture run `42441448884` and original four-platform
+binary review `42444450521`, verified the SHA256SUMS and actual pinned
+Git tree and rehashed **all 11 notice contents** as original Git blobs.
+
+The actual reviewer-only GitHub Actions artifact
+`AnythingPlays-3.0.0-PARALLEL-N64-SOURCE-LICENSES-UNAPPROVED`
+(artifact ID `13606623497`) was downloaded and independently checked:
+it contains exactly **two files**, the unapproved report JSON and
+SHA256SUMS.txt; the report's SHA-256 matched the checksum file.
+The machine-generated evidence verifies **0 Gitlinks, empty real
+`.gitmodules`, 11 notice SHA256 values and the four original core
+SHA256 identities**, while these source/rights flags remain explicitly
+**false**: binary-to-source correspondence, compiled notice selection,
+GPL/cross-license review, public distribution and production release.
+
+This clears only the previously inaccurate statement that additional
+N64 Git submodule archives needed to be retrieved. It does **not**
+allow the in-process GPL/noncommercial bundle to be published, declare
+the nightly binary reproduced from this source, or substitute automated
+tests for physical user gameplay/saving/long-run evidence.
