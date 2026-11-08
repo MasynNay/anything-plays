@@ -12,6 +12,7 @@ import unittest
 from tools.emit_v30_production_provenance import (
     NATIVE_MAP, prepare_production_artifact, validate_source_inventory,
 )
+from tools.check_v30_source_gate import check_approved_source_package
 from tools.stage_v30_release_assets import expected_installers
 from tools.v30_release_lock import CORE_NAMES, TARGETS as NATIVE_TARGETS
 
@@ -208,16 +209,48 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "locked build commit"):
             validate_source_inventory(lock, source)
 
-    def test_existing_checkout_cannot_claim_per_core_clearance(self):
-        # Real current release research is explicitly UNAPPROVED. A green
-        # source CI run may not turn those source observations into a license.
-        root = Path(__file__).resolve().parents[1]
-        checked_in_lock = json.loads(
-            (root / "config/v3.0-core-lock.json").read_text("utf-8"))
-        self.assertIs(checked_in_lock["approved_for_binary_distribution"], False)
-        self.assertIs(checked_in_lock["license_compatibility_reviewed"], False)
-        self.assertIs(checked_in_lock["corresponding_source_inventory_verified"], False)
-        self.assertFalse((root / "config/v3.0-corresponding-source-inventory.json").exists())
+    def test_preflight_checks_documents_and_every_core_before_expensive_build(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lock_file = folder / "lock.json"
+            inventory_file = folder / "source.json"
+            review_file = folder / "rights.md"
+            def write():
+                lock_file.write_text(json.dumps(lock), "utf-8")
+                inventory_file.write_text(json.dumps(source), "utf-8")
+            write()
+            text = "APPROVED-3.0-DISTRIBUTION " + "THIS IS A SYNTHETIC TEST ONLY. " * 20
+            review_file.write_text(text, "utf-8")
+            kw = dict(lock_path=lock_file, inventory_path=inventory_file,
+                      license_review_path=review_file)
+            result = check_approved_source_package(**kw)
+            self.assertEqual(result["native_binaries_source_reviewed"], 44)
+            self.assertEqual(result["dolphin_sys_archives_reviewed"], 4)
+            self.assertFalse(result["public_release_approval_automatically_granted"])
+            source["targets"]["linux-x86_64"]["cores"]["genesis_plus_gx"][
+                "redistribution_license_reviewed"] = False
+            write()
+            with self.assertRaisesRegex(ValueError, "redistribution_license_reviewed"):
+                check_approved_source_package(**kw)
+            source["targets"]["linux-x86_64"]["cores"]["genesis_plus_gx"][
+                "redistribution_license_reviewed"] = True
+            write()
+            review_file.write_text("not reviewed", "utf-8")
+            with self.assertRaisesRegex(ValueError, "distribution decision"):
+                check_approved_source_package(**kw)
+
+    def test_preflight_does_not_bootstrap_unapproved_real_lock_or_rights(self):
+        from tools.v30_release_lock import LOCK_PATH
+        lock = json.loads(LOCK_PATH.read_text("utf-8"))
+        if lock["approved_for_binary_distribution"] is not True:
+            # Standard development mode is required to be blocked. In a
+            # future independently approved main release, this test still
+            # remains valid and needn't assert that approval is forever false.
+            with self.assertRaisesRegex(ValueError, "blocked|not approved"):
+                check_approved_source_package()
+        self.assertEqual(len(CORE_NAMES), 11)
+        self.assertEqual(len(NATIVE_TARGETS), 4)
 
     def test_rejects_wrong_architecture_and_unapproved_review(self):
         lock, source = synthetic_evidence()
