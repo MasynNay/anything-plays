@@ -61,7 +61,8 @@ def find_core(system="gba"):
     # genuine original native file/source identities, never aliases them to
     # the old noncommercial emulator filenames. A corrupt marker fails
     # CLOSED rather than falling through to another native implementation.
-    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000", "pce"):
+    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000", "pce",
+                  "nes", "atari2600", "atari7800", "ngp", "ngpc", "ws", "wsc"):
         from anything_plays.v30_approved_core_map import find_approved_core
         try:
             approved, path = find_approved_core(
