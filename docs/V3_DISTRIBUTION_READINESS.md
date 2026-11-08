@@ -14,6 +14,41 @@ This is the 3.0-specific audit trail. The earlier [v2.0 distribution decision](R
 - The maintainer separately reports Dolphin/GameCube now works on a physical Linux system. The precise tested installer SHA, 30-minute endurance and full control/save matrix remain unrecorded.
 - The camera-side label-size slider, persistent size preference and zone-constrained rendering are merged. Their source checks and the complete offline installer lab passed.
 
+## Source-built Beetle PCE Fast — separate experimental candidate
+
+The original 3.0 developer-preview Beetle PCE Fast buildbot binary identifies
+itself as `v1.31.0.0` but does **not** expose an upstream Git source revision.
+The source snapshots therefore correctly mark its binary/source correspondence
+as **unresolved**.
+
+To eliminate the unknown-build-source problem *without guessing* about the
+existing binary, a separate four-platform lab now checks out the official
+[Beetle PCE Fast Libretro upstream repository](https://github.com/libretro/beetle-pce-fast-libretro)
+at immutable commit
+`2de1ce1c3f237b161c126c54ba407990bb86d1e9`, compiles a **new**
+native Libretro candidate from that exact source, archives the source and
+GPL-2.0 text alongside the compiled core, hashes both files and runs an
+**original, generated PC Engine HuCard** through the real native application
+frontend. The homebrew test checks actual changing native video and
+nonzero HuC6280 PSG audio. No copyrighted game ROM or CD BIOS is needed.
+
+Workflow: `.github/workflows/v30-pce-pinned-source.yml`
+(`Anything Plays 3.0 | PCE pinned-source replacement research`).
+The evidence script is `tools/capture_v30_pce_source_build.py`;
+it rejects an unexpected Git commit, modified tracked source, mismatched
+repository URL, missing GPL notice or incorrectly named native binary.
+Each workflow artifact contains the new `mednafen_pce_fast_libretro` binary,
+matching full pinned-source tarball, GPL notice and real playback evidence.
+
+**Important scope limitation:** This workflow tests a *replacement candidate*,
+not the native PCE binary inside the current successful 3.0 installers. It
+does not establish that the current buildbot binary corresponds to this commit;
+does not change or approve `config/v3.0-core-lock.json`; does not establish
+that a combined distribution of GPL/noncommercial cores is compatible; and
+does not certify real-device retail-game compatibility. A failed platform
+build or native audio/video gate must remain failed. Only a separately reviewed
+replacement could be integrated after all four platform jobs pass.
+
 ## Four-platform immutable candidate lock, not a license clearance
 
 The successful [full offline CI run 42437133733](https://github.com/MasynNay/anything-plays/actions/runs/42437133733)
