@@ -21,9 +21,12 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+ROOT = Path(__file__).resolve().parents[1]
+# Direct CLI invocation sets sys.path[0] to tools/, so the root downloader
+# is not normally importable. Resolve explicitly without depending on CI env.
+sys.path.insert(0, str(ROOT))
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES, SOURCE_REPOSITORIES
 
-ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/v3.0-preview-candidate-integrity.json"
 NAMES = frozenset((*CORE_NAMES, *OPTIONAL_V21_CORES))
 FULL_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
