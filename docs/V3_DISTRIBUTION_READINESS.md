@@ -128,6 +128,38 @@ question that checksum and notice checks cannot answer. See the dedicated
 A legally reviewed permissible distribution architecture or relevant
 rights-holder authorization is a prerequisite; CI cannot infer it.
 
+## Actual ParaLLEl-N64 source has zero Gitlinks (not missing submodule archives)
+
+An earlier release-risk summary grouped ParaLLEl-N64 with Dolphin because
+both pinned upstream source trees contain a file named `.gitmodules`.
+The **real pinned N64 source commit**
+`e0ef5d673257e2e83bf9b7cffe62eda141af8493` has exactly
+**1970 Git tree entries and zero Gitlink objects**; its original
+`.gitmodules` is the empty **0-byte Git blob**
+`e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`.
+Unlike Dolphin's 34 direct plus 3 nested Gitlinks, there are **no
+ParaLLEl-N64 submodules to archive** at this revision.
+
+The original independently preserved N64 source TAR from
+[run 42441448884](https://github.com/MasynNay/anything-plays/actions/runs/42441448884)
+has SHA-256 `a8beb0a4aef9636479457237d3e12393c65425068e30c6d98f8f36faa4cb723e`
+and **6,877,459 bytes**. It includes the empty `.gitmodules` and
+**11 source-embedded license/notice files**. The four already-frozen
+native ParaLLEl binaries' hashes and the 11 original Git-blob SHA
+identities are recorded in
+`config/v3.0-parallel-n64-source-notice-candidates.json`.
+`tools/audit_v30_parallel_n64_source.py` and
+`.github/workflows/v30-parallel-n64-source-audit.yml` explicitly
+recheck actual source ZIP bytes and every notice against Git, while
+keeping per-component license and binary/source correspondence
+unapproved. [Full reviewer audit](V3_PARALLEL_N64_SOURCE_NOTICE_REVIEW.md).
+
+**Do not confuse absence of Gitlinks with complete compiled source
+provenance.** Build flags, external linked libraries, generated code,
+embedded copyleft notice and source-access obligations, actual binary
+reproducibility and the GPL/noncommercial core-host distribution
+question still require independent verification and/or permissions.
+
 ## Dolphin submodules pinned to their exact parent commit
 
 The first ten [upstream source snapshots](https://github.com/MasynNay/anything-plays/actions/runs/42441448884)
