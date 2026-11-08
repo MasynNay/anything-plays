@@ -68,3 +68,74 @@ SNES saves, gamepad/camera controls and ROM switching, and pass sustained
 real installed-game compatibility testing. Independent corresponding
 source and legally reviewed combined-program distribution decisions remain
 mandatory. See [release blocker #28](https://github.com/MasynNay/anything-plays/issues/28).
+
+## Four-platform source-built follow-up (separate research gate)
+
+The second independent research lab,
+`.github/workflows/v30-supafaust-four-os-source.yml`, runs **four**
+freshly compiled, immutable upstream native candidates from the SAME
+GPLv2-or-later source commit on different actual operating systems:
+
+| Native target | Real GitHub runner | Expected original core |
+| --- | --- | --- |
+| Windows x64 | `windows-2025` with MSYS2 MINGW64 | `mednafen_supafaust_libretro.dll` |
+| Linux x64 | `ubuntu-24.04` | `mednafen_supafaust_libretro.so` |
+| Apple Silicon | `macos-15` | `mednafen_supafaust_libretro.dylib` |
+| Intel Mac | `macos-15-intel` | `mednafen_supafaust_libretro.dylib` |
+
+The `capture_v30_supafaust_source` utility now validates native file
+name **and platform-specific PE/ELF/Mach-O header**, immutable Git source
+commit, unchanged upstream tracked source, exact original GPL license
+text/grant and archive hash. It records the actual new native bytes and
+an original source snapshot for *each OS*, with distinct architecture
+metadata and all public distribution and substitution approvals FALSE.
+The source-only regression uses each OS binary signature plus a real
+source archive and SHA256SUMS; the actual workflow requires authentic
+moving SNES PPU video and nonzero SPC audio in the same Libretro frontend
+on the runner, not just that a library was built.
+
+This cross-platform lab may require compiler compatibility fixes on
+modern Apple and MSYS2 runners. Such fixes must not silently alter
+upstream GPL source, suppress a failing platform, skip playback or
+relabel research-only binaries as approved shipping emulator cores.
+Passing the lab is **not** evidence of real keyboard/camera/save, physical
+speaker, retail game compatibility, or the legal compatibility of the
+entire combined 11-core 3.0 installer. Research only.
+
+### Reproducing the exact macOS compatibility change
+
+The first untouched upstream macOS source builds correctly **failed**
+because `mednafen/config.h` defined `HAVE_SEM_TIMEDWAIT` for Darwin,
+although the Apple SDK has no `sem_timedwait`. The same upstream
+`mednafen/mthreading/MThreading_POSIX.cpp` already implements a
+pthread-condition-variable-backed semaphore fallback.
+
+`tools/patch_v30_supafaust_macos_semaphore.py` performs exactly this
+single-line source modification **only** in the temporary checked-out
+Git source for the two Mac builds:
+
+```diff
+-#if !defined(__SWITCH__) && !defined(HAVE_LIBNX)
++#if !defined(__SWITCH__) && !defined(HAVE_LIBNX) && !defined(__APPLE__)
+```
+
+The script refuses the wrong upstream commit, origin URL, dirty original
+tree or unexpected header contents. Before original source/native
+preservation, `tools/capture_v30_supafaust_source.py` **independently
+compares the entire changed header to the pristine original Git blob with
+only that one replacement**, rejects any other changed tracked file,
+retains the authentic original source `git archive` **plus** exact
+`git diff` as `SUPAFAUST_MACOS_SOURCE_PATCH_UNAPPROVED.diff`,
+and adds the patch SHA-256 to its unapproved native/source manifest.
+That makes the modified research build reproducible without falsely
+claiming that unpatched upstream source built the Mac binary. The patch
+is GPL-licensed source research and is **not** legal approval to bundle
+that emulator with Anything Plays.
+
+The independent Windows source build also found that native
+`Path.write_text()` created CRLF `SHA256SUMS.txt` lines, which GNU
+`sha256sum -c` interpreted as \r in filenames. The research capture
+writes **byte-exact LF-only checksums** on all platforms now and tests
+the actual raw checksum bytes. Neither platform issue is masked or
+excluded from the four-platform required native audio/video matrix.
+
