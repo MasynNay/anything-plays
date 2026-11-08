@@ -27,7 +27,9 @@
           "source_repository": "https://github.com/google/googletest",
           "gitlink_commit": "40412d85124f7c6f3d88454583c4633e5e10fc8c"
         }
-      ]
+      ],
+      "parent_source_archive_sha256": "a795511bf56183ff7bad8fb2d2836ca5bb158e12ddd519caced62946ffa69c83",
+      "parent_source_archive_size_bytes": 228779
     },
     {
       "parent_path": "Externals/libadrenotools",
@@ -40,7 +42,10 @@
           "source_repository": "https://github.com/bylaws/liblinkernsbypass",
           "gitlink_commit": "aa3975893d83ef1bc84c321ec60c65fbf1287887"
         }
-      ]
+      ],
+      "parent_source_archive_sha256": "ceffce971676d4cfdf348a082df06fc92a1dca6d95bea892a480d63f200961cb",
+      "parent_source_archive_size_bytes": 88816
     }
-  ]
+  ],
+  "original_34_review_run": "42447184893"
 }
