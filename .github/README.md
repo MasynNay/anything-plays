@@ -15,6 +15,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **v30-lab.yml** | Experimental emulator diagnostics |
 | **capture-sources.yml** | Source provenance |
 | **candidate-draft.yml**, **release.yml** | Historical, controlled 2.0 release workflows |
+| **v30-publish-approved.yml** | Manual only, verified production-only 3.0 release publication (fail closed) |
 
 Every workflow has different evidence boundaries. Passing a preview build does not authorize a stable release. Native redistribution, required sources, signing and real-device QA are tracked in [release readiness](../../docs/V3_DISTRIBUTION_READINESS.md) and the [fail-closed release checker](../../tools/check_v30_release.py).
 
