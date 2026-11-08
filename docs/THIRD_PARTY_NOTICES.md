@@ -41,6 +41,45 @@ Gambatte (GPLv2) appeared in historical development builds but is not
 included in this release plan. Historical license:
 `history/Gambatte-GPL-2.0.txt`.
 
+## Additional 3.0 core license texts (candidate audit)
+
+The 3.0 **full offline developer preview** includes additional independent
+cores beyond the v2.0 mGBA and Snes9x set. Their inclusion does not mean
+that public redistribution is already approved.
+
+The following GPLv2 license texts have been copied verbatim from upstream.
+Four are anchored to the specific source revisions reported by the Linux
+preview binaries; Beetle PCE Fast is separately flagged as an unverified
+source-to-binary association:
+
+- **ProSystem (Atari 7800):** `licenses/ProSystem-GPL-2.0.txt`,
+  [pinned upstream license](https://github.com/libretro/prosystem-libretro/blob/8a88014287c7a01cd568067e5a557d0a2b2a051f/License.txt).
+- **Beetle NeoPop (Neo Geo Pocket / Color):**
+  `licenses/Beetle-NeoPop-GPL-2.0.txt`,
+  [pinned upstream COPYING](https://github.com/libretro/beetle-ngp-libretro/blob/a50d5ac288a81f2104ddf43195a4efdd15c72227/COPYING).
+- **Beetle WonderSwan (WonderSwan / Color):**
+  `licenses/Beetle-WonderSwan-GPL-2.0.txt`,
+  [pinned upstream COPYING](https://github.com/libretro/beetle-wswan-libretro/blob/4b01295838ea89e3f1355bbe4cb5cf98aa6108cd/COPYING).
+
+- **Stella 2014 (Atari 2600):**
+  `licenses/Stella2014-GPL-2.0.txt`,
+  [pinned upstream license](https://github.com/libretro/stella2014-libretro/blob/7d1361e407e63f29e52892655069e5fb4096e691/stella/license.txt).
+- **Beetle PCE Fast (PC Engine / TurboGrafx-16):**
+  `licenses/Beetle-PCE-Fast-GPL-2.0.txt`,
+  [current upstream COPYING](https://github.com/libretro/beetle-pce-fast-libretro/blob/master/COPYING).
+  **Important:** This binary does not advertise a source revision, so the
+  current upstream license file is not independently linked to the exact
+  packaged binary's source commit. It is a preliminary notice, not final
+  provenance evidence.
+
+A `COPYING` or `License.txt` file is only part of a complete release
+notice inventory. Copyright headers, corresponding source distribution,
+linked library terms and any other obligations must still be reviewed
+against the exact packaged native binary. Reported Git versions are not
+independent proof of reproducible compilation. The release remains blocked
+until [the 3.0 distribution review](V3_DISTRIBUTION_READINESS.md) and
+release acceptance evidence are complete.
+
 ## Python and native dependencies
 
 OpenCV, NumPy, Pillow, sounddevice, glcontext, PyObjC (macOS), and transitive native

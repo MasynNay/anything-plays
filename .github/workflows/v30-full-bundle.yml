@@ -10,6 +10,10 @@ on:
     paths:
       - '.github/workflows/v30-full-bundle.yml'
       - 'packaging/**'
+      - 'licenses/**'
+      - 'docs/THIRD_PARTY_NOTICES.md'
+      - 'docs/THIRD_PARTY_COMPONENTS.md'
+      - 'tests/test_v30_pinned_license_texts.py'
       - 'fetch_mgba_core.py'
       - 'verify_bundle.py'
       - 'anything_plays/core_locator.py'
