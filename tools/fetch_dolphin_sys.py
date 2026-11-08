@@ -35,7 +35,7 @@ def read_system_archive():
     if is_release:
         if not v30_release:
             raise ValueError(
-                "Dolphin Sys is not approved for the historical v2.0 release"
+                "Dolphin Sys requires approved/pinned inputs; the historical v2.0 release excludes it"
             )
         if not os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip():
             raise ValueError(
