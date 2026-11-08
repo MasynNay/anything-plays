@@ -152,6 +152,13 @@ class AuthenticMonoAVTests(unittest.TestCase):
         base = Path(__file__).resolve().parents[1]
         yml = (base/".github/workflows/v30-ngp-mono-native-av.yml").read_text("utf-8")
         self.assertIn("probe_v30_ngp_mono_native_av", yml)
+        self.assertIn("fail-fast: false", yml)
+        for target in ("linux-x64", "windows-x64",
+                       "macos-arm64", "macos-x64"):
+            self.assertIn(f"target: {target}", yml)
+        self.assertIn("matrix.ext", yml)
+        self.assertIn("matrix.target", yml)
+        self.assertIn("if: runner.os == 'Linux'", yml)
         self.assertIn("NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json", yml)
         self.assertNotIn("gh release create", yml)
         self.assertNotIn("continue-on-error: true", yml)
