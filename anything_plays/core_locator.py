@@ -57,6 +57,19 @@ def find_core(system="gba"):
     accidentally boot a ROM with the wrong system's emulator.
     """
     core = SYSTEMS[system].core
+    # The independently reviewed full 3.0 alternative installer records
+    # genuine original native file/source identities, never aliases them to
+    # the old noncommercial emulator filenames. A corrupt marker fails
+    # CLOSED rather than falling through to another native implementation.
+    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000", "pce"):
+        from anything_plays.v30_approved_core_map import find_approved_core
+        try:
+            approved, path = find_approved_core(
+                _search_directories(), system, _library_extension())
+        except (OSError, ValueError, TypeError, KeyError):
+            return None
+        if approved:
+            return path
     # Research-only complete offline preview, never the public stable build:
     # a marker and exact source-built GPL images must be present in the
     # installed bundle. No implicit downloads and no fallback to NC cores.
