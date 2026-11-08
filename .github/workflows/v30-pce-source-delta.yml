@@ -1,0 +1,102 @@
+name: Anything Plays 3.0 | Reconcile 11th PCE source candidate
+
+# Research-only: 11 native source IDs for the NEW PCE-swap trial; original
+# nightly remains unversioned. Never publishes binaries or authorizes rights.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-source-delta.yml'
+      - 'tools/create_v30_pce_source_review_delta.py'
+      - 'tests/test_v30_pce_source_review_delta.py'
+      - 'config/v3.0-pce-pinned-source-candidates.json'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-source-delta.yml'
+      - 'tools/create_v30_pce_source_review_delta.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-11-source-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile-with-actual-complete-app-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_SOURCE_REVIEW_RUN: '42444450521'
+      SOURCE_BUILT_INTEGRATION_RUN: '42445580786'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact original 10-source and new all-four platform runs succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(gh run view "$ORIGINAL_SOURCE_REVIEW_RUN" --json conclusion --jq .conclusion)" == success ]] || exit 1
+          [[ "$(gh run view "$SOURCE_BUILT_INTEGRATION_RUN" --json conclusion --jq .conclusion)" == success ]] || exit 1
+          [[ "$(gh run view "$ORIGINAL_SOURCE_REVIEW_RUN" --json name --jq .name)" == "Anything Plays 3.0 | Assemble unapproved source review matrix" ]] || exit 1
+          [[ "$(gh run view "$SOURCE_BUILT_INTEGRATION_RUN" --json name --jq .name)" == "Anything Plays 3.0 | Source-built PCE offline installer integration" ]] || exit 1
+          python -m unittest discover -s tests -p 'test_v30_pce_source_review_delta.py' -v
+      - name: Acquire exact 10-source original and all four successful source-built PCE trial summaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$ORIGINAL_SOURCE_REVIEW_RUN" \
+            --name AnythingPlays-3.0.0-SOURCE-REVIEW-UNAPPROVED \
+            --dir original-10-source-review
+          for target in windows-x64 linux-x64 macos-arm64 macos-x64; do
+            gh run download "$SOURCE_BUILT_INTEGRATION_RUN" \
+              --name "AnythingPlays-3.0.0-PCE-INTEGRATED-UNAPPROVED-$target" \
+              --dir "trial-evidence/$target"
+          done
+          (cd original-10-source-review && sha256sum -c SHA256SUMS.txt)
+      - name: Strictly preserve 40 untouched core sources and complete only the new PCE source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p review-only
+          python -m tools.create_v30_pce_source_review_delta \
+            --original-source-review original-10-source-review/v3.0.0-corresponding-source-review-UNAPPROVED.json \
+            --trial-evidence-directory trial-evidence \
+            --output review-only/v3.0.0-11-source-built-pce-REVIEW-UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("review-only/v3.0.0-11-source-built-pce-REVIEW-UNAPPROVED.json")
+          r=json.loads(p.read_text("utf-8"))
+          assert r["source_snapshots_captured"]==11
+          assert r["source_snapshots_missing"]==[]
+          assert set(r["targets"])=={"windows-x86_64","linux-x86_64","macos-arm64","macos-x86_64"}
+          assert all(len(x["cores"])==11 for x in r["targets"].values())
+          for row in r["targets"].values():
+            pce=row["cores"]["mednafen_pce_fast"]
+            assert pce["source_built_in_isolated_original_hucard_ci"] is True
+            assert pce["source_to_binary_verified"] is False
+            assert pce["redistribution_license_reviewed"] is False
+            assert pce["source_build_dependencies_reviewed"] is False
+          assert r["approved_for_public_binary_distribution"] is False
+          assert r["corresponding_source_inventory_verified"] is False
+          assert r["independent_binary_to_source_match_proven"] is False
+          assert len(r["unresolved_old_pce_buildbot_source_by_target"])==4
+          print("11 verified SOURCE IDENTITIES for new PCE trial, ZERO public-release approvals")
+          PY
+          (cd review-only && sha256sum *.json > SHA256SUMS.txt)
+      - name: Retain only the unapproved eleven-source candidate review evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-ELEVEN-SOURCE-REVIEW-UNAPPROVED
+          path: review-only/*
+          if-no-files-found: error
+          retention-days: 90
