@@ -183,6 +183,11 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 raise ValueError(f"GPL trial missing original license: {name}")
         if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
             raise ValueError("Noncommercial core entered the GPL alternative test lineup")
+        if platform_name == "windows":
+            win_notice = licenses / "Winpthreads-COPYING.txt"
+            if (win_notice.is_symlink() or not win_notice.is_file()
+                    or not win_notice.read_bytes().strip()):
+                raise ValueError("Bundled MinGW runtime requires original Winpthreads permission notice")
     if len(expected_cores) > len(CORE_NAMES):
         verify_v21_artwork(bundle)
     required_notices = (
