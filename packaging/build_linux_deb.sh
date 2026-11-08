@@ -143,16 +143,40 @@ Icon=anything-plays-preview
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
+# Preview installs side by side with 2.0. The stable Linux package identity
+# is selected only after exact 3.0 source/rights/real-device checks pass.
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  mv "$PKG/opt/anything-plays-30-preview" "$PKG/opt/anything-plays"
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays@g' \
+    -e 's@anything-plays-preview@anything-plays@g' \
+    -e 's@Preview launch@Application launch@g' \
+    "$PKG/usr/bin/anything-plays-30-preview"
+  mv "$PKG/usr/bin/anything-plays-30-preview" "$PKG/usr/bin/anything-plays"
+  sed -i \
+    -e 's@Package: anything-plays-preview@Package: anything-plays@g' \
+    -e 's@and experimental 3D cores@and embedded 3D cores@g' \
+    "$PKG/DEBIAN/control"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays.png"
+fi
 mkdir -p release
 chmod g-s "$PKG/DEBIAN"
 chmod 0755 "$PKG/DEBIAN"
-dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays-preview_${VERSION}_${ARCH}.deb"
+dpkg-deb --build --root-owner-group "$PKG" "$OUTPUT_DEB"
 # Verify the exact DEB payload, not only the staging folder.
 AUDIT_DIR="$(mktemp -d)"
 trap 'rm -rf "$AUDIT_DIR"' EXIT
-dpkg-deb -x "release/anything-plays-preview_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
-python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-30-preview"
-python3 - "$AUDIT_DIR/opt/anything-plays-30-preview" <<'PY'
+dpkg-deb -x "$OUTPUT_DEB" "$AUDIT_DIR"
+python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/$INSTALL_ID"
+python3 - "$AUDIT_DIR/opt/$INSTALL_ID" <<'PY'
 import sys
 from pathlib import Path
 from tools.prune_linux_system_libs import EXCLUDED_RELATIVE_FILES
@@ -165,7 +189,7 @@ PY
 # cannot traverse. stat() is enough to check root-owned package mode bits
 # without needing to grant sudo or read any private user files.
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
-  python3 - "$AUDIT_DIR/opt/anything-plays-30-preview/cores/dolphin-emu" <<'PY'
+  python3 - "$AUDIT_DIR/opt/$INSTALL_ID/cores/dolphin-emu" <<'PY'
 from pathlib import Path
 import stat
 import sys
@@ -188,4 +212,4 @@ PY
 fi
 rm -rf "$AUDIT_DIR"
 trap - EXIT
-echo "Created release/anything-plays-preview_${VERSION}_${ARCH}.deb"
+echo "Created $OUTPUT_DEB"
