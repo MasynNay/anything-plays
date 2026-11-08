@@ -37,6 +37,14 @@ keyboard. A webcam is optional for manual play.
 > [source/license notices](docs/RELEASE_SOURCE_ACCESS.md) available.
 > The app includes no game ROMs or BIOS files.
 
+## 3.0 engineering preview — tested, not yet a public installer
+
+The [3.0 development source](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) adds **18 console profiles across 11 embedded Libretro core families**, including Nintendo 64 and GameCube. The maintainer has already **personally tested Windows, Linux and macOS**, including working N64 and GameCube gameplay. These owner tests should not be requested again as a generic release prerequisite.
+
+The actual frozen desktop application, not just emulator libraries, opened and initialized its UI on **all four automated targets**: Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. See the [original four-platform installed application test](https://github.com/MasynNay/anything-plays/actions/runs/42529022383), the [full source-built-core regression](https://github.com/MasynNay/anything-plays/actions/runs/42519987017), and the [active roadmap](ROADMAP.md).
+
+**3.0.0 is not yet a published binary release.** The remaining blocker is third-party bundled emulator redistribution, compatible licensing and corresponding-source compliance, not unperformed repeat Windows/Linux/Mac gameplay tests. The stable [v2.0.0 installer](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) remains unchanged, and no commercial ROMs or BIOS are included in either line of development.
+
 ## Supported consoles
 
 | Console | Accepted ROMs | Libretro core |
