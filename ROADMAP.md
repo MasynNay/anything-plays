@@ -33,6 +33,12 @@
 
 These are engineering milestones, **not an announcement of a stable 3.0 release**. Roadmap statuses update when real evidence changes, not just to make the project appear active.
 
+## November 8, 2026 — verified 3.0 playback and source progress
+
+- **Maintainer gameplay already completed:** Nintendo 64 game loading, repeated ROM switching and Dolphin/GameCube playback were confirmed working by the owner. GameCube functionality was reported on Windows, Apple Silicon macOS and Linux after the Sys-file access fix. These are genuine owner reports and **must not be requested again** as new tests. They do not certify every game, save format, physical audio output or exact yet-to-be-produced public installer.
+- **Ten genuinely original source-built core families:** [the full offline desktop installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed on all four targets: Windows x64, Linux x64, macOS Apple Silicon and Intel. [PR #102](https://github.com/MasynNay/anything-plays/pull/102) is merged. All 18 profiles and 11 native core slots remain present. The original Dolphin buildbot binary is now the only native family in this experimental lineup not independently rebuilt from the exact pinned source.
+- **The remaining 3.0 publication blocker is not an N64 or Dolphin gameplay defect:** exact combined GPL license compatibility, independently verified corresponding sources for the *distributed* native libraries and their dependencies (including Dolphin), immutable approved production artifacts and final production-identity acceptance are still unresolved. Successful real gameplay is recorded, not ignored. No stable 3.0 installer has been published yet.
+
 ## Delivered milestones
 
 ### 1.0–2.0 — Desktop foundation
