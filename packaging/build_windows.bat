@@ -86,6 +86,10 @@ if errorlevel 1 exit /b 1
 if "%AP_V30_GPL_TRIAL%"=="1" (
   copy /Y "cores\V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json" "dist\AnythingPlays\cores\" >nul
   if errorlevel 1 exit /b 1
+  REM The source-built Windows research cores link libwinpthread; bundle the
+  REM exact original SHA-verified DLL rather than assuming MSYS2 is installed.
+  copy /Y "cores\libwinpthread-1.dll" "dist\AnythingPlays\cores\" >nul
+  if errorlevel 1 exit /b 1
 )
 if "%AP_FULL_CORE_BUILD%"=="1" (
   if not exist "cores\dolphin-emu\Sys\codehandler.bin" (
