@@ -34,6 +34,16 @@ The list is derived from `fetch_mgba_core.py` and the full-bundle packaging work
 
 At the time of review, repository `licenses/` included the full 2.0 core texts, a Dolphin GPL file, FCEUmm GPL text, Genesis Plus GX license text and glcontext MIT text. Standalone, verified bundled license/source inventories are **not yet demonstrated for all eleven 3.0 cores and transitive components**. Some licenses can impose additional source-availability, linking, relinking or use restrictions, and compatibility of combined distribution must be reviewed rather than assumed.
 
+## License compatibility question
+
+The exact 3.0 package includes both GPL-family native cores and
+noncommercial Snes9x / Genesis Plus GX cores. Their use via an in-process
+Libretro plugin interface may raise a *combined-work versus aggregation*
+question that checksum and notice checks cannot answer. See the dedicated
+[GPL / noncommercial compatibility assessment](V3_LICENSE_COMPATIBILITY_GATE.md).
+A legally reviewed permissible distribution architecture or relevant
+rights-holder authorization is a prerequisite; CI cannot infer it.
+
 ## Publication blockers and required evidence
 
 1. **Freeze exact bytes.** Current full-preview build runs with `AP_RELEASE_BUILD=0` and `AP_V30_TEST_CORES=1`. The acquisition path can fetch Libretro `latest` cores. Preserve each archive, its SHA-256, target architecture, reported revision and exact final packaged native binary hash. The old approved v2.0 lock does not cover the additional 3.0 cores.
