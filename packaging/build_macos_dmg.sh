@@ -128,6 +128,9 @@ cp licenses/*.txt "$LICENSE_DIR/"
 if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" "$LICENSE_DIR/"
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" "$LICENSE_DIR/"
+  if [[ "${AP_V30_PINNED_PCE:-0}" == "1" ]]; then
+    cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/"
+  fi
 fi
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 

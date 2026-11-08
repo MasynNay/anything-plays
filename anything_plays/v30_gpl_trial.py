@@ -31,6 +31,8 @@ ALTERNATIVE_CORES = 2
 EXPECTED_PROFILES = 18
 EXPECTED_CORES = 11
 WINDOWS_RUNTIME = "libwinpthread-1.dll"
+PCE_SOURCE_COMMIT = "2de1ce1c3f237b161c126c54ba407990bb86d1e9"
+PCE_SOURCE_REPO = "https://github.com/libretro/beetle-pce-fast-libretro"
 # Keep os.add_dll_directory handles alive for the loaded native cores.
 # A list would add a new OS DLL-search directory handle on EVERY console
 # switch, leaking one native handle per ROM opened for the lifetime of the UI.
@@ -133,6 +135,29 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
             sha = hashlib.sha256(native.read_bytes()).hexdigest()
             if sha != digest:
                 raise ValueError(f"Tampered GPL alternative native binary: {name}")
+    # Optional forward-only pinned PC Engine source-built research variant:
+    # the ORIGINAL nightly PCE had no reported source revision; never
+    # mislabel its native bytes as coming from the new exact source checkout.
+    pce = info.get("source_built_pce")
+    if pce is not None:
+        if (not isinstance(pce, dict)
+                or pce.get("source_repository") != PCE_SOURCE_REPO
+                or pce.get("source_commit") != PCE_SOURCE_COMMIT
+                or pce.get("native_filename") != f"mednafen_pce_fast_libretro{extension}"
+                or pce.get("old_unknown_source_nightly_substituted") is not True
+                or type(pce.get("original_source_build_run_id")) is not int
+                or pce["original_source_build_run_id"] != 42444367068):
+            raise ValueError("Unrecognized PCE pinned-source replacement record")
+        for field in ("native_sha256", "source_archive_sha256", "native_archive_sha256", "notice_sha256"):
+            digest = pce.get(field)
+            if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+                raise ValueError(f"Invalid PCE exact source/native {field}")
+        if verify_native:
+            native = root / pce["native_filename"]
+            if native.is_symlink() or not native.is_file() or native.stat().st_size > 60 * 1024 * 1024:
+                raise ValueError("Missing source-built PC Engine native core")
+            if hashlib.sha256(native.read_bytes()).hexdigest() != pce["native_sha256"]:
+                raise ValueError("Source-built PC Engine native hash mismatch")
     _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):

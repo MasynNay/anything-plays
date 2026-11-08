@@ -125,6 +125,10 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
   if errorlevel 1 exit /b 1
   copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-BlastEm-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
   if errorlevel 1 exit /b 1
+  if "%AP_V30_PINNED_PCE%"=="1" (
+    copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+    if errorlevel 1 exit /b 1
+  )
 )
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
