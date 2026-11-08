@@ -7,11 +7,13 @@ downloaded by the application at runtime. The shipped app requires users to
 provide their own lawful ROMs.
 
 Both downloads are pinned to an immutable upstream Git commit and verified
-against the corresponding Git blob SHA-1 and expected size **before execution**.
+against the corresponding Git blob SHA-1, expected size, and actual cartridge
+header byte `0x23` **before execution**. File extensions are not evidence of
+monochrome vs. color mode; the true monochrome release gate requires 0x00.
 
-## Monochrome Neo Geo Pocket
+## Color-header calibration ROM with a `.ngp` filename (not true monochrome proof)
 
-- **NGPCraft emulator**, original alignment-calibration cartridge v12.
+- **NGPCraft emulator**, original alignment-calibration cartridge v12. **Important:** despite the `.ngp` extension, the pinned Git blob's cartridge header has **byte `0x23 = 0x10` (Color-compatible)**, not `0x00` (monochrome). It is **not** a valid genuine monochrome acceptance fixture.
 - Author: **Tixul**. Source repository: https://github.com/Tixul/Ngpcraft_emulator
 - Commit: `93b1fd666ff375afcbb48079fbcf61dbb99b86b4`
 - File: `hw_calibration/a_align_calib_v12.ngp` (10,630 bytes).
@@ -47,7 +49,10 @@ copyright and permission text.
 
 The probe uses the real embedded `CoreSession` and strict native video and
 nonzero PCM acceptance rules, and runs across Windows x64, Linux x64, Intel
-macOS x64 and Apple Silicon macOS. Failure to generate sound in a test demo is
+macOS x64 and Apple Silicon macOS. The parent strict acceptance **rejects**
+the color-header `.ngp` test fixture for the `ngp` monochrome target even if
+its native video/audio/input callbacks succeed. The color StarGunner `.ngc`
+fixture declares `0x10` and remains the independently valid NGPC color test. Failure to generate sound in a test demo is
 not automatically an emulator bug: it remains a failed *audio evidence gate*
 until a suitable reproducible test program establishes real audio. **Do not
 weaken this gate or claim physical speaker testing based on CI PCM callbacks.**
