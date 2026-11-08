@@ -35,6 +35,15 @@ OPTIONAL_V21_CORES = (
 
 
 def core_names_for_build():
+    # Official 3.0 is a completely separate, 11-core release lane.
+    # A tampered environment flag cannot substitute for the approved
+    # per-architecture binary/source/license lock.
+    if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+        if os.environ.get("AP_RELEASE_BUILD") != "1":
+            raise ValueError("3.0 approved cores require release build mode")
+        from tools.v30_release_lock import load_approved_lock
+        load_approved_lock()
+        return (*CORE_NAMES, *OPTIONAL_V21_CORES)
     # Optional downloadable cores are packaged separately. Never fetch
     # Dolphin here: it depends on system assets and failed gameplay QA.
     if any(os.environ.get(flag, "") == "1" for flag in ("AP_V30_CORE_PACK_BUILD", "AP_V21_CORE_PACK_BUILD")):
@@ -250,6 +259,18 @@ def fetch_core(name, destination=CORE_FOLDER):
     print(f"Preparing {name}; upstream reference: {url}", flush=True)
 
     archive_data = _read_core_archive(url, filename)
+    v30_release = (
+        os.environ.get("AP_RELEASE_BUILD") == "1"
+        and os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
+    )
+    if v30_release:
+        from tools.v30_release_lock import (
+            load_approved_lock, verify_core_archive,
+        )
+        approved_lock = load_approved_lock()
+        verify_core_archive(
+            approved_lock, sys.platform, platform.machine(), name, archive_data,
+        )
 
     with zipfile.ZipFile(io.BytesIO(archive_data)) as archive:
         candidates = [
@@ -270,14 +291,21 @@ def fetch_core(name, destination=CORE_FOLDER):
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
     if release_mode == "1":
-        # Enforce binary integrity before writing or executing a native core.
-        from tools.core_release_lock import LOCK_PATH, verify_download_before_loading
-
-        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
-        verify_download_before_loading(
-            lock, sys.platform, platform.machine(), name,
-            filename, url, len(content), digest,
-        )
+        # Validate the complete core payload BEFORE writing it or loading it
+        # through the Libretro native API. The 2.0 lock is unchanged.
+        if v30_release:
+            from tools.v30_release_lock import verify_core_payload
+            verify_core_payload(
+                approved_lock, sys.platform, platform.machine(),
+                name, filename, content,
+            )
+        else:
+            from tools.core_release_lock import LOCK_PATH, verify_download_before_loading
+            lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+            verify_download_before_loading(
+                lock, sys.platform, platform.machine(), name,
+                filename, url, len(content), digest,
+            )
     destination.mkdir(parents=True, exist_ok=True)
     target = destination / filename
     target.write_bytes(content)
@@ -338,10 +366,17 @@ def fetch_all(destination=CORE_FOLDER):
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
     if release_mode == "1":
-        # Only the four approved v2.0 release architectures are allowed here.
-        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
-        target = verify_release_lock(manifest, lock)
-        print(f"Release core lock verified for {target}", flush=True)
+        if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+            from tools.v30_release_lock import (
+                load_approved_lock, verify_native_bundle,
+            )
+            target = verify_native_bundle(load_approved_lock(), manifest)
+            print(f"Approved 3.0 native lock verified for {target}", flush=True)
+        else:
+            # The historical v2.0 release lock stays unchanged.
+            lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+            target = verify_release_lock(manifest, lock)
+            print(f"Release core lock verified for {target}", flush=True)
     else:
         # Development still supports architectures outside the public
         # release matrix (for example, 32-bit Linux builds).
