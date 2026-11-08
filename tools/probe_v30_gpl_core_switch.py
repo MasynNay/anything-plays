@@ -62,9 +62,28 @@ def validate_original_source_artifact(folder, system, target):
         if not name or "/" in name or "\\" in name or name in names:
             raise ValueError("Unsafe source artifact member")
         names[name] = digest
-    files = {p.name for p in folder.iterdir() if p.is_file() and not p.is_symlink()}
-    if files != set(names) | {"SHA256SUMS.txt"} or len(names) < 4:
-        raise ValueError("Original artifact has missing, extra or symlinked files")
+    # The original preserved research checksums were captured BEFORE the
+    # native A/V probes. Those workflows then appended a known, finite set
+    # of test reports and original homebrew frame screenshots. Do not demand
+    # that original reports be retroactively in their older checksum file;
+    # neither read nor execute unchecksummed diagnostics as binary inputs.
+    allowed_diagnostics = (
+        {"SUPAFAUST_NATIVE_AV_UNAPPROVED.json", "snes-original-frame.png"}
+        if system == "snes" else {
+            "GENESIS_AV_UNAPPROVED.json", "ISOLATED_SEGA_PROCESS_UNAPPROVED.json",
+            "mastersystem-AV_UNAPPROVED.json", "gamegear-AV_UNAPPROVED.json",
+            "sg1000-AV_UNAPPROVED.json",
+            "mastersystem-test-frame.png", "gamegear-test-frame.png",
+            "sg1000-test-frame.png",
+        }
+    )
+    members = list(folder.iterdir())
+    if any(p.is_symlink() or not p.is_file() for p in members):
+        raise ValueError("Original source artifact contains unsafe entries")
+    files = {p.name for p in members}
+    required = set(names) | {"SHA256SUMS.txt"}
+    if len(names) < 4 or not required.issubset(files) or files - required - allowed_diagnostics:
+        raise ValueError("Original source artifact has missing or unexpected entries")
     for name, expected in names.items():
         if hashlib.sha256((folder / name).read_bytes()).hexdigest() != expected:
             raise ValueError(f"Original artifact checksum mismatch: {name}")
