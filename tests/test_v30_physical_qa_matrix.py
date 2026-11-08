@@ -17,10 +17,19 @@ def create_fixture(root: Path, *, complete=False):
     installers = {}
     records = root / "owner-packets"
     records.mkdir()
+    names = {
+        "windows-x64": "AnythingPlaysSetup-3.0.0-alpha.1.exe",
+        "linux-x64": "anything-plays-preview_3.0.0~alpha1_amd64.deb",
+        "macos-arm64": "AnythingPlays-3.0.0-alpha.1.dmg",
+        "macos-x86_64": "AnythingPlays-3.0.0-alpha.1.dmg",
+    }
     for target in sorted(qa.TARGETS):
-        ext = matrix.TARGET_SUFFIX[target]
-        name = f"AnythingPlays-3.0.0-{target}{ext}"
-        candidate = root / name
+        name = names[target]
+        # The two real macOS previews intentionally share the SAME basename
+        # but have different architecture-specific file bytes and paths.
+        folder = root / "original-installers" / target
+        folder.mkdir(parents=True)
+        candidate = folder / name
         candidate.write_bytes((target + "\n").encode() * 70)
         installers[target] = candidate
         with patch.object(qa, "detected_target", return_value=target):
@@ -37,6 +46,24 @@ def create_fixture(root: Path, *, complete=False):
 
 
 class FourOSPhysicalQATests(unittest.TestCase):
+    def test_exact_real_preview_installer_naming_across_four_architectures(self):
+        with TemporaryDirectory() as temp:
+            catalog, packets, _ = create_fixture(Path(temp))
+            self.assertEqual(
+                catalog["targets"]["linux-x64"]["installer_filename"],
+                "anything-plays-preview_3.0.0~alpha1_amd64.deb"
+            )
+            self.assertEqual(
+                catalog["targets"]["macos-arm64"]["installer_filename"],
+                catalog["targets"]["macos-x86_64"]["installer_filename"],
+            )
+            self.assertNotEqual(
+                catalog["targets"]["macos-arm64"]["installer_sha256"],
+                catalog["targets"]["macos-x86_64"]["installer_sha256"],
+            )
+            report = matrix.reconcile(catalog, packets)
+            self.assertEqual(report["counts"]["not-tested"], 600)
+
     def test_hash_real_frozen_four_local_installers_and_source_commit(self):
         with TemporaryDirectory() as folder:
             catalog, packets, installers = create_fixture(Path(folder))
