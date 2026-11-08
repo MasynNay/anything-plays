@@ -60,8 +60,11 @@ obligations.
   native binaries, bundled Sys data and relevant dependencies.
 - [ ] Create and independently approve the immutable **11-core 3.0** lock.
   Distinguish published source rights and immutable test inputs.
-- [ ] Complete and document the required real hardware and audio/video/input/
-  save/endurance matrix, including [NGP monochrome audio](https://github.com/MasynNay/anything-plays/issues/41).
+- [ ] Complete and document the required **real hardware** and audio/video/input/
+  save/endurance matrix; the source-built [NGP monochrome audio blocker #41](https://github.com/MasynNay/anything-plays/issues/41)
+  is already technically closed after all four architectures passed native CI.
+  Use the [offline physical QA evidence recorder](V3_PHYSICAL_QA_RUNBOOK.md)
+  for actual installed gameplay and save/reload tests. CI homebrew success is not physical QA.
 - [ ] Record signing/notarization limitations and complete a clean installation
   using the exact intended production installers.
 - [ ] Only with evidence-backed values, make
