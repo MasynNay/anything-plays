@@ -178,8 +178,8 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
     if remaining is not None:
         if (not isinstance(remaining, dict)
                 or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
-                or info.get("total_source_built_core_families") != 8
-                or info.get("original_unchanged_core_archives") != 3
+                or info.get("total_source_built_core_families") != (9 if info.get("source_built_mgba") is not None else 8)
+                or info.get("original_unchanged_core_archives") != (2 if info.get("source_built_mgba") is not None else 3)
                 or info.get("five_source_family_run_id") != 42515151314
                 or pce is None):
             raise ValueError("Eight source-built families are not complete and exact")
@@ -209,6 +209,36 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                         or not 10000<native.stat().st_size<60*1024*1024
                         or hashlib.sha256(native.read_bytes()).hexdigest()!=row["native_sha256"]):
                     raise ValueError(f"Modified source-built 3.0 original core: {name}")
+    # Optional ninth, separately compiled MPL2 mGBA candidate. Never treat
+    # its old unverified buildbot native as an independently sourced binary.
+    mgba = info.get("source_built_mgba")
+    if mgba is not None:
+        from tools.capture_v30_mgba_original_source import SOURCE_REVISION, SOURCE_REPOSITORY
+        if (remaining is None or pce is None or not isinstance(mgba, dict)
+                or mgba.get("source_repository") != SOURCE_REPOSITORY
+                or mgba.get("source_commit") != SOURCE_REVISION
+                or mgba.get("native_filename") != f"mgba_libretro{extension}"
+                or mgba.get("source_build_run_id") != 42527449154
+                or mgba.get("old_unverified_source_buildbot_replaced") is not True
+                or mgba.get("original_mpl_notice_copied") is not True
+                or not isinstance(mgba.get("original_native_av_report_sha256"), dict)
+                or set(mgba["original_native_av_report_sha256"])
+                != {f"ORIGINAL_{system}_NATIVE_AV.json" for system in ("GB", "GBC", "GBA")}):
+            raise ValueError("Unverified ninth original source-built MPL2 mGBA candidate")
+        for key in ("native_sha256", "source_archive_sha256",
+                    "native_archive_sha256", "original_license_notice_sha256"):
+            value = mgba.get(key)
+            if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError(f"Missing ninth original source-native fingerprint: {key}")
+        for value in mgba["original_native_av_report_sha256"].values():
+            if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError("Missing original GB/GBC/GBA A/V report fingerprints")
+        if verify_native:
+            native = root / mgba["native_filename"]
+            if (native.is_symlink() or not native.is_file()
+                    or not 50000 < native.stat().st_size < 70 * 1024 * 1024
+                    or hashlib.sha256(native.read_bytes()).hexdigest() != mgba["native_sha256"]):
+                raise ValueError("Installed ninth original source-built mGBA binary is not authentic")
     _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):
