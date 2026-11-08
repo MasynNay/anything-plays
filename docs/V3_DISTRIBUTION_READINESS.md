@@ -148,12 +148,25 @@ python -m tools.check_v30_dolphin_submodules
 python -m tools.check_v30_dolphin_submodules --verify-upstream
 ```
 
-**What this establishes:** exact upstream Gitlink identities suitable for a
-subsequent pinned corresponding-source acquisition, license inventory and
-build-system audit. **What remains unresolved:** actual archived submodule
-contents, nested submodule sources and build dependencies, whether each
-dependency is part of the distributed native Libretro build, and exact
-native-binary-to-source correspondence. Every approval flag stays **false**.
+**Source archive candidate capture now executed:** [PR #57](https://github.com/MasynNay/anything-plays/pull/57)
+added the isolated `.github/workflows/v30-dolphin-submodule-sources.yml`
+workflow. Its [six-shard run 42446758270](https://github.com/MasynNay/anything-plays/actions/runs/42446758270)
+passed all six jobs and retained six `DOLPHIN-SOURCE-UNAPPROVED` Actions
+artifacts covering the **34 original pinned Gitlinks**. Each GitHub or GitLab
+immutable-revision archive is bounded, validated as an unextracted tarball,
+rehash-checked against the saved SHA-256 and recorded in a shard manifest.
+[Seven accompanying source/package CI jobs](https://github.com/MasynNay/anything-plays/actions/runs/42446758291)
+passed on PR #57 before merge at `eec9170eb0106ee7c5d5d99d1cc372be3986c769`.
+These are time-limited research artifacts, not source offers attached to a
+public production release.
+
+**What this establishes:** pinned and archived upstream Dolphin dependency
+source **candidates** with checksums, not a binary/source equivalence proof.
+**What remains unresolved:** nested submodules and external build
+dependencies, which components were actually compiled into the original
+Dolphin Libretro binary and on which build flags, licenses/notices and
+redistribution of the combined program and Dolphin Sys. Every source-to-
+shipped-binary and public distribution approval flag remains **false**.
 
 ## Reported upstream source capture (new evidence path)
 
