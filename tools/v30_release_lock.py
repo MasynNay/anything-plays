@@ -32,6 +32,13 @@ ALTERNATIVE_CORE_ORDER = (
     "mednafen_ngp", "mednafen_wswan",
 )
 ALTERNATIVE_CORE_NAMES = frozenset(ALTERNATIVE_CORE_ORDER)
+# No original noncommercial core can be part of the source-built 3.0
+# lineup. The full 8-family release *additionally* requires source-reviewed
+# builds for original NES/Atari/NGP/WonderSwan, not old buildbot DLLs.
+SOURCE_BUILT_THREE = frozenset(("mednafen_supafaust", "blastem", "mednafen_pce_fast"))
+SOURCE_BUILT_FIVE = frozenset(("fceumm", "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan"))
+SOURCE_BUILT_EIGHT = SOURCE_BUILT_THREE | SOURCE_BUILT_FIVE
+assert len(SOURCE_BUILT_EIGHT) == 8 and SOURCE_BUILT_EIGHT.issubset(ALTERNATIVE_CORE_NAMES)
 ORIGINAL_CORE_ORDER = (
     "mgba", "snes9x", "fceumm", "genesis_plus_gx", "parallel_n64",
     "dolphin", "stella2014", "prosystem", "mednafen_pce_fast",
@@ -60,12 +67,28 @@ def selected_core_set(lock):
     mode = lock.get("core_set_id", "legacy-noncommercial")
     if mode == "legacy-noncommercial":
         return CORE_NAMES
-    if mode != "gpl-source-built-alternative":
+    if mode not in ("gpl-source-built-alternative", "gpl-source-built-eight"):
         raise ValueError("Unknown 3.0 release core set")
     if (lock.get("legacy_noncommercial_native_binaries_excluded") is not True
             or lock.get("source_built_alternative_binary_rights_reviewed") is not True):
         raise ValueError("GPL-alternative release rights/exclusion not approved")
+    if mode == "gpl-source-built-eight":
+        if (lock.get("eight_source_built_families_reviewed") is not True
+                or lock.get("three_unchanged_native_families_reviewed") is not True):
+            raise ValueError("Eight reviewed source-built and three retained native families require real signoffs")
     return ALTERNATIVE_CORE_NAMES
+
+
+def selected_source_families(lock):
+    """Exactly which ORIGINAL independently reviewed native source builds ship.
+
+    File names alone cannot distinguish a freshly built NES core from an
+    unrelated, unknown-source nightly with the very same Libretro filename.
+    """
+    names = selected_core_set(lock)
+    if names != ALTERNATIVE_CORE_NAMES:
+        return frozenset()
+    return SOURCE_BUILT_EIGHT if lock.get("core_set_id")=="gpl-source-built-eight" else SOURCE_BUILT_THREE
 
 
 def ordered_core_names_for_lock(lock):

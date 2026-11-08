@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
 from tools.v30_release_lock import (
     ALTERNATIVE_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
+    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_FIVE,
     verify_core_archive, verify_core_payload, verify_dolphin_archive,
 )
 from tools.emit_v30_production_provenance import SOURCE_FILE, validate_source_inventory
@@ -36,9 +37,15 @@ from tools.stage_v30_approved_native_mapping import (
 from tools.stage_v30_gpl_trial_inputs import package_native_zip
 from tools.probe_v30_gpl_core_switch import validate_original_source_artifact
 from tools.v30_pce_candidate import inspect_artifact, load_index
-from anything_plays.v30_approved_core_map import REPOSITORIES, EXPECTED, WINDOWS_RUNTIME
+from anything_plays.v30_approved_core_map import (
+    REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED, WINDOWS_RUNTIME,
+)
+from tools.stage_v30_eight_source_inputs import check_original_five_artifact
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
+FIVE_FAMILY_SOURCE_RUN = 42515151314
+UNCHANGED_3 = frozenset(("mgba", "parallel_n64", "dolphin"))
+assert len(UNCHANGED_3) == 3
 RECEIPT = "V30_SOURCE_BUILT_INPUTS_MATCH_REVIEWED_LOCK.json"
 # The old Snes9x / Genesis Plus GX must NOT be copied into production.
 REPLACED_ORIGINAL = frozenset(("snes9x", "genesis_plus_gx", "mednafen_pce_fast"))
@@ -139,7 +146,7 @@ def _source_original_family(root, name, target, extension):
 
 def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              snes_dir, sega_dir, pce_artifact, output_dir,
-                             windows_runtime=None):
+                             windows_runtime=None, five_dirs=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -156,6 +163,14 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         raise ValueError("Only the reviewed source-built alternative set is supported")
     validate_source_inventory(lock, inventory)
     reviewed_map = approved_core_map_from_lock(lock, target)
+    eight = selected_source_families(lock) == SOURCE_BUILT_EIGHT
+    if eight != (five_dirs is not None):
+        raise ValueError("Eight reviewed sources require EXACT original five-family artifact inputs")
+    if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=SOURCE_BUILT_FIVE):
+        raise ValueError("Exactly five additional pinned original source builds required")
+    retained = UNCHANGED_3 if eight else UNCHANGED_8
+    expected = EIGHT_EXPECTED if eight else EXPECTED
+    repositories = EIGHT_REPOSITORIES if eight else REPOSITORIES
     ext = EXT[target]
     original_target = {
         "windows-x86_64": "windows-x64",
@@ -176,16 +191,17 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
            or Path(folder).resolve() in output.resolve().parents
            for folder in (original_dir, snes_dir, sega_dir, pce_artifact)):
         raise ValueError("Cannot overwrite original source-built proof/archive files")
-    # All 12 old archived inputs must be valid, but ONLY the eight unchanged
-    # and Dolphin Sys may enter the approved alternative production candidate.
+    # All 12 old archived inputs MUST remain verified, but only the actual
+    # 3 retained originals (8 source builds) or 8 retained originals
+    # (3 source builds) and Dolphin Sys may enter approved production.
     original = _original_inputs(original_dir, original_target, ext)
     payload = {
         f"{name}_libretro{ext}.zip": original[f"{name}_libretro{ext}.zip"]
-        for name in UNCHANGED_8
+        for name in retained
     }
     payload["Dolphin.zip"] = original["Dolphin.zip"]
     # Verifies exact immutable core ZIP (and Dolphin) identities from LOCK.
-    for name in UNCHANGED_8:
+    for name in retained:
         verify_core_archive(lock, _sys_platform(target), _architecture(target),
                             name, payload[f"{name}_libretro{ext}.zip"])
     verify_dolphin_archive(lock, _sys_platform(target), _architecture(target), payload["Dolphin.zip"])
@@ -221,6 +237,38 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
             "original_owned_actions_run_id": SOURCE_ARTIFACT_RUNS[name],
         }
         archives[name] = sha(zipped)
+    if eight:
+        for name,path in sorted(five_dirs.items()):
+            # Exact original Git TAR and original compiled binary plus real
+            # original tracked GPLv2 source notice, with A/V evidence. The
+            # matching source from OLD historical buildbot ZIP is UNKNOWN.
+            native, original_notice, original_record = check_original_five_artifact(
+                path, name, original_target, ext)
+            if original_notice is None:
+                raise ValueError(f"Unverified original GPL source notice: {name}")
+            native_zip = package_native_zip(name, ext, native)
+            verify_core_archive(lock,_sys_platform(target),_architecture(target),name,native_zip)
+            verify_core_payload(lock,_sys_platform(target),_architecture(target),
+                                name,f"{name}_libretro{ext}",native)
+            if sha(original_notice) != reviewed_map["cores"][name]["license_notice_sha256"]:
+                raise ValueError(f"Unreviewed actual original upstream license: {name}")
+            source_row=inventory["targets"][target]["cores"][name]
+            if (source_row.get("source_archive_sha256") != original_record["source_archive_sha256"]
+                    or source_row.get("source_commit_sha") != expected[name]
+                    or source_row.get("source_repository") != repositories[name]
+                    or source_row.get("native_sha256") != sha(native)
+                    or original_record.get("original_license_notice_copied") is not True):
+                raise ValueError(f"Original 5-family source/archive differs from independent reviewed inventory: {name}")
+            payload[f"{name}_libretro{ext}.zip"] = native_zip
+            payload[f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"] = original_notice
+            sources[name] = {
+                "source_revision": expected[name],
+                "source_archive_sha256": original_record["source_archive_sha256"],
+                "native_sha256": sha(native),
+                "original_native_archive_sha256": sha(native_zip),
+                "original_license_sha256": sha(original_notice),
+                "original_owned_actions_run_id": FIVE_FAMILY_SOURCE_RUN,
+            }
     if target == "windows-x86_64":
         binary = _file_bytes(Path(windows_runtime).parent, Path(windows_runtime).name,
                              max_size=8 * 1024 * 1024)
@@ -240,7 +288,7 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         "status": "MATCHED-INDEPENDENTLY-APPROVED-3.0-SOURCE-LOCK",
         "target": target,
         "native_core_count": 11, "system_profile_count": 18,
-        "unchanged_original_core_count": 8,
+        "unchanged_original_core_count": len(retained),
         "all_native_archive_sha256": {
             name: sha(data) for name, data in sorted(payload.items())
             if name.endswith(".zip")
@@ -275,17 +323,26 @@ def main(argv=None):
     parser.add_argument("--pce-artifact", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--windows-runtime", type=Path)
+    for name in sorted(SOURCE_BUILT_FIVE):
+        parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
     try:
         lock = load_approved_lock()  # ALWAYS fails with current UNAPPROVED.
         inventory = json.loads(SOURCE_FILE.read_text("utf-8"))
         if not (ROOT / "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md").is_file():
             raise ValueError("Independent reviewed copyright decision is missing")
+        wants_eight = selected_source_families(lock) == SOURCE_BUILT_EIGHT
+        five={name: getattr(args,name+"_dir") for name in SOURCE_BUILT_FIVE}
+        if wants_eight and any(path is None for path in five.values()):
+            raise ValueError("Independent 8-family source lock requires all 5 original artifacts")
+        if not wants_eight and any(path is not None for path in five.values()):
+            raise ValueError("Original 3-family source lock must not consume 5-family unreviewed inputs")
         result = assemble_approved_inputs(
             lock=lock, inventory=inventory, target=args.target,
             original_dir=args.original_dir, snes_dir=args.snes_dir,
             sega_dir=args.sega_dir, pce_artifact=args.pce_artifact,
             output_dir=args.output_dir, windows_runtime=args.windows_runtime,
+            five_dirs=five if wants_eight else None,
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")
