@@ -10,7 +10,11 @@ class SourceReviewWorkflowContracts(unittest.TestCase):
     def test_joins_existing_successful_runs_without_publishing(self):
         workflow = (ROOT / ".github/workflows/v30-source-review-matrix.yml").read_text("utf-8")
         self.assertIn("workflow_dispatch:", workflow)
-        self.assertNotIn("\n  push:", workflow)
+        self.assertIn("\n  pull_request:", workflow)
+        self.assertIn("\n  push:", workflow)
+        self.assertIn("branches: [feature/v3.0-unified-test]", workflow)
+        self.assertIn("inputs.native_input_run_id || '42437133733'", workflow)
+        self.assertIn("inputs.source_snapshot_run_id || '42441448884'", workflow)
         for name in (
             "Anything Plays 3.0 | Complete offline installer lab",
             "Anything Plays 3.0 | Preserve reported upstream sources",
