@@ -193,6 +193,38 @@ jobs:
           assert (root / "dolphin-emu/Sys/codehandler.bin").is_file(), "Missing GameCube Sys data"
           print(f"{target}: {len(SYSTEMS)} consoles, {len(expected)} native cores, GameCube Sys included")
           PY
+      - name: Prove fresh-user 18-console runtime core selection works entirely offline
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v30_offline_runtime_cores.py' -v
+          if [[ "$TARGET" == macos-* ]]; then
+            core_dir="dist/AnythingPlays30Preview.app/Contents/Resources/cores"
+          else
+            core_dir="dist/AnythingPlays/cores"
+          fi
+          mkdir -p test-evidence
+          python -m tools.probe_v30_installed_offline_cores \
+            --core-dir "$core_dir" \
+            --target "$TARGET" \
+            --report "test-evidence/offline-runtime-$TARGET.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('test-evidence') / ('offline-runtime-' + os.environ['TARGET'] + '.json')
+          data = json.loads(p.read_text('utf-8'))
+          assert data['systems_resolved_without_network'] == 18
+          assert data['native_cores_hash_verified'] == 11
+          assert data['clean_user_core_overlay'] is True
+          assert data['no_external_emulator_setup_required_in_staged_bundle'] is True
+          assert data['no_runtime_core_download_required_for_fresh_bundled_lookup'] is True
+          assert data['approved_for_public_release'] is False
+          assert data['real_gameplay_video_audio_input_verified'] is False
+          assert data['legal_distribution_review_complete'] is False
+          print('Fresh native profile offline selection proven without claiming game/license approval')
+          PY
       - name: Record unmet public-release gates without approving binaries
         run: python tools/check_v30_release.py --report-only
       - name: Prepare test-only installer checksum and limitations manifest
@@ -311,5 +343,6 @@ jobs:
             release/*.deb
             test-evidence/SHA256SUMS.txt
             test-evidence/FULL_PREVIEW_INFO.json
+            test-evidence/offline-runtime-*.json
           if-no-files-found: error
           retention-days: 14
