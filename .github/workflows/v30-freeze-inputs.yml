@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p candidate-evidence
-          python tools/create_v30_candidate_lock.py \
+          python -m tools.create_v30_candidate_lock \
             --windows-x64 original-artifacts/windows-x64.zip \
             --macos-arm64 original-artifacts/macos-arm64.zip \
             --macos-x64 original-artifacts/macos-x64.zip \
