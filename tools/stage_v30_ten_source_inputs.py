@@ -129,7 +129,7 @@ def check_original_n64_artifact(folder, target):
                 # when normalizing yields the exact independently attested
                 # original Git blob length AND SHA. Anything else fails.
                 if len(data) != identity["size_bytes"] or digest(data) != identity.get("sha256"):
-                    normalized = data.replace(b"\\r\\n",b"\\n")
+                    normalized = data.replace(b"\r\n",b"\n")
                     if (normalized == data or len(normalized) != identity["size_bytes"]
                             or digest(normalized) != identity.get("sha256")):
                         raise ValueError(f"Original N64 GPL/LGPL/MIT notice mismatch: {path}")
