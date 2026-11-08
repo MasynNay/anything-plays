@@ -61,7 +61,8 @@ def package_native_zip(name, ext, data):
     return buffer.getvalue()
 
 
-def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target, windows_runtime=None):
+def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target,
+                 windows_runtime=None, pce_artifact=None):
     if (os.environ.get("AP_V30_GPL_TRIAL") != "1"
             or os.environ.get("AP_V30_TEST_CORES") != "1"
             or os.environ.get("AP_RELEASE_BUILD", "0") != "0"
@@ -69,6 +70,9 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target, win
         raise ValueError("Unapproved offline 3.0 GPL trial mode is required")
     if target not in TARGET_EXT:
         raise ValueError("Unsupported trial target")
+    pinned_pce = os.environ.get("AP_V30_PINNED_PCE", "0") == "1"
+    if pinned_pce != (pce_artifact is not None):
+        raise ValueError("Source-built PCE trial requires exactly its original authentic artifact")
     if len(V30_GPL_TRIAL_CORES) != 11 or len(set(V30_GPL_TRIAL_CORES)) != 11:
         raise ValueError("Trial must keep all 11 native core slots")
     ext = TARGET_EXT[target]
@@ -152,6 +156,38 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target, win
         preserved[f"{core}_libretro{ext}.zip"] = zipped
     for forbidden in ("snes9x", "genesis_plus_gx"):
         del preserved[f"{forbidden}_libretro{ext}.zip"]
+    pinned_pce_record = None
+    if pinned_pce:
+        # The old buildbot PCE ZIP has NO independently reported source
+        # revision. Substitute the already source-built exact PCE bytes
+        # instead of inventing a matching Git commit for the nightly binary.
+        from tools.v30_pce_candidate import load_index, inspect_artifact, COMMIT as PCE_COMMIT
+        from zipfile import ZipFile
+        idx = load_index()
+        pce_native = inspect_artifact(pce_artifact, target, idx)
+        pce_row = idx["targets"][target]
+        native_name = f"mednafen_pce_fast_libretro{ext}"
+        native_zip_name = native_name + ".zip"
+        pce_zip = package_native_zip("mednafen_pce_fast", ext, pce_native)
+        if len(pce_native) != pce_row["native_bytes"] or sha256(pce_native) != pce_row["native_sha256"]:
+            raise ValueError("PCE compiled source-native byte mismatch")
+        with ZipFile(pce_artifact) as source:
+            pce_notice = source.read("PCE_COPYING_GPL-2.0.txt")
+        if b"GNU GENERAL PUBLIC LICENSE" not in pce_notice or b"Version 2" not in pce_notice:
+            raise ValueError("PCE missing source-original GPL2 notice")
+        notices["GPL-TRIAL-PCE-COPYING.txt"] = pce_notice
+        preserved[native_zip_name] = pce_zip
+        pinned_pce_record = {
+            "source_repository": idx["upstream_source_repository"],
+            "source_commit": PCE_COMMIT,
+            "native_filename": native_name,
+            "native_sha256": pce_row["native_sha256"],
+            "source_archive_sha256": pce_row["source_archive_sha256"],
+            "native_archive_sha256": sha256(pce_zip),
+            "notice_sha256": sha256(pce_notice),
+            "original_source_build_run_id": idx["original_run_id"],
+            "old_unknown_source_nightly_substituted": True,
+        }
     expected = {f"{name}_libretro{ext}.zip" for name in V30_GPL_TRIAL_CORES}
     expected.add("Dolphin.zip")
     if set(preserved) != expected or len(preserved) != 12:
@@ -174,7 +210,8 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target, win
         "all_console_profiles": 18,
         "native_core_count": 11,
         "alternatives": replacements,
-        "original_unchanged_core_archives": 9,
+        "original_unchanged_core_archives": 8 if pinned_pce else 9,
+        "source_built_pce": pinned_pce_record,
         "original_dolphin_sys_archive_unchanged": True,
         "original_native_inputs_sha256": sha256(record_path.read_bytes()),
         "runtime_dependencies": runtime_dependencies,
@@ -203,13 +240,16 @@ def main(argv=None):
     ap.add_argument("--output", required=True, type=Path)
     ap.add_argument("--evidence", required=True, type=Path)
     ap.add_argument("--target", required=True, choices=tuple(TARGET_EXT))
+    ap.add_argument("--pce-artifact", type=Path,
+                    help="Original exact source-built PCE research zip; required only in pinned-PCE mode")
     ap.add_argument("--windows-runtime", type=Path,
                     help="Exact original Windows DLL from MSYS2 MINGW64 on Windows only")
     args = ap.parse_args(argv)
     try:
         result = stage_inputs(args.original_dir, args.snes_dir, args.sega_dir,
                               args.output, args.evidence, args.target,
-                              windows_runtime=args.windows_runtime)
+                              windows_runtime=args.windows_runtime,
+                              pce_artifact=args.pce_artifact)
     except (ValueError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         ap.exit(1, f"GPL alternative offline installer trial BLOCKED: {exc}\n")
     print(f"{result['target']}: exact 18-profile/11-core GPL alternative input set staged, NOT approved")
