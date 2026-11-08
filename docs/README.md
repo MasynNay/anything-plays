@@ -21,6 +21,7 @@ This directory is the index for technical and release evidence. The [repository 
 | Outstanding native source/rights checks | [Distribution review](V3_DISTRIBUTION_READINESS.md) |
 | GPL and noncommercial license question | [Compatibility assessment](V3_LICENSE_COMPATIBILITY_GATE.md) |
 | Evidence-based four-Sega-console core license choices | [Sega legal/engineering review options](V3_SEGA_LICENSE_OPTIONS.md) |
+| Experimental disposable 2D Libretro worker technical feasibility (not release-approved) | [Isolated core research](V3_ISOLATED_CORE_RESEARCH.md) |
 | Draft release text (not published) | [3.0 release notes](V3_RELEASE_NOTES_DRAFT.md) |
 | Neo Geo Pocket test ROM license evidence | [NGP test license](V3_NGP_TEST_LICENSE.md) |
 | Exact recovery checkpoint | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |
