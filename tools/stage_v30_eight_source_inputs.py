@@ -219,7 +219,7 @@ def main(argv=None):
         p.add_argument("--"+name.replace("_","-")+"-dir",required=True)
     args=vars(p.parse_args(argv))
     five={
-        n: Path(args[n.replace("_","-")+"-dir"])
+        n: Path(args[n+"_dir"])
         for n in FAMILIES
     }
     try:
