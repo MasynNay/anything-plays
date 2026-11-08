@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
-import shutil
 import zipfile
 
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
@@ -74,7 +74,7 @@ def stage_inputs(original_dir, candidate, output, evidence, target):
         snapshots[name] = data
     pce_name = "mednafen_pce_fast_libretro" + extension
     candidate_zip_name = pce_name + ".zip"
-    with __import__("io").BytesIO() as buffer:
+    with io.BytesIO() as buffer:
         with zipfile.ZipFile(buffer, "w") as archive:
             member = zipfile.ZipInfo(pce_name, (1980, 1, 1, 0, 0, 0))
             member.compress_type = zipfile.ZIP_STORED
