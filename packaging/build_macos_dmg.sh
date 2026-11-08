@@ -95,6 +95,9 @@ for name in "${CORE_LIST[@]}"; do
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
 cp cores/CORE_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json ]]; then
+  cp cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json "$APP_BUNDLE/Contents/Resources/cores/"
+fi
 if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   cp cores/V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json "$APP_BUNDLE/Contents/Resources/cores/"
 fi
@@ -131,6 +134,11 @@ if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   if [[ "${AP_V30_PINNED_PCE:-0}" == "1" ]]; then
     cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/"
   fi
+fi
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json ]]; then
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" "$LICENSE_DIR/Supafaust-COPYING.txt"
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" "$LICENSE_DIR/BlastEm-COPYING.txt"
+  cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/PCE-COPYING.txt"
 fi
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 

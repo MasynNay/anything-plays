@@ -170,6 +170,43 @@ def verify_bundle(bundle, platform_name, check_native=False):
         cores = bundle / "cores"
 
     expected_cores = core_names_for_build()
+    if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+        # The production binary's installed paths MUST match the 44-asset
+        # independently reviewed native lock, not the original Snes9x /
+        # Genesis Plus GX paths or any test-only research marker.
+        from tools.v30_release_lock import (
+            ALTERNATIVE_CORE_NAMES, load_approved_lock, selected_core_set,
+        )
+        from tools.core_release_lock import release_target
+        approved_lock = load_approved_lock()
+        if selected_core_set(approved_lock) == ALTERNATIVE_CORE_NAMES:
+            from anything_plays.v30_approved_core_map import (
+                MARKER as PRODUCTION_MAP, validate_installed_map,
+            )
+            if (cores / "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json").exists():
+                raise ValueError("Production installer contains unapproved research marker")
+            selected = validate_installed_map(cores, EXTENSIONS[platform_name])
+            records = approved_lock["targets"][
+                release_target(sys.platform, __import__("platform").machine())]["cores"]
+            notices = {
+                "mednafen_supafaust": "Supafaust-COPYING.txt",
+                "blastem": "BlastEm-COPYING.txt",
+                "mednafen_pce_fast": "PCE-COPYING.txt",
+            }
+            for name, filename in notices.items():
+                row = selected["cores"][name]
+                if row["native_sha256"] != records[name]["native_sha256"]:
+                    raise ValueError(f"Approved 3.0 native mapping differs from core lock: {name}")
+                license_file = licenses / filename
+                if license_file.is_symlink() or not license_file.is_file():
+                    raise ValueError(f"Missing original source license notice: {filename}")
+                if (hashlib.sha256(license_file.read_bytes()).hexdigest()
+                        != row["license_notice_sha256"]):
+                    raise ValueError(f"Unreviewed GPL source notice bytes: {name}")
+            if platform_name == "windows":
+                win_notice = licenses / "Winpthreads-COPYING.txt"
+                if win_notice.is_symlink() or not win_notice.is_file() or not win_notice.read_bytes().strip():
+                    raise ValueError("Original Winpthreads source notice is required")
     if os.environ.get("AP_V30_GPL_TRIAL") == "1":
         # Never mistake test-only noncommercial-core substitutions for an
         # approved 3.0 production input. Validate the actual installed native

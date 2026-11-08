@@ -125,6 +125,12 @@ def _inspect_core_identity_in_process(path, name):
     """
     if name not in SOURCE_REPOSITORIES:
         raise ValueError(f"Unknown core: {name}")
+    if (os.name == "nt" and os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
+            and name in ("mednafen_supafaust", "blastem", "mednafen_pce_fast")):
+        from anything_plays.v30_approved_core_map import enable_windows_offline_runtime
+        # The archive and DLL fingerprint have already passed the reviewed
+        # native lock. All remaining core binaries may not yet be extracted.
+        enable_windows_offline_runtime(Path(path).parent, verify_native=False)
     if os.name == "nt" and os.environ.get("AP_V30_GPL_TRIAL") == "1":
         # Original Windows Supafaust/BlastEm use MinGW winpthread. Python
         # excludes PATH during ctypes dependency lookup; use the exact
@@ -365,6 +371,21 @@ def fetch_core(name, destination=CORE_FOLDER):
 def fetch_all(destination=CORE_FOLDER):
     """Retrieve every required core and write a per-build provenance manifest."""
     destination = Path(destination)
+    if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+        # A reviewed alternate production lock selects the genuine 3-family
+        # core metadata and pinned offline native runtime BEFORE ctypes opens
+        # any source-built Windows library. This is NOT the trial marker.
+        from tools.v30_release_lock import (
+            ALTERNATIVE_CORE_NAMES, load_approved_lock, selected_core_set,
+        )
+        reviewed = load_approved_lock()
+        if selected_core_set(reviewed) == ALTERNATIVE_CORE_NAMES:
+            from tools.core_release_lock import release_target
+            from tools.stage_v30_approved_native_mapping import stage_approved_map
+            destination.mkdir(parents=True, exist_ok=True)
+            stage_approved_map(
+                reviewed, release_target(sys.platform, platform.machine()),
+                destination, Path(os.environ["AP_CORE_ARCHIVE_DIR"]))
     if os.environ.get("AP_V30_GPL_TRIAL") == "1":
         # Stage the original marker (and verified Windows native runtime)
         # BEFORE Python opens the first experimental native library.
@@ -407,6 +428,14 @@ def fetch_all(destination=CORE_FOLDER):
         (destination / "CORE_PROVENANCE.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
+    # Distinct exact-review production marker must still resolve genuine
+    # native PCE/SNES/Sega bytes after all eleven approved cores are extracted.
+    if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+        from anything_plays.v30_approved_core_map import (
+            MARKER as PRODUCTION_CORE_MAP, validate_installed_map,
+        )
+        if (destination / PRODUCTION_CORE_MAP).exists():
+            validate_installed_map(destination, build_target()[1])
     # Distinct, source-identical preview marker goes into installed core
     # directory and is validated before packaging and on every trial launch.
     # The production source/native lock cannot consume this trial mode.
