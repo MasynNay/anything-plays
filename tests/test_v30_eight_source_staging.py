@@ -93,7 +93,7 @@ class EightOriginalCoreOfflineContracts(unittest.TestCase):
                 native,notice,record=check_original_five_artifact(folder,name,"linux-x64",".so")
                 self.assertEqual(sha(native),original["native_sha256"])
                 self.assertEqual(record["exact_source_revision"],PINNED_COMMITS[name])
-                self.assertEqual(notice is not None,name!="stella2014")
+                self.assertIsNotNone(notice)
                 self.assertFalse(record["binary_redistribution_approved"])
 
     def test_tampered_native_source_or_false_approval_is_refused(self):
