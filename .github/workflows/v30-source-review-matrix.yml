@@ -2,6 +2,21 @@ name: Anything Plays 3.0 | Assemble unapproved source review matrix
 
 # Research artifact only. No native binaries, no public release, no false flags.
 on:
+  # Research-only PR verification from two *known, completed* archived runs.
+  # Never automatically approve rights or upload native binaries to a release.
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-source-review-matrix.yml'
+      - 'tools/create_v30_source_review_inventory.py'
+      - 'tools/create_v30_candidate_lock.py'
+      - 'tests/test_v30_source_review_*.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-source-review-matrix.yml'
+      - 'tools/create_v30_source_review_inventory.py'
+      - 'tools/create_v30_candidate_lock.py'
   workflow_dispatch:
     inputs:
       native_input_run_id:
@@ -23,8 +38,11 @@ jobs:
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
-      NATIVE_RUN: ${{ inputs.native_input_run_id }}
-      SOURCE_RUN: ${{ inputs.source_snapshot_run_id }}
+      # Fixed, previously successful original binary/source research inputs
+      # for PR/push validation. On manual runs the operator may pick different
+      # successful lab and snapshot run IDs; the strict validator rejects others.
+      NATIVE_RUN: ${{ inputs.native_input_run_id || '42437133733' }}
+      SOURCE_RUN: ${{ inputs.source_snapshot_run_id || '42441448884' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
