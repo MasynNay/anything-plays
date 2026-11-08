@@ -149,6 +149,12 @@ if "%AP_V30_APPROVED_RELEASE%"=="1" if exist "cores\V30_SOURCE_BUILT_PRODUCTION_
   if errorlevel 1 exit /b 1
   copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\PCE-COPYING.txt" >nul
   if errorlevel 1 exit /b 1
+  if "%AP_V30_APPROVED_EIGHT%"=="1" (
+    for %%C in (fceumm stella2014 prosystem mednafen_ngp mednafen_wswan) do (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-%%C-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    )
+  )
 )
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
