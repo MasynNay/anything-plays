@@ -125,6 +125,12 @@ def _inspect_core_identity_in_process(path, name):
     """
     if name not in SOURCE_REPOSITORIES:
         raise ValueError(f"Unknown core: {name}")
+    if os.name == "nt" and os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        # Original Windows Supafaust/BlastEm use MinGW winpthread. Python
+        # excludes PATH during ctypes dependency lookup; use the exact
+        # bundled SHA-verified runtime without requiring user-installed MSYS2.
+        from anything_plays.v30_gpl_trial import enable_windows_trial_runtime
+        enable_windows_trial_runtime(Path(path).parent)
     library = C.CDLL(str(Path(path).resolve()))
     describe = library.retro_get_system_info
     describe.argtypes = [C.POINTER(_LibretroCoreInfo)]
@@ -359,6 +365,24 @@ def fetch_core(name, destination=CORE_FOLDER):
 def fetch_all(destination=CORE_FOLDER):
     """Retrieve every required core and write a per-build provenance manifest."""
     destination = Path(destination)
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        # Stage the original marker (and verified Windows native runtime)
+        # BEFORE Python opens the first experimental native library.
+        from anything_plays.v30_gpl_trial import (
+            MARKER, WINDOWS_RUNTIME, validate_trial_core_directory,
+        )
+        archived = Path(os.environ["AP_CORE_ARCHIVE_DIR"])
+        source_marker = archived / MARKER
+        if source_marker.is_symlink() or not source_marker.is_file():
+            raise ValueError("Original alternative source-built manifest missing")
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / MARKER).write_bytes(source_marker.read_bytes())
+        if os.name == "nt":
+            native_dep = archived / WINDOWS_RUNTIME
+            if native_dep.is_symlink() or not native_dep.is_file():
+                raise ValueError("Required exact Windows offline native DLL missing")
+            (destination / WINDOWS_RUNTIME).write_bytes(native_dep.read_bytes())
+        validate_trial_core_directory(destination, build_target()[1], verify_native=False)
     binaries = [fetch_core(name, destination) for name in core_names_for_build()]
     manifest = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -390,10 +414,6 @@ def fetch_all(destination=CORE_FOLDER):
         from anything_plays.v30_gpl_trial import (
             MARKER, validate_trial_core_directory,
         )
-        archived = Path(os.environ["AP_CORE_ARCHIVE_DIR"]) / MARKER
-        if archived.is_symlink() or not archived.is_file():
-            raise ValueError("Original GPL alternative trial marker absent")
-        (destination / MARKER).write_bytes(archived.read_bytes())
         validate_trial_core_directory(destination, build_target()[1])
     from tools.core_release_lock import (
         LOCK_PATH, candidate_fingerprint, verify_release_lock,
