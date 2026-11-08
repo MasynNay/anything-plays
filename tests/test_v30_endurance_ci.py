@@ -35,7 +35,7 @@ class EnduranceCiContracts(unittest.TestCase):
         self.assertIn("controller_effect_required", code)
         self.assertIn("gamecube_button_a_visual_effect_verified", code)
         self.assertIn("native_pcm_nonzero_values", code)
-        self.assertIn("resident_growth_mb", code)
+        self.assertIn("native_rss_growth_mb", code)
 
     def test_strict_failures_no_fake_public_rights_or_retail_gameplay(self):
         workflow = (ROOT/".github/workflows/v30-endurance.yml").read_text("utf-8")
