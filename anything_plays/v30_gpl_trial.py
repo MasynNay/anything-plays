@@ -191,7 +191,7 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                     or row.get("native_filename") != f"{name}_libretro{extension}"
                     or row.get("source_build_run_id") != 42513615955
                     or row.get("old_unknown_source_buildbot_replaced") is not True
-                    or row.get("original_license_notice_copied") is not (name!="stella2014")):
+                    or row.get("original_license_notice_copied") is not True):
                 raise ValueError(f"Wrong original source-built core family: {name}")
             for field in ("native_sha256","source_archive_sha256",
                           "native_archive_sha256"):
@@ -200,10 +200,7 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                         or any(c not in "0123456789abcdef" for c in value)):
                     raise ValueError(f"Missing real compiled core/source fingerprint: {name}/{field}")
             notice=row.get("original_license_notice_sha256")
-            if name=="stella2014":
-                if notice is not None:
-                    raise ValueError("Stella source notice review cannot be faked")
-            elif (not isinstance(notice,str) or len(notice)!=64
+            if (not isinstance(notice,str) or len(notice)!=64
                   or any(c not in "0123456789abcdef" for c in notice)):
                 raise ValueError(f"Missing original GPL source notice: {name}")
             if verify_native:
