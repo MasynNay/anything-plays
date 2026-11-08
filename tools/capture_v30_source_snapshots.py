@@ -83,6 +83,10 @@ def _copy_url_to_archive(url, path, *, limit=MAX_ARCHIVE_BYTES):
                         raise ValueError("Upstream source archive exceeds download limit")
                     digest.update(chunk)
                     temporary.write(chunk)
+            # The temporary file remains open while its gzip members are
+            # validated, so flush buffered writes before reopening by path.
+            temporary.flush()
+            os.fsync(temporary.fileno())
             with tarfile.open(staged, "r:gz") as tree:
                 members = tree.getmembers()
                 if not members or any(member.name.startswith("/")
