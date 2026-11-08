@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "status": "UNAPPROVED-PINNED-SUBMODULE-GITLINK-EVIDENCE",
+  "parent_repository": "https://github.com/libretro/dolphin",
+  "parent_commit": "32c61f9d0e933331bb7087ba57e96883241b4960",
+  "parent_git_tree_sha": "32c61f9d0e933331bb7087ba57e96883241b4960",
+  "source": "GitHub Git tree at exact self-reported Dolphin Libretro source commit plus that commit's .gitmodules",
+  "submodule_count": 34,
+  "all_gitlinks_pinned": true,
+  "nested_source_dependencies_verified": false,
+  "source_to_shipped_binary_correspondence_verified": false,
+  "public_binary_redistribution_approved": false,
+  "note": "Each gitlink commit is the actual Git tree object at parent commit, not proof that a corresponding build used that submodule, that its source is mirrored, or that any licensing requirement is fulfilled.",
+  "submodules": [
+    {
+      "path": "Externals/bzip2/bzip2",
+      "source_repository": "https://gitlab.com/bzip2/bzip2.git",
+      "gitlink_commit": "6a8690fc8d26c815e798c588f796eabe9d684cf0",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/cpp-ipc/cpp-ipc",
+      "source_repository": "https://github.com/mutouyun/cpp-ipc.git",
+      "gitlink_commit": "b6cbbc940e25ff898f09a40b107781cef6027b13",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/cpp-optparse/cpp-optparse",
+      "source_repository": "https://github.com/weisslj/cpp-optparse.git",
+      "gitlink_commit": "2265d647232249a53a03b411099863ceca35f0d3",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/cubeb/cubeb",
+      "source_repository": "https://github.com/mozilla/cubeb.git",
+      "gitlink_commit": "54217bca3f3e0cd53c073690a23dd25d83557909",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/curl/curl",
+      "source_repository": "https://github.com/curl/curl.git",
+      "gitlink_commit": "cfbfb65047e85e6b08af65fe9cdbcf68e9ad496a",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/enet/enet",
+      "source_repository": "https://github.com/lsalzman/enet.git",
+      "gitlink_commit": "2662c0de09e36f2a2030ccc2c528a3e4c9e8138a",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/FFmpeg-bin",
+      "source_repository": "https://github.com/dolphin-emu/ext-win-ffmpeg.git",
+      "gitlink_commit": "9bc087fbca36ce5a85eb4fd73f0c73813593e5a2",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/fmt/fmt",
+      "source_repository": "https://github.com/fmtlib/fmt.git",
+      "gitlink_commit": "e424e3f2e607da02742f73db84873b8084fc714c",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/glslang/glslang",
+      "source_repository": "https://github.com/KhronosGroup/glslang.git",
+      "gitlink_commit": "a57276bf558f5cf94d3a9854ebdf5a2236849a5a",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/gtest",
+      "source_repository": "https://github.com/google/googletest.git",
+      "gitlink_commit": "eb2d85edd0bff7a712b6aff147cd9f789f0d7d0b",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/hidapi/hidapi-src",
+      "source_repository": "https://github.com/libusb/hidapi.git",
+      "gitlink_commit": "d6b2a974608dec3b76fb1e36c189f22b9cf3650c",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/imgui/imgui",
+      "source_repository": "https://github.com/ocornut/imgui.git",
+      "gitlink_commit": "45acd5e0e82f4c954432533ae9985ff0e1aad6d5",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/implot/implot",
+      "source_repository": "https://github.com/epezent/implot.git",
+      "gitlink_commit": "3da8bd34299965d3b0ab124df743fe3e076fa222",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/libadrenotools",
+      "source_repository": "https://github.com/bylaws/libadrenotools.git",
+      "gitlink_commit": "8fae8ce254dfc1344527e05301e43f37dea2df80",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/libspng/libspng",
+      "source_repository": "https://github.com/randy408/libspng.git",
+      "gitlink_commit": "fb768002d4288590083a476af628e51c3f1d47cd",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/libusb/libusb",
+      "source_repository": "https://github.com/libusb/libusb.git",
+      "gitlink_commit": "15a7ebb4d426c5ce196684347d2b7cafad862626",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/lz4/lz4",
+      "source_repository": "https://github.com/lz4/lz4.git",
+      "gitlink_commit": "5fc0630a0ed55e9755b0fe3990cd021ae1c3edc1",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/mGBA/mgba",
+      "source_repository": "https://github.com/mgba-emu/mgba.git",
+      "gitlink_commit": "0b40863f64d0940f333fa1c638e75f86f8a26a33",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/miniupnpc/miniupnp",
+      "source_repository": "https://github.com/miniupnp/miniupnp.git",
+      "gitlink_commit": "bf4215a7574f88aa55859db9db00e3ae58cf42d6",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/minizip-ng/minizip-ng",
+      "source_repository": "https://github.com/zlib-ng/minizip-ng.git",
+      "gitlink_commit": "55db144e03027b43263e5ebcb599bf0878ba58de",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/pugixml/pugixml",
+      "source_repository": "https://github.com/zeux/pugixml.git",
+      "gitlink_commit": "ee86beb30e4973f5feffe3ce63bfa4fbadf72f38",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/Qt",
+      "source_repository": "https://github.com/dolphin-emu/ext-win-qt.git",
+      "gitlink_commit": "306289108d29a4b31a5460f7b55d28fde7b96d1b",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/rcheevos/rcheevos",
+      "source_repository": "https://github.com/RetroAchievements/rcheevos.git",
+      "gitlink_commit": "926e4608f8dca7989267c787bbefb3ab1c835ac5",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/SDL/SDL",
+      "source_repository": "https://github.com/libsdl-org/SDL.git",
+      "gitlink_commit": "f87239e71e42da91ca317a12eefb82cfbf3393eb",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/SFML/SFML",
+      "source_repository": "https://github.com/SFML/SFML.git",
+      "gitlink_commit": "0fa201c969e48ecc253581c5841ce73f44d42f49",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/spirv_cross/SPIRV-Cross",
+      "source_repository": "https://github.com/KhronosGroup/SPIRV-Cross.git",
+      "gitlink_commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/tinygltf/tinygltf",
+      "source_repository": "https://github.com/syoyo/tinygltf.git",
+      "gitlink_commit": "c5641f2c22d117da7971504591a8f6a41ece488b",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/Vulkan-Headers",
+      "source_repository": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+      "gitlink_commit": "39f924b810e561fd86b2558b6711ca68d4363f68",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/VulkanMemoryAllocator",
+      "source_repository": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git",
+      "gitlink_commit": "3bab6924988e5f19bf36586a496156cf72f70d9f",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/watcher/watcher",
+      "source_repository": "https://github.com/e-dant/watcher.git",
+      "gitlink_commit": "b03bdcfc11549df595b77239cefe2643943a3e2f",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/wil",
+      "source_repository": "https://github.com/microsoft/wil.git",
+      "gitlink_commit": "7447d38337abf23a5c2286305b743506455aa9cc",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/xxhash/xxHash",
+      "source_repository": "https://github.com/Cyan4973/xxHash.git",
+      "gitlink_commit": "e626a72bc2321cd320e953a0ccf1584cad60f363",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/zlib-ng/zlib-ng",
+      "source_repository": "https://github.com/zlib-ng/zlib-ng.git",
+      "gitlink_commit": "ce01b1e41da298334f8214389cc9369540a7560f",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    },
+    {
+      "path": "Externals/zstd/zstd",
+      "source_repository": "https://github.com/facebook/zstd.git",
+      "gitlink_commit": "711e17da98510a3567bf47f85a08a76f64811474",
+      "git_object_type": "commit",
+      "corresponding_binary_verified": false,
+      "submodule_archive_captured": false,
+      "license_reviewed": false
+    }
+  ]
+}
