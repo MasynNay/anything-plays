@@ -121,7 +121,7 @@ class PublicationContracts(unittest.TestCase):
         self.assertNotIn("\n  push:", workflow)
         self.assertIn('refs/heads/main', workflow)
         self.assertIn("python tools/check_v30_release.py", workflow)
-        self.assertIn("collect_v30_production_assets.py", workflow)
+        self.assertIn("python -m tools.collect_v30_production_assets", workflow)
         self.assertIn("APPROVED-3.0-DISTRIBUTION", workflow)
         self.assertIn("Approved production candidates", workflow)
         self.assertIn("docs/V3_RELEASE_NOTES_APPROVED.md", workflow)
