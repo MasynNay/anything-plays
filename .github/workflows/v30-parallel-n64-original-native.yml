@@ -1,0 +1,144 @@
+name: Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64
+# Source authenticity research only. No public release, third-party writes,
+# game dumps, BIOS, or unapproved production downloads.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-parallel-n64-original-native.yml'
+      - 'tools/capture_v30_n64_original_source_build.py'
+      - 'tests/test_v30_n64_original_source_build.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v30-original-source-n64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-original-n64:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, platform: unix, extension: so}
+          - {runner: windows-2025, target: windows-x64, platform: win, extension: dll}
+          - {runner: macos-15, target: macos-arm64, platform: osx, extension: dylib}
+          - {runner: macos-15-intel, target: macos-x64, platform: osx, extension: dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 105
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      SOURCE_COMMIT: e0ef5d673257e2e83bf9b7cffe62eda141af8493
+      SOURCE_DIR: research/original-parallel-n64
+      TARGET: ${{ matrix.target }}
+      LIBRETRO_EXT: ${{ matrix.extension }}
+      MAKE_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read-only exact upstream N64 source checkout
+        uses: actions/checkout@v4
+        with:
+          repository: libretro/parallel-n64
+          ref: e0ef5d673257e2e83bf9b7cffe62eda141af8493
+          path: research/original-parallel-n64
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Enforce original N64 source SHA and source-only negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test -f "$SOURCE_DIR/Makefile"
+          test ! -s "$SOURCE_DIR/.gitmodules"
+          python -m unittest discover -s tests -p 'test_v30_n64_original_source_build.py' -v
+      - name: Install source build dependencies for Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends build-essential nasm pkg-config python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install original Windows MinGW compiler and N64 assembler
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-make
+            make
+      - name: Install native Apple N64 source assembler
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v nasm >/dev/null 2>&1; then brew install nasm; fi
+      - name: Compile original ParaLLEl N64 Libretro core on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          make -C "$SOURCE_DIR" -j2 platform=win HAVE_OPENGL=0 HAVE_PARALLEL=0 HAVE_PARALLEL_RSP=0
+          test -s "$SOURCE_DIR/parallel_n64_libretro.dll"
+      - name: Compile original ParaLLEl N64 Libretro core on Unix/macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C "$SOURCE_DIR" -j2 "platform=$MAKE_PLATFORM" HAVE_OPENGL=0 HAVE_PARALLEL=0 HAVE_PARALLEL_RSP=0
+          test -s "$SOURCE_DIR/parallel_n64_libretro.$LIBRETRO_EXT"
+      - name: Authenticate original source, eleven notices and real newly built native SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_n64_original_source_build             --source "$SOURCE_DIR"             --native "$SOURCE_DIR/parallel_n64_libretro.$LIBRETRO_EXT"             --target "$TARGET"             --output "test-evidence/n64-$TARGET"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          folder=Path('test-evidence')/('n64-'+os.environ['TARGET'])
+          record=json.loads((folder/'ORIGINAL_N64_SOURCE_NATIVE_UNAPPROVED.json').read_text('utf-8'))
+          assert record['original_license_notice_count']==11
+          assert record['actual_source_compiled_native_sha256']
+          for flag in ('public_binary_redistribution_approved',
+                       'mixed_gpl_combined_program_license_approved',
+                       'corresponding_source_review_approved',
+                       'physical_game_audio_save_long_run_reviewed'):
+              assert record[flag] is False,flag
+          print('Real upstream N64 source compiled and original eleven notices preserved')
+          PY
+      - name: Install genuine N64 homebrew playback prerequisites
+        run: python -m pip install -r requirements.txt
+      - name: Play actual original-source N64 native video in application CoreSession
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="test-evidence/n64-$TARGET/parallel_n64_libretro.$LIBRETRO_EXT"
+          python tools/probe_n64_homebrew.py             --core "$CORE" --seconds 15             --report "test-evidence/n64-$TARGET/ORIGINAL_N64_NATIVE_PLAYBACK_UNAPPROVED.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('test-evidence')/('n64-'+os.environ['TARGET'])/'ORIGINAL_N64_NATIVE_PLAYBACK_UNAPPROVED.json'
+          row=json.loads(p.read_text('utf-8'))
+          assert row['probe_passed'] is True and row['child_returncode']==0
+          assert row['details']['playback_probe_passed'] is True
+          assert row['details']['nonblank_samples']>=1
+          print('Authentic original source-built ParaLLEl N64 rendered homebrew on',os.environ['TARGET'])
+          PY
+      - name: Store only owner-only research evidence, never a public release
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-PARALLEL-N64-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED
+          path: test-evidence/n64-${{ matrix.target }}/
+          retention-days: 30
+          if-no-files-found: warn
