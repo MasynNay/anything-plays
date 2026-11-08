@@ -34,8 +34,8 @@ def original_fixture(folder, target="linux-x64"):
     folder.mkdir()
     ext=TARGET_EXT[target]
     native_name=f"parallel_n64_libretro{ext}"
-    header={".dll":b"MZ",".so":b"\\x7fELF",
-            ".dylib":b"\\xcf\\xfa\\xed\\xfe"}[ext]
+    header={".dll":b"MZ",".so":b"\x7fELF",
+            ".dylib":b"\xcf\xfa\xed\xfe"}[ext]
     native=header+b"not executable synthetic original N64"*11000
     (folder/native_name).write_bytes(native)
     notes={}
