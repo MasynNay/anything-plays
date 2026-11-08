@@ -20,6 +20,9 @@ on:
       - 'anything_plays/core_locator.py'
       - 'fetch_mgba_core.py'
       - 'verify_bundle.py'
+      - 'app.py'
+      - 'tools/probe_v30_frozen_gui_launch.py'
+      - 'tests/test_v30_real_frozen_gui_launch.py'
       - 'packaging/**'
       - 'tests/test_v30_gpl_full_offline_trial.py'
   workflow_dispatch:
@@ -175,6 +178,39 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: bash packaging/build_macos_dmg.sh
+      - name: Cold-launch the ACTUAL packaged Anything Plays Tk GUI on real OS, not just its Libretro cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Linux GUI processes need the actual X server equivalent; the
+          # existing Linux runner installed xvfb but previously never used
+          # it to launch the compiled PyInstaller window.
+          if [[ "$TARGET" == linux-x64 ]]; then
+            xvfb-run -a -s "-screen 0 1600x900x24" \
+              python tools/probe_v30_frozen_gui_launch.py \
+                --target "$TARGET" \
+                --report test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json
+          else
+            python tools/probe_v30_frozen_gui_launch.py \
+              --target "$TARGET" \
+              --report test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json")
+          item=json.loads(p.read_text("utf-8"))
+          assert item["passed"] is True,item.get("error")
+          assert item["frozen_ui_initialized"] is True
+          assert item["original_console_profiles"]==18
+          assert item["native_exit_code"]==0
+          assert item["child_original_tk_report"]["frozen_binary"] is True
+          assert item["child_original_tk_report"]["actual_tk_mainloop_ran"] is True
+          for flag in ("public_binary_distribution_approved","license_review_approved",
+                       "camera_hardware_tested","physical_qa_approved"):
+            assert item[flag] is False, flag
+          print("ACTUAL FROZEN APP Tk UI WINDOW LAUNCHED ON",item["target"],"; public/QA flags FALSE")
+          PY
       - name: Check all 18 profiles, 11 REAL embedded native images, source pins and absent noncommercial binaries
         shell: bash
         run: |
