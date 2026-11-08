@@ -31,12 +31,14 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
         source.mkdir()
         (source/".gitmodules").write_bytes(b"")
         notes=[]
+        original_blobs={}
         for i in range(11):
             name=f"component-{i}/COPYING"
             file=source/name
             file.parent.mkdir(parents=True,exist_ok=True)
             raw=(f"ORIGINAL-SYNTHETIC-N64-NOTICE-{i}".encode()*200)
             file.write_bytes(raw)
+            original_blobs[name]=raw
             notes.append({"path":name,"git_blob_sha1":mod.gitblob(raw),
                           "size_bytes":len(raw),"notice_reviewed":False})
         index={
@@ -60,6 +62,7 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
             name=args[0] if args else ""
             if name=="rev-parse":return (mod.SOURCE_REVISION+"\n").encode()
             if name=="status":return b""
+            if name=="show":return original_blobs[args[1].split("HEAD:",1)[1]]
             if name=="ls-tree":
                 return b"".join(f"100644 blob {'a'*40} source/{n}\n".encode() for n in range(1970))
             if name=="archive":return b"SYNTHETIC ORIGINAL SOURCE TAR "*45000
@@ -109,10 +112,21 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
     def test_changed_original_notice_and_gitlink_are_blocked(self):
         src,native,idx,row,git_output=self.mock_original()
         note=src/row["notices"][0]["path"]
+        # The actual Git blob is the authority: a modified committed
+        # license is forbidden, even on a platform that rendered CRLF.
         note.write_bytes(b"tampered")
-        with patch.object(mod,"_git",side_effect=lambda source,*a:git_output(*a)):
+        def bad_original(*args):
+            if args and args[0]=="show" and args[1].endswith(row["notices"][0]["path"]):
+                return b"tampered"
+            return git_output(*args)
+        with patch.object(mod,"_git",side_effect=lambda source,*a:bad_original(*a)):
             with self.assertRaises(ValueError):
                 mod.validate_source_and_notices(src,row)
+        # Windows source worktree newline differences do NOT alter the
+        # underlying original Git SHA and do not misidentify the license.
+        note.write_bytes(b"CRLF rendered fixture, original Git blob unchanged")
+        with patch.object(mod,"_git",side_effect=lambda source,*a:git_output(*a)):
+            self.assertEqual(len(mod.validate_source_and_notices(src,row)),11)
         note.write_bytes(b"ORIGINAL-SYNTHETIC-N64-NOTICE-0"*200)
         def git_with_link(*args):
             if args and args[0]=="ls-tree":
