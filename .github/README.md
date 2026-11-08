@@ -13,6 +13,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **v30-pce-offline-integration.yml** | Test all 18 profiles and 11 offline native cores using a verified source-built PCE replacement while retaining original other-core ZIPs |
 | **v30-pce-source-delta.yml** | Assemble 11-source review matrix from four verified integrated PCE trial artifacts, retaining unknown old nightly and unapproved rights flags |
 | **v30-dolphin-submodule-sources.yml** | Research-only capture of 34 pinned Dolphin Gitlink source candidates in six bounded, checksum-verified CI shards (never public-release approval) |
+| **v30-dolphin-source-review.yml** | Independently rehash the six original Dolphin source artifacts and produce a 34-dependency reviewer-only JSON/checksum inventory (no binaries or rights approval) |
 | **v30-endurance.yml** | Stability and long-session checks |
 | **v30-n64-restart.yml** | N64 repeated-launch checks |
 | **v30-virtual-aquarium.yml** | Camera control simulation |
