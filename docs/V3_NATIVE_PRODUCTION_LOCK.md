@@ -48,6 +48,17 @@ reviewed local `Dolphin.zip` and rejects changed bytes; network fallback is
 prohibited. Windows, Linux, and Mac build scripts must carry all eleven core
 libraries and Dolphin Sys in this mode.
 
+The controlled GitHub workflow `.github/workflows/v30-production-candidates.yml`
+now defines the **four-platform approved production artifact producer**. It
+requires explicit owner confirmation, a fully reviewed immutable native lock,
+`config/v3.0-corresponding-source-inventory.json`, an independently approved
+`docs/V3_LICENSE_COMPATIBILITY_APPROVED.md` rights decision, strict QA
+acceptance and original matching ZIP archives. These files and approvals
+are not yet complete, so the workflow intentionally cannot produce public
+approved binaries. It emits exactly one canonical stable installer and one
+`PRODUCTION_PROVENANCE.json` per target after rechecking source, lock, bundle
+and installer hashes. The separate manual publisher reads these four artifacts.
+
 **Additional production tasks remain:** a separately approved immutable 11-core
 input lock, final stable OS installer identities (the current scripts still
 default to preview branding), a four-platform reviewed production build
