@@ -82,6 +82,14 @@ def fake_original(folder):
                     "original_archive_count": 12, "files": rows}), "utf-8")
 
 
+def fake_windows_runtime(root):
+    if HOST_TARGET != "windows-x64":
+        return None
+    path = Path(root) / "original-winpthread-fixture.dll"
+    path.write_bytes(b"MZ" + b"synthetic original DLL test fixture" * 2000)
+    return path
+
+
 def env():
     return mock.patch.dict(os.environ, {
         "AP_V30_GPL_TRIAL": "1",
@@ -132,7 +140,8 @@ class FullGPLOfflineTrial(TestCase):
             fake_source(snes, "snes")
             fake_source(sega, "sega")
             output, proof = root / "trial", root / "evidence" / "record.json"
-            result = stage_inputs(original, snes, sega, output, proof, HOST_TARGET)
+            result = stage_inputs(original, snes, sega, output, proof, HOST_TARGET,
+                                  windows_runtime=fake_windows_runtime(root))
             self.assertEqual(result["status"], STATUS)
             self.assertEqual(result["native_core_count"], 11)
             self.assertEqual(result["all_console_profiles"], 18)
@@ -143,6 +152,8 @@ class FullGPLOfflineTrial(TestCase):
             expected |= {"Dolphin.zip", MARKER,
                          "GPL-TRIAL-Supafaust-COPYING.txt",
                          "GPL-TRIAL-BlastEm-COPYING.txt"}
+            if HOST_TARGET == "windows-x64":
+                expected.add("libwinpthread-1.dll")
             self.assertEqual({p.name for p in output.iterdir()}, expected)
             self.assertEqual((output / "Dolphin.zip").read_bytes(),
                              (original / "Dolphin.zip").read_bytes())
@@ -155,6 +166,9 @@ class FullGPLOfflineTrial(TestCase):
             installed = root / "installed-cores"
             installed.mkdir()
             (installed / MARKER).write_bytes((output / MARKER).read_bytes())
+            if HOST_TARGET == "windows-x64":
+                (installed / "libwinpthread-1.dll").write_bytes(
+                    (output / "libwinpthread-1.dll").read_bytes())
             for name in ("mednafen_supafaust", "blastem"):
                 with ZipFile(output / f"{name}_libretro{EXT}.zip") as z:
                     (installed / f"{name}_libretro{EXT}").write_bytes(
@@ -182,7 +196,8 @@ class FullGPLOfflineTrial(TestCase):
             fake_source(root / "sega", "sega")
             output = root / "output"
             stage_inputs(root / "original", root / "snes", root / "sega",
-                         output, root / "proof.json", HOST_TARGET)
+                         output, root / "proof.json", HOST_TARGET,
+                         windows_runtime=fake_windows_runtime(root))
             info = json.loads((output / MARKER).read_text("utf-8"))
             for flag in ("public_binary_distribution_approved",
                          "combined_gpl_license_reviewed",
@@ -209,12 +224,14 @@ class FullGPLOfflineTrial(TestCase):
             (root / "original" / f"snes9x_libretro{EXT}.zip").write_bytes(b"tampered")
             with self.assertRaises(ValueError):
                 stage_inputs(root / "original", root / "snes", root / "sega",
-                             root / "dst", root / "proof.json", HOST_TARGET)
+                             root / "dst", root / "proof.json", HOST_TARGET,
+                         windows_runtime=fake_windows_runtime(root))
             self.assertFalse((root / "dst").exists())
             with mock.patch.dict(os.environ, {"AP_RELEASE_BUILD": "1"}):
                 with self.assertRaises(ValueError):
                     stage_inputs(root / "original", root / "snes", root / "sega",
-                                 root / "dst", root / "proof.json", HOST_TARGET)
+                                 root / "dst", root / "proof.json", HOST_TARGET,
+                         windows_runtime=fake_windows_runtime(root))
 
 
 if __name__ == "__main__":
