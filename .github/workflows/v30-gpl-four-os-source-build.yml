@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/v30-gpl-four-os-source-build.yml'
       - 'tests/test_v30_gpl_four_os_research.py'
+      - 'tools/capture_v30_gpl_alternative_source_build.py'
+      - 'tools/probe_v30_blastem_genesis_variant.py'
   workflow_dispatch:
 permissions:
   contents: read
