@@ -29,3 +29,35 @@ cores/*
 
 # Generated PyInstaller specifications are not source files
 *.spec
+
+# Local test, debug and coverage outputs
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+*.log
+test-evidence/
+release-evidence/
+preserved-native-inputs/
+frozen-inputs/
+release-inputs/
+candidate-assets/
+
+# Never version native application packages, wheels or game dumps
+*.deb
+*.dmg
+*.exe
+*.msi
+*.pkg
+*.whl
+*.iso
+*.gcm
+*.gcz
+*.ngp
+*.ngc
+*.nes
+*.sfc
+*.smc
+*.n64
+*.z64
+*.v64
