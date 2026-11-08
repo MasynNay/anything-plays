@@ -55,7 +55,7 @@
       "in_app_video": false,
       "camera_controls": true,
       "real_game_verified": false,
-      "notes": "Experimental built for internal CI software renderer exists; real in-panel gameplay not verified.",
+      "notes": "Owner already confirmed real N64 gameplay and repeated ROM unload/reload without restarting the app, with successful cross-platform preview testing. These owner observations must not be erased or retested merely because the final production installer/source SHA has not been approved; formal final-installer input/audio/save/endurance matrix remains separately pending.",
       "primary_runtime": "embedded-libretro-software",
       "audio_verified": false,
       "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
@@ -65,7 +65,7 @@
       "in_app_video": false,
       "camera_controls": false,
       "real_game_verified": false,
-      "notes": "Accelerated embedded Dolphin core plus verified Sys assets are required in the installer. Original 3D/audio homebrew CI is not sufficient evidence of complete game compatibility, saves, physical audio and longevity.",
+      "notes": "Owner already confirmed Dolphin/GameCube works on macOS and Windows and later on Linux after the bundled Dolphin Sys permission fix. Do not ask the owner to repeat that working gameplay. Exact production build identity, full per-profile audio/input/save/endurance evidence and third-party source/license compliance remain separately pending.",
       "primary_runtime": "embedded-libretro-hardware",
       "audio_verified": false,
       "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
