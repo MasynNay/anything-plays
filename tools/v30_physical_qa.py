@@ -220,8 +220,8 @@ def brief(report):
     )
 
 
-def review_wizard(report, *, reader=input, printer=print):
-    """Single-run physical walkthrough; 'q' saves progress to the caller."""
+def review_wizard(report, *, reader=input, printer=print, on_record=None):
+    """Physical walkthrough; optional callback atomically saves EACH answer."""
     for label, system, results in (
         [("Installed application", None, report["host_checks"])]
         + [(SYSTEMS[key].title, key, report["console_checks"][key])
@@ -242,6 +242,8 @@ def review_wizard(report, *, reader=input, printer=print):
                           result={"p": "pass", "f": "fail",
                                   "s": "not-tested"}[answer],
                           system=system)
+            if on_record is not None:
+                on_record(report)
     return report
 
 
@@ -284,7 +286,13 @@ def main(argv=None):
         else:
             obj = load_report(args.report)
             if args.cmd == "wizard":
-                review_wizard(obj)
+                # Persist each observed step, so a killed terminal, accidental
+                # Ctrl+C, or power loss cannot discard verified progress.
+                review_wizard(
+                    obj,
+                    on_record=lambda progress: _store(
+                        args.report, progress, existing=True),
+                )
                 _store(args.report, obj, existing=True)
             elif args.cmd == "record":
                 record_result(obj, check=args.check, result=args.result, system=args.system)
