@@ -189,7 +189,25 @@ done
 # Verify bytes after they have been packaged into the actual distributable DMG.
 MOUNT_DIR="$(mktemp -d /tmp/anything-plays-release.XXXXXX)"
 trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/dev/null 2>&1 || true' EXIT
-hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" "$DMG"
+# Creating the DMG does not guarantee DiskImages has freed its transient
+# device. Hosted arm64 runners have returned "Resource temporarily unavailable"
+# at this exact attach step despite a valid, already-created image. Retry the
+# REAL mount, never skip the installed app's checksum/license verification.
+MOUNT_OK=0
+for ATTEMPT in 1 2 3 4 5 6; do
+  if hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" "$DMG"; then
+    MOUNT_OK=1
+    break
+  fi
+  echo "macOS DiskImages mount refused attempt $ATTEMPT of 6; retrying" >&2
+  # A partially created mount is not proof of a verified disk image.
+  hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true
+  sleep "$((ATTEMPT * 2))"
+done
+[[ "$MOUNT_OK" == "1" ]] || {
+  echo "DMG validation BLOCKED: unable to attach after six attempts" >&2
+  exit 1
+}
 "$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/${BUNDLE_FILE}"
 hdiutil detach "$MOUNT_DIR"
 rmdir "$MOUNT_DIR"
