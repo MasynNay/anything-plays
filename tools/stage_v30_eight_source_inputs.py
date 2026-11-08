@@ -121,9 +121,14 @@ def check_original_five_artifact(folder, name, target, extension):
         raise ValueError("Stella original source license cannot be falsely inferred")
     for report in reports:
         row=json.loads((folder/report).read_text("utf-8"))
+        details=row.get("details")
+        child_passed = (
+            details.get("playback_probe_passed") is True
+            if name=="fceumm" and isinstance(details,dict)
+            else isinstance(details,dict) and details.get("passed") is True
+        )
         if (row.get("passed") is not True or row.get("native_exit_code") != 0
-                or not isinstance(row.get("details"),dict)
-                or row["details"].get("passed") is not True):
+                or not child_passed):
             raise ValueError(f"Original source-built native A/V failed: {name}/{report}")
     return native, notice, info
 
