@@ -59,6 +59,13 @@ compatible with GPL permissions if both licenses apply to one combined work.
    fail-closed `config/v3.0-release-acceptance.json` record be completed and
    the `tools/check_v30_release.py` gate run **without** `--report-only`.
 
+The candidate-specific [four-Sega-console source/license decision record](V3_SEGA_LICENSE_OPTIONS.md)
+compares current Genesis Plus GX, source-built GPLv3 BlastEm, noncommercial
+PicoDrive, GPLv3 Gearsystem, GPLv2 SMS Plus GX and AGPLv3 ClownMDEmu
+without claiming any component resolves legal rights on its own. The
+reviewer must not substitute cores or approve a separate-process design
+solely because CI demonstrated original homebrew video/audio.
+
 ### Options that preserve the user's product scope
 
 The product decision is **no additional emulators for 3.0** and all core
