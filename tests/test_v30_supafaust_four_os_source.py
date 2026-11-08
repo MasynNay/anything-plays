@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from tools import capture_v30_supafaust_source as source
+from tools import patch_v30_supafaust_macos_semaphore as macfix
 
 
 class SupafaustFourOSContracts(unittest.TestCase):
@@ -38,25 +39,38 @@ class SupafaustFourOSContracts(unittest.TestCase):
             (original/"mednafen/snes_faust/snes.cpp").write_text(
                 "either version 2 or any later version\n", "utf-8")
             (original/"Makefile").write_text("all: \n\t@echo test\n", "utf-8")
+            original_config = macfix.BEFORE + "\n"
+            config = original/"mednafen/config.h"
+            config.write_text(original_config, "utf-8")
             source_tar = io.BytesIO()
             with tarfile.open(fileobj=source_tar, mode="w") as tar:
-                for name in ["COPYING", "mednafen/snes_faust/snes.cpp", "Makefile"]:
+                for name in ["COPYING", "mednafen/snes_faust/snes.cpp",
+                             "mednafen/config.h", "Makefile"]:
                     data=(original/name).read_bytes()
                     item=tarfile.TarInfo(name)
                     item.size=len(data)
                     tar.addfile(item, io.BytesIO(data))
+            current_target = ["linux-x64"]
             def fake_git(root_arg, *args, binary=False):
                 if args[:2]==("rev-parse","HEAD"):
                     return source.COMMIT
                 if args[:2]==("remote","get-url"):
                     return source.REPOSITORY + ".git"
                 if args[:2]==("status","--porcelain"):
-                    return ""
+                    return "M mednafen/config.h" if current_target[0].startswith("macos-") else ""
+                if args[:2]==("show","HEAD:mednafen/config.h"):
+                    return original_config.encode("utf-8")
+                if args[:2]==("diff","--"):
+                    return b"diff --git a/mednafen/config.h b/mednafen/config.h\n" + macfix.AFTER.encode("utf-8")
                 if args[:2]==("archive","--format=tar"):
                     return source_tar.getvalue()
                 raise ValueError("Unexpected source identity query")
             for target, native_name in source.NATIVE_BY_TARGET.items():
                 with self.subTest(target=target), patch.object(source,"git",fake_git):
+                    current_target[0]=target
+                    config.write_text(
+                        original_config.replace(macfix.BEFORE,macfix.AFTER,1)
+                        if target.startswith("macos-") else original_config, "utf-8")
                     native=original/native_name
                     blob=source.HEADER_BY_TARGET[target][0] + (target.encode()*7000)
                     native.write_bytes(blob)
@@ -70,6 +84,14 @@ class SupafaustFourOSContracts(unittest.TestCase):
                     self.assertFalse(result["public_binary_redistribution_approved"])
                     self.assertFalse(result["replaces_current_snes9x_in_app"])
                     self.assertFalse(result["complete_combined_core_license_reviewed"])
+                    is_macos=target.startswith("macos-")
+                    self.assertEqual(result["original_source_modified_for_macos"], is_macos)
+                    patchfile=folder/"SUPAFAUST_MACOS_SOURCE_PATCH_UNAPPROVED.diff"
+                    self.assertEqual(patchfile.is_file(),is_macos)
+                    if is_macos:
+                        self.assertEqual(
+                            result["reproducible_macos_source_patch_sha256"],
+                            hashlib.sha256(patchfile.read_bytes()).hexdigest())
                     self.assertEqual((folder/native_name).read_bytes(),blob)
                     self.assertIn("mednafen/snes_faust/snes.cpp",
                                   tarfile.open(folder/result["source_archive"],"r:gz").getnames())
@@ -107,6 +129,7 @@ class SupafaustFourOSContracts(unittest.TestCase):
         for criterion in ("native_video_frames","native_nonzero_pcm_values","distinct_rgb_frames"):
             self.assertIn(criterion,workflow)
         self.assertIn("capture_v30_supafaust_source",workflow)
+        self.assertIn("patch_v30_supafaust_macos_semaphore",workflow)
         self.assertIn("probe_snes_homebrew.py",workflow)
         self.assertNotIn("gh release create",workflow)
         self.assertNotIn("APPROVED-IMMUTABLE-PRODUCTION",workflow)
