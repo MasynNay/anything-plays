@@ -66,7 +66,7 @@ for SIZE in 16 32 128 256 512; do
   DOUBLE=$((SIZE * 2))
   sips -z "$DOUBLE" "$DOUBLE" build/v21-icon/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o ${APP_BUNDLE}/Contents/Resources/AnythingPlays.icns
+iconutil -c icns "$ICONSET" -o "$APP_BUNDLE/Contents/Resources/AnythingPlays.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" ${APP_BUNDLE}/Contents/Info.plist
 mkdir -p ${APP_BUNDLE}/Contents/Resources/cores
 CORE_LIST=(mgba snes9x)
@@ -78,16 +78,16 @@ fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
-  cp "$core" ${APP_BUNDLE}/Contents/Resources/cores/
+  cp "$core" "$APP_BUNDLE/Contents/Resources/cores/"
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
-cp cores/CORE_PROVENANCE.json ${APP_BUNDLE}/Contents/Resources/cores/
+cp cores/CORE_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   # Dolphin's self-contained core needs compatibility tables under Sys/.
   # Ship them with the signed app; never ask the player to download them.
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
-  cp -R cores/dolphin-emu ${APP_BUNDLE}/Contents/Resources/cores/
-  cp cores/DOLPHIN_SYS_PROVENANCE.json ${APP_BUNDLE}/Contents/Resources/cores/
+  cp -R cores/dolphin-emu "$APP_BUNDLE/Contents/Resources/cores/"
+  cp cores/DOLPHIN_SYS_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
 fi
 # Required for Finder launches: macOS kills camera-using apps without this key.
 PLIST="${APP_BUNDLE}/Contents/Info.plist"
@@ -111,17 +111,17 @@ cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
-"$PYTHON" verify_bundle.py --check-native macos ${APP_BUNDLE}
+"$PYTHON" verify_bundle.py --check-native macos "$APP_BUNDLE"
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
-  .build-venv/bin/python tools/probe_embedded_3d.py macos ${APP_BUNDLE}
+  .build-venv/bin/python tools/probe_embedded_3d.py macos "$APP_BUNDLE"
 fi
 # Sign the outer application only. --deep would mutate nested Libretro dylibs
 # after their SHA-256 values were recorded in CORE_PROVENANCE.json.
-codesign --force --sign - ${APP_BUNDLE}
+codesign --force --sign - "$APP_BUNDLE"
 # Verify again after signing; reject even a successfully signed but modified
 # bundle instead of shipping a DMG with invalid core provenance.
-"$PYTHON" verify_bundle.py --check-native macos ${APP_BUNDLE}
-codesign --verify --verbose=2 ${APP_BUNDLE}
+"$PYTHON" verify_bundle.py --check-native macos "$APP_BUNDLE"
+codesign --verify --verbose=2 "$APP_BUNDLE"
 mkdir -p release
 # CI's shared macOS disk-image service intermittently returns Resource busy
 # after a clean ad-hoc signed bundle. Retry ONLY the DMG mount operation:
@@ -131,7 +131,7 @@ DMG_READY=0
 for ATTEMPT in 1 2 3 4; do
   rm -f "$DMG"
   if hdiutil create -volname "$DMG_VOLUME" \
-      -srcfolder ${APP_BUNDLE} -ov -format UDZO "$DMG"; then
+      -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG"; then
     DMG_READY=1
     break
   fi
