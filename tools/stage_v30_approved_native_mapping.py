@@ -12,12 +12,12 @@ import json
 from pathlib import Path
 
 from anything_plays.v30_approved_core_map import (
-    EXPECTED, REPOSITORIES, MARKER, STATUS, WINDOWS_RUNTIME, _require_hash,
-    validate_installed_map,
+    EXPECTED, REPOSITORIES, EIGHT_EXPECTED, EIGHT_REPOSITORIES,
+    MARKER, STATUS, WINDOWS_RUNTIME, _require_hash, validate_installed_map,
 )
 from tools.v30_release_lock import (
-    ALTERNATIVE_CORE_NAMES, selected_core_set,
-    TARGETS, load_approved_lock,
+    ALTERNATIVE_CORE_NAMES, selected_core_set, selected_source_families,
+    SOURCE_BUILT_EIGHT, TARGETS, load_approved_lock,
 )
 
 EXT = {
@@ -44,18 +44,24 @@ def approved_core_map_from_lock(lock, target):
     cores = row.get("cores")
     if not isinstance(cores, dict) or set(cores) != ALTERNATIVE_CORE_NAMES:
         raise ValueError("Source-reviewed production core inventory does not have 11 names")
+    eight = selected_source_families(lock) == SOURCE_BUILT_EIGHT
+    expected = EIGHT_EXPECTED if eight else EXPECTED
+    repositories = EIGHT_REPOSITORIES if eight else REPOSITORIES
     result = {
         "schema_version": 1, "status": STATUS,
-        "core_set_id": "gpl-source-built-alternative",
+        "core_set_id": lock.get("core_set_id"),
         "all_console_profiles": 18, "native_core_count": 11,
         "legacy_noncommercial_native_binaries_excluded": True,
         "cores": {}, "runtime_dependencies": {},
     }
+    if eight:
+        result["eight_source_built_families_reviewed"] = True
+        result["three_unchanged_native_families_reviewed"] = True
     ext = EXT[target]
-    for name, source in EXPECTED.items():
+    for name, source in expected.items():
         core = cores[name]
         if (core.get("source_commit_sha") != source
-                or core.get("upstream_source_repository") != REPOSITORIES[name]
+                or core.get("upstream_source_repository") != repositories[name]
                 or core.get("file") != f"{name}_libretro{ext}"
                 or core.get("corresponding_source_verified") is not True
                 or core.get("redistribution_approved") is not True):
@@ -66,7 +72,7 @@ def approved_core_map_from_lock(lock, target):
             "native_filename": core["file"],
             "native_sha256": core["native_sha256"],
             "source_commit": source,
-            "source_repository": REPOSITORIES[name],
+            "source_repository": repositories[name],
             "license_notice_sha256": core["original_license_notice_sha256"],
         }
     if target == "windows-x86_64":
@@ -101,7 +107,7 @@ def stage_approved_map(lock, target, core_dir, archive_dir):
         runtime_payload = path.read_bytes()
         if hashlib.sha256(runtime_payload).hexdigest() != info["runtime_dependencies"][WINDOWS_RUNTIME]:
             raise ValueError("Windows source-built runtime differs from the REVIEWED immutable lock")
-    for name in EXPECTED:
+    for name in info["cores"]:
         original = folder / f"{name}_libretro{EXT[target]}"
         if original.exists() or original.is_symlink():
             raise ValueError("Approved core map must be staged BEFORE extracting replacement cores")
