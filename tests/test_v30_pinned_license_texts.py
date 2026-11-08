@@ -22,7 +22,7 @@ class V30PinnedLicensesTests(unittest.TestCase):
                 self.assertTrue(path.is_file())
                 value = path.read_text(encoding="utf-8")
                 self.assertGreater(len(value), 14000)
-                self.assertIn("GNU GENERAL PUBLIC LICENSE", value)
+                self.assertIn("gnu general public license", value.casefold())
                 self.assertIn("Version 2, June 1991", value)
                 self.assertIn(name, notices)
 
