@@ -27,6 +27,7 @@ This directory is the index for technical and release evidence. The [repository 
 | Controlled stable-release publication and production artifact assembly | [3.0 publication runbook](V3_PUBLICATION_RUNBOOK.md) |
 | Distinct 3.0 immutable native release lock | [Native production lock](V3_NATIVE_PRODUCTION_LOCK.md) |
 | Reviewer-ready cross-platform source evidence generator | [Native production lock: source review matrix](V3_NATIVE_PRODUCTION_LOCK.md#automated-draft-corresponding-source-review-matrix) |
+| Verified N64 empty submodules and eleven embedded source notices | [ParaLLEl-N64 pinned source review](V3_PARALLEL_N64_SOURCE_NOTICE_REVIEW.md) |
 
 The complete offline **3.0 preview** has passed four-platform packaging checks. It is not yet an approved public binary release. The [current stable release is 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
 
