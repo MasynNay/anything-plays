@@ -76,6 +76,13 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
   if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
   set "CORE_LIST=mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
 )
+REM An ACTUALLY APPROVED production build must take its names from the
+REM independently reviewed 11-core lock, not the original NC hardcoded list.
+if "%AP_V30_APPROVED_RELEASE%"=="1" (
+  set "CORE_LIST="
+  for /f "usebackq delims=" %%L in (`python -m tools.v30_release_lock --print-approved-core-names`) do set "CORE_LIST=%%L"
+  if not defined CORE_LIST exit /b 1
+)
 for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
   copy /Y "cores\%%C_libretro.dll" "dist\AnythingPlays\cores\" >nul
