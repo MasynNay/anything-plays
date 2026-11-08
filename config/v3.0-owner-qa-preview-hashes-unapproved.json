@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "REVIEWER-HASHED-FOUR-OS-INSTALLERS-UNAPPROVED",
+  "source_revision": "7004115e7b9d57a3ef8f44062e134a3b55410f25",
+  "targets": {
+    "windows-x64": {
+      "installer_filename": "AnythingPlaysSetup-3.0.0-alpha.1.exe",
+      "installer_sha256": "407cd9ccaed7b3e1a420b46847acc04e8c6207ba819da8f9c42ef6344f55d5ee",
+      "installer_size_bytes": 67893022
+    },
+    "linux-x64": {
+      "installer_filename": "anything-plays-preview_3.0.0~alpha1_amd64.deb",
+      "installer_sha256": "db38caa17f0fee117b63c6d616cb876da408b7d9a1b04d1f548e906a7ff7520d",
+      "installer_size_bytes": 100714864
+    },
+    "macos-arm64": {
+      "installer_filename": "AnythingPlays-3.0.0-alpha.1.dmg",
+      "installer_sha256": "ad079cbdb518e7f0a9e0e93c89544b17cbf0a3703878c0b365d72cea648fac25",
+      "installer_size_bytes": 107319945
+    },
+    "macos-x86_64": {
+      "installer_filename": "AnythingPlays-3.0.0-alpha.1.dmg",
+      "installer_sha256": "f83aca8dd3965c60aeb690c2a8a8b862239131a8e3ed705fd3a5c1df10ec14f8",
+      "installer_size_bytes": 94451784
+    }
+  },
+  "binary_to_source_independently_reviewed": false,
+  "external_license_rights_approved": false,
+  "public_release_approved": false
+}
