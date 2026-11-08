@@ -9,6 +9,8 @@ on:
     branches: [feature/v3.0-unified-test]
     paths:
       - '.github/workflows/v30-full-bundle.yml'
+      - 'packaging/build_macos_dmg.sh'
+      - 'tests/test_v30_macos_dmg_mount_retry.py'
       - 'tools/probe_v30_installed_offline_cores.py'
       - 'tests/test_v30_offline_runtime_cores.py'
       - 'anything_plays/core_locator.py'
