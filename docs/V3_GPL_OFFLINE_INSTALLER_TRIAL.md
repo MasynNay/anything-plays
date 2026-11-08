@@ -30,3 +30,26 @@ The full real-device playtesting also remains mandatory: camera movement, sound 
 ## Scope of noncontact
 
 Per the owner's explicit instruction, **no upstream rights-holder contacts, GitHub issues in outside repositories, licensing emails or requests to anyone else will be sent**. The engineering work proceeds independently within the owner's repository. Stable public v2.0.0 remains available; a lawful full offline v3.0.0 binary awaits genuine technical, licensing, source and physical acceptance.
+
+## Verified complete four-platform actual packaged-app tests — November 8, 2026
+
+[Original complete 18-profile/11-core GPL-alternative offline lab run 42503215322](https://github.com/MasynNay/anything-plays/actions/runs/42503215322) **PASSED ALL FOUR JOBS** on the true Windows x64, Linux x64, macOS Apple Silicon and Intel Mac runners. The same commit's [normal original offline installer regression run 42503215187](https://github.com/MasynNay/anything-plays/actions/runs/42503215187) and [source CI 42503215279](https://github.com/MasynNay/anything-plays/actions/runs/42503215279) also passed. The genuine executable Windows installer, Linux DEB and both macOS DMGs were built **locally in their isolated workflow runners**, with all eleven newly staged native cores and original Dolphin Sys. Only the seven research JSON reports per host were archived; no unapproved binary installer was published or uploaded as an artifact.
+
+The original four source-independent evidence ZIPs were downloaded and individually inspected: each archive has *exactly seven* JSON reports, an original source/native staging manifest, the complete installed-core SHA-256 provenance and exactly five original nonretail SNES/Sega A/V reports. No ZIP contains a game ROM, native core library, or installer. Every installed candidate report has `installed_core_count=11`, `console_profiles=18`, original Dolphin Sys verified, genuine `mednafen_supafaust` + `blastem` core identities, zero `snes9x`/`genesis_plus_gx` binaries, and FALSE source/legal/physical release approval.
+
+| Actual host | Original research-only artifact ID | Original evidence ZIP SHA-256 | Authentic installed native SNES/SMS/GG/SG1000/Genesis frame counts | Native tests |
+| --- | ---: | --- | --- | --- |
+| Windows x64 | 13626032695 | `c2abca16ff73910b303ef682f116444985d63401bdf663416c1871e51fb3b062` | 358 / 359 / 360 / 359 / 360 | 5/5 passed |
+| Linux x64 | 13626745972 | `bb27a71a96e8b8a46ba4d782600b601cbd6c96d06c7914bacd3a9b41076f10c1` | 359 / 360 / 360 / 360 / 360 | 5/5 passed |
+| macOS ARM64 | 13626357814 | `0480c47dfc64fe8922d6ba63446b329ab753a96a423720421deb46d94019920a` | 360 / 360 / 360 / 361 / 364 | 5/5 passed |
+| macOS Intel | 13626890568 | `addbffe49d68478f82e4561616d0e4184f726f074f92d9ba3226fd77cba9e557` | 363 / 365 / 368 / 367 / 363 | 5/5 passed |
+
+**All 20/20 individual original SNES/four Sega installed-library video and native PCM checks passed**, each with real exit code zero, changing video and nonzero PCM. These tests measure native emulator callback results, **not** physical speaker playback or installed-game full compatibility. Existing base full-offline QA checks the remaining nine cores and Dolphin Sys, but the new alternative lab's explicit A/V loop covers only the five replaced console profiles. Signed Windows and Apple-notarized Mac releases are not claimed.
+
+### Windows no-extra-download runtime
+
+The newly compiled Windows Supafaust and BlastEm libraries require the MinGW `libwinpthread-1.dll` runtime in addition to ordinary Windows system DLLs. The trial now copies the actual original MSYS2 MINGW64 runtime byte-for-byte with SHA-256 in the test manifest and Windows installer, validates its integrity before loading a core, and permanently registers **only that verified installed core directory** using `os.add_dll_directory`. The original installer no longer needs a separately installed MSYS2 runtime to inspect or launch the alternative cores. An early test exposed the missing dependency, which was fixed rather than suppressed. The upstream [Winpthreads COPYING](https://github.com/mingw-w64/mingw-w64/blob/master/mingw-w64-libraries/winpthreads/COPYING) grants permissive rights subject to copyright/notice reproduction; the exact verbatim original notice is tracked at `licenses/Winpthreads-COPYING.txt` and is required by `verify_bundle.py` on Windows trial builds. The exact corresponding MSYS2 runtime package revision and all transitive compiler dependencies still need formal complete-corresponding-source review before any stable binary distribution.
+
+### QA and rights still strictly withheld
+
+The test-only marker includes explicit `public_binary_distribution_approved=false`, `combined_gpl_license_reviewed=false`, `production_core_substitution_approved=false`, `physical_qa_approved=false`. Neither the source GPLv2+/GPLv3 test successes nor a permissively licensed MinGW runtime resolve the separate GPLv2-only vs GPLv3-only library compatibility review for other emulators. The exact source correspondence for the other nine binaries plus full Dolphin Sys still needs final review. The app cannot be called a production release until genuine physical camera/controller/speaker/save/endurance review and complete source/license decisions. **No outside repository contacts or permission requests are made.**
