@@ -36,7 +36,7 @@ class V30WorkflowPathTests(unittest.TestCase):
             "tests/test_zone_label_sizing.py",
         ):
             with self.subTest(path=path):
-                self.assertIn(f"'{{path}}'".replace("{{path}}", path), workflow)
+                self.assertIn(f"'{path}'", workflow)
                 self.assertTrue((ROOT / path).is_file())
 
 
