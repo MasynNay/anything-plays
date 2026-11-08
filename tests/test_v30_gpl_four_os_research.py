@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
+import io
+import subprocess
+import tarfile
 import unittest
 
-from tools.capture_v30_gpl_alternative_source_build import SOURCE, EXT
+from tools.capture_v30_gpl_alternative_source_build import SOURCE, EXT, _git
 
 
 class FourPlatformGPLSourceContracts(unittest.TestCase):
@@ -86,6 +90,41 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
             self.assertIn(name,workflow)
         self.assertIn("all(p.is_file() for p in reports)",workflow)
         self.assertNotIn("where.glob('*_AV_UNAPPROVED.json')",workflow)
+
+    def test_pinned_source_archive_is_unsmudged_git_blob_even_with_autocrlf_true(self):
+        # Git for Windows source archives are otherwise CRLF-smudged even
+        # though the exact same immutable commit is used on Linux/macOS.
+        # Prove raw git committed content is the archive source content.
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def run(*args):
+                return subprocess.run(
+                    ["git","-C",str(root),*args],
+                    check=True,capture_output=True,
+                ).stdout
+            run("init","-q")
+            run("config","user.name","Source regression")
+            run("config","user.email","source-regression@example.invalid")
+            run("config","core.autocrlf","true")
+            source=root/"ORIGINAL_LICENSE.txt"
+            source.write_bytes(b"GNU GENERAL PUBLIC LICENSE\\nVersion 3\\nOriginal blob.\\n".replace(b"\\\\n",b"\\n"))
+            run("add","ORIGINAL_LICENSE.txt")
+            run("commit","-qm","source input")
+            committed=run("show","HEAD:ORIGINAL_LICENSE.txt")
+            self.assertIn(b"\\n",committed)
+            original_archive=_git(root,"archive","--format=tar","HEAD",binary=True)
+            with tarfile.open(fileobj=io.BytesIO(original_archive),mode="r:") as t:
+                smudged=t.extractfile("ORIGINAL_LICENSE.txt").read()
+            self.assertEqual(smudged.replace(b"\\r\\n",b"\\n"),committed)
+            canonical=_git(root,"-c","core.autocrlf=false",
+                           "archive","--format=tar","HEAD",binary=True)
+            with tarfile.open(fileobj=io.BytesIO(canonical),mode="r:") as t:
+                stored=t.extractfile("ORIGINAL_LICENSE.txt").read()
+            self.assertEqual(stored,committed)
+            self.assertNotIn(b"\\r\\n",stored)
+            actual_tool=(Path(__file__).resolve().parents[1]/
+                         "tools/capture_v30_gpl_alternative_source_build.py").read_text("utf-8")
+            self.assertIn('"core.autocrlf=false"',actual_tool)
 
     def test_genesis_variant_must_be_platform_native_not_elf_on_windows(self):
         root=Path(__file__).resolve().parents[1]
