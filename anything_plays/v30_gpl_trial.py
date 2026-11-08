@@ -213,7 +213,8 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
     # its old unverified buildbot native as an independently sourced binary.
     mgba = info.get("source_built_mgba")
     if mgba is not None:
-        from tools.capture_v30_mgba_original_source import SOURCE_REVISION, SOURCE_REPOSITORY
+        SOURCE_REVISION = "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"
+        SOURCE_REPOSITORY = "https://github.com/libretro/mgba"
         if (remaining is None or pce is None or not isinstance(mgba, dict)
                 or mgba.get("source_repository") != SOURCE_REPOSITORY
                 or mgba.get("source_commit") != SOURCE_REVISION
