@@ -87,3 +87,42 @@ The production gates in `tools/check_v30_source_gate.py`,
 `tools/check_v30_release.py`, and `config/v3.0-core-lock.json`
 remain fail-closed. Stable public 3.0 must not be published on the
 strength of this research alone.
+
+## Actual independent three-source capture result — verified
+
+[PR #69](https://github.com/MasynNay/anything-plays/pull/69)
+**merged** after [source regression run 42452594655](https://github.com/MasynNay/anything-plays/actions/runs/42452594655)
+and [real nested source capture run 42452594761](https://github.com/MasynNay/anything-plays/actions/runs/42452594761)
+both completed **SUCCESS** on the exact reviewed PR head
+`09e4a4dc4297967824c67b034c0cc7904aef8531`.
+The source CI ran Python 3.12/3.13 and native mGBA compatibility
+successfully; source-only build changes correctly skipped three
+unaffected package jobs.
+
+The actual test-only GitHub Actions archive
+`AnythingPlays-3.0.0-DOLPHIN-THREE-NESTED-SOURCES-UNAPPROVED`
+(artifact ID `13606560568`) was **downloaded and independently
+rehash-verified**. It contains exactly **five** files: the three original
+immutable source TAR.GZ files, one reviewer JSON and SHA256SUMS.txt.
+All four checksum entries (three TARs and reviewer JSON) match actual
+downloaded bytes.
+
+| Exact additional source snapshot | Actual TAR bytes | Actual TAR SHA-256 |
+| --- | ---: | --- |
+| `cmake/sanitizers-cmake` at `aab6948...` | 7,234 | `9f5b073625375322236a94ce8d2d803cdedad321c91e63845f487b9ebfb2c433` |
+| `googletest` at `40412d8...` | 868,503 | `ff9fb47ea9e2cb4dc0f30956a2f3b5e42dde67b06f33241d22ac255e5981eda0` |
+| `lib/linkernsbypass` at `aa39758...` | 5,656 | `da1128c8aa771c4d24766b53a47822d0717baa5c536ca8491220402942b80638` |
+
+All three source archives contained a candidate root `LICENSE`
+file; the archived JSON records their exact contents' SHA-256,
+but this is **not** a license compatibility determination or proof those
+dependencies are compiled into the distributed Dolphin Libretro core.
+
+**Result:** pinned Git-submodule source candidates captured and
+verified: **34 direct + 3 nested = 37**. No deeper Gitlinks at
+these immutable child revisions. The original binary/source
+correspondence, runtime-specific build graph, additional external
+build tool dependencies, Dolphin Sys rights and mixed GPL/noncommercial
+permission remain independently unapproved. Do not promote this source
+audit to `corresponding_source_inventory_verified=true` or publish stable
+v3.0 on its strength.
