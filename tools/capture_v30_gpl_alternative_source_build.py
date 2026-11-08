@@ -88,7 +88,14 @@ def capture_source_built_candidate(*, source, native, output, candidate, target)
     native_bytes=native.read_bytes()
     if not any(native_bytes.startswith(sig) for sig in MAGIC[EXT[target]]):
         raise ValueError("Compiled library format differs from requested platform")
-    tar=_git(root,"archive","--format=tar","HEAD",binary=True)
+    # Git for Windows with core.autocrlf=true *converts the bytes that
+    # git archive exports*, despite the immutable commit being identical.
+    # Independent 4-OS review detected 1285 CRLF-smudged text files in
+    # its Windows archive while Linux/ARM/Intel retained canonical LF.
+    # This flag is local to this archive command and does NOT alter any
+    # upstream source tree or the actual native compilation checkout.
+    tar=_git(root,"-c","core.autocrlf=false",
+             "archive","--format=tar","HEAD",binary=True)
     if not tar or len(tar)>200*1024*1024:
         raise ValueError("Upstream pinned git archive unavailable or excessive")
     with tarfile.open(fileobj=io.BytesIO(tar),mode="r:") as archive:
