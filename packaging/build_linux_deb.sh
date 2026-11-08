@@ -3,6 +3,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="${VERSION:-3.0.0~alpha1}"
 ARCH="$(dpkg --print-architecture)"
+PACKAGE_NAME="anything-plays-preview"
+INSTALL_ID="anything-plays-30-preview"
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" == "1" ]] || { echo "Production requires AP_RELEASE_BUILD=1"; exit 1; }
+  [[ -n "${AP_CORE_ARCHIVE_DIR:-}" ]] || { echo "Production requires pinned AP_CORE_ARCHIVE_DIR"; exit 1; }
+  python3 tools/check_v30_release.py
+  python3 -c 'from tools.v30_release_lock import load_approved_lock; load_approved_lock()'
+  VERSION="3.0.0"
+  PACKAGE_NAME="anything-plays"
+  INSTALL_ID="anything-plays"
+fi
+OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip==26.3
@@ -66,7 +78,7 @@ if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1"
   .build-venv/bin/python tools/probe_embedded_3d.py linux dist/AnythingPlays
 fi
 
-PKG="build/deb/anything-plays-preview_${VERSION}_${ARCH}"
+PKG="build/deb/${PACKAGE_NAME}_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-30-preview" "$PKG/usr/bin" "$PKG/usr/share/applications"
 cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-30-preview/"
