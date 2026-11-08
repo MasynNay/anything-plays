@@ -1,0 +1,475 @@
+name: Anything Plays 3.0 | 9 original-source cores in full 18-console offline preview
+# Engineering research only: source-built SNES/Sega with TRUE native identities.
+# All 18 console profiles / 11 core slots preserved. Absolutely NO public
+# release, native ZIP, ROM/BIOS or unapproved installer uploaded.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-nine-source-offline-integration.yml'
+      - 'tools/stage_v30_nine_source_inputs.py'
+      - 'tests/test_v30_nine_source_staging.py'
+      - 'tools/capture_v30_mgba_original_source.py'
+      - 'tools/stage_v30_eight_source_inputs.py'
+      - 'tools/capture_v30_2d_five_source_build.py'
+      - 'tests/test_v30_eight_source_staging.py'
+      - 'tests/test_v30_real_frozen_startup.py'
+      - 'tools/probe_v30_installed_desktop_window.py'
+      - 'app.py'
+      - 'tools/stage_v30_gpl_trial_inputs.py'
+      - 'tools/v30_pce_candidate.py'
+      - 'config/v3.0-pce-pinned-source-candidates.json'
+      - 'tools/probe_v30_installed_switch.py'
+      - 'tests/test_v30_installed_switch.py'
+      - 'tests/test_v30_gpl_trial_lifetime.py'
+      - 'anything_plays/v30_gpl_trial.py'
+      - 'anything_plays/core_locator.py'
+      - 'fetch_mgba_core.py'
+      - 'verify_bundle.py'
+      - 'app.py'
+      - 'anything_plays/frozen_gui_smoke.py'
+      - 'tools/probe_v30_frozen_gui_launch.py'
+      - 'tests/test_v30_real_frozen_gui_launch.py'
+      - 'packaging/**'
+      - 'tests/test_v30_gpl_full_offline_trial.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v30-nine-pinned-original-offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  complete-offline-18-profile-11-core-lab:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, target: windows-x64, ext: dll, platform: windows}
+          - {runner: ubuntu-24.04, target: linux-x64, ext: so, platform: linux}
+          - {runner: macos-15, target: macos-arm64, ext: dylib, platform: macos}
+          - {runner: macos-15-intel, target: macos-x64, ext: dylib, platform: macos}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_TEST_CORES: '1'
+      AP_V30_GPL_TRIAL: '1'
+      AP_V30_PINNED_PCE: '1'
+      AP_V30_PINNED_FIVE: '1'
+      FIVE_SOURCE_RUN_ID: '42515151314'
+      MGBA_SOURCE_RUN_ID: '42527449154'
+      AP_V30_PINNED_MGBA: '1'
+      AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/gpl-trial-native-inputs
+      GH_TOKEN: ${{ github.token }}
+      TARGET: ${{ matrix.target }}
+      EXT: ${{ matrix.ext }}
+      PLATFORM: ${{ matrix.platform }}
+      OLD_INPUT_RUN_ID: '42437133733'
+      GPL_SNES_RUN_ID: '42494297281'
+      GPL_SEGA_RUN_ID: '42496671418'
+      PINNED_PCE_RUN_ID: '42444367068'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require exact original successful upstream-source research and local fail-closed unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$OLD_INPUT_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$GPL_SNES_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$GPL_SEGA_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$PINNED_PCE_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$FIVE_SOURCE_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$MGBA_SOURCE_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$MGBA_SOURCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)"
+          python -m unittest discover -s tests -p 'test_v30_nine_source_staging.py' -v
+          test "$(gh run view "$FIVE_SOURCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)"
+          python -m unittest discover -s tests -p 'test_v30_eight_source_staging.py' -v
+          test "$(gh run view "$PINNED_PCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | PCE pinned-source replacement research"
+          test "$(gh run view "$OLD_INPUT_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Complete offline installer lab"
+          test "$(gh run view "$GPL_SNES_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate"
+          test "$(gh run view "$GPL_SEGA_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform pinned GPL candidate research"
+          # Regression of the original two-family trial must remain valid
+          # without a pinned PCE original research artifact supplied.
+          AP_V30_PINNED_PCE=0 python -m unittest discover -s tests -p 'test_v30_gpl_full_offline_trial.py' -v
+          python -m unittest discover -s tests -p 'test_v30_gpl_pce_pinned_full_trial.py' -v
+          python -m unittest discover -s tests -p 'test_v30_installed_switch.py' -v
+          python -m unittest discover -s tests -p 'test_v30_gpl_trial_lifetime.py' -v
+      - name: Retrieve 12 verified original offline build inputs and both source-built GPL alternative core families
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$OLD_INPUT_RUN_ID" --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" --dir original-native-inputs
+          gh run download "$GPL_SNES_RUN_ID" --name "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" --dir source-built-snes
+          gh run download "$GPL_SEGA_RUN_ID" --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" --dir source-built-sega
+          gh run download "$PINNED_PCE_RUN_ID" --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" --dir source-built-pce
+          gh run download "$MGBA_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-mgba
+          for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+            gh run download "$FIVE_SOURCE_RUN_ID" \
+              --name "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
+              --dir "source-built-five/$name"
+          done
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile,ZIP_STORED
+          source=Path("source-built-pce")
+          members=sorted(source.iterdir())
+          assert len(members)==6 and all(p.is_file() and not p.is_symlink() for p in members)
+          with ZipFile("original-source-built-pce.zip","w",ZIP_STORED) as z:
+              for p in members: z.write(p,arcname=p.name)
+          PY
+          (cd source-built-snes && sha256sum -c SHA256SUMS.txt)
+          (cd source-built-sega && sha256sum -c SHA256SUMS.txt)
+      - name: Install exact Windows MinGW native runtime (source-built research dependency)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Preserve original native winpthread runtime in explicit trial input directory
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          test -s /mingw64/bin/libwinpthread-1.dll
+          cp /mingw64/bin/libwinpthread-1.dll research-winpthread-1.dll
+          test -s research-winpthread-1.dll
+      - name: Replace exactly two NC core families with genuine separately named GPL source-built originals
+        shell: bash
+        run: |
+          set -euo pipefail
+          # macOS ships Bash 3.2; an empty array with set -u produces
+          # an unbound-variable failure. Use a single optional safe token.
+          WIN_RUNTIME_ARG=""
+          if [[ "$TARGET" == "windows-x64" ]]; then
+            WIN_RUNTIME_ARG="--windows-runtime=research-winpthread-1.dll"
+          fi
+          python -m tools.stage_v30_nine_source_inputs \
+            --original-dir original-native-inputs \
+            --snes-dir source-built-snes --sega-dir source-built-sega \
+            --pce-artifact original-source-built-pce.zip \
+            --mgba-dir source-built-mgba \
+            --fceumm-dir source-built-five/fceumm \
+            --stella2014-dir source-built-five/stella2014 \
+            --prosystem-dir source-built-five/prosystem \
+            --mednafen-ngp-dir source-built-five/mednafen_ngp \
+            --mednafen-wswan-dir source-built-five/mednafen_wswan \
+            --target "$TARGET" \
+            --output gpl-trial-native-inputs \
+            --evidence test-evidence/ORIGINAL_9_SOURCE_BUILT_NATIVE_STAGING_UNAPPROVED.json \
+            ${WIN_RUNTIME_ARG:+$WIN_RUNTIME_ARG}
+      - name: Install Windows source-accurate packaging compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux complete offline package builder
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Build actual Windows offline GUI installer (test-only)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Build actual Linux offline GUI DEB (test-only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build actual Mac offline GUI DMG (test-only)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Cold-launch the ACTUAL packaged Anything Plays Tk GUI on real OS, not just its Libretro cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Linux GUI processes need the actual X server equivalent; the
+          # existing Linux runner installed xvfb but previously never used
+          # it to launch the compiled PyInstaller window.
+          if [[ "$TARGET" == linux-x64 ]]; then
+            xvfb-run -a -s "-screen 0 1600x900x24" \
+              python tools/probe_v30_frozen_gui_launch.py \
+                --target "$TARGET" \
+                --report test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json
+          else
+            python tools/probe_v30_frozen_gui_launch.py \
+              --target "$TARGET" \
+              --report test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("test-evidence/ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json")
+          item=json.loads(p.read_text("utf-8"))
+          assert item["passed"] is True,item.get("error")
+          assert item["frozen_ui_initialized"] is True
+          assert item["original_console_profiles"]==18
+          assert item["native_exit_code"]==0
+          assert item["child_original_tk_report"]["frozen_binary"] is True
+          assert item["child_original_tk_report"]["actual_tk_mainloop_ran"] is True
+          for flag in ("public_binary_distribution_approved","license_review_approved",
+                       "camera_hardware_tested","physical_qa_approved"):
+            assert item[flag] is False, flag
+          print("ACTUAL FROZEN APP Tk UI WINDOW LAUNCHED ON",item["target"],"; public/QA flags FALSE")
+          PY
+      - name: Open actual frozen Anything Plays desktop window and run Tk App startup on each OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.probe_v30_installed_desktop_window \
+            --platform "$TARGET" \
+            --report "test-evidence/ACTUAL_FROZEN_DESKTOP_UI_LAUNCH_UNAPPROVED.json" \
+            --timeout 65
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("test-evidence/ACTUAL_FROZEN_DESKTOP_UI_LAUNCH_UNAPPROVED.json").read_text("utf-8"))
+          assert report["passed"] is True and report["actual_tk_window_started"] is True
+          assert report["actual_app_initialized"] is True and report["actual_tk_mainloop_ran"] is True
+          assert report["console_profile_count"]==18 and report["frozen_binary"] is True
+          assert report["camera_hardware_tested"] is False
+          assert report["gameplay_hardware_tested"] is False
+          assert report["physical_qa_approved"] is False
+          assert report["public_distribution_approved"] is False
+          print("Real packaged executable spawned and actual Tk App user interface entered event loop")
+          PY
+      - name: Check all 18 profiles, 11 REAL embedded native images, source pins and absent noncommercial binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          from anything_plays.systems import SYSTEMS
+          from anything_plays.v30_gpl_trial import validate_trial_core_directory,MARKER
+          from fetch_mgba_core import V30_GPL_TRIAL_CORES
+          from unittest import mock
+          from anything_plays import core_locator
+          target=os.environ["TARGET"];ext="."+os.environ["EXT"]
+          cores=(Path("dist/AnythingPlays30Preview.app/Contents/Resources/cores")
+                 if target.startswith("macos") else Path("dist/AnythingPlays/cores"))
+          assert len(SYSTEMS)==18 and len(V30_GPL_TRIAL_CORES)==11
+          trials=validate_trial_core_directory(cores,ext)
+          assert trials["native_core_count"]==11 and trials["all_console_profiles"]==18
+          assert trials["original_unchanged_core_archives"]==2
+          assert trials["total_source_built_core_families"]==9
+          assert trials["source_built_mgba"]["source_commit"]=="7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"
+          assert trials["source_built_mgba"]["source_build_run_id"]==42527449154
+          assert trials["five_source_family_run_id"]==42515151314
+          assert set(trials["source_built_remaining_five"])=={
+            "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan"
+          }
+          assert trials["source_built_pce"]["old_unknown_source_nightly_substituted"] is True
+          assert trials["source_built_pce"]["source_commit"]=="2de1ce1c3f237b161c126c54ba407990bb86d1e9"
+          manifest=json.loads((cores/"CORE_PROVENANCE.json").read_text("utf-8"))
+          rows={record["name"]:record for record in manifest["cores"]}
+          assert set(rows)==set(V30_GPL_TRIAL_CORES)
+          for name,row in rows.items():
+              native=cores/f"{name}_libretro{ext}"
+              assert native.is_file() and hashlib.sha256(native.read_bytes()).hexdigest()==row["sha256"]
+          for name in ("mednafen_supafaust","blastem"):
+              assert rows[name]["sha256"]==trials["alternatives"][name]["native_sha256"]
+          assert rows["mednafen_pce_fast"]["sha256"] == trials["source_built_pce"]["native_sha256"]
+          assert rows["mgba"]["sha256"] == trials["source_built_mgba"]["native_sha256"]
+          for name in ("fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan"):
+              assert rows[name]["sha256"]==trials["source_built_remaining_five"][name]["native_sha256"]
+          assert not list(cores.glob("snes9x_libretro.*"))
+          assert not list(cores.glob("genesis_plus_gx_libretro.*"))
+          for system,core in (("snes","mednafen_supafaust"),("genesis","blastem"),
+                              ("mastersystem","blastem"),("gamegear","blastem"),("sg1000","blastem")):
+              with mock.patch.object(core_locator,"_search_directories",return_value=[cores]):
+                  found=core_locator.find_core(system)
+                  assert Path(found).name==f"{core}_libretro{ext}"
+          assert trials["public_binary_distribution_approved"] is False
+          assert (Path("dist/AnythingPlays30Preview.app/Contents/Resources/licenses/MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt") if target.startswith("macos") else Path("dist/AnythingPlays/licenses/MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt")).is_file()
+          assert trials["combined_gpl_license_reviewed"] is False
+          assert trials["physical_qa_approved"] is False
+          print(f"{target}: full 18-console/11-native-core installer staged; NC library payloads absent, rights FALSE")
+          evidence={
+              "target":target,"status":"UNAPPROVED-OFFLINE-INSTALLER-GPL-ALTERNATIVE-REAL-4OS",
+              "installed_core_count":11,"console_profiles":18,"actual_core_sha256":
+              {name:row["sha256"] for name,row in sorted(rows.items())},
+              "source_alternative_manifest_sha256":hashlib.sha256((cores/MARKER).read_bytes()).hexdigest(),
+              "dolphin_sys_bundled":(cores/"dolphin-emu/Sys/codehandler.bin").is_file(),
+              "source_provenance_recorded":True,
+              "physical_hardware_acceptance":False,
+              "legal_review_and_redistribution_approved":False,
+              "unapproved_installer_uploaded":False,
+          }
+          Path("test-evidence/INSTALLED_GPL_ALTERNATIVE_PROVENANCE_UNAPPROVED.json").write_text(
+              json.dumps(evidence,indent=2,sort_keys=True)+"\n","utf-8")
+          PY
+      - name: Install original project-native A/V test dependencies (the packaged app already built)
+        run: python -m pip install -r requirements.txt
+      - name: Run original native SNES PPU/SPC and four Sega VDP/PSG from ACTUAL installed images
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == "windows-x64" ]]; then
+            # Test against the SHA-checked PACKAGED runtime only, not an
+            # accidentally preinstalled system-wide MSYS2 dependency.
+            export AP_V30_MINGW_CI_DLL_DIR="$(python -c 'import os;print(os.path.join(os.getcwd(),"dist","AnythingPlays","cores"))')"
+            export PYTHONPATH="$(python -c 'import os;print(os.path.join(os.getcwd(),"tools","v30_windows_gpl_lab"))')"
+          fi
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_snes_homebrew.py \
+            --core "$CORE_DIR/mednafen_supafaust_libretro.$EXT" --seconds 6 \
+            --report test-evidence/ACTUAL_INSTALLED_SNES_NATIVE_AV_UNAPPROVED.json
+          for system in mastersystem gamegear sg1000; do
+            python tools/probe_sega8_homebrew.py \
+              --core "$CORE_DIR/blastem_libretro.$EXT" --system "$system" --seconds 6 \
+              --report "test-evidence/ACTUAL_INSTALLED_$system-NATIVE-AV_UNAPPROVED.json"
+          done
+          python tools/probe_v30_blastem_genesis_variant.py \
+            --core "$CORE_DIR/blastem_libretro.$EXT" --seconds 6 \
+            --report test-evidence/ACTUAL_INSTALLED_GENESIS_NATIVE_AV_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          folder=Path("test-evidence")
+          paths=[folder/"ACTUAL_INSTALLED_SNES_NATIVE_AV_UNAPPROVED.json",
+                 folder/"ACTUAL_INSTALLED_GENESIS_NATIVE_AV_UNAPPROVED.json"]
+          paths.extend(folder/f"ACTUAL_INSTALLED_{n}-NATIVE-AV_UNAPPROVED.json"
+                       for n in ("mastersystem","gamegear","sg1000"))
+          for path in paths:
+              item=json.loads(path.read_text("utf-8"))
+              assert item["passed"] is True and item["native_exit_code"]==0,path
+              assert item["details"]["passed"] is True,path
+          print("Five original, genuine source-built installed-core video and PCM probes passed")
+          PY
+      - name: Prove original MPL2 source-built mGBA GB GBC GBA A-V inside the actual desktop installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          for system in gb gbc; do
+            python tools/probe_gb_homebrew.py --system "$system" --core "$CORE_DIR/mgba_libretro.$EXT" --seconds 6 \
+              --report "test-evidence/ACTUAL_INSTALLED_${system}_SOURCE_MGBA_NATIVE_AV_UNAPPROVED.json"
+          done
+          python tools/probe_gba_homebrew.py --core "$CORE_DIR/mgba_libretro.$EXT" --seconds 6 \
+            --report test-evidence/ACTUAL_INSTALLED_gba_SOURCE_MGBA_NATIVE_AV_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for system in ("gb","gbc","gba"):
+              result=json.loads(Path(f"test-evidence/ACTUAL_INSTALLED_{system}_SOURCE_MGBA_NATIVE_AV_UNAPPROVED.json").read_text())
+              assert result["passed"] is True and result["native_exit_code"]==0,system
+          print("Actual installed ninth source-built MPL2 mGBA passed GB/GBC/GBA native A-V")
+          PY
+      - name: Prove genuine source-built PC Engine sound and video from FULLY INSTALLED offline core
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_pce_homebrew.py \
+            --core "$CORE_DIR/mednafen_pce_fast_libretro.$EXT" \
+            --seconds 10 \
+            --report test-evidence/ACTUAL_INSTALLED_PINNED_PCE_NATIVE_AV_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("test-evidence/ACTUAL_INSTALLED_PINNED_PCE_NATIVE_AV_UNAPPROVED.json").read_text())
+          assert x["passed"] is True and x["details"]["passed"] is True
+          assert x["details"]["native_video_frames"] >= 30
+          assert x["details"]["native_nonzero_pcm_samples"] > 100
+          print("ACTUAL installed source-verified PCE original HuCard + PSG PCM passed")
+          PY
+      - name: Exercise ACTUAL installed five newly source-built NES/Atari/NGPC/WonderSwan cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_nes_homebrew.py --core "$CORE_DIR/fceumm_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_NES_SOURCE_RESEARCH_UNAPPROVED.json
+          python tools/probe_atari_homebrew.py --core "$CORE_DIR/stella2014_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_ATARI2600_SOURCE_RESEARCH_UNAPPROVED.json
+          python tools/probe_atari7800_homebrew.py --core "$CORE_DIR/prosystem_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_ATARI7800_SOURCE_RESEARCH_UNAPPROVED.json
+          python tools/probe_ngp_mit_homebrew.py --system ngpc --core "$CORE_DIR/mednafen_ngp_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_NGPC_SOURCE_RESEARCH_UNAPPROVED.json
+          python tools/probe_wswan_homebrew.py --system ws --core "$CORE_DIR/mednafen_wswan_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_WSWAN_SOURCE_RESEARCH_UNAPPROVED.json
+          python tools/probe_wswan_homebrew.py --system wsc --core "$CORE_DIR/mednafen_wswan_libretro.$EXT" --seconds 6 \
+            --report test-evidence/INSTALLED_WSC_SOURCE_RESEARCH_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          names=("NES","ATARI2600","ATARI7800","NGPC","WSWAN","WSC")
+          for name in names:
+              row=json.loads(Path(f"test-evidence/INSTALLED_{name}_SOURCE_RESEARCH_UNAPPROVED.json").read_text())
+              assert row["passed"] is True and row["native_exit_code"]==0,name
+              child=row.get("details")
+              assert isinstance(child,dict) and (child.get("passed") is True or (name=="NES" and child.get("playback_probe_passed") is True)),name
+          print("6 original native 8-family installed homebrew A/V results passed")
+          PY
+      - name: Prove real installed application survives seven sequential SNES/Sega native restarts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_v30_installed_switch.py \
+            --cores "$CORE_DIR" --target "$TARGET" --seconds 5 \
+            --report test-evidence/ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("test-evidence/ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json").read_text())
+          assert x["passed"] is True, x.get("child_console_tail")
+          assert x["actual_installed_native_cores"] == 11
+          assert x["full_console_profiles"] == 18
+          assert x["sessions_completed"] == x["sessions_expected"] == 7
+          assert [r["system"] for r in x["real_native_session_details"]["cycles"]] == [
+            "snes", "mastersystem", "gamegear", "sg1000",
+            "genesis", "snes", "mastersystem",
+          ]
+          assert all(r["passed"] and r["core_nonzero_pcm_values"] > 100
+                     and r["distinct_rgb_frames"] >= 2
+                     for r in x["real_native_session_details"]["cycles"])
+          assert x["native_child_exit_code"] == 0 and x["timed_out"] is False
+          for key in ("combined_gpl_license_reviewed", "public_binary_distribution_approved",
+                      "physical_audio_camera_save_qa_approved", "release_approved"):
+              assert x[key] is False
+          print("Genuine source-built INSTALLED GUI CORE repeated 7/7 native A/V passes; public rights OFF")
+          PY
+      - name: Preserve only authenticated package integrity and test reports (NEVER installers/ROMs/cores)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-NINE-SOURCE-CORE-INSTALLED-${{ matrix.target }}-UNAPPROVED
+          path: |
+            test-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 30
