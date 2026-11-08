@@ -21,7 +21,7 @@ from unittest import mock
 
 from anything_plays import core_locator, core_packs
 from anything_plays.systems import SYSTEMS
-from fetch_mgba_core import core_names_for_build
+from tools.v30_release_lock import CORE_NAMES
 
 TARGETS = {
     "windows-x64": ".dll",
@@ -61,7 +61,7 @@ def check_offline_bundle(core_dir, target, *, lookup=None):
         raise ValueError("Staged bundle missing genuine native core provenance")
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     source_records = manifest.get("cores")
-    expected_names = set(core_names_for_build())
+    expected_names = set(CORE_NAMES)
     if len(SYSTEMS) != 18 or len(expected_names) != 11:
         raise ValueError("3.0 frozen console/core inventory changed")
     if not isinstance(source_records, list) or len(source_records) != 11:
