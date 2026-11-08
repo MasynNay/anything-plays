@@ -51,6 +51,34 @@ def read_system_archive():
             data = response.read(MAX_DOWNLOAD_BYTES + 1)
     if not data or len(data) > MAX_DOWNLOAD_BYTES:
         raise ValueError("Dolphin system ZIP is empty or too large")
+    # Preserve exactly the upstream bytes that were verified and installed.
+    # Future release candidates must reuse reviewed archives, not a newer
+    # nightly served from the same mutable buildbot URL.
+    capture = os.environ.get("AP_CORE_ARCHIVE_CAPTURE_DIR", "").strip()
+    if capture:
+        folder = Path(capture).expanduser()
+        if folder.is_symlink():
+            raise ValueError("Refusing symlinked Dolphin capture directory")
+        folder.mkdir(parents=True, exist_ok=True)
+        archived = folder / ARCHIVE_NAME
+        if archived.is_symlink():
+            raise ValueError("Refusing symlinked Dolphin archive destination")
+        from tempfile import NamedTemporaryFile
+        with NamedTemporaryFile(
+            prefix=".dolphin-capture-", suffix=".zip",
+            dir=folder, delete=False,
+        ) as stream:
+            staged = Path(stream.name)
+            try:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            except BaseException:
+                staged.unlink(missing_ok=True)
+                raise
+        os.replace(staged, archived)
+        print(f"Preserved Dolphin Sys source ZIP: {archived} "
+              f"sha256={hashlib.sha256(data).hexdigest()}", flush=True)
     return data
 
 
