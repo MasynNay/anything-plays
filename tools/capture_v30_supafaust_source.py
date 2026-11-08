@@ -17,6 +17,12 @@ import shutil
 import subprocess
 import tarfile
 
+from tools.patch_v30_supafaust_macos_semaphore import (
+    BEFORE as MAC_SEM_BEFORE,
+    AFTER as MAC_SEM_AFTER,
+    TARGET as MAC_SEM_PATH,
+)
+
 REPOSITORY = "https://github.com/libretro/supafaust"
 COMMIT = "642d1d1b6684aa7e306a02a89885f3f5456a5157"
 BINARY = "mednafen_supafaust_libretro.so"
@@ -73,7 +79,24 @@ def capture(*, source, native, output, target="linux-x64"):
     upstream = git(root, "remote", "get-url", "origin").rstrip("/").removesuffix(".git")
     if upstream != REPOSITORY:
         raise ValueError("Unexpected original source repository")
-    if git(root, "status", "--porcelain", "--untracked-files=no"):
+    status = git(root, "status", "--porcelain", "--untracked-files=no")
+    source_patch_bytes = None
+    if target.startswith("macos-"):
+        # Darwin has no sem_timedwait. Accept a documented SINGLE source
+        # change and retain the actual Git diff beside original source.
+        if status != f"M {MAC_SEM_PATH}":
+            raise ValueError("macOS candidate missing exactly one reviewed config.h source patch")
+        original_header = git(root, "show", f"HEAD:{MAC_SEM_PATH}", binary=True)
+        if original_header.count(MAC_SEM_BEFORE.encode("utf-8")) != 1:
+            raise ValueError("Upstream semaphore guard changed")
+        expected_header = original_header.replace(
+            MAC_SEM_BEFORE.encode("utf-8"), MAC_SEM_AFTER.encode("utf-8"), 1)
+        if (root / MAC_SEM_PATH).read_bytes() != expected_header:
+            raise ValueError("Unexpected modified GPL source beyond exact Mac semaphore fix")
+        source_patch_bytes = git(root, "diff", "--", MAC_SEM_PATH, binary=True)
+        if not source_patch_bytes:
+            raise ValueError("Missing reproducible original source patch Git diff")
+    elif status:
         raise ValueError("Tracked upstream SNES source changed during build")
     license_file, licensing_code = root / ORIGINAL_LICENSE, root / LICENSE_SOURCE
     if any(not p.is_file() or p.is_symlink() for p in (license_file, licensing_code)):
@@ -99,6 +122,9 @@ def capture(*, source, native, output, target="linux-x64"):
     (destination / tar_name).write_bytes(zipped)
     shutil.copyfile(library, destination / library.name)
     (destination / "SUPAFAUST_ORIGINAL_GPL2_LICENSE.txt").write_bytes(license_bytes)
+    if source_patch_bytes is not None:
+        (destination / "SUPAFAUST_MACOS_SOURCE_PATCH_UNAPPROVED.diff").write_bytes(
+            source_patch_bytes)
     evidence = {
         "schema_version": 1,
         "status": "UNAPPROVED-GPL2-OR-LATER-SUPAFAUST-RESEARCH",
@@ -114,6 +140,13 @@ def capture(*, source, native, output, target="linux-x64"):
         "original_license_sha256": hashlib.sha256(license_bytes).hexdigest(),
         "source_level_license_notice": LICENSE_SOURCE,
         "compiled_from_exact_upstream_checkout": True,
+        "original_source_modified_for_macos": source_patch_bytes is not None,
+        "reproducible_macos_source_patch_filename": (
+            "SUPAFAUST_MACOS_SOURCE_PATCH_UNAPPROVED.diff"
+            if source_patch_bytes is not None else None),
+        "reproducible_macos_source_patch_sha256": (
+            hashlib.sha256(source_patch_bytes).hexdigest()
+            if source_patch_bytes is not None else None),
         "replaces_current_snes9x_in_app": False,
         "independently_reproducible_binary_reviewed": False,
         "source_dependent_licenses_reviewed": False,
