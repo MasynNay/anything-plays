@@ -1,0 +1,115 @@
+name: Anything Plays 3.0 | Audit original ParaLLEl-N64 source notices and zero Gitlinks
+
+# Original Git source evidence only. No ROMs, native cores or binary release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - 'config/v3.0-parallel-n64-source-notice-candidates.json'
+      - 'tools/audit_v30_parallel_n64_source.py'
+      - 'tests/test_v30_parallel_n64_source_audit.py'
+      - '.github/workflows/v30-parallel-n64-source-audit.yml'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - 'tools/audit_v30_parallel_n64_source.py'
+      - '.github/workflows/v30-parallel-n64-source-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: anything-plays-n64-source-notices-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-n64-source-and-embedded-license-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '42441448884'
+      BINARY_REVIEW_RUN: '42444450521'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate exact N64 source and notice contracts
+        run: python -m unittest discover -s tests -p 'test_v30_parallel_n64_source_audit.py' -v
+      - name: Verify original immutable upstream and 44-native source-review runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$SOURCE_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$SOURCE_RUN" --json name --jq .name)" = "Anything Plays 3.0 | Preserve reported upstream sources"
+          test "$(gh run view "$BINARY_REVIEW_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$BINARY_REVIEW_RUN" --json name --jq .name)" = "Anything Plays 3.0 | Assemble unapproved source review matrix"
+      - name: Download exact original Git source and four-platform source-review evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$SOURCE_RUN" \
+            --name "AnythingPlays-3.0.0-SOURCE-SNAPSHOTS-UNAPPROVED" --dir original-upstream
+          gh run download "$BINARY_REVIEW_RUN" \
+            --name "AnythingPlays-3.0.0-SOURCE-REVIEW-UNAPPROVED" --dir original-review
+          test "$(find original-upstream -maxdepth 1 -type f | wc -l)" -eq 11
+          (cd original-review && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('original-upstream')
+          manifest=json.loads((root/'SOURCE_SNAPSHOTS_UNAPPROVED.json').read_text('utf-8'))
+          core=manifest['cores']['parallel_n64']
+          assert core['reported_commit']=='e0ef5d673257e2e83bf9b7cffe62eda141af8493'
+          assert core['status']=='REPORTED-COMMIT-SNAPSHOT-CAPTURED-NOT-APPROVED'
+          assert core['sha256']=='a8beb0a4aef9636479457237d3e12393c65425068e30c6d98f8f36faa4cb723e'
+          assert core['size_bytes']==6877459
+          assert manifest['independent_binary_to_source_match_proven'] is False
+          assert manifest['approved_for_binary_distribution'] is False
+          print('Original N64 source TAR provenance verified, source/binary unapproved')
+          PY
+      - name: Audit actual 1970-entry upstream Git tree, original TAR and eleven license blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.audit_v30_parallel_n64_source \
+            --source-review original-review/v3.0.0-corresponding-source-review-UNAPPROVED.json \
+            --source-tar original-upstream/source-parallel_n64-e0ef5d673257e2e83bf9b7cffe62eda141af8493.tar.gz \
+            --output n64-review-only
+      - name: Verify exact original notices and retain false rights correspondence flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd n64-review-only && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('n64-review-only')
+          report=json.loads((root/'PARALLEL_N64_PINNED_SOURCE_NOTICES_UNAPPROVED.json').read_text('utf-8'))
+          assert report['status']=='UNAPPROVED-PARALLEL-N64-EXACT-ARCHIVE-NOTICE-REVIEW'
+          assert report['actual_gitlink_count']==0 and report['empty_gitmodules_verified'] is True
+          assert report['embedded_notice_count']==11
+          assert len(report['embedded_source_notice_candidates'])==11
+          assert len(report['original_4_architecture_native_sha256'])==4
+          assert all(report[f] is False for f in (
+              'source_to_native_binary_independently_verified',
+              'compiled_notice_selection_independently_verified',
+              'upstream_license_and_transitive_copyleft_reviewed',
+              'in_process_gpl_noncommercial_license_decision_complete',
+              'public_distribution_approved', 'production_release_approved',
+          ))
+          assert len(list(root.iterdir()))==2
+          print('Verified exactly 11 original license blobs and zero actual source Gitlinks')
+          PY
+      - name: Retain only unapproved source reviewer JSON and SHA256SUMS
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-PARALLEL-N64-SOURCE-LICENSES-UNAPPROVED
+          path: n64-review-only/*
+          if-no-files-found: error
+          retention-days: 90
