@@ -69,12 +69,17 @@ class ReviewedGitRuntimeSourceTests(unittest.TestCase):
         self.assertTrue(evidence["runtime_and_packaging_source_unchanged"])
 
     def test_any_updated_binary_build_input_blocks_metadata_only_release(self):
-        self.approvals()
+        approved = self.approvals()
         for path in ("app.py", "anything_plays/runner.py",
                      "packaging/build_linux_deb.sh", "tools/check_v30_release.py",
                      ".github/workflows/v30-production-candidates.yml",
                      "docs/NEW_UNREVIEWED.md", "requirements.txt"):
             with self.subTest(path=path):
+                # Isolate EACH forbidden path against the genuine reviewed
+                # approval-only baseline. Otherwise the first dirty app.py
+                # would make all later subtests spuriously pass.
+                git(self.root, "reset", "--hard", approved)
+                git(self.root, "clean", "-fd")
                 write(self.root, path, "unreviewed runtime/ci/source edit\n")
                 actual=commit(self.root, "Unreviewed code changed")
                 with self.assertRaisesRegex(ValueError, "Unreviewed application/build source"):
