@@ -60,6 +60,11 @@ for name in "${CORE_LIST[@]}"; do
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
+# Approved source-built production uses a DIFFERENT runtime map than the
+# unapproved GPL research preview. The reviewed lock fully gates its creation.
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json ]]; then
+  cp cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json dist/AnythingPlays/cores/
+fi
 if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   cp cores/V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json dist/AnythingPlays/cores/
 fi
