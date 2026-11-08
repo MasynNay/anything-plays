@@ -213,9 +213,21 @@ Its per-platform `offline-runtime-<target>.json` test evidence is included in
 the **TEST-ONLY** installer artifact. Release rights, native actual game
 video/audio/input and full physical-installed-device QA remain marked false.
 Do not count a simulated fresh-core lookup as a physical clean install or as
-legal permission. Only mark the two *no separate emulator setup/download*
-release evidence flags as verified if **all four actual platform jobs** pass
-on this exact script and their reports have been reviewed.
+legal permission. **All four original platform jobs passed** in [run 42448004780](https://github.com/MasynNay/anything-plays/actions/runs/42448004780),
+at exact reviewed PR commit `2b6e0c687577b8d847ed35dcb4f10b808e5b9367`.
+Each job's real log records **18/18 system-to-bundled-core lookups** and
+**11/11 SHA-256 native checks**, without external emulator directories or
+network connections; the Windows, macOS arm64, macOS Intel and Linux build
+artifacts also retained `offline-runtime-<target>.json` evidence. [All seven
+independent source/package jobs](https://github.com/MasynNay/anything-plays/actions/runs/42448004787)
+also passed; [PR #59](https://github.com/MasynNay/anything-plays/pull/59)
+merged the verified tooling.
+
+Only `no_external_emulator_setup_required` and
+`no_runtime_emulator_download_required` in the 3.0 acceptance policy have
+therefore become **true**, with an immutable run/source link; this does *not*
+satisfy actual complete real-game tests, physical clean installs, longer runs,
+or any third-party distribution/source licensing requirement.
 
 ## Publication blockers and required evidence
 
