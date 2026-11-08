@@ -21,6 +21,7 @@ on:
       - 'fetch_mgba_core.py'
       - 'verify_bundle.py'
       - 'app.py'
+      - 'anything_plays/frozen_gui_smoke.py'
       - 'tools/probe_v30_frozen_gui_launch.py'
       - 'tests/test_v30_real_frozen_gui_launch.py'
       - 'packaging/**'
