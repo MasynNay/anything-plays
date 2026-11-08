@@ -32,7 +32,7 @@ def sha(data):
 
 
 def gitblob(data):
-    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\\0" + data).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
 
 
 def validate_native(name, raw, target):
@@ -41,9 +41,9 @@ def validate_native(name, raw, target):
     ext = EXTENSIONS[target]
     magic = {
         ".dll": (b"MZ",),
-        ".so": (b"\\x7fELF",),
-        ".dylib": (b"\\xcf\\xfa\\xed\\xfe", b"\\xfe\\xed\\xfa\\xcf",
-                   b"\\xca\\xfe\\xba\\xbe", b"\\xca\\xfe\\xba\\xbf"),
+        ".so": (b"\x7fELF",),
+        ".dylib": (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf",
+                   b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"),
     }[ext]
     if (name != "parallel_n64_libretro" + ext
             or not 100000 <= len(raw) <= MAX_NATIVE
