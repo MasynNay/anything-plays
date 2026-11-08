@@ -93,6 +93,7 @@ def fake_windows_runtime(root):
 def env():
     return mock.patch.dict(os.environ, {
         "AP_V30_GPL_TRIAL": "1",
+        "AP_V30_PINNED_PCE": "0",
         "AP_V30_TEST_CORES": "1",
         "AP_RELEASE_BUILD": "0",
         "AP_V30_APPROVED_RELEASE": "0",
