@@ -26,13 +26,13 @@ def fixture(folder, target="linux-x64"):
     ext=TARGET_EXT[target]
     native_name=f"mgba_libretro{ext}"
     source_name=f"mgba-{SOURCE_REVISION}-ORIGINAL-SOURCE.tar"
-    magic={"windows-x64":b"MZ","linux-x64":b"\\x7fELF",
-           "macos-arm64":b"\\xcf\\xfa\\xed\\xfe",
-           "macos-x64":b"\\xcf\\xfa\\xed\\xfe"}[target]
+    magic={"windows-x64":b"MZ","linux-x64":b"\x7fELF",
+           "macos-arm64":b"\xcf\xfa\xed\xfe",
+           "macos-x64":b"\xcf\xfa\xed\xfe"}[target]
     native=magic+b"synthetic source-compiled mGBA bytes (NOT EXECUTABLE)"*1600
     source=b"SYNTHETIC PINNED SOURCE TAR FIXTURE"*10000
-    license_bytes=(b"Mozilla Public License Version 2.0\\n1. Definitions\\n"
-                   b"3. Responsibilities\\nSYNTHETIC TEST ONLY\\n")
+    license_bytes=(b"Mozilla Public License Version 2.0\n1. Definitions\n"
+                   b"3. Responsibilities\nSYNTHETIC TEST ONLY\n")
     (folder/native_name).write_bytes(native)
     (folder/source_name).write_bytes(source)
     (folder/"ORIGINAL_MPL_2_0_LICENSE.txt").write_bytes(license_bytes)
