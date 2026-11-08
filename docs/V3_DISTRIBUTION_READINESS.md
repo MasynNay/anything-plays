@@ -44,6 +44,20 @@ question that checksum and notice checks cannot answer. See the dedicated
 A legally reviewed permissible distribution architecture or relevant
 rights-holder authorization is a prerequisite; CI cannot infer it.
 
+## Reported upstream source capture (new evidence path)
+
+The 3.0 [preview integrity manifest](../config/v3.0-preview-candidate-integrity.json)
+contains eleven core identities. Ten report short Git revisions that have been
+resolved to complete upstream commits; **Beetle PCE Fast does not report a
+revision**. The new source-only CI workflow
+`Anything Plays 3.0 | Preserve reported upstream sources` archives the ten
+reported commit tarballs from GitHub and records SHA-256, size and submodule
+presence. Its output is an Actions artifact marked `UNAPPROVED`, not a
+public GitHub release. Run `python tools/capture_v30_source_snapshots.py
+--output source-snapshots` to repeat it in a trusted checkout. The exact
+published native binaries, build flags, transitive source and rights remain
+unverified. Never interpret archived upstream source alone as compliance.
+
 ## Publication blockers and required evidence
 
 1. **Freeze exact bytes.** Current full-preview build runs with `AP_RELEASE_BUILD=0` and `AP_V30_TEST_CORES=1`. The acquisition path can fetch Libretro `latest` cores. Preserve each archive, its SHA-256, target architecture, reported revision and exact final packaged native binary hash. The old approved v2.0 lock does not cover the additional 3.0 cores.
