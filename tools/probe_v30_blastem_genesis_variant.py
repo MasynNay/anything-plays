@@ -42,8 +42,15 @@ def run_native(core, report, seconds=12):
     core, report = Path(core), Path(report)
     if seconds < 2 or seconds > 60:
         raise ValueError("Diagnostic playback must last 2..60 seconds")
-    if core.suffix != ".so" or not core.is_file() or core.is_symlink():
-        raise ValueError("Expected ephemeral original Linux native BlastEm candidate")
+    # Retain a strict per-host native library suffix. The original research
+    # started on Linux; this same source-authored cartridge now runs on
+    # Windows x64 and both macOS architectures without copying ELF binaries.
+    expected = ".dll" if sys.platform == "win32" else (
+        ".dylib" if sys.platform == "darwin" else ".so")
+    if core.suffix.lower() != expected or not core.is_file() or core.is_symlink():
+        raise ValueError(
+            f"Expected ephemeral platform-native BlastEm core ending in {expected}"
+        )
     if report.is_symlink():
         raise ValueError("Never write a reviewer report via symlink")
     original, candidate = original_without_unconditional_tmss()
