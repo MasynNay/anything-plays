@@ -26,7 +26,7 @@ mkdir -p dist/AnythingPlays/cores
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
   CORE_LIST=(mgba)
-elif [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+elif [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
 for name in "${CORE_LIST[@]}"; do
@@ -35,7 +35,7 @@ for name in "${CORE_LIST[@]}"; do
   cp "$core" dist/AnythingPlays/cores/
 done
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays/cores/
-if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
   cp -R cores/dolphin-emu dist/AnythingPlays/cores/
   cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays/cores/
@@ -62,7 +62,7 @@ cp licenses/*.txt dist/AnythingPlays/licenses/
 .build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
 python3 verify_bundle.py --check-native linux dist/AnythingPlays
-if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   .build-venv/bin/python tools/probe_embedded_3d.py linux dist/AnythingPlays
 fi
 
@@ -152,7 +152,7 @@ PY
 # CI and local builds must reject a Debian package that an ordinary user
 # cannot traverse. stat() is enough to check root-owned package mode bits
 # without needing to grant sudo or read any private user files.
-if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   python3 - "$AUDIT_DIR/opt/anything-plays-30-preview/cores/dolphin-emu" <<'PY'
 from pathlib import Path
 import stat
