@@ -74,6 +74,19 @@ class GPLSwitchEvidenceContracts(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     mod.validate_original_source_artifact(root, system, target)
 
+    def test_original_post_source_a_v_reports_are_accepted_but_not_used_as_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "src"
+            fixture(root, "sega", "linux-x64")
+            (root / "GENESIS_AV_UNAPPROVED.json").write_text('{"passed": true}', "utf-8")
+            (root / "ISOLATED_SEGA_PROCESS_UNAPPROVED.json").write_text('{"passed": true}', "utf-8")
+            (root / "mastersystem-test-frame.png").write_bytes(b"untrusted diagnostic image")
+            native, digest = mod.validate_original_source_artifact(root, "sega", "linux-x64")
+            self.assertEqual(hashlib.sha256(native.read_bytes()).hexdigest(), digest)
+            (root / "unrecognized-emulator-native.so").write_bytes(b"unexpected")
+            with self.assertRaises(ValueError):
+                mod.validate_original_source_artifact(root, "sega", "linux-x64")
+
     def test_extra_symlink_and_mutated_license_approval_rejected(self):
         target = "linux-x64"
         with tempfile.TemporaryDirectory() as tmp:
