@@ -56,9 +56,14 @@ def verify_runtime_code_unchanged(reviewed_source_commit, actual_build_commit,
         if not isinstance(value, str) or not COMMIT.fullmatch(value):
             raise ValueError(f"{label} must be an immutable full Git commit SHA")
     repo = Path(repo).resolve()
-    if (not repo.is_dir() or
-            _git(repo, "rev-parse", "--show-toplevel").stdout.decode("utf-8").strip()
-            != str(repo)):
+    if not repo.is_dir():
+        raise ValueError("Missing production Git checkout")
+    # Git on Windows prints forward slashes while pathlib can print
+    # backslashes. Compare normalized Path identities, not strings.
+    top = Path(
+        _git(repo, "rev-parse", "--show-toplevel").stdout.decode("utf-8").strip()
+    ).resolve()
+    if top != repo:
         raise ValueError("Cannot verify source outside the exact checkout root")
     head = _git(repo, "rev-parse", "HEAD").stdout.decode("ascii").strip()
     if head != actual_build_commit:
