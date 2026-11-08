@@ -29,7 +29,15 @@ retains per-console settings and fits long names inside their own zones.
 
 The remaining launch requirements are exact native source/license
 compatibility, selected real-device/audio/endurance acceptance, and a
-verified production release. The documented [GPL/noncommercial core
+verified production release. The required [Neo Geo Pocket 11-job
+native acceptance run](https://github.com/MasynNay/anything-plays/actions/runs/42451407552)
+passed for genuine monochrome and color on all four operating systems.
+That is original homebrew/Libretro callback evidence, **not** a physical
+retail-game test. [Issue #41](https://github.com/MasynNay/anything-plays/issues/41)
+is closed; [release issue #28](https://github.com/MasynNay/anything-plays/issues/28)
+remains open. Testers can record actual installation, game video, audible
+sound, camera actions, save/reload and endurance using the [private, offline
+physical QA checklist](docs/V3_PHYSICAL_QA_RUNBOOK.md). The documented [GPL/noncommercial core
 compatibility issue](docs/V3_LICENSE_COMPATIBILITY_GATE.md) must be
 resolved before publishing the combined stable installer. Automated
 packaging does not independently establish redistribution rights.
@@ -65,7 +73,7 @@ All eleven cores below are included in the **full offline 3.0 developer preview*
 | Stella 2014 | Atari 2600 | Native audio/video tests; real-game coverage pending |
 | ProSystem | Atari 7800 | Native homebrew tests; real-device coverage pending |
 | Beetle PCE Fast | TurboGrafx-16 / PC Engine HuCard | Native homebrew tests; real-device coverage pending |
-| Beetle NeoPop | Neo Geo Pocket and Color | **Monochrome NGP audible-fixture coverage still incomplete** |
+| Beetle NeoPop | Neo Geo Pocket and Color | Authentic monochrome and color native audio/video/input CI passed all four OSes; physical game/saves still need validation |
 | Beetle WonderSwan | WonderSwan and Color | Native homebrew AV checks; real-device coverage pending |
 | ParaLLEl-N64 | Nintendo 64 | **Repeat-launch fix** passed 3 cycles on four OS builds; owner tested switching on Apple Silicon |
 | Dolphin Libretro | GameCube | Bundled in experimental preview; **GPU performance/real-game acceptance incomplete** |
