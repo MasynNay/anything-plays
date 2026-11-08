@@ -80,7 +80,7 @@ jobs:
             fceumm) notice=Copying ;;
             prosystem) notice=License.txt ;;
             mednafen_ngp|mednafen_wswan) notice=COPYING ;;
-            stella2014) notice="" ;; # No root tracked license. REVIEW REQUIRED.
+            stella2014) notice=stella/license.txt ;; # Verified original nested GPLv2 text.
             *) exit 1 ;;
           esac
           if [[ -n "$notice" ]]; then
