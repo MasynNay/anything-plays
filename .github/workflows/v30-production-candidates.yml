@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       native_input_run_id:
-        description: Successful complete offline lab with preserved original ZIPs
+        description: Successful original 12-archive full offline lab (the other 8 cores and Dolphin Sys remain exact)
         required: true
         type: string
       confirmation:
@@ -31,21 +31,25 @@ jobs:
         include:
           - runner: windows-2025
             target: windows-x64
+            lock_target: windows-x86_64
             extension: dll
             installer: AnythingPlaysSetup-3.0.0.exe
             core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
           - runner: macos-15
             target: macos-arm64
+            lock_target: macos-arm64
             extension: dylib
             installer: AnythingPlays-3.0.0-macos-arm64.dmg
             core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
           - runner: macos-15-intel
             target: macos-x64
+            lock_target: macos-x86_64
             extension: dylib
             installer: AnythingPlays-3.0.0-macos-x64.dmg
             core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
           - runner: ubuntu-24.04
             target: linux-x64
+            lock_target: linux-x86_64
             extension: so
             installer: anything-plays_3.0.0_amd64.deb
             core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
@@ -58,6 +62,9 @@ jobs:
       AP_V30_APPROVED_RELEASE: '1'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/immutable-inputs
       GH_TOKEN: ${{ github.token }}
+      GPL_SNES_RUN_ID: '42494297281'
+      GPL_SEGA_RUN_ID: '42496671418'
+      PINNED_PCE_RUN_ID: '42444367068'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,7 +89,14 @@ jobs:
           fi
           python tools/check_repository_hygiene.py
           python tools/check_v30_release.py
-          python -c 'from tools.v30_release_lock import load_approved_lock; load_approved_lock()'
+          python - <<'PY'
+          from tools.v30_release_lock import (
+              load_approved_lock, selected_core_set, ALTERNATIVE_CORE_NAMES)
+          lock = load_approved_lock()
+          assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
+              "Production must use the FULL source-built GPL alternative core set; "
+              "original Snes9x/Genesis GX are not accepted for v3")
+          PY
           test -s config/v3.0-corresponding-source-inventory.json
           test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
           test -s docs/V3_RELEASE_NOTES_APPROVED.md
@@ -108,35 +122,97 @@ jobs:
             echo "::error::Original preserved ZIPs must come from a completed successful 3.0 full lab"
             exit 1
           fi
-      - name: Fetch original Libretro ZIPs and Dolphin Sys from preserved evidence
+          for pair in \
+            "$GPL_SNES_RUN_ID|Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate" \
+            "$GPL_SEGA_RUN_ID|Anything Plays 3.0 | Four-platform pinned GPL candidate research" \
+            "$PINNED_PCE_RUN_ID|Anything Plays 3.0 | PCE pinned-source replacement research"; do
+            run_id="${pair%%|*}"
+            expected_name="${pair#*|}"
+            [[ "$(gh run view "$run_id" --json conclusion --jq .conclusion)" == success ]] || exit 1
+            [[ "$(gh run view "$run_id" --json name --jq .name)" == "$expected_name" ]] || exit 1
+          done
+      - name: Download original privately preserved core ZIPs and exact source-built upstream artifacts
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$AP_CORE_ARCHIVE_DIR"
           gh run download "$SOURCE_RUN_ID" \
             --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}" \
-            --dir "$AP_CORE_ARCHIVE_DIR"
-      - name: Enforce complete original archive list before building
-        shell: bash
-        env:
-          NATIVE_EXTENSION: ${{ matrix.extension }}
-          PLATFORM_NAME: ${{ matrix.target }}
+            --dir original-native-inputs
+          gh run download "$GPL_SNES_RUN_ID" \
+            --name "AnythingPlays-3.0-SUPAFAUST-${{ matrix.target }}-SOURCE-UNAPPROVED" \
+            --dir source-built-snes
+          gh run download "$GPL_SEGA_RUN_ID" \
+            --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-${{ matrix.target }}-UNAPPROVED" \
+            --dir source-built-sega
+          gh run download "$PINNED_PCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-${{ matrix.target }}-UNAPPROVED" \
+            --dir source-built-pce
+          # Original PCE CI includes exactly six immutable sources/notices.
+          # Build a deterministic ZIP locally and let inspect_artifact verify
+          # every original source/native/notice SHA before ANY build.
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_STORED
+          root = Path("source-built-pce")
+          files = sorted(root.iterdir())
+          assert len(files) == 6 and all(p.is_file() and not p.is_symlink() for p in files)
+          with ZipFile("original-source-built-pce.zip", "w", ZIP_STORED) as archive:
+              for item in files:
+                  archive.write(item, arcname=item.name)
+          PY
+      - name: Prepare Windows source-built runtime dependency without external user requirements
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Capture exact candidate Winpthreads native bytes; immutable reviewed lock must approve this precise hash
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           set -euo pipefail
+          test -s /mingw64/bin/libwinpthread-1.dll
+          cp /mingw64/bin/libwinpthread-1.dll original-native-winpthread.dll
+          test -s original-native-winpthread.dll
+      - name: Stage EXACT SOURCE-REVIEWED 11-core production offline inputs, or fail before build
+        shell: bash
+        env:
+          REVIEWED_TARGET: ${{ matrix.lock_target }}
+        run: |
+          set -euo pipefail
+          WIN_DLL=""
+          if [[ "$REVIEWED_TARGET" == windows-x86_64 ]]; then
+            WIN_DLL="--windows-runtime=original-native-winpthread.dll"
+          fi
+          python -m tools.stage_v30_approved_source_inputs \
+            --target "$REVIEWED_TARGET" \
+            --original-dir original-native-inputs \
+            --snes-dir source-built-snes \
+            --sega-dir source-built-sega \
+            --pce-artifact original-source-built-pce.zip \
+            --output-dir "$AP_CORE_ARCHIVE_DIR" \
+            ${WIN_DLL:+$WIN_DLL}
+          # This receipt is strictly source/native provenance; it is NOT a
+          # generated grant of rights or a public binary release decision.
           python - <<'PY'
           import json, os
           from pathlib import Path
-          from tools.v30_release_lock import CORE_NAMES
+          from tools.v30_release_lock import load_approved_lock, selected_core_set
+          from tools.stage_v30_approved_source_inputs import RECEIPT
+          lock = load_approved_lock()
           root = Path(os.environ["AP_CORE_ARCHIVE_DIR"])
-          ext = os.environ["NATIVE_EXTENSION"]
-          expected = {f"{core}_libretro.{ext}.zip" for core in CORE_NAMES}
-          expected |= {"Dolphin.zip", "PRESERVED_NATIVE_INPUTS.json"}
-          found = {file.name for file in root.iterdir() if file.is_file() and not file.is_symlink()}
-          assert found == expected, f"Wrong native archives: missing={expected-found}, extra={found-expected}"
-          record = json.loads((root/"PRESERVED_NATIVE_INPUTS.json").read_text("utf-8"))
-          assert record["target"] == os.environ["PLATFORM_NAME"]
-          assert record["public_distribution_approved"] is False
-          print("Original preserved source ZIP inventory is complete; approved lock will independently check each native byte")
+          manifest = json.loads((root/RECEIPT).read_text("utf-8"))
+          assert manifest["native_core_count"] == 11
+          assert manifest["system_profile_count"] == 18
+          assert manifest["unchanged_original_core_count"] == 8
+          assert manifest["native_approval_comes_from_separately_reviewed_lock"] is True
+          assert manifest["auto_granted_license_rights"] is False
+          assert set(manifest["source_built_families"]) == {
+              "mednafen_supafaust", "blastem", "mednafen_pce_fast"}
+          assert selected_core_set(lock) == set(lock["targets"][manifest["target"]]["cores"])
           PY
       - name: Install Windows installer compiler
         if: runner.os == 'Windows'
