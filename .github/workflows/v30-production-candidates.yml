@@ -138,6 +138,16 @@ jobs:
           gh run download "$SOURCE_RUN_ID" \
             --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}" \
             --dir original-native-inputs
+          # The original research archive's flag MUST remain false. Approval
+          # comes from the separately independently reviewed immutable lock,
+          # never by relabeling a previously unapproved buildbot native ZIP.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          row=json.loads(Path("original-native-inputs/PRESERVED_NATIVE_INPUTS.json").read_text("utf-8"))
+          assert row["public_distribution_approved"] is False
+          assert row["original_archive_count"] == 12
+          PY
           gh run download "$GPL_SNES_RUN_ID" \
             --name "AnythingPlays-3.0-SUPAFAUST-${{ matrix.target }}-SOURCE-UNAPPROVED" \
             --dir source-built-snes
