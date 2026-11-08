@@ -33,6 +33,20 @@ EXPECTED_CORES = 11
 WINDOWS_RUNTIME = "libwinpthread-1.dll"
 PCE_SOURCE_COMMIT = "2de1ce1c3f237b161c126c54ba407990bb86d1e9"
 PCE_SOURCE_REPO = "https://github.com/libretro/beetle-pce-fast-libretro"
+FIVE_ORIGINAL_SOURCE_COMMITS = {
+    "fceumm": "e0f3086a8104f8fbbe49a2615b10401504a9533f",
+    "stella2014": "7d1361e407e63f29e52892655069e5fb4096e691",
+    "prosystem": "8a88014287c7a01cd568067e5a557d0a2b2a051f",
+    "mednafen_ngp": "a50d5ac288a81f2104ddf43195a4efdd15c72227",
+    "mednafen_wswan": "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd",
+}
+FIVE_ORIGINAL_SOURCE_REPOSITORIES = {
+    "fceumm": "https://github.com/libretro/libretro-fceumm",
+    "stella2014": "https://github.com/libretro/stella2014-libretro",
+    "prosystem": "https://github.com/libretro/prosystem-libretro",
+    "mednafen_ngp": "https://github.com/libretro/beetle-ngp-libretro",
+    "mednafen_wswan": "https://github.com/libretro/beetle-wswan-libretro",
+}
 # Keep os.add_dll_directory handles alive for the loaded native cores.
 # A list would add a new OS DLL-search directory handle on EVERY console
 # switch, leaking one native handle per ROM opened for the lifetime of the UI.
@@ -158,6 +172,43 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                 raise ValueError("Missing source-built PC Engine native core")
             if hashlib.sha256(native.read_bytes()).hexdigest() != pce["native_sha256"]:
                 raise ValueError("Source-built PC Engine native hash mismatch")
+    # Source-built 8/11 integrated complete offline variant. These are
+    # NEW original source builds, never relabeled historical native-nightlies.
+    remaining = info.get("source_built_remaining_five")
+    if remaining is not None:
+        if (not isinstance(remaining, dict)
+                or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
+                or info.get("total_source_built_core_families") != 8
+                or info.get("original_unchanged_core_archives") != 3
+                or info.get("five_source_family_run_id") != 42515151314
+                or pce is None):
+            raise ValueError("Eight source-built families are not complete and exact")
+        for name, revision in FIVE_ORIGINAL_SOURCE_COMMITS.items():
+            row=remaining[name]
+            if (not isinstance(row, dict)
+                    or row.get("source_repository") != FIVE_ORIGINAL_SOURCE_REPOSITORIES[name]
+                    or row.get("source_commit") != revision
+                    or row.get("native_filename") != f"{name}_libretro{extension}"
+                    or row.get("source_build_run_id") != 42515151314
+                    or row.get("old_unknown_source_buildbot_replaced") is not True
+                    or row.get("original_license_notice_copied") is not True):
+                raise ValueError(f"Wrong original source-built core family: {name}")
+            for field in ("native_sha256","source_archive_sha256",
+                          "native_archive_sha256"):
+                value=row.get(field)
+                if (not isinstance(value,str) or len(value)!=64
+                        or any(c not in "0123456789abcdef" for c in value)):
+                    raise ValueError(f"Missing real compiled core/source fingerprint: {name}/{field}")
+            notice=row.get("original_license_notice_sha256")
+            if (not isinstance(notice,str) or len(notice)!=64
+                  or any(c not in "0123456789abcdef" for c in notice)):
+                raise ValueError(f"Missing original GPL source notice: {name}")
+            if verify_native:
+                native=root/row["native_filename"]
+                if (native.is_symlink() or not native.is_file()
+                        or not 10000<native.stat().st_size<60*1024*1024
+                        or hashlib.sha256(native.read_bytes()).hexdigest()!=row["native_sha256"]):
+                    raise ValueError(f"Modified source-built 3.0 original core: {name}")
     _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):

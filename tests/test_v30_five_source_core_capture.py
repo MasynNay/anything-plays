@@ -29,6 +29,7 @@ def make_git_source(root, candidate):
         encoding="utf-8")
     license_name = CANDIDATES[candidate][1]
     if license_name:
+        (root / license_name).parent.mkdir(parents=True,exist_ok=True)
         (root / license_name).write_text(
             "GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\n"
             "Synthetic fixture. Not for redistribution.\n", encoding="utf-8")

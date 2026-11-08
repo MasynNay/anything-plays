@@ -135,6 +135,12 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
     copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
     if errorlevel 1 exit /b 1
   )
+  if "%AP_V30_PINNED_FIVE%"=="1" (
+    for %%C in (fceumm stella2014 prosystem mednafen_ngp mednafen_wswan) do (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-%%C-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    )
+  )
 )
 if "%AP_V30_APPROVED_RELEASE%"=="1" if exist "cores\V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json" (
   copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-Supafaust-COPYING.txt" "dist\AnythingPlays\licenses\Supafaust-COPYING.txt" >nul
