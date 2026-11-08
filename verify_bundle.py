@@ -193,6 +193,12 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 "blastem": "BlastEm-COPYING.txt",
                 "mednafen_pce_fast": "PCE-COPYING.txt",
             }
+            if selected["core_set_id"] == "gpl-source-built-eight":
+                # A native same-name buildbot ZIP is NOT the verified
+                # original source-built NES/Atari/NGP/WonderSwan binary.
+                for name in ("fceumm","stella2014","prosystem",
+                             "mednafen_ngp","mednafen_wswan"):
+                    notices[name] = f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
             for name, filename in notices.items():
                 row = selected["cores"][name]
                 if row["native_sha256"] != records[name]["native_sha256"]:
