@@ -9,6 +9,7 @@ on:
       - 'tests/test_v30_gpl_four_os_research.py'
       - 'tools/capture_v30_gpl_alternative_source_build.py'
       - 'tools/probe_v30_blastem_genesis_variant.py'
+      - 'tools/bsnes_mingw_vasprintf_compat.h'
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,6 +72,7 @@ jobs:
           install: >-
             make git
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
       - name: Install Linux compiler and original Libretro A-V dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -91,7 +93,15 @@ jobs:
         shell: bash
         run: |
           if [[ "$V30_CANDIDATE" == bsnes ]]; then
-            make -C research/bsnes-src -j 3 platform=osx
+            # The pinned 2019 makefile advertises a macOS 10.1 minimum,
+            # incompatible with modern Intel SDK struct stat declarations.
+            # Later EXTRA_INCLUDES compiler flag overrides that obsolete 10.1
+            # target without modifying one byte of the reviewed upstream tree.
+            if [[ "$V30_TARGET" == macos-x64 ]]; then
+              make -C research/bsnes-src -j 3 platform=osx EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE"
+            else
+              make -C research/bsnes-src -j 3 platform=osx
+            fi
           else
             make -C research/blastem-src -f Makefile.libretro -j 3 core
           fi
@@ -101,7 +111,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$V30_CANDIDATE" == bsnes ]]; then
-            make -C research/bsnes-src -j 3 platform=win
+            # GNU make's EXTRA_INCLUDES is appended to both C and C++
+            # compilation. Only C receives a guarded legacy vasprintf shim.
+            # Original tracked bsnes source and GPL notice stay pristine.
+            make -C research/bsnes-src -j 3 platform=win EXTRA_INCLUDES="-include $(pwd)/tools/bsnes_mingw_vasprintf_compat.h"
           else
             make -C research/blastem-src -f Makefile.libretro -j 3 core
           fi
@@ -150,9 +163,16 @@ jobs:
           for name in ('public_binary_distribution_approved','source_to_binary_independently_reproducible',
                        '3_0_native_core_substitution_approved','combined_gpl_2_and_gpl_3_license_reviewed'):
               assert manifest[name] is False
-          reports=list(where.glob('*_AV_UNAPPROVED.json'))
+          # Genesis uses an underscore; the three original Sega-8 reports
+          # use '-AV', so a single '*_AV' glob silently omits 3 REAL passes.
+          filenames=(['SNES_AV_UNAPPROVED.json'] if os.environ['V30_CANDIDATE']=='bsnes'
+                     else ['GENESIS_AV_UNAPPROVED.json',
+                           'mastersystem-AV_UNAPPROVED.json',
+                           'gamegear-AV_UNAPPROVED.json',
+                           'sg1000-AV_UNAPPROVED.json'])
+          reports=[where/name for name in filenames]
           expect=1 if os.environ['V30_CANDIDATE']=='bsnes' else 4
-          assert len(reports)==expect, (expect,reports)
+          assert len(reports)==expect and all(p.is_file() for p in reports), (expect,reports)
           for p in reports:
               row=json.loads(p.read_text())
               assert row.get('passed') is True and row.get('native_exit_code')==0, p
