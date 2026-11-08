@@ -2,6 +2,11 @@
 setlocal EnableExtensions
 cd /d "%~dp0.."
 set "VERSION=3.0.0-alpha.1"
+REM Both CI preview and fully approved 3.0 builds include all 11 cores.
+REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
+set "AP_FULL_CORE_BUILD=0"
+if "%AP_V30_TEST_CORES%"=="1" set "AP_FULL_CORE_BUILD=1"
+if "%AP_V30_APPROVED_RELEASE%"=="1" set "AP_FULL_CORE_BUILD=1"
 REM Use one explicit interpreter for the downloader, build venv and bundle
 REM verification. The unqualified Windows 'py' launcher may select a different
 REM installation than actions/setup-python (observed Python 3.15 vs 3.13).
@@ -44,7 +49,7 @@ set "CORE_LIST=mgba snes9x"
 if "%AP_V30_MINIMAL_CORE_BUILD%"=="1" (
   set "CORE_LIST=mgba"
 ) else (
-  if "%AP_V30_TEST_CORES%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
+  if "%AP_FULL_CORE_BUILD%"=="1" set "CORE_LIST=mgba snes9x fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
 )
 for %%C in (%CORE_LIST%) do (
   if not exist "cores\%%C_libretro.dll" (echo Missing required core %%C & exit /b 1)
@@ -53,7 +58,7 @@ for %%C in (%CORE_LIST%) do (
 )
 copy /Y "cores\CORE_PROVENANCE.json" "dist\AnythingPlays\cores\" >nul
 if errorlevel 1 exit /b 1
-if "%AP_V30_TEST_CORES%"=="1" (
+if "%AP_FULL_CORE_BUILD%"=="1" (
   if not exist "cores\dolphin-emu\Sys\codehandler.bin" (
     echo Missing bundled Dolphin Sys resources
     exit /b 1
@@ -80,7 +85,7 @@ if errorlevel 1 exit /b 1
 
 python verify_bundle.py --check-native windows dist\AnythingPlays
 if errorlevel 1 exit /b 1
-if "%AP_V30_TEST_CORES%"=="1" (
+if "%AP_FULL_CORE_BUILD%"=="1" (
   .build-venv\Scripts\python.exe tools\probe_embedded_3d.py windows dist\AnythingPlays
   if errorlevel 1 exit /b 1
 )
