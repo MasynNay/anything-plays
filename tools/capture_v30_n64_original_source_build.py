@@ -100,7 +100,11 @@ def validate_source_and_notices(source, index):
         raise ValueError("Duplicate original N64 license notices")
     # An empty .gitmodules is insufficient if Git actually tracks another Gitlink.
     entries = _git(source, "ls-tree", "-r", "HEAD").decode("utf-8", "replace").splitlines()
-    if len(entries) != 1970 or any(row.startswith("160000 commit ") for row in entries):
+    # GitHub's recursive tree count includes directory nodes; git ls-tree -r
+    # omits those directories. The *exact* Git commit and all original notices
+    # are checked above, so bound the leaf-object count rather than equating
+    # it to the 1970-entry GitHub tree total.
+    if not 1200 <= len(entries) <= 1970 or any(row.startswith("160000 commit ") for row in entries):
         raise ValueError("Missing/injected upstream original N64 Gitlink")
     return verified
 
