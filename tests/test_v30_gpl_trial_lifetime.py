@@ -77,9 +77,16 @@ class WindowsGPLTrialDllHandleLifetime(unittest.TestCase):
                     with TemporaryDirectory() as other:
                         target = Path(other) / "original.dll"
                         target.write_bytes(b"MZ" + b"source-built-test-only-winpthread" * 1200)
-                        path.symlink_to(target)
-                        with self.assertRaises(ValueError):
-                            trial._register_windows_runtime_directory(root, info)
+                        try:
+                            path.symlink_to(target)
+                        except (OSError, NotImplementedError):
+                            # Unprivileged Windows CI hosts may forbid symlinks.
+                            # The independent missing-file rejection above still
+                            # runs, and Linux/macOS cover symlink tampering.
+                            pass
+                        else:
+                            with self.assertRaises(ValueError):
+                                trial._register_windows_runtime_directory(root, info)
                     self.assertEqual(register.call_count, 0)
                     self.assertEqual(len(trial._WINDOWS_NATIVE_DLL_HANDLES), 0)
                 finally:
