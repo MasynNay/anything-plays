@@ -26,8 +26,16 @@ concurrency:
 
 jobs:
   original-native-mono-audio-video-input:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, ext: so}
+          - {runner: windows-2025, target: windows-x64, ext: dll}
+          - {runner: macos-15, target: macos-arm64, ext: dylib}
+          - {runner: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 18
     env:
       AP_V30_TEST_CORES: '1'
       AP_RELEASE_BUILD: '0'
@@ -38,26 +46,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install native NeoPop test dependencies
+      - name: Install Linux native NeoPop graphics and audio runtime
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
-          python -m pip install -r requirements.txt
+      - name: Install cross-platform native test Python dependencies
+        run: python -m pip install -r requirements.txt
       - name: Verify byte-exact mono K1GE/PSG construction and zero false acceptance
         run: |
           python -m unittest discover -s tests -p 'test_v30_ngp_mono_native_av.py' -v
           python -m unittest discover -s tests -p 'test_v30_ngp_original_mono_psg.py' -v
-      - name: Fetch test-only actual NeoPop native core and record exact hash
+      - name: Fetch a test-only actual NeoPop core for THIS architecture
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      - name: Verify exact platform-native core SHA-256
+        shell: bash
         run: |
-          python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
-          test -s cores/mednafen_ngp_libretro.so
-          sha256sum cores/mednafen_ngp_libretro.so
-      - name: Exercise actual native K1GE monochrome video, PSG PCM, and input events
-        run: |
-          python -m tools.probe_v30_ngp_mono_native_av \
-            --core cores/mednafen_ngp_libretro.so \
-            --output actual-mono-av-evidence \
-            --seconds 12
+          set -euo pipefail
+          test -s "cores/mednafen_ngp_libretro.${{ matrix.ext }}"
+          sha256sum "cores/mednafen_ngp_libretro.${{ matrix.ext }}"
+      - name: Exercise real native K1GE monochrome video, PSG PCM and input events
+        run: python -m tools.probe_v30_ngp_mono_native_av --core "cores/mednafen_ngp_libretro.${{ matrix.ext }}" --output actual-mono-av-evidence --seconds 12
       - name: Verify real native measured metrics and forbid game/native artifact uploads
         shell: bash
         run: |
@@ -93,17 +102,17 @@ jobs:
           if j['audio_verified_in_native_test']:
               assert m['native_nonzero_pcm_values']>100
               assert m['native_audio_peak']>0
-          print('ACTUAL native K1GE video frames:',m['sampled_nonblank_frames'] if m else None)
+          print('PLATFORM ${{ matrix.target }} actual native K1GE nonblank frames:', m['sampled_nonblank_frames'] if m else None)
           print('ACTUAL distinct nonblank frames:',m['distinct_nonblank_frames'] if m else None)
           print('ACTUAL native nonzero PCM:',m['native_nonzero_pcm_values'] if m else None)
           print('ACTUAL complete local A/V/input:',j['full_native_audio_video_input_verified'])
           if not j['full_native_audio_video_input_verified']:
               print('Original mono K1GE/A/V research incomplete; keep release gate blocked')
           PY
-      - name: Retain ONLY unapproved native metrics and checksum, never a ROM or app
+      - name: Retain ONLY per-architecture unapproved native metrics and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-3.0.0-ORIGINAL-MONO-K1GE-AV-RESEARCH-UNAPPROVED
+          name: AnythingPlays-3.0.0-ORIGINAL-MONO-K1GE-AV-${{ matrix.target }}-UNAPPROVED
           path: |
             actual-mono-av-evidence/NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json
             actual-mono-av-evidence/SHA256SUMS.txt
