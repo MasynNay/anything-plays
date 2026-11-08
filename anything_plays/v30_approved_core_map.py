@@ -17,6 +17,7 @@ from pathlib import Path
 from anything_plays.v30_gpl_trial import (
     EXPECTED_SOURCE_COMMITS, PCE_SOURCE_COMMIT, PCE_SOURCE_REPO,
     PROFILE_TO_CORE, WINDOWS_RUNTIME, _register_windows_runtime_directory,
+    FIVE_ORIGINAL_SOURCE_COMMITS, FIVE_ORIGINAL_SOURCE_REPOSITORIES,
 )
 
 MARKER = "V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json"
@@ -29,6 +30,14 @@ REPOSITORIES = {
     "mednafen_supafaust": "https://github.com/libretro/supafaust",
     "blastem": "https://github.com/libretro/blastem",
     "mednafen_pce_fast": PCE_SOURCE_REPO,
+}
+EIGHT_EXPECTED = {**EXPECTED, **FIVE_ORIGINAL_SOURCE_COMMITS}
+EIGHT_REPOSITORIES = {**REPOSITORIES, **FIVE_ORIGINAL_SOURCE_REPOSITORIES}
+ADDITIONAL_SYSTEMS = {
+    "nes":"fceumm", "atari2600":"stella2014",
+    "atari7800":"prosystem", "ngp":"mednafen_ngp",
+    "ngpc":"mednafen_ngp", "ws":"mednafen_wswan",
+    "wsc":"mednafen_wswan",
 }
 SHA = set("0123456789abcdef")
 MAX_LIBRARY = 60 * 1024 * 1024
@@ -49,20 +58,25 @@ def validate_installed_map(folder, extension, *, verify_native=True):
     info = json.loads(marker.read_text("utf-8"))
     if (not isinstance(info, dict) or info.get("schema_version") != 1
             or info.get("status") != STATUS
-            or info.get("core_set_id") != "gpl-source-built-alternative"
+            or info.get("core_set_id") not in ("gpl-source-built-alternative", "gpl-source-built-eight")
             or info.get("all_console_profiles") != 18
             or info.get("native_core_count") != 11
             or info.get("legacy_noncommercial_native_binaries_excluded") is not True):
         raise ValueError("Incorrect source-built production core identity")
     rows = info.get("cores")
-    if not isinstance(rows, dict) or set(rows) != set(EXPECTED):
-        raise ValueError("All three original source-built core families are required")
-    for name, revision in EXPECTED.items():
+    eight = info["core_set_id"] == "gpl-source-built-eight"
+    expected = EIGHT_EXPECTED if eight else EXPECTED
+    repositories = EIGHT_REPOSITORIES if eight else REPOSITORIES
+    if (not isinstance(rows, dict) or set(rows) != set(expected)
+            or (eight and info.get("eight_source_built_families_reviewed") is not True)
+            or (eight and info.get("three_unchanged_native_families_reviewed") is not True)):
+        raise ValueError("Reviewed 3.0 original source-built library families incomplete")
+    for name, revision in expected.items():
         row = rows[name]
         filename = f"{name}_libretro{extension}"
         if (not isinstance(row, dict) or row.get("native_filename") != filename
                 or row.get("source_commit") != revision
-                or row.get("source_repository") != REPOSITORIES[name]):
+                or row.get("source_repository") != repositories[name]):
             raise ValueError(f"Original source-built revision/filename mismatch: {name}")
         _require_hash(row.get("native_sha256"), f"{name} binary digest")
         _require_hash(row.get("license_notice_sha256"), f"{name} original GPL notice")
@@ -103,7 +117,7 @@ def enable_windows_offline_runtime(folder, *, verify_native=True):
 
 def find_approved_core(directories, system, extension):
     """(found, path). A detected but invalid marker must NEVER fall back."""
-    if system not in PROFILE_TO_CORE and system != "pce":
+    if system not in PROFILE_TO_CORE and system != "pce" and system not in ADDITIONAL_SYSTEMS:
         return False, None
     for folder in directories:
         root = Path(folder)
@@ -113,7 +127,14 @@ def find_approved_core(directories, system, extension):
         if not marker.exists():
             continue
         info = validate_installed_map(root, extension)
+        name = ("mednafen_pce_fast" if system == "pce" else
+                PROFILE_TO_CORE[system] if system in PROFILE_TO_CORE
+                else ADDITIONAL_SYSTEMS[system])
+        if name not in info["cores"]:
+            # Three-source legacy reviewed package does NOT claim new
+            # five-family original-source provenance, so ordinary NES/Atari/
+            # NGP/WS lookup remains the previous unchanged path.
+            continue
         enable_windows_offline_runtime(root)
-        name = "mednafen_pce_fast" if system == "pce" else PROFILE_TO_CORE[system]
         return True, str(root / info["cores"][name]["native_filename"])
     return False, None
