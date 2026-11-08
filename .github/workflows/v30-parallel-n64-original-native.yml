@@ -65,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends build-essential nasm pkg-config python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends build-essential nasm pkg-config libgl-dev libglu1-mesa-dev python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2
       - name: Install original Windows MinGW compiler and N64 assembler
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
