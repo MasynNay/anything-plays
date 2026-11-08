@@ -35,7 +35,7 @@ camera processing happens locally.
 
 **Starter application / managed updates:** The smaller application workflow packages mGBA initially. Other cores can be installed or updated through the app only when suitable reviewed packs are available. Both packaging models are intentionally separate: the full test packages demonstrate offline bundle feasibility, not legal approval or compatibility for every existing game.
 
-Real-world testing, native-core license/source obligations, physical GPU performance and signing/notarization are tracked in the [roadmap](ROADMAP.md).
+Real-world testing, native-core license/source obligations, physical GPU performance and signing/notarization are tracked in the [roadmap](ROADMAP.md), with the [3.0 release-specific distribution audit](docs/V3_DISTRIBUTION_READINESS.md) and [draft launch notes](docs/V3_RELEASE_NOTES_DRAFT.md). The complete four-platform offline installer workflow passed on the merged slider fix in [run 42426209611](https://github.com/MasynNay/anything-plays/actions/runs/42426209611), but these test installers are not approved public distribution assets.
 
 ## Console library plan
 
