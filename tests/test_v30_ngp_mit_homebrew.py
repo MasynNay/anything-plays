@@ -2,7 +2,7 @@
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from tools.ngp_mit_fixtures import FIXTURES, fetch_test_fixture
+from tools.ngp_mit_fixtures import FIXTURES, fetch_test_fixture, declared_console_compatibility
 
 
 class NeoGeoPocketCIContracts(unittest.TestCase):
@@ -16,6 +16,51 @@ class NeoGeoPocketCIContracts(unittest.TestCase):
                 self.assertGreater(spec["bytes"], 10000)
                 self.assertTrue(spec["path"].endswith(spec["ext"]))
                 self.assertNotIn("latest", spec["commit"].casefold())
+
+    def test_filename_cannot_certify_monochrome_header(self):
+        # All 14 Tixul calibration files end .ngp, yet each actual byte 0x23
+        # is 0x10 (color). Verified directly against their pinned Git blobs.
+        self.assertEqual(FIXTURES["ngp"]["pinned_header_mode"], 0x10)
+        self.assertEqual(FIXTURES["ngpc"]["pinned_header_mode"], 0x10)
+        invalid = declared_console_compatibility("ngp", 0x10)
+        self.assertFalse(invalid["authentic_monochrome_cartridge"])
+        self.assertFalse(invalid["header_matches_test_target"])
+        self.assertTrue(declared_console_compatibility("ngp", 0x00)
+                        ["header_matches_test_target"])
+        self.assertTrue(declared_console_compatibility("ngpc", 0x10)
+                        ["header_matches_test_target"])
+        self.assertFalse(declared_console_compatibility("ngpc", 0x00)
+                         ["header_matches_test_target"])
+        with self.assertRaises(ValueError):
+            declared_console_compatibility("ngp", 0x42)
+
+    def test_original_ngp_parent_rejects_even_a_fake_positive_native_report_with_color_header(self):
+        from tempfile import TemporaryDirectory
+        from types import SimpleNamespace
+        import json
+        from tools.probe_ngp_mit_homebrew import _parent
+
+        def positive_child(command, **kwargs):
+            output = Path(command[command.index("--report") + 1])
+            output.write_text(json.dumps({"system": "ngp", "passed": True}),
+                              encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with TemporaryDirectory() as tmp:
+            core = Path(tmp) / "native-libretro.so"
+            core.write_bytes(b"TEST ONLY")
+            report = Path(tmp) / "report.json"
+            with patch("tools.probe_ngp_mit_homebrew.fetch_test_fixture",
+                       return_value={"header_matches_test_target": False,
+                                     "authentic_monochrome_cartridge": False,
+                                     "header_mode_byte": 0x10}), patch(
+                       "tools.probe_ngp_mit_homebrew.subprocess.run",
+                       side_effect=positive_child):
+                self.assertEqual(_parent("ngp", core, report, 2), 1)
+            record = json.loads(report.read_text("utf-8"))
+            self.assertFalse(record["passed"])
+            self.assertTrue(record["details"]["passed"])
+            self.assertFalse(record["fixture"]["header_matches_test_target"])
 
     def test_download_is_rejected_if_source_bytes_fail_git_integrity(self):
         from tempfile import TemporaryDirectory
