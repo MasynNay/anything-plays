@@ -51,7 +51,7 @@ jobs:
       AP_V30_GPL_TRIAL: '1'
       AP_V30_PINNED_PCE: '1'
       AP_V30_PINNED_FIVE: '1'
-      FIVE_SOURCE_RUN_ID: '42513615955'
+      FIVE_SOURCE_RUN_ID: '42515151314'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/gpl-trial-native-inputs
       GH_TOKEN: ${{ github.token }}
       TARGET: ${{ matrix.target }}
@@ -195,7 +195,7 @@ jobs:
           assert trials["native_core_count"]==11 and trials["all_console_profiles"]==18
           assert trials["original_unchanged_core_archives"]==3
           assert trials["total_source_built_core_families"]==8
-          assert trials["five_source_family_run_id"]==42513615955
+          assert trials["five_source_family_run_id"]==42515151314
           assert set(trials["source_built_remaining_five"])=={
             "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan"
           }
