@@ -27,7 +27,7 @@ from tools.stage_v30_approved_native_mapping import (
     approved_core_map_from_lock, stage_approved_map,
 )
 from tools import stage_v30_approved_source_inputs as staging
-from tests.test_v30_approved_source_inputs import (
+from test_v30_approved_source_inputs import (
     synthetic_four_platform_review, fake_source, original_stub,
 )
 from tools.stage_v30_gpl_trial_inputs import package_native_zip
