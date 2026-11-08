@@ -66,6 +66,33 @@ question that checksum and notice checks cannot answer. See the dedicated
 A legally reviewed permissible distribution architecture or relevant
 rights-holder authorization is a prerequisite; CI cannot infer it.
 
+## Dolphin submodules pinned to their exact parent commit
+
+The first ten [upstream source snapshots](https://github.com/MasynNay/anything-plays/actions/runs/42441448884)
+correctly preserved the parent source trees but did **not** include Git
+submodule content. In particular, the Dolphin Libretro source at commit
+`32c61f9d0e933331bb7087ba57e96883241b4960` contains **34 Gitlinks** to
+pinned third-party commits, not 33 and not a complete vendored source tree.
+
+A new [unapproved Gitlink index](../config/v3.0-dolphin-submodule-candidates.json)
+records all 34 exact Git commit hashes and source URLs as extracted from that
+commit's own Git tree and `.gitmodules`. One external dependency is hosted
+on GitLab; the rest use GitHub. The companion
+[offline and optional live verifier](../tools/check_v30_dolphin_submodules.py)
+ensures the index cannot silently omit or change a dependency:
+
+```bash
+python -m tools.check_v30_dolphin_submodules
+python -m tools.check_v30_dolphin_submodules --verify-upstream
+```
+
+**What this establishes:** exact upstream Gitlink identities suitable for a
+subsequent pinned corresponding-source acquisition, license inventory and
+build-system audit. **What remains unresolved:** actual archived submodule
+contents, nested submodule sources and build dependencies, whether each
+dependency is part of the distributed native Libretro build, and exact
+native-binary-to-source correspondence. Every approval flag stays **false**.
+
 ## Reported upstream source capture (new evidence path)
 
 The 3.0 [preview integrity manifest](../config/v3.0-preview-candidate-integrity.json)
