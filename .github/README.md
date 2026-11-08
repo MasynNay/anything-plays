@@ -16,6 +16,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **capture-sources.yml** | Source provenance |
 | **candidate-draft.yml**, **release.yml** | Historical, controlled 2.0 release workflows |
 | **v30-publish-approved.yml** | Manual only, verified production-only 3.0 release publication (fail closed) |
+| **v30-production-candidates.yml** | Manual only, four-target immutable 3.0 installer producer; cannot publish releases |
 | **v30-source-snapshots.yml** | Preserve reported upstream source revisions as unapproved Actions evidence |
 | **v30-freeze-inputs.yml** | Manually produce an unapproved four-platform 48-archive fingerprint record from saved native inputs |
 
