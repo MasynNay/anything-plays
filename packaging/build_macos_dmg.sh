@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Stable builds are allowed only with independently approved source/rights,
+# four-platform real-device acceptance and an exact immutable native core lock.
+AP_V30_PRODUCTION="0"
+BUNDLE_FILE="AnythingPlays30Preview.app"
+DMG_NAME="AnythingPlays-3.0.0-alpha.1.dmg"
+DMG_VOLUME="Anything Plays 3.0 Preview"
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" == "1" ]] || { echo "Production requires AP_RELEASE_BUILD=1"; exit 1; }
+  [[ -n "${AP_CORE_ARCHIVE_DIR:-}" ]] || { echo "Production requires pinned AP_CORE_ARCHIVE_DIR"; exit 1; }
+  python3 tools/check_v30_release.py
+  python3 -c 'from tools.v30_release_lock import load_approved_lock; load_approved_lock()'
+  AP_V30_PRODUCTION="1"
+  BUNDLE_FILE="AnythingPlays.app"
+  DMG_VOLUME="Anything Plays"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.0.0-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.0.0-macos-x64.dmg" ;;
+    *) echo "Unsupported 3.0 production macOS architecture"; exit 1 ;;
+  esac
+fi
+APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
   PYTHON=/opt/homebrew/bin/python3.13
@@ -34,7 +55,9 @@ fi
 .build-venv/bin/python -m PyInstaller --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
 # Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
-mv dist/AnythingPlays.app dist/AnythingPlays30Preview.app
+if [[ "$AP_V30_PRODUCTION" != "1" ]]; then
+  mv dist/AnythingPlays.app dist/AnythingPlays30Preview.app
+fi
 # Generate a native macOS icon from the branded PNG.
 ICONSET="build/AnythingPlays.iconset"
 mkdir -p "$ICONSET"
@@ -43,9 +66,9 @@ for SIZE in 16 32 128 256 512; do
   DOUBLE=$((SIZE * 2))
   sips -z "$DOUBLE" "$DOUBLE" build/v21-icon/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o dist/AnythingPlays30Preview.app/Contents/Resources/AnythingPlays.icns
-/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" dist/AnythingPlays30Preview.app/Contents/Info.plist
-mkdir -p dist/AnythingPlays30Preview.app/Contents/Resources/cores
+iconutil -c icns "$ICONSET" -o "$APP_BUNDLE/Contents/Resources/AnythingPlays.icns"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" "$APP_BUNDLE/Contents/Info.plist"
+mkdir -p "$APP_BUNDLE/Contents/Resources/cores"
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
   CORE_LIST=(mgba)
@@ -55,25 +78,30 @@ fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }
-  cp "$core" dist/AnythingPlays30Preview.app/Contents/Resources/cores/
+  cp "$core" "$APP_BUNDLE/Contents/Resources/cores/"
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
-cp cores/CORE_PROVENANCE.json dist/AnythingPlays30Preview.app/Contents/Resources/cores/
+cp cores/CORE_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   # Dolphin's self-contained core needs compatibility tables under Sys/.
   # Ship them with the signed app; never ask the player to download them.
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
-  cp -R cores/dolphin-emu dist/AnythingPlays30Preview.app/Contents/Resources/cores/
-  cp cores/DOLPHIN_SYS_PROVENANCE.json dist/AnythingPlays30Preview.app/Contents/Resources/cores/
+  cp -R cores/dolphin-emu "$APP_BUNDLE/Contents/Resources/cores/"
+  cp cores/DOLPHIN_SYS_PROVENANCE.json "$APP_BUNDLE/Contents/Resources/cores/"
 fi
 # Required for Finder launches: macOS kills camera-using apps without this key.
-PLIST="dist/AnythingPlays30Preview.app/Contents/Info.plist"
+PLIST="${APP_BUNDLE}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :NSCameraUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Anything Plays uses the camera to track moving objects for game controls." "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
-/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.0 Preview" "$PLIST" || true
+if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.release30" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
+else
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.0 Preview" "$PLIST" || true
+fi
 # Include project and third-party licensing documentation.
-LICENSE_DIR="dist/AnythingPlays30Preview.app/Contents/Resources/licenses"
+LICENSE_DIR="${APP_BUNDLE}/Contents/Resources/licenses"
 mkdir -p "$LICENSE_DIR"
 
 cp LICENSE "$LICENSE_DIR/AnythingPlays-MIT.txt"
@@ -83,27 +111,27 @@ cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
-"$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays30Preview.app
+"$PYTHON" verify_bundle.py --check-native macos "$APP_BUNDLE"
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
-  .build-venv/bin/python tools/probe_embedded_3d.py macos dist/AnythingPlays30Preview.app
+  .build-venv/bin/python tools/probe_embedded_3d.py macos "$APP_BUNDLE"
 fi
 # Sign the outer application only. --deep would mutate nested Libretro dylibs
 # after their SHA-256 values were recorded in CORE_PROVENANCE.json.
-codesign --force --sign - dist/AnythingPlays30Preview.app
+codesign --force --sign - "$APP_BUNDLE"
 # Verify again after signing; reject even a successfully signed but modified
 # bundle instead of shipping a DMG with invalid core provenance.
-"$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays30Preview.app
-codesign --verify --verbose=2 dist/AnythingPlays30Preview.app
+"$PYTHON" verify_bundle.py --check-native macos "$APP_BUNDLE"
+codesign --verify --verbose=2 "$APP_BUNDLE"
 mkdir -p release
 # CI's shared macOS disk-image service intermittently returns Resource busy
 # after a clean ad-hoc signed bundle. Retry ONLY the DMG mount operation:
 # never suppress a permanent packaging/verification failure.
-DMG="release/AnythingPlays-3.0.0-alpha.1.dmg"
+DMG="release/$DMG_NAME"
 DMG_READY=0
 for ATTEMPT in 1 2 3 4; do
   rm -f "$DMG"
-  if hdiutil create -volname 'Anything Plays 3.0 Preview' \
-      -srcfolder dist/AnythingPlays30Preview.app -ov -format UDZO "$DMG"; then
+  if hdiutil create -volname "$DMG_VOLUME" \
+      -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG"; then
     DMG_READY=1
     break
   fi
@@ -117,9 +145,9 @@ done
 # Verify bytes after they have been packaged into the actual distributable DMG.
 MOUNT_DIR="$(mktemp -d /tmp/anything-plays-release.XXXXXX)"
 trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/dev/null 2>&1 || true' EXIT
-hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" release/AnythingPlays-3.0.0-alpha.1.dmg
-"$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays30Preview.app"
+hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" "$DMG"
+"$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/${BUNDLE_FILE}"
 hdiutil detach "$MOUNT_DIR"
 rmdir "$MOUNT_DIR"
 trap - EXIT
-echo 'Created release/AnythingPlays-3.0.0-alpha.1.dmg (unsigned; notarization required for normal public distribution)'
+echo "Created $DMG (ad-hoc signed app; Apple notarization is NOT claimed)"

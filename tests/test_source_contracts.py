@@ -99,12 +99,16 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("Contents/Resources/cores", script)
         self.assertNotIn("Contents/MacOS/cores", script)
         self.assertIn("hdiutil attach -readonly", script)
-        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays30Preview.app"', script)
+        self.assertIn('BUNDLE_FILE="AnythingPlays30Preview.app"', script)
+        self.assertIn('BUNDLE_FILE="AnythingPlays.app"', script)
+        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/${BUNDLE_FILE}"', script)
 
     def test_linux_verifies_extracted_debian_payload(self):
         script = (ROOT / "packaging/build_linux_deb.sh").read_text(encoding="utf-8")
         self.assertIn('dpkg-deb -x', script)
-        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-30-preview"', script)
+        self.assertIn('INSTALL_ID="anything-plays-30-preview"', script)
+        self.assertIn('INSTALL_ID="anything-plays"', script)
+        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/$INSTALL_ID"', script)
 
     def test_ui_boundary_is_explicit(self):
         from app import App

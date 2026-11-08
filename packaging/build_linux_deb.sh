@@ -3,6 +3,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="${VERSION:-3.0.0~alpha1}"
 ARCH="$(dpkg --print-architecture)"
+PACKAGE_NAME="anything-plays-preview"
+INSTALL_ID="anything-plays-30-preview"
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" == "1" ]] || { echo "Production requires AP_RELEASE_BUILD=1"; exit 1; }
+  [[ -n "${AP_CORE_ARCHIVE_DIR:-}" ]] || { echo "Production requires pinned AP_CORE_ARCHIVE_DIR"; exit 1; }
+  python3 tools/check_v30_release.py
+  python3 -c 'from tools.v30_release_lock import load_approved_lock; load_approved_lock()'
+  VERSION="3.0.0"
+  PACKAGE_NAME="anything-plays"
+  INSTALL_ID="anything-plays"
+fi
+OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
 .build-venv/bin/python -m pip install --upgrade pip==26.3
@@ -66,7 +78,7 @@ if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1"
   .build-venv/bin/python tools/probe_embedded_3d.py linux dist/AnythingPlays
 fi
 
-PKG="build/deb/anything-plays-preview_${VERSION}_${ARCH}"
+PKG="build/deb/${PACKAGE_NAME}_${VERSION}_${ARCH}"
 rm -rf "$PKG"
 mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-30-preview" "$PKG/usr/bin" "$PKG/usr/share/applications"
 cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-30-preview/"
@@ -131,16 +143,40 @@ Icon=anything-plays-preview
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
+# Preview installs side by side with 2.0. The stable Linux package identity
+# is selected only after exact 3.0 source/rights/real-device checks pass.
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  mv "$PKG/opt/anything-plays-30-preview" "$PKG/opt/anything-plays"
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays@g' \
+    -e 's@anything-plays-preview@anything-plays@g' \
+    -e 's@Preview launch@Application launch@g' \
+    "$PKG/usr/bin/anything-plays-30-preview"
+  mv "$PKG/usr/bin/anything-plays-30-preview" "$PKG/usr/bin/anything-plays"
+  sed -i \
+    -e 's@Package: anything-plays-preview@Package: anything-plays@g' \
+    -e 's@and experimental 3D cores@and embedded 3D cores@g' \
+    "$PKG/DEBIAN/control"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays.png"
+fi
 mkdir -p release
 chmod g-s "$PKG/DEBIAN"
 chmod 0755 "$PKG/DEBIAN"
-dpkg-deb --build --root-owner-group "$PKG" "release/anything-plays-preview_${VERSION}_${ARCH}.deb"
+dpkg-deb --build --root-owner-group "$PKG" "$OUTPUT_DEB"
 # Verify the exact DEB payload, not only the staging folder.
 AUDIT_DIR="$(mktemp -d)"
 trap 'rm -rf "$AUDIT_DIR"' EXIT
-dpkg-deb -x "release/anything-plays-preview_${VERSION}_${ARCH}.deb" "$AUDIT_DIR"
-python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays-30-preview"
-python3 - "$AUDIT_DIR/opt/anything-plays-30-preview" <<'PY'
+dpkg-deb -x "$OUTPUT_DEB" "$AUDIT_DIR"
+python3 verify_bundle.py --check-native linux "$AUDIT_DIR/opt/$INSTALL_ID"
+python3 - "$AUDIT_DIR/opt/$INSTALL_ID" <<'PY'
 import sys
 from pathlib import Path
 from tools.prune_linux_system_libs import EXCLUDED_RELATIVE_FILES
@@ -153,7 +189,7 @@ PY
 # cannot traverse. stat() is enough to check root-owned package mode bits
 # without needing to grant sudo or read any private user files.
 if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
-  python3 - "$AUDIT_DIR/opt/anything-plays-30-preview/cores/dolphin-emu" <<'PY'
+  python3 - "$AUDIT_DIR/opt/$INSTALL_ID/cores/dolphin-emu" <<'PY'
 from pathlib import Path
 import stat
 import sys
@@ -176,4 +212,4 @@ PY
 fi
 rm -rf "$AUDIT_DIR"
 trap - EXIT
-echo "Created release/anything-plays-preview_${VERSION}_${ARCH}.deb"
+echo "Created $OUTPUT_DEB"
