@@ -110,11 +110,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/collect_v30_production_assets.py \
+          python -m tools.collect_v30_production_assets \
             --version "$VERSION" \
             --source-commit "$GITHUB_SHA" \
             --input candidate-platforms --output production-input
-          python tools/stage_v30_release_assets.py \
+          python -m tools.stage_v30_release_assets \
             --version "$VERSION" \
             --input production-input --output public-release
           cd public-release
