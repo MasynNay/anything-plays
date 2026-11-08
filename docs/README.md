@@ -36,6 +36,8 @@ This directory is the index for technical and release evidence. The [repository 
 | Reviewer-ready cross-platform source evidence generator | [Native production lock: source review matrix](V3_NATIVE_PRODUCTION_LOCK.md#automated-draft-corresponding-source-review-matrix) |
 | Verified N64 empty submodules and eleven embedded source notices | [ParaLLEl-N64 pinned source review](V3_PARALLEL_N64_SOURCE_NOTICE_REVIEW.md) |
 
+The original 3.0 GUI **itself** now launches from the frozen Windows EXE, Linux executable and both macOS .app binaries: [actual four-platform desktop cold-launch report](V3_FROZEN_DESKTOP_LAUNCH_EVIDENCE.md). This is separate from emulator-only native tests and is not a public release or physical camera acceptance.
+
 The complete offline **3.0 preview** has passed four-platform packaging checks. It is not yet an approved public binary release. The [current stable release is 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
 
 ## Archives and continuity
