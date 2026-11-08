@@ -102,6 +102,8 @@ class PCEOriginalSourceLabTests(unittest.TestCase):
         self.assertIn("msys2/setup-msys2@v2", workflow)
         for target in PLATFORM_FILES:
             self.assertIn("target: " + target, workflow)
+        self.assertIn('EXTRA_INCLUDES="-include stdio.h"', workflow)
+        self.assertIn('platform=osx', workflow)
         self.assertIn("probe_pce_homebrew.py", workflow)
         self.assertIn("native_nonzero_pcm_samples", workflow)
         self.assertIn("gameplay_native_video_audio_verified", workflow)
