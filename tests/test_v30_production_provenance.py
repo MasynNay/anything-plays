@@ -131,7 +131,7 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
             installer.write_bytes(b"synthetic release candidate " * 70000)
             record = prepare_production_artifact(
                 target="linux-x64", version="3.0.0",
-                source_commit="a" * 40, installer=installer,
+                source_commit="b" * 40, installer=installer,
                 bundle_manifest=bundle_manifest(lock, "linux-x64"),
                 lock=lock, inventory=source,
                 review_text="APPROVED-3.0-DISTRIBUTION " + ("reviewed synthetic test only " * 20),
@@ -145,6 +145,39 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
             self.assertEqual(record["release_mode"], "APPROVED-IMMUTABLE-PRODUCTION")
             self.assertTrue(record["public_binary_distribution_approved"])
             self.assertEqual(record["native_cores_bundled"], 11)
+
+    def test_different_application_revision_cannot_reuse_approved_native_source(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            installer = root / expected_installers("3.0.0")[3]
+            installer.write_bytes(b"synthetic checked installer " * 60000)
+            common = dict(
+                target="linux-x64", version="3.0.0", installer=installer,
+                bundle_manifest=bundle_manifest(lock, "linux-x64"),
+                lock=lock, inventory=source,
+                review_text="APPROVED-3.0-DISTRIBUTION "
+                            + "SYNTHETIC NEGATIVE TEST " * 25,
+                output=root / "production", lock_digest="b" * 64,
+                source_digest="c" * 64,
+            )
+            # This previously passed: emitter stamped the application as
+            # built from 'a'*40 while its independent 44-core approval was
+            # exclusively for 'b'*40. The defect was present in the normal
+            # successful emitter fixture before this regression.
+            with self.assertRaisesRegex(ValueError, "application source revision"):
+                prepare_production_artifact(
+                    **common, source_commit="a" * 40)
+            self.assertFalse((root / "production").exists())
+            correct = prepare_production_artifact(
+                **common, source_commit="b" * 40)
+            self.assertEqual(correct["source_revision"], "b" * 40)
+
+    def test_rejects_source_catalog_approval_for_a_different_build_revision(self):
+        lock, inventory = synthetic_evidence()
+        inventory["source_commit"] = "a" * 40
+        with self.assertRaisesRegex(ValueError, "locked build commit"):
+            validate_source_inventory(lock, inventory)
 
     def test_refuses_missing_source_or_unverified_dependencies(self):
         lock, source = synthetic_evidence()
@@ -260,7 +293,7 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
             installer = root/name
             installer.write_bytes(b"synthetic " * 150000)
             common = dict(target="linux-x64", version="3.0.0",
-                          source_commit="a"*40, installer=installer,
+                          source_commit="b"*40, installer=installer,
                           lock=lock, inventory=source,
                           output=root/"production",
                           lock_digest="b"*64, source_digest="c"*64)

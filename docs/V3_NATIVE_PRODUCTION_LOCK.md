@@ -112,6 +112,27 @@ retail-game/hardware acceptance is implied.** The technical core swap is
 evaluated in isolation and may be adopted for a future reviewed release
 only after independent evidence and rights decisions.
 
+### Release application revision must equal independently approved source revision
+
+The production artifact emitter must compare **all three** sources of the
+application's build identity before copying any final installer:
+
+1. The actual checkout supplied as `--source-commit "$GITHUB_SHA"`.
+2. The independently approved `config/v3.0-core-lock.json` top-level
+   `source_commit`.
+3. The independently verified `config/v3.0-corresponding-source-inventory.json`
+   top-level `source_commit`.
+
+A mismatch rejects the production artifact even when all **44 core hashes**
+and Dolphin Sys native archives match. An approved native snapshot from
+one application version does **not** authorize a newer desktop application's
+bundle simply because the native code is byte-for-byte identical.
+The source-only synthetic regression
+`tests/test_v30_production_provenance.py`
+reproduces and blocks an attempt to stamp a new GitHub commit onto an
+older approved native/source lock. This is a source-integrity guard, not
+an automatic license permission determination.
+
 ## Strict per-core source-and-rights preflight for approved production
 
 Before an approved builder spends time compiling installers, it now runs
