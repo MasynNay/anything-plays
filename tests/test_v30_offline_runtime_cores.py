@@ -51,6 +51,8 @@ class OfflineResolverAcceptanceTests(unittest.TestCase):
             self.assertEqual(report["native_cores_hash_verified"], 11)
             self.assertEqual(set(report["system_to_core"]), set(SYSTEMS))
             self.assertEqual(set(report["native_payload_checksums"]), set(CORE_NAMES))
+            self.assertEqual(report["system_to_core"]["n64"], "parallel_n64")
+            self.assertEqual(report["system_to_core"]["gamecube"], "dolphin")
             self.assertTrue(report["no_external_emulator_setup_required_in_staged_bundle"])
             self.assertTrue(report["no_runtime_core_download_required_for_fresh_bundled_lookup"])
             for flag in ("physical_installer_launch_verified",
@@ -85,7 +87,7 @@ class OfflineResolverAcceptanceTests(unittest.TestCase):
             data = json.loads(p.read_text())
             data["cores"][0]["name"] = data["cores"][1]["name"]
             p.write_text(json.dumps(data))
-            with self.assertRaisesRegex(ValueError, "repeated native"):
+            with self.assertRaisesRegex(ValueError, "repeated native|Wrong platform core filename"):
                 check_offline_bundle(core_dir, target)
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
