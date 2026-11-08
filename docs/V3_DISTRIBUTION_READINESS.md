@@ -196,6 +196,27 @@ public GitHub release. Run `python tools/capture_v30_source_snapshots.py
 published native binaries, build flags, transitive source and rights remain
 unverified. Never interpret archived upstream source alone as compliance.
 
+## Fresh-install offline core-resolution acceptance (four-platform lab)
+
+The four-platform full offline installer lab now includes
+`tools/probe_v30_installed_offline_cores.py`, which audits the **actual staged
+native payloads** rather than merely checking download-time inventory. It
+rehashes all 11 installed native binaries against `CORE_PROVENANCE.json`,
+checks the bundled Dolphin Sys files, and calls the application's real
+`find_core()` for each of the 18 console profiles using a temporary fresh
+managed-core store. Network sockets and `urllib.request.urlopen` are blocked
+during those calls, and the resolver may look only in the staged install.
+
+The audit rejects missing/altered cores, wrong platform, external emulator
+paths, developer-only RetroArch fallback and incomplete native bundles.
+Its per-platform `offline-runtime-<target>.json` test evidence is included in
+the **TEST-ONLY** installer artifact. Release rights, native actual game
+video/audio/input and full physical-installed-device QA remain marked false.
+Do not count a simulated fresh-core lookup as a physical clean install or as
+legal permission. Only mark the two *no separate emulator setup/download*
+release evidence flags as verified if **all four actual platform jobs** pass
+on this exact script and their reports have been reviewed.
+
 ## Publication blockers and required evidence
 
 1. **Freeze exact bytes.** Current full-preview build runs with `AP_RELEASE_BUILD=0` and `AP_V30_TEST_CORES=1`. The acquisition path can fetch Libretro `latest` cores. Preserve each archive, its SHA-256, target architecture, reported revision and exact final packaged native binary hash. The old approved v2.0 lock does not cover the additional 3.0 cores.
