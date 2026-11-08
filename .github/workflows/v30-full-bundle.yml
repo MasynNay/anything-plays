@@ -70,6 +70,14 @@ on:
       - 'tools/fetch_dolphin_sys.py'
       - 'tests/test_v30_original_input_capture.py'
       - 'config/v3.0-release-acceptance.json'
+      # Physical test evidence must bind to a CURRENT complete offline
+      # 18-profile/11-core installer, not stale alpha artifacts. When the
+      # private owner QA recorder/reconciler changes, produce fresh test-only
+      # owner-accessible installer artifacts at that exact merged commit.
+      - 'tools/v30_physical_qa.py'
+      - 'tools/v30_physical_qa_matrix.py'
+      - 'tests/test_v30_physical_qa.py'
+      - 'tests/test_v30_physical_qa_matrix.py'
   workflow_dispatch:
 
 permissions:
