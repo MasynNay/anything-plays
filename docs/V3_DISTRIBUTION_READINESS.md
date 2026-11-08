@@ -182,6 +182,34 @@ placing any native payloads into the Git repository or GitHub Releases.
 The remaining source-to-shipped-binary, transitive source, license compatibility,
 Dolphin Sys and final hardware acceptance requirements remain unchanged.
 
+### Two nested Dolphin .gitmodules manifests require three further pinned sources
+
+The complete original 34-archive reviewer index
+([verified run 42447184893](https://github.com/MasynNay/anything-plays/actions/runs/42447184893))
+identifies `.gitmodules` files inside **two** of the 34 captured
+submodules: Cubeb and libadrenotools. Direct inspection of their
+immutable upstream Git trees finds **three actual nested Gitlinks**:
+Cubeb's `googletest` and `cmake/sanitizers-cmake`, and libadrenotools'
+`lib/linkernsbypass`. Each of these three exact child Git trees showed
+**zero further Gitlinks** on independent inspection. These are original
+upstream source dependencies, not additional emulators.
+
+The independently audited original parent archive hashes, source repos,
+three child revisions and their declared `.gitmodules` URLs are frozen
+in `config/v3.0-dolphin-nested-submodule-candidates.json`.
+`tools/capture_v30_dolphin_nested_sources.py` and the new review-only
+`.github/workflows/v30-dolphin-nested-sources.yml` verify those parent
+tree links against the original 34-source audit and acquire **three
+immutable source TAR candidates**, reporting actual SHA-256, byte sizes,
+and candidate root license-file SHA-256 values. See
+[V3_DOLPHIN_NESTED_SOURCE_REVIEW.md](V3_DOLPHIN_NESTED_SOURCE_REVIEW.md).
+
+Even an exact 34+3 recursive Gitlink capture does **not** independently
+prove complete build inputs, correct source-to-shipped-native binary
+correspondence, Apache/GPL/noncommercial combined-work licensing or
+permission to distribute the GameCube core. All corresponding-source,
+rights, Dolphin Sys and release authorization flags remain false.
+
 ## Reported upstream source capture (new evidence path)
 
 The 3.0 [preview integrity manifest](../config/v3.0-preview-candidate-integrity.json)
