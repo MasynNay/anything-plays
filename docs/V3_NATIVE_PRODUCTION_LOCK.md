@@ -33,6 +33,28 @@ The top-level `license_compatibility_reviewed`,
 `approved_for_binary_distribution` values must remain false until genuine
 approval. No automatic tool sets these flags.
 
+## Automated draft corresponding-source review matrix
+
+A manual, research-only GitHub workflow
+`.github/workflows/v30-source-review-matrix.yml` now joins the 48 previously
+captured original inputs (44 platform-specific libraries + four Dolphin Sys
+archives) to the ten preserved upstream Git source tarballs. It rechecks all
+original ZIP/native SHA-256 identities and every source tarball SHA-256 and
+reported Git revision prefix before producing an **unapproved** four-platform
+source-review inventory. It flags the missing Beetle PCE Fast source revision,
+Dolphin submodule contents, transitive licenses and binary-to-source mapping
+instead of inventing source approval. The output is an Actions artifact,
+not a new public release and not the final reviewed
+`config/v3.0-corresponding-source-inventory.json`.
+
+Run it from GitHub Actions using the successful
+[original native archive run 42437133733](https://github.com/MasynNay/anything-plays/actions/runs/42437133733)
+and [source snapshot run 42441448884](https://github.com/MasynNay/anything-plays/actions/runs/42441448884).
+The exact generated source-review matrix must be independently examined,
+completed with source and license evidence, and reviewed before it can be
+proposed for the approved production path. Its automatically produced flags
+are deliberately **all false**.
+
 ## Distinct release and development modes
 
 | Mode | Build environment | Effect |
