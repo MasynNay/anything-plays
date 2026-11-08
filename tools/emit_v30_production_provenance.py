@@ -125,6 +125,17 @@ def prepare_production_artifact(*, target, version, source_commit, installer,
         if not isinstance(value, str) or not SHA256.fullmatch(value):
             raise ValueError(f"Missing signed-off {name} digest")
     validate_source_inventory(lock, inventory)
+    # The approved native/source snapshot MUST belong to this exact source
+    # checkout. Before this check, an approved 44-binary inventory for an
+    # earlier revision could be reused while stamping a NEWER GitHub SHA
+    # into the production installer provenance. The individual core hashes
+    # alone cannot prove what application source built that installer.
+    if (source_commit != lock.get("source_commit")
+            or source_commit != inventory.get("source_commit")):
+        raise ValueError(
+            "Production application source revision does not match "
+            "the independently approved native/source lock"
+        )
     installed = verify_native_bundle(lock, bundle_manifest)
     if installed != NATIVE_MAP[target]:
         raise ValueError("Installed native core bundle belongs to another target")
