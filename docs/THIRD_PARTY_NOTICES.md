@@ -80,6 +80,36 @@ independent proof of reproducible compilation. The release remains blocked
 until [the 3.0 distribution review](V3_DISTRIBUTION_READINESS.md) and
 release acceptance evidence are complete.
 
+### ParaLLEl-N64 (Nintendo 64)
+
+The full 3.0 developer bundle also contains the ParaLLEl-N64 native core,
+whose [reported upstream revision](https://github.com/libretro/parallel-n64/commit/e0ef5d673257e2e83bf9b7cffe62eda141af8493)
+is `e0ef5d673257e2e83bf9b7cffe62eda141af8493`.
+[Libretro's license inventory](https://docs.libretro.com/development/licenses/)
+lists ParaLLEl-N64 as GPLv3. We preserve a complete GPLv3 reference text in
+`licenses/ParaLLEl-N64-GPL-3.0.txt` (sourced from the official
+[Libretro RetroArch COPYING](https://github.com/libretro/RetroArch/blob/master/COPYING)).
+
+This core contains independently attributed subcomponents and alternative
+licensing choices. Their pinned upstream notices are included verbatim:
+
+- `licenses/ParaLLEl-N64-Mupen64Plus-Core-LICENSES.txt`:
+  [Mupen64Plus-Core notice](https://github.com/libretro/parallel-n64/blob/e0ef5d673257e2e83bf9b7cffe62eda141af8493/mupen64plus-core/LICENSES),
+  including GPLv2 attribution.
+- `licenses/ParaLLEl-N64-RSP-LICENSE.txt`:
+  [RSP dual-license explanation](https://github.com/libretro/parallel-n64/blob/e0ef5d673257e2e83bf9b7cffe62eda141af8493/mupen64plus-rsp-paraLLEl/LICENSE).
+- `licenses/ParaLLEl-N64-RSP-LGPL-3.0.txt` and
+  `licenses/ParaLLEl-N64-RSP-MIT.txt`: the corresponding pinned RSP
+  [LGPLv3](https://github.com/libretro/parallel-n64/blob/e0ef5d673257e2e83bf9b7cffe62eda141af8493/mupen64plus-rsp-paraLLEl/LICENSE.LESSER)
+  and [MIT](https://github.com/libretro/parallel-n64/blob/e0ef5d673257e2e83bf9b7cffe62eda141af8493/mupen64plus-rsp-paraLLEl/LICENSE.MIT)
+  texts.
+
+These files are necessary attribution inputs, **not** evidence that every
+compiled plugin/submodule has been inventoried or that the exact full native
+binary complies with all source and linking requirements. Binary-to-source
+correspondence and compatibility with noncommercial cores such as Snes9x and
+Genesis Plus GX require separate review before public distribution.
+
 ## Python and native dependencies
 
 OpenCV, NumPy, Pillow, sounddevice, glcontext, PyObjC (macOS), and transitive native
