@@ -107,10 +107,11 @@ def native_monochrome_av(core, output, *, seconds=12, runner=subprocess.run):
     report = output / "NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json"
     report.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n",
                       encoding="utf-8")
-    (output / "SHA256SUMS.txt").write_text(
-        f"{hashlib.sha256(report.read_bytes()).hexdigest()}  {report.name}\n",
-        encoding="utf-8",
-    )
+    # GNU sha256sum -c under Git Bash treats Windows CRLF's carriage
+    # return as part of the filename. Always emit an exact LF checksum file,
+    # while hashing the actual report bytes present on this native platform.
+    checksum = f"{hashlib.sha256(report.read_bytes()).hexdigest()}  {report.name}\n"
+    (output / "SHA256SUMS.txt").write_bytes(checksum.encode("ascii"))
     return evidence
 
 
