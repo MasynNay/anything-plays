@@ -3,6 +3,16 @@ name: Anything Plays 3.0 | Sustained endurance lab
 # On-demand and code-change-only: neither test constitutes physical GPU or
 # real camera/speaker certification. Do not upload native test game binaries.
 on:
+  # Exercise the real 10/15-minute long-run test BEFORE merging a change.
+  # The jobs remain research-only; GPU simulation and synthetic camera do
+  # not certify physical speakers, real games or four-platform hardware.
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-endurance.yml'
+      - 'tests/soak_gui.py'
+      - 'tools/probe_gamecube_app.py'
+      - 'tests/test_v30_endurance_ci.py'
   push:
     branches: [feature/v3.0-unified-test]
     paths:
@@ -18,6 +28,8 @@ permissions:
 
 concurrency:
   group: v30-endurance-${{ github.ref }}
+  # Keep the newest verified commit; do not report a superseded run
+  # as accepted hardware evidence.
   cancel-in-progress: true
 
 jobs:
@@ -79,7 +91,7 @@ jobs:
           xvfb-run -a python tools/probe_gamecube_app.py \
             --core cores/dolphin_libretro.so \
             --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
-            --require-animated --require-audio --seconds 600 \
+            --require-animated --require-audio --require-controller-effect --seconds 600 \
             --max-growth-mb 192 \
             --report test-evidence/gamecube-10minute-rss.json
       - uses: actions/upload-artifact@v4
