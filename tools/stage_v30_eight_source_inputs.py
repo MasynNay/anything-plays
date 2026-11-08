@@ -7,7 +7,7 @@ built binaries in their genuine original name slots. The unchanged native
 families are mGBA, ParaLLEl-N64 and Dolphin, plus original Dolphin Sys.
 
 The 20 original compiled source/native artifacts are from Actions run
-42513615955 (not five guessed replacements for the old buildbot sources).
+42515151314 (not five guessed replacements for the old buildbot sources).
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from tools.stage_v30_gpl_trial_inputs import stage_inputs, TARGET_EXT, package_n
 from tools.capture_v30_2d_five_source_build import CANDIDATES, PINNED_COMMITS
 
 STATUS = "UNAPPROVED-EIGHT-SOURCE-FAMILY-FULL-3.0-OFFLINE-TEST"
-ORIGINAL_RUN = 42513615955
+ORIGINAL_RUN = 42515151314
 FAMILIES = frozenset(PINNED_COMMITS)
 LEFT_UNCHANGED = frozenset(("mgba", "parallel_n64", "dolphin"))
 assert len(FAMILIES) == 5
