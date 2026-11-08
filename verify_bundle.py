@@ -245,6 +245,13 @@ def verify_bundle(bundle, platform_name, check_native=False):
                     raise ValueError(f"Original source-built GPL notice missing: {name}")
                 if hashlib.sha256(original.read_bytes()).hexdigest()!=row["original_license_notice_sha256"]:
                     raise ValueError(f"Wrong original 3.0 GPL license notice: {name}")
+        mgba = trial_marker.get("source_built_mgba")
+        if mgba is not None:
+            original = licenses / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt"
+            if original.is_symlink() or not original.is_file():
+                raise ValueError("Missing original MPL2 source license for the ninth core")
+            if hashlib.sha256(original.read_bytes()).hexdigest() != mgba["original_license_notice_sha256"]:
+                raise ValueError("Original ninth source-built mGBA MPL2 license was modified")
         if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
             raise ValueError("Noncommercial core entered the GPL alternative test lineup")
         if platform_name == "windows":
