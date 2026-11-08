@@ -1,0 +1,176 @@
+name: Anything Plays 3.0 | Approved production candidates
+
+# A closed, manual production lane. This file cannot build test-only binaries
+# and never publishes a GitHub release. Publication uses a separate guarded job.
+on:
+  workflow_dispatch:
+    inputs:
+      native_input_run_id:
+        description: Successful complete offline lab with preserved original ZIPs
+        required: true
+        type: string
+      confirmation:
+        description: Type APPROVED-3.0-DISTRIBUTION after independent source, rights and QA review
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-v30-approved-production
+  cancel-in-progress: false
+
+jobs:
+  approved-four-platform-candidates:
+    environment: stable-v3-production-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows-x64
+            extension: dll
+            installer: AnythingPlaysSetup-3.0.0.exe
+            core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
+          - runner: macos-15
+            target: macos-arm64
+            extension: dylib
+            installer: AnythingPlays-3.0.0-macos-arm64.dmg
+            core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
+          - runner: macos-15-intel
+            target: macos-x64
+            extension: dylib
+            installer: AnythingPlays-3.0.0-macos-x64.dmg
+            core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
+          - runner: ubuntu-24.04
+            target: linux-x64
+            extension: so
+            installer: anything-plays_3.0.0_amd64.deb
+            core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      SOURCE_RUN_ID: ${{ inputs.native_input_run_id }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      AP_RELEASE_BUILD: '1'
+      AP_V30_APPROVED_RELEASE: '1'
+      AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/immutable-inputs
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require reviewed main commit and independent release approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/main || "$RELEASE_CONFIRMATION" != APPROVED-3.0-DISTRIBUTION ]]; then
+            echo "::error::Production is main-only with explicit reviewed rights confirmation"
+            exit 1
+          fi
+          if [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Exact original-native-input Actions run ID is required"
+            exit 1
+          fi
+          python tools/check_repository_hygiene.py
+          python tools/check_v30_release.py
+          python -c 'from tools.v30_release_lock import load_approved_lock; load_approved_lock()'
+          test -s config/v3.0-corresponding-source-inventory.json
+          test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
+          test -s docs/V3_RELEASE_NOTES_APPROVED.md
+          run_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
+          run_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
+          if [[ "$run_name" != "Anything Plays 3.0 | Complete offline installer lab" || "$run_status" != success ]]; then
+            echo "::error::Original preserved ZIPs must come from a completed successful 3.0 full lab"
+            exit 1
+          fi
+      - name: Fetch original Libretro ZIPs and Dolphin Sys from preserved evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$AP_CORE_ARCHIVE_DIR"
+          gh run download "$SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}" \
+            --dir "$AP_CORE_ARCHIVE_DIR"
+      - name: Enforce complete original archive list before building
+        shell: bash
+        env:
+          NATIVE_EXTENSION: ${{ matrix.extension }}
+          PLATFORM_NAME: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from tools.v30_release_lock import CORE_NAMES
+          root = Path(os.environ["AP_CORE_ARCHIVE_DIR"])
+          ext = os.environ["NATIVE_EXTENSION"]
+          expected = {f"{core}_libretro.{ext}.zip" for core in CORE_NAMES}
+          expected |= {"Dolphin.zip", "PRESERVED_NATIVE_INPUTS.json"}
+          found = {file.name for file in root.iterdir() if file.is_file() and not file.is_symlink()}
+          assert found == expected, f"Wrong native archives: missing={expected-found}, extra={found-expected}"
+          record = json.loads((root/"PRESERVED_NATIVE_INPUTS.json").read_text("utf-8"))
+          assert record["target"] == os.environ["PLATFORM_NAME"]
+          assert record["public_distribution_approved"] is False
+          print("Original preserved source ZIP inventory is complete; approved lock will independently check each native byte")
+          PY
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Build exact stable Windows setup EXE
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Build exact stable macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Build exact stable Linux DEB
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Verify corresponding-source record and emit production provenance
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          INSTALLER_NAME: ${{ matrix.installer }}
+          NATIVE_MANIFEST: ${{ matrix.core_manifest }}
+        run: |
+          set -euo pipefail
+          python -m tools.emit_v30_production_provenance \
+            --target "$RELEASE_TARGET" \
+            --version 3.0.0 \
+            --source-commit "$GITHUB_SHA" \
+            --installer "release/$INSTALLER_NAME" \
+            --core-provenance "$NATIVE_MANIFEST" \
+            --output production-artifact
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path("production-artifact")
+          expected = {"PRODUCTION_PROVENANCE.json", os.environ["INSTALLER_NAME"]}
+          assert {x.name for x in root.iterdir()} == expected
+          record = json.loads((root/"PRODUCTION_PROVENANCE.json").read_text("utf-8"))
+          assert record["release_mode"] == "APPROVED-IMMUTABLE-PRODUCTION"
+          assert record["source_revision"] == os.environ["GITHUB_SHA"]
+          PY
+      - name: Preserve exact approved two-file production artifact for manual release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-PRODUCTION-${{ matrix.target }}
+          path: production-artifact/*
+          if-no-files-found: error
+          retention-days: 30

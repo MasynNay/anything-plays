@@ -48,9 +48,23 @@ reviewed local `Dolphin.zip` and rejects changed bytes; network fallback is
 prohibited. Windows, Linux, and Mac build scripts must carry all eleven core
 libraries and Dolphin Sys in this mode.
 
-**Additional production tasks remain:** a separately approved immutable 11-core
-input lock, final stable OS installer identities (the current scripts still
-default to preview branding), a four-platform reviewed production build
-workflow, final signing/notarization disclosure and the manual
-[publication runbook](V3_PUBLICATION_RUNBOOK.md). These are release gates;
-this native preflight does not itself generate or publish a public release.
+The controlled GitHub workflow `.github/workflows/v30-production-candidates.yml`
+now defines the **four-platform approved production artifact producer**. It
+requires explicit owner confirmation, a fully reviewed immutable native lock,
+`config/v3.0-corresponding-source-inventory.json`, an independently approved
+`docs/V3_LICENSE_COMPATIBILITY_APPROVED.md` rights decision, strict QA
+acceptance and original matching ZIP archives. These files and approvals
+are not yet complete, so the workflow intentionally cannot produce public
+approved binaries. It emits exactly one canonical stable installer and one
+`PRODUCTION_PROVENANCE.json` per target after rechecking source, lock, bundle
+and installer hashes. The separate manual publisher reads these four artifacts.
+
+**Additional production tasks remain:** independent approval and population
+of the immutable 11-core lock, corresponding-source inventories (including
+submodules and an identifiable PCE Fast source), GPL/noncommercial rights review,
+final signing/notarization disclosures, and actual platform/audio/gameplay
+acceptance. The Windows/macOS/Linux packaging scripts now have separate stable
+production identities alongside unchanged preview mode, and the four-platform
+candidate producer exists, but both fail closed until all evidence is reviewed.
+The distinct manual [publication runbook](V3_PUBLICATION_RUNBOOK.md) controls
+the final release, not these build scripts.
