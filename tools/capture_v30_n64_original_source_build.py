@@ -89,11 +89,16 @@ def validate_source_and_notices(source, index):
                 or note.get("notice_reviewed") is not False):
             raise ValueError("Unexpected or preapproved original N64 license path")
         item = source / filename
-        if (item.is_symlink() or not item.is_file() or item.stat().st_size != note.get("size_bytes")
-                or not 0 < item.stat().st_size <= 1024 * 1024):
-            raise ValueError("Missing or modified original N64 license material")
-        raw = item.read_bytes()
-        if gitblob(raw) != note.get("git_blob_sha1"):
+        if item.is_symlink() or not item.is_file():
+            raise ValueError("Missing or unsafe checked-out original N64 license")
+        # On Windows, actions/checkout can render tracked text as CRLF. An
+        # immutable Git object's original bytes, NOT the platform-specific
+        # working tree rendering, are the correct source-license evidence.
+        # Git status above separately rejects *actual tracked modifications*.
+        raw = _git(source, "show", "HEAD:" + filename)
+        if (not 0 < len(raw) <= 1024 * 1024
+                or len(raw) != note.get("size_bytes")
+                or gitblob(raw) != note.get("git_blob_sha1")):
             raise ValueError(f"Original N64 upstream license Git blob changed: {filename}")
         verified[filename] = {"sha256": sha(raw), "size_bytes": len(raw)}
     if len(verified) != 11:
