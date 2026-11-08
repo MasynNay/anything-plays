@@ -65,6 +65,7 @@ def validate_installed_map(folder, extension, *, verify_native=True):
                 or row.get("source_repository") != REPOSITORIES[name]):
             raise ValueError(f"Original source-built revision/filename mismatch: {name}")
         _require_hash(row.get("native_sha256"), f"{name} binary digest")
+        _require_hash(row.get("license_notice_sha256"), f"{name} original GPL notice")
         if verify_native:
             path = root / filename
             if (path.is_symlink() or not path.is_file()
