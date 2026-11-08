@@ -1,0 +1,42 @@
+# CONTINUE HERE — Anything Plays 3.0 public release
+
+Last verified November 7, 2026. This is the durable handoff/checkpoint if a conversation or tool stream fails. Do not reset 3.0 work or re-add emulators.
+
+## Product decision (frozen)
+
+- **No new emulator/core/console integration in 3.0.** Supported test inventory stays **18 console profiles and 11 native Libretro cores**. No Wii.
+- User confirmed Linux GameCube/Dolphin works on their machine, after the writable Sys fix. Their last screenshot exposed **oversized camera control labels**; label fix now merged.
+- User wants a public version **3.0.0** first; only after that, announce/publish the *future* versioned roadmap. Do **not** prepublish a new 3.1–4.0 roadmap.
+- Preserve the original artwork, theme support and all existing emulator functionality; keep stable v2.0.0 untouched.
+
+## Verified complete work
+
+1. PR [#31](https://github.com/MasynNay/anything-plays/pull/31) merged into `feature/v3.0-unified-test` (squash commit `43cc14b572b039b0d0074fa4726ed4d65ffd764b`). Restored camera-left label-size slider, reset button, per-console persisted size, and fit-to-zone render constraint; added regression test.
+2. The **complete** four-platform offline installer lab passed on the slider-fix commit: [workflow 42426209611](https://github.com/MasynNay/anything-plays/actions/runs/42426209611). Windows x64, macOS arm64, macOS x64 and Linux x64 all passed. Linux job includes unprivileged installed-app startup and readonly-Dolphin GameCube native smoke.
+3. Source checks succeeded on the PR commit (and preceding development commit).
+4. PR [#32](https://github.com/MasynNay/anything-plays/pull/32) merged (squash commit `21557ddf3f7af73cd8966e4da2645c18088cf685`) with [3.0 distribution evidence audit](docs/V3_DISTRIBUTION_READINESS.md), [draft 3.0 release notes](docs/V3_RELEASE_NOTES_DRAFT.md), and README links. The future version-number roadmap was intentionally **not** announced.
+5. Linux hardware follow-up recorded in [issue #25](https://github.com/MasynNay/anything-plays/issues/25). Stable public download remains [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
+
+## PUBLIC 3.0 IS NOT YET PUBLISHED — true blockers
+
+- [3.0 release issue #28](https://github.com/MasynNay/anything-plays/issues/28) remains open for per-core license/source/redistribution and architecture-by-architecture official binary approval, and end-to-end real-device acceptance.
+- `config/v3.0-release-acceptance.json` still has numerous intentionally false per-console/per-platform/rights statuses. Never manufacture true values to enable publication.
+- Full **test-only** installers are built from `AP_RELEASE_BUILD=0`, `AP_V30_TEST_CORES=1`, optionally changing Libretro `latest` native inputs. No immutable reviewed eleven-core release lock / source inventory yet. Prior v2.0 approval applies only to the older exact binaries.
+- `tools/check_v30_release.py` must pass **without** `--report-only` after documented review; latest full bundle intentionally uses report-only and is NOT a release authorization.
+- Need exact four immutable production installers, corresponding license/source notices and hashes, cross-platform QA evidence, packaging inspection, signed/notarized limitations, final manual release approval.
+- The currently available connected GitHub tool set has branch/file/PR issue writes and GitHub Actions reads, **but no release-create/publish or workflow-dispatch action**. Do not claim any GitHub release was published without actually checking releases. The one-time publish mechanism may need an intentionally gated GitHub Actions workflow and owner-approved trigger if tool capabilities do not change.
+
+## Next practical actions
+
+1. Complete eleven-core third-party licenses and provenance, including Snes9x noncommercial conditions and GPL/LGPL dependencies and exact Dolphin Sys assets; preserve source snapshots and notices.
+2. Make an immutable archive for 3.0 on four targets (not nightly fetch at release time) and verify final installed hashes. Keep source/technical files accessible without cluttering the four main downloads.
+3. Finish real device matrix and long-run checks, especially GameCube, plus actual game audio/input/save evidence.
+4. Set evidence-backed release gate flags, ensure `python tools/check_v30_release.py` succeeds, and run final 3.0 candidate builds.
+5. Publicly publish four verified installers plus `SHA256SUMS.txt` and required source/license access documentation. Update README/main and website to stable 3.0.
+6. **Only after successful public 3.0:** publish the proposed forward roadmap, with version labels treated as tentative.
+
+## Safety
+
+- Do not delete stable 2.0 or replace main downloads with unapproved 3.0 binaries.
+- Do not distribute copyrighted game ROMs or BIOS.
+- Do not call developer-test CI success a blanket emulator compatibility certification or third-party redistribution authorization.
