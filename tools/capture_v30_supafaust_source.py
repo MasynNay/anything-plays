@@ -160,8 +160,10 @@ def capture(*, source, native, output, target="linux-x64"):
     for p in sorted(destination.iterdir()):
         if p.name != "SHA256SUMS.txt":
             entries.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}")
-    (destination / "SHA256SUMS.txt").write_text(
-        "\n".join(entries) + "\n", encoding="ascii")
+    # write_text() uses native newlines on Windows, producing CRLF that
+    # GNU sha256sum treats as part of the filename. Force portable LF bytes.
+    (destination / "SHA256SUMS.txt").write_bytes(
+        ("\n".join(entries) + "\n").encode("ascii"))
     return evidence
 
 
