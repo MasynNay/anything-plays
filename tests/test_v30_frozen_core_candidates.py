@@ -110,7 +110,7 @@ class FrozenV30CandidateTests(unittest.TestCase):
             paths = {key: root / (key + ".zip") for key in PLATFORMS}
             for target, path in paths.items():
                 make_bundle(path, target, source_sha="a" * 40 if target == "macos-x64" else SOURCE_SHA)
-            with self.assertRaisesRegex(ValueError, "same source commit"):
+            with self.assertRaisesRegex(ValueError, "share a source commit"):
                 build_candidate(paths)
             with self.assertRaisesRegex(ValueError, "exactly four platforms"):
                 build_candidate({key: path for key, path in paths.items()
