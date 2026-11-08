@@ -67,8 +67,8 @@ for SIZE in 16 32 128 256 512; do
   sips -z "$DOUBLE" "$DOUBLE" build/v21-icon/anything_plays.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP_BUNDLE/Contents/Resources/AnythingPlays.icns"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" ${APP_BUNDLE}/Contents/Info.plist
-mkdir -p ${APP_BUNDLE}/Contents/Resources/cores
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AnythingPlays.icns" "$APP_BUNDLE/Contents/Info.plist"
+mkdir -p "$APP_BUNDLE/Contents/Resources/cores"
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
   CORE_LIST=(mgba)
