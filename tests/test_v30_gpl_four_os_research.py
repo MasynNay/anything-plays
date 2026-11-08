@@ -49,6 +49,8 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
         workflow=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         header=(root/"tools/bsnes_mingw_vasprintf_compat.h").read_text("utf-8")
         self.assertIn("mingw-w64-x86_64-python",workflow)
+        self.assertIn("C:/msys64/mingw64/bin",workflow)
+        self.assertIn('LDFLAGS="-fPIC -dynamiclib -Wl,-ld_classic"',workflow)
         self.assertIn('EXTRA_INCLUDES="-include $(pwd)/tools/bsnes_mingw_vasprintf_compat.h"',workflow)
         self.assertIn('EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE"',workflow)
         self.assertIn("#if defined(_WIN32) && !defined(__cplusplus)",header)
