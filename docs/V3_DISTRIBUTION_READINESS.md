@@ -168,6 +168,20 @@ Dolphin Libretro binary and on which build flags, licenses/notices and
 redistribution of the combined program and Dolphin Sys. Every source-to-
 shipped-binary and public distribution approval flag remains **false**.
 
+**Independent 34-archive reconciliation complete:** [PR #58](https://github.com/MasynNay/anything-plays/pull/58)
+merged after its [seven-job source/packaging CI](https://github.com/MasynNay/anything-plays/actions/runs/42447184884)
+and the [real original-artifact reconciliation run 42447184893](https://github.com/MasynNay/anything-plays/actions/runs/42447184893)
+both passed. `tools/reconcile_v30_dolphin_source_archives.py` downloaded
+all six original unapproved source artifacts, independently rehashed and checked
+the 34 original source TARs against original shard manifests, checksum lists,
+original pinned Gitlink commits and repository URLs. It retained a single
+`AnythingPlays-3.0.0-DOLPHIN-34-SOURCE-REVIEW-UNAPPROVED` review artifact
+containing **only a 34-source JSON and SHA256SUMS.txt**, not binaries or ROMs.
+This audit makes the precise upstream dependencies easy to inspect without
+placing any native payloads into the Git repository or GitHub Releases.
+The remaining source-to-shipped-binary, transitive source, license compatibility,
+Dolphin Sys and final hardware acceptance requirements remain unchanged.
+
 ## Reported upstream source capture (new evidence path)
 
 The 3.0 [preview integrity manifest](../config/v3.0-preview-candidate-integrity.json)
