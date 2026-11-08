@@ -55,7 +55,7 @@ class PinnedMGBASourceContracts(unittest.TestCase):
     def test_real_source_revision_must_match_and_preserve_mpl(self):
         src,img,sha=self._prepare()
         with patch("tools.capture_v30_mgba_original_source.SOURCE_REVISION",sha),\
-             patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=True):
+             patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=False):
             out=self.root/"record"
             result=capture(src,img,out,"linux-x64")
         self.assertEqual(result["status"],STATUS)
@@ -74,14 +74,14 @@ class PinnedMGBASourceContracts(unittest.TestCase):
 
     def test_unmatched_source_and_would_be_release_fail_before_writes(self):
         src,img,sha=self._prepare()
-        with patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=True):
+        with patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=False):
             with self.assertRaises(ValueError):
                 capture(src,img,self.root/"bad","linux-x64")
         self.assertFalse((self.root/"bad").exists())
         with patch("tools.capture_v30_mgba_original_source.SOURCE_REVISION",sha):
             for mode in ({"AP_RELEASE_BUILD":"1","AP_V30_APPROVED_RELEASE":"0"},
                          {"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"1"}):
-                with patch.dict(os.environ,mode,clear=True):
+                with patch.dict(os.environ,mode,clear=False):
                     with self.assertRaises(ValueError):
                         capture(src,img,self.root/"blocked","linux-x64")
         self.assertFalse((self.root/"blocked").exists())
@@ -90,7 +90,7 @@ class PinnedMGBASourceContracts(unittest.TestCase):
         src,img,sha=self._prepare()
         (src/"LICENSE").write_text("Not MPL")
         with patch("tools.capture_v30_mgba_original_source.SOURCE_REVISION",sha), \
-             patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=True):
+             patch.dict(os.environ,{"AP_RELEASE_BUILD":"0","AP_V30_APPROVED_RELEASE":"0"},clear=False):
             with self.assertRaises(ValueError):
                 capture(src,img,self.root/"badlicense","linux-x64")
         self.assertFalse((self.root/"badlicense").exists())
