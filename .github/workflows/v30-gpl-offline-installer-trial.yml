@@ -97,9 +97,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          EXTRA_ARGS=()
+          # macOS ships Bash 3.2; an empty array with set -u produces
+          # an unbound-variable failure. Use a single optional safe token.
+          WIN_RUNTIME_ARG=""
           if [[ "$TARGET" == "windows-x64" ]]; then
-            EXTRA_ARGS=(--windows-runtime research-winpthread-1.dll)
+            WIN_RUNTIME_ARG="--windows-runtime=research-winpthread-1.dll"
           fi
           python -m tools.stage_v30_gpl_trial_inputs \
             --original-dir original-native-inputs \
@@ -107,7 +109,7 @@ jobs:
             --target "$TARGET" \
             --output gpl-trial-native-inputs \
             --evidence test-evidence/ORIGINAL_GPL_ALTERNATIVE_NATIVE_STAGING_UNAPPROVED.json \
-            "${EXTRA_ARGS[@]}"
+            ${WIN_RUNTIME_ARG:+$WIN_RUNTIME_ARG}
       - name: Install Windows source-accurate packaging compiler
         if: runner.os == 'Windows'
         shell: pwsh
