@@ -18,6 +18,7 @@ This directory is the index for technical and release evidence. The [repository 
 
 | Purpose | Document |
 | --- | --- |
+| Fully tested 18-console/11-core four-platform offline installer with 8 source-built families (UNAPPROVED) | [Eight source-family exact evidence](V3_EIGHT_SOURCE_CORE_FULL_OFFLINE_EVIDENCE.md) |
 | Outstanding native source/rights checks | [Distribution review](V3_DISTRIBUTION_READINESS.md) |
 | GPL and noncommercial license question | [Compatibility assessment](V3_LICENSE_COMPATIBILITY_GATE.md) |
 | Evidence-based four-Sega-console core license choices | [Sega legal/engineering review options](V3_SEGA_LICENSE_OPTIONS.md) |
