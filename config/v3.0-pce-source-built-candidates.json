@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "status": "UNAPPROVED-FOUR-PLATFORM-PINNED-PCE-REPLACEMENT-CANDIDATE",
+  "source_repository": "https://github.com/libretro/beetle-pce-fast-libretro",
+  "source_commit": "2de1ce1c3f237b161c126c54ba407990bb86d1e9",
+  "source_license": "GPL-2.0",
+  "test_workflow_run": "https://github.com/MasynNay/anything-plays/actions/runs/42444367068",
+  "source_built_replacement_only": true,
+  "old_preview_pce_binary_replaced": false,
+  "full_eleven_core_release_lock_approved": false,
+  "mixed_gpl_noncommercial_distribution_approved": false,
+  "rights_reviewed": false,
+  "targets": {
+    "windows-x64": {
+      "artifact_id": 13603260566,
+      "native_file": "mednafen_pce_fast_libretro.dll",
+      "native_sha256": "58c495574383e4daa3f8c281b4befa45b2f14ad104fddf461c8221e9ac2b97c0",
+      "native_size_bytes": 4225255,
+      "source_archive_sha256": "140ca883a2a43b404d879dead4793810d73fac06bdff7ab90228688a8c7072e5",
+      "source_archive_size_bytes": 1200909,
+      "test_report_sha256": "a79ef80eb901ce158ecee3b5bf642f62eae5140bb98a8df4d26ee3c349061a53",
+      "native_video_frames": 717,
+      "native_pcm_nonzero_values": 1052671,
+      "approved_for_public_distribution": false,
+      "bundled_into_stable_3_0": false
+    },
+    "linux-x64": {
+      "artifact_id": 13603061481,
+      "native_file": "mednafen_pce_fast_libretro.so",
+      "native_sha256": "7adb1a08b9cb6680354ac871c979236fe579f67e3b08059903bf07288a706422",
+      "native_size_bytes": 4640768,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_size_bytes": 1190870,
+      "test_report_sha256": "c193cfd707c17a8a11c004e62fd0045dfeeee5edbbafabffee909092a9751c11",
+      "native_video_frames": 718,
+      "native_pcm_nonzero_values": 1054139,
+      "approved_for_public_distribution": false,
+      "bundled_into_stable_3_0": false
+    },
+    "macos-arm64": {
+      "artifact_id": 13603390034,
+      "native_file": "mednafen_pce_fast_libretro.dylib",
+      "native_sha256": "093b5af4f7db4a36dba7e43fa2a10b384d14c38199b8e8401f5b97110a84bcaa",
+      "native_size_bytes": 3869984,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_size_bytes": 1190870,
+      "test_report_sha256": "e4b4c96812046f9737c1aea9f814dfc61cc5e6eefd09eb9f3caa8addb7d651a4",
+      "native_video_frames": 725,
+      "native_pcm_nonzero_values": 1064421,
+      "approved_for_public_distribution": false,
+      "bundled_into_stable_3_0": false
+    },
+    "macos-x64": {
+      "artifact_id": 13602813636,
+      "native_file": "mednafen_pce_fast_libretro.dylib",
+      "native_sha256": "6706cd61515755eb1039cff4f8cd50f2aae8c458d767e616c5ed01a5f9059643",
+      "native_size_bytes": 3887896,
+      "source_archive_sha256": "835adee5444279e2e38126ec3c70a535feabd33fbfd7ee50850b7c76d8d0131e",
+      "source_archive_size_bytes": 1190870,
+      "test_report_sha256": "a27446571dbf01188bede60d5e5874f10ede8052023889611ef7a0447e048f6c",
+      "native_video_frames": 720,
+      "native_pcm_nonzero_values": 1057077,
+      "approved_for_public_distribution": false,
+      "bundled_into_stable_3_0": false
+    }
+  },
+  "independent_artifact_checksum_verification_complete": true,
+  "binary_to_new_source_build_verified": true,
+  "binary_to_old_buildbot_source_match_proven": false,
+  "platform_source_tarbinding_note": "Windows Git source archive bytes differ from Linux/macOS due to platform checkout normalization; each original byte hash independently verified, while all target builds use the same immutable Git commit.",
+  "note": "Immutable technical evidence only; no native binaries or game ROMs checked in and no permission to publish mixed-license bundle."
+}
