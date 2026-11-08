@@ -19,6 +19,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **v30-production-candidates.yml** | Manual only, four-target immutable 3.0 installer producer; cannot publish releases |
 | **v30-source-snapshots.yml** | Preserve reported upstream source revisions as unapproved Actions evidence |
 | **v30-freeze-inputs.yml** | Manually produce an unapproved four-platform 48-archive fingerprint record from saved native inputs |
+| **v30-source-review-matrix.yml** | Join all 44 binary identities with ten pinned source archives into a 3.0 review-only artifact, approval flags false |
 
 Every workflow has different evidence boundaries. Passing a preview build does not authorize a stable release. Native redistribution, required sources, signing and real-device QA are tracked in [release readiness](../../docs/V3_DISTRIBUTION_READINESS.md) and the [fail-closed release checker](../../tools/check_v30_release.py).
 
