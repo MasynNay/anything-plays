@@ -56,6 +56,8 @@ on:
       - 'tests/test_v30_gamecube_preview_optimization.py'
       - 'tests/smoke_gui.py'
       - 'tools/check_v30_release.py'
+      - 'tools/fetch_dolphin_sys.py'
+      - 'tests/test_v30_original_input_capture.py'
       - 'config/v3.0-release-acceptance.json'
   workflow_dispatch:
 
@@ -65,6 +67,9 @@ permissions:
 env:
   AP_RELEASE_BUILD: '0'
   AP_V30_TEST_CORES: '1'
+  # Persist the actual upstream ZIPs used by this build; they remain
+  # UNAPPROVED until full source/license verification is complete.
+  AP_CORE_ARCHIVE_CAPTURE_DIR: preserved-native-inputs
 
 jobs:
   complete-installer-lab:
@@ -238,6 +243,64 @@ jobs:
           print(f"Verified installable preview payload: {target}, {file.stat().st_size} bytes")
           print(f"SHA256: {digest.hexdigest()}")
           PY
+      - name: Verify and fingerprint exact preserved native input archives
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from fetch_mgba_core import core_names_for_build
+          target = os.environ["TARGET"]
+          ext = ".dll" if target.startswith("windows") else ".dylib" if target.startswith("macos") else ".so"
+          original = Path("cores/CORE_PROVENANCE.json")
+          manifest = json.loads(original.read_text(encoding="utf-8"))
+          cores = {record["name"]: record for record in manifest["cores"]}
+          names = set(core_names_for_build())
+          assert len(names) == 11 and names == set(cores), "Unexpected core inventory"
+          archive_dir = Path("preserved-native-inputs")
+          files = []
+          for name in sorted(names):
+              record = cores[name]
+              assert record["file"] == f"{name}_libretro{ext}", (name, target)
+              path = archive_dir / (record["file"] + ".zip")
+              assert path.is_file() and not path.is_symlink(), f"Missing original core ZIP: {path}"
+              payload = path.read_bytes()
+              sha = hashlib.sha256(payload).hexdigest()
+              assert sha == record["archive_sha256"], f"Core ZIP changed: {name}"
+              assert len(payload) == record["archive_size_bytes"], f"Core ZIP size changed: {name}"
+              files.append({"name": path.name, "sha256": sha, "size_bytes": len(payload)})
+          dolphin = manifest["dolphin_system_assets"]
+          path = archive_dir / "Dolphin.zip"
+          assert path.is_file() and not path.is_symlink(), "Missing original Dolphin Sys ZIP"
+          payload = path.read_bytes()
+          sha = hashlib.sha256(payload).hexdigest()
+          assert sha == dolphin["archive_sha256"], "Dolphin Sys source archive changed"
+          assert len(payload) == dolphin["archive_size_bytes"], "Dolphin Sys archive size changed"
+          files.append({"name": path.name, "sha256": sha, "size_bytes": len(payload)})
+          result = {
+              "source_revision": os.environ["GITHUB_SHA"],
+              "target": target,
+              "status": "UNAPPROVED-TEST-INPUTS",
+              "public_distribution_approved": False,
+              "original_archive_count": len(files),
+              "files": files,
+              "source_core_provenance": manifest,
+          }
+          (archive_dir / "PRESERVED_NATIVE_INPUTS.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(f"{target}: preserved {len(files)} matching immutable native input archives")
+          PY
+      - name: Retain original upstream native ZIP inputs (test only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}
+          path: preserved-native-inputs/*
+          if-no-files-found: error
+          retention-days: 90
       - name: Upload full offline 3.0 installer for authorized hands-on testing
         uses: actions/upload-artifact@v4
         with:
