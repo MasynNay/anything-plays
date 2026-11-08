@@ -1,0 +1,144 @@
+name: Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)
+# Read-only exact libretro/mgba upstream checkout. Own repo only; no external
+# repository submissions, copyright permissions assumed, or public releases.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-mgba-original-source-four-os.yml'
+      - 'tools/capture_v30_mgba_original_source.py'
+      - 'tests/test_v30_mgba_original_source.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v30-source-mgba-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-source-compiled-mgba:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, target: windows-x64, extension: dll}
+          - {runner: ubuntu-24.04, target: linux-x64, extension: so}
+          - {runner: macos-15, target: macos-arm64, extension: dylib}
+          - {runner: macos-15-intel, target: macos-x64, extension: dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      ORIGINAL_MGBA_SHA: '7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6'
+      ORIGINAL_TARGET: ${{ matrix.target }}
+      ORIGINAL_EXTENSION: ${{ matrix.extension }}
+      ORIGINAL_SOURCE_DIR: research/original-mgba
+    steps:
+      - name: Checkout owner's unchanged development app
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read exact original upstream mGBA source without submitting changes
+        uses: actions/checkout@v4
+        with:
+          repository: libretro/mgba
+          ref: 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+          path: research/original-mgba
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check source SHA, real MPL license, negative test cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$ORIGINAL_SOURCE_DIR" rev-parse HEAD)" = "$ORIGINAL_MGBA_SHA"
+          grep -F "Mozilla Public License Version 2.0" "$ORIGINAL_SOURCE_DIR/LICENSE"
+          python -m unittest discover -s tests -p 'test_v30_mgba_original_source.py' -v
+      - name: Install Windows source compiler and CMake
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+      - name: Install Linux source build requirements
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends build-essential cmake ninja-build python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Compile genuine original Libretro mGBA source on Linux/macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S "$ORIGINAL_SOURCE_DIR" -B original-mgba-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_LIBRETRO=ON \
+            -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_GL=OFF \
+            -DBUILD_GLES2=OFF -DBUILD_GLES3=OFF \
+            -DDISABLE_DEPS=ON -DBUILD_STATIC=ON -DBUILD_TEST=OFF \
+            -DBUILD_SUITE=OFF -DBUILD_PERF=OFF
+          cmake --build original-mgba-build --target mgba_libretro --parallel 3
+          test -s "original-mgba-build/mgba_libretro.$ORIGINAL_EXTENSION"
+      - name: Compile genuine original Libretro mGBA source on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          cmake -S "$ORIGINAL_SOURCE_DIR" -B original-mgba-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_LIBRETRO=ON \
+            -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_GL=OFF \
+            -DBUILD_GLES2=OFF -DBUILD_GLES3=OFF \
+            -DDISABLE_DEPS=ON -DBUILD_STATIC=ON -DBUILD_TEST=OFF \
+            -DBUILD_SUITE=OFF -DBUILD_PERF=OFF
+          cmake --build original-mgba-build --target mgba_libretro --parallel 3
+          test -s "original-mgba-build/mgba_libretro.$ORIGINAL_EXTENSION"
+      - name: Preserve exact Git-source TAR original MPL and compiled core SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_mgba_original_source \
+            --source "$ORIGINAL_SOURCE_DIR" \
+            --native "original-mgba-build/mgba_libretro.$ORIGINAL_EXTENSION" \
+            --target "$ORIGINAL_TARGET" \
+            --output "test-evidence/mgba-$ORIGINAL_TARGET"
+      - name: Install original native Game Boy/GBC/GBA A-V test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test actual source-built original GB, GBC and GBA game video plus native PCM
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR="test-evidence/mgba-$ORIGINAL_TARGET"
+          CORE="$DIR/mgba_libretro.$ORIGINAL_EXTENSION"
+          python tools/probe_gb_homebrew.py --system gb --core "$CORE" --seconds 8 --report "$DIR/ORIGINAL_GB_NATIVE_AV.json"
+          python tools/probe_gb_homebrew.py --system gbc --core "$CORE" --seconds 8 --report "$DIR/ORIGINAL_GBC_NATIVE_AV.json"
+          python tools/probe_gba_homebrew.py --core "$CORE" --seconds 8 --report "$DIR/ORIGINAL_GBA_NATIVE_AV.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path('test-evidence')/('mgba-'+os.environ['ORIGINAL_TARGET'])
+          data=json.loads((root/'PINNED_MGBA_SOURCE_NATIVE_UNAPPROVED.json').read_text())
+          assert data['source_checkout_verified'] is True
+          assert data['license_family']=='MPL-2.0'
+          for key in ('binary_redistribution_approved',
+                      'combined_gpl_license_review_approved',
+                      'production_source_inventory_approved',
+                      'physical_qa_approved'):
+              assert data[key] is False, key
+          for system in ('GB','GBC','GBA'):
+              obj=json.loads((root/f'ORIGINAL_{system}_NATIVE_AV.json').read_text())
+              assert obj['passed'] is True and obj['native_exit_code']==0,system
+          print('Three source-created original cartridge formats all have real native mGBA video/audio')
+          PY
+      - name: Retain original source tar MPL and native research only (NEVER release installer)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-PINNED-MGBA-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED
+          path: test-evidence/mgba-${{ matrix.target }}/
+          retention-days: 30
+          if-no-files-found: warn
