@@ -117,7 +117,7 @@ class DolphinPinnedSourceCaptureTests(unittest.TestCase):
         self.assertIn("--shard-count", result.stdout)
         workflow = (root / ".github/workflows/v30-dolphin-submodule-sources.yml").read_text()
         self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("release/v30-dolphin-immutable-source-archives", workflow)
+        self.assertIn("branches: [feature/v3.0-unified-test]", workflow)
         self.assertIn("retention-days: 45", workflow)
         self.assertNotIn("gh release create", workflow)
         self.assertNotIn("gh release upload", workflow)
