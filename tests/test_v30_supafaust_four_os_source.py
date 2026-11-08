@@ -95,7 +95,10 @@ class SupafaustFourOSContracts(unittest.TestCase):
                     self.assertEqual((folder/native_name).read_bytes(),blob)
                     self.assertIn("mednafen/snes_faust/snes.cpp",
                                   tarfile.open(folder/result["source_archive"],"r:gz").getnames())
-                    for check in (folder/"SHA256SUMS.txt").read_text("ascii").splitlines():
+                    raw_checksums=(folder/"SHA256SUMS.txt").read_bytes()
+                    self.assertNotIn(b"\r", raw_checksums)
+                    self.assertTrue(raw_checksums.endswith(b"\n"))
+                    for check in raw_checksums.decode("ascii").splitlines():
                         digest,name=check.split("  ")
                         self.assertEqual(hashlib.sha256((folder/name).read_bytes()).hexdigest(),digest)
                     native.unlink()
