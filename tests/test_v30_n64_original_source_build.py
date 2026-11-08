@@ -52,16 +52,16 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
         idx=self.root/"index.json"
         idx.write_text(json.dumps(index),"utf-8")
         ext=mod.EXTENSIONS[target]
-        header={".dll":b"MZ",".so":b"\\x7fELF",
-                ".dylib":b"\\xcf\\xfa\\xed\\xfe"}[ext]
+        header={".dll":b"MZ",".so":b"\x7fELF",
+                ".dylib":b"\xcf\xfa\xed\xfe"}[ext]
         native=self.root/f"parallel_n64_libretro{ext}"
         native.write_bytes(header+b"synthetic not executable native"*7000)
         def git_output(*args):
             name=args[0] if args else ""
-            if name=="rev-parse":return (mod.SOURCE_REVISION+"\\n").encode()
+            if name=="rev-parse":return (mod.SOURCE_REVISION+"\n").encode()
             if name=="status":return b""
             if name=="ls-tree":
-                return b"".join(f"100644 blob {'a'*40} source/{n}\\n".encode() for n in range(1970))
+                return b"".join(f"100644 blob {'a'*40} source/{n}\n".encode() for n in range(1970))
             if name=="archive":return b"SYNTHETIC ORIGINAL SOURCE TAR "*45000
             raise AssertionError("Unexpected Git command")
         return source,native,idx,index,git_output
@@ -79,8 +79,6 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
 
     def _new_fixture(self,target):
         # Each subtest gets a distinct fixture directory; no native is executed.
-        with TemporaryDirectory() as temp:
-            pass
         suffix=target.replace("-","_")
         old=self.root
         try:
@@ -118,8 +116,8 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
         note.write_bytes(b"ORIGINAL-SYNTHETIC-N64-NOTICE-0"*200)
         def git_with_link(*args):
             if args and args[0]=="ls-tree":
-                return b"160000 commit "+b"0"*40+b" a/submodule\\n"+b"".join(
-                    b"100644 blob "+b"a"*40+b" other\\n" for _ in range(1969))
+                return b"160000 commit "+b"0"*40+b" a/submodule\n"+b"".join(
+                    b"100644 blob "+b"a"*40+b" other\n" for _ in range(1969))
             return git_output(*args)
         with patch.object(mod,"_git",side_effect=lambda source,*a:git_with_link(*a)):
             with self.assertRaises(ValueError):
@@ -144,7 +142,7 @@ class PinnedOriginalN64Contracts(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         mod.validate_native("parallel_n64_libretro"+mod.EXTENSIONS[target],original,target)
         with self.assertRaises(ValueError):
-            mod.validate_native("parallel_n64_libretro.so",b"\\x7fELF", "linux-x64")
+            mod.validate_native("parallel_n64_libretro.so",b"\x7fELF", "linux-x64")
 
 
 if __name__=="__main__":
