@@ -254,10 +254,16 @@ def verify_bundle(bundle, platform_name, check_native=False):
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
     if release_mode == "1":
-        from tools.core_release_lock import LOCK_PATH, verify_release_lock
-
-        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
-        verify_release_lock(manifest, lock)
+        if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+            from tools.v30_release_lock import (
+                load_approved_lock, verify_native_bundle,
+            )
+            verify_native_bundle(load_approved_lock(), manifest)
+        else:
+            # Old published 2.0 checks must not be affected by 3.0.
+            from tools.core_release_lock import LOCK_PATH, verify_release_lock
+            lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+            verify_release_lock(manifest, lock)
 
     if check_native:
         _validate_mgba_core(cores / f"mgba_libretro{EXTENSIONS[platform_name]}")
