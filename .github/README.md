@@ -10,6 +10,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **v30-cores.yml** | Native emulator and update verification |
 | **v30-ngp.yml** | Dedicated NGP/NGPC audio, video, controls and save tests |
 | **v30-pce-pinned-source.yml** | Experimental four-platform PCE core built from exact GPL source and tested with original HuCard PCM/video |
+| **v30-pce-offline-integration.yml** | Test all 18 profiles and 11 offline native cores using a verified source-built PCE replacement while retaining original other-core ZIPs |
 | **v30-endurance.yml** | Stability and long-session checks |
 | **v30-n64-restart.yml** | N64 repeated-launch checks |
 | **v30-virtual-aquarium.yml** | Camera control simulation |
