@@ -42,12 +42,15 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
     def setUpClass(cls):
         cls.index = json.loads(INDEX.read_text("utf-8"))
 
-    def test_upstream_git_tree_has_14_exact_mit_mono_candidates(self):
+    def test_upstream_git_tree_has_14_ngp_named_color_header_candidates(self):
         records = validate_index(self.index)
         self.assertEqual(len(records), 14)
         self.assertIn("hw_calibration/a_align_calib_v12.ngp",
                       [x["path"] for x in records])
         self.assertTrue(all(x["path"].endswith(".ngp") for x in records))
+        self.assertTrue(all(x["header_mode_byte"] == 0x10 for x in records))
+        self.assertTrue(all(x["genuine_monochrome_header"] is False for x in records))
+        self.assertEqual(self.index["genuine_monochrome_header_candidates"], 0)
         self.assertFalse(self.index["candidate_native_audio_verified"])
         self.assertFalse(self.index["distribution_in_app"])
 
@@ -60,6 +63,8 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
             lambda x: x.update(source_commit="f" * 40),
             lambda x: x.update(public_release_approved=True),
             lambda x: x.update(candidate_native_audio_verified=True),
+            lambda x: x["candidates"][0].update(header_mode_byte=0x00),
+            lambda x: x["candidates"][0].update(genuine_monochrome_header=True),
         ):
             data = copy.deepcopy(self.index)
             mutate(data)
@@ -69,7 +74,9 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
     def test_download_exact_source_blob_and_reject_corruption(self):
         data = copy.deepcopy(self.index)
         entry = data["candidates"][0]
-        payload = b"ORIGINAL MIT HOME BREW TEST CONTENTS" * 450
+        payload = bytearray(b"ORIGINAL MIT HOME BREW TEST CONTENTS" * 450)
+        payload[0x23] = 0x10
+        payload = bytes(payload)
         entry["size_bytes"] = len(payload)
         entry["git_blob_sha1"] = gitblob(payload)
         with TemporaryDirectory() as root:
@@ -85,6 +92,8 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
             self.assertEqual(name.read_bytes(), payload)
             self.assertEqual(result["source_blob_sha1"], gitblob(payload))
             self.assertEqual(result["candidate_sha256"], hashlib.sha256(payload).hexdigest())
+            self.assertEqual(result["header_mode_byte"], 0x10)
+            # A real git blob with an .ngp suffix is still color-mode data.
             entry["git_blob_sha1"] = "0" * 40
             with self.assertRaisesRegex(ValueError, "SHA-1 mismatch"):
                 fetch_candidate(
@@ -111,7 +120,8 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
             path.write_bytes(b"FIXTURE NOT REAL")
             return {"source_blob_sha1": row["git_blob_sha1"],
                     "size_bytes": row["size_bytes"],
-                    "candidate_sha256": "f" * 64}
+                    "candidate_sha256": "f" * 64,
+                    "header_mode_byte": row["header_mode_byte"]}
         def fake_run(argv, **kw):
             self.assertIn(str(PROBE), argv)
             self.assertEqual(argv[argv.index("--system") + 1], "ngp")
@@ -138,7 +148,13 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
             self.assertEqual(result["attempted_original_mono_cartridges"], 14)
             self.assertEqual(result["source_downloads_integrity_verified"], 14)
             self.assertTrue(result["all_source_candidate_downloads_verified"])
-            self.assertEqual(len(result["native_audio_pass_candidates"]), 1)
+            self.assertEqual(len(result["native_audio_pass_candidates"]), 0)
+            self.assertEqual(result["genuine_monochrome_header_candidates"], 0)
+            self.assertTrue(result["all_pinned_files_color_header_despite_ngp_extension"])
+            # Even injected positive PCM from a mock child must NOT pass mono
+            # when its cartridge declares COLOR mode 0x10.
+            self.assertTrue(result["per_cartridge"][self.index["candidates"][6]["path"]]
+                            ["native_audio_observed_but_color_header"])
             self.assertEqual(result["full_native_av_input_pass_candidates"], [])
             self.assertEqual(result["status"], STATUS)
             self.assertFalse(result["public_release_approved"])
