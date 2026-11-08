@@ -93,8 +93,14 @@ class PhysicalQAContracts(unittest.TestCase):
             report = qa.create_report(source, commit="a"*40)
             answers = iter(("p", "f", "q"))
             messages = []
+            checkpoints = []
             qa.review_wizard(report, reader=lambda prompt: next(answers),
-                             printer=messages.append)
+                             printer=messages.append,
+                             on_record=lambda state: checkpoints.append(
+                                 dict(state["host_checks"])))
+            self.assertEqual(len(checkpoints), 2)
+            self.assertEqual(checkpoints[0][qa.HOST_CHECKS[0]], "pass")
+            self.assertEqual(checkpoints[1][qa.HOST_CHECKS[1]], "fail")
             self.assertEqual(report["host_checks"][qa.HOST_CHECKS[0]], "pass")
             self.assertEqual(report["host_checks"][qa.HOST_CHECKS[1]], "fail")
             self.assertEqual(report["host_checks"][qa.HOST_CHECKS[2]], "not-tested")
