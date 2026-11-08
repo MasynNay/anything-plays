@@ -111,7 +111,7 @@ class SupafaustSourceTests(unittest.TestCase):
                           output=self.root/"separate")
             with self.assertRaisesRegex(ValueError, "distinct"):
                 s.capture(source=self.upstream, native=self.native,
-                          output=self.upstream)
+                          output=self.upstream/"new-evidence-inside-source")
 
     def test_research_ci_pins_real_source_and_runs_original_snes_audio_video(self):
         root=Path(__file__).resolve().parents[1]
