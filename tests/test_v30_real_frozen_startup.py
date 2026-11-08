@@ -104,11 +104,14 @@ class RealFrozenUIContracts(unittest.TestCase):
     def test_3_0_app_smoke_uses_same_tk_app_and_never_fake_camera(self):
         root=Path(__file__).resolve().parents[1]
         app=(root/"app.py").read_text("utf-8")
-        for snippet in ("def _smoke_real_frozen_window():",
-                        "root = tk.Tk()", "app = App(root)",
+        smoke=(root/"anything_plays/frozen_gui_smoke.py").read_text("utf-8")
+        self.assertIn("from anything_plays.frozen_gui_smoke import run_smoke_gui",app)
+        self.assertIn("return run_smoke_gui(App, SYSTEMS)",app)
+        for snippet in ("def run_smoke_gui(app_type, systems):",
+                        "root = tk.Tk()", "app = app_type(root)",
                         "root.mainloop()", 'AP_V30_UI_SMOKE_CHECK',
                         "camera_hardware_tested", "physical_qa_approved"):
-            self.assertIn(snippet,app)
+            self.assertIn(snippet,smoke)
         self.assertIn('if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":',app)
         self.assertIn("root.after(100, self.scan_cameras)",app)
         yml=(root/".github/workflows/v30-eight-source-offline-integration.yml").read_text("utf-8")
