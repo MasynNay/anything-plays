@@ -193,9 +193,29 @@
   },
   "required_release_evidence": {
     "third_party_license_audit_complete": false,
-    "no_external_emulator_setup_required": false,
+    "no_external_emulator_setup_required": true,
     "packaged_binary_integrity_verified": true,
-    "no_runtime_emulator_download_required": false
+    "no_runtime_emulator_download_required": true,
+    "offline_runtime_evidence": {
+      "verification_type": "STAGED-NATIVE-RUNTIME-RESOLUTION-ONLY",
+      "workflow": "https://github.com/MasynNay/anything-plays/actions/runs/42448004780",
+      "verified_commit": "2b6e0c687577b8d847ed35dcb4f10b808e5b9367",
+      "profiles_resolved_per_platform": 18,
+      "native_sha256_verified_per_platform": 11,
+      "targets": [
+        "windows-x64",
+        "linux-x64",
+        "macos-arm64",
+        "macos-x64"
+      ],
+      "strict_network_denial": true,
+      "fresh_core_pack_store": true,
+      "third_party_emulator_needed": false,
+      "public_distribution_approved": false,
+      "physical_install_and_gameplay_verified": false,
+      "legal_redistribution_review_complete": false,
+      "statement": "All 4 actual installer lab jobs passed against staged native binaries; source-built and native runtime proof only, no real-game, physical install, or license approval."
+    }
   },
-  "evidence_notes": "Only verified package-presence flags updated after successful four-platform complete offline installer lab. Real-game behavior, audio, controls, long-run, legal/source, and production approval requirements remain unverified and blocked. This does not authorize public release."
+  "evidence_notes": "Four-platform staged installer native runtime selection proven for 18/18 system profiles and 11/11 SHA-256 matched cores per platform, from successful GitHub Actions run 42448004780 (commit 2b6e0c68). Two exact standalone setup/download flags now true; game video, audio, physical clean-install, NGP mono sound, cross-core legal compatibility, corresponding binary source, and release approval remain UNVERIFIED. Do not publish 3.0 until independent release gates succeed."
 }
