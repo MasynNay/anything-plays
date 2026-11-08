@@ -62,3 +62,48 @@ gameplay/keyboard/camera/sound/save/endurance tests. Do not set release
 approval booleans based on this experimental research. See
 [release blocker #28](https://github.com/MasynNay/anything-plays/issues/28)
 and [V3 GPL alternatives](V3_GPL_SNES_SEGA_ALTERNATIVES.md).
+
+## Verified Linux source-build milestone — original artifacts rehashed
+
+[PR #79](https://github.com/MasynNay/anything-plays/pull/79) **merged**
+on November 8, 2026 UTC after
+[full source regression 42459386203](https://github.com/MasynNay/anything-plays/actions/runs/42459386203)
+**SUCCESS** (Python 3.12/3.13 + native mGBA), and the
+[actual two-source Linux build and homebrew run 42459386197](https://github.com/MasynNay/anything-plays/actions/runs/42459386197)
+**SUCCESS 2/2** from the exact reviewed PR head
+`e6cbe271dd15226e3cd17ae21e6fdb48169d38e8`.
+
+Unlike the first mutable buildbot alternatives, these are **freshly
+compiled from their own exact pinned upstream repositories** with their
+matching original complete Git source TARs and GPLv3 notices retained in
+authenticated test-only GitHub Actions artifacts. Both zipped artifacts
+were downloaded and independently SHA-256 verified **for every original
+checksum entry and both native/source hash fields**.
+
+| Exact Linux source-built candidate | Native .so size (bytes) | Original native SHA-256 | Original source TAR SHA-256 |
+| --- | ---: | --- | --- |
+| bsnes, source commit `63ee22f7...` | 2,645,656 | `9a851d8d2af077dd2348f51e5c9959430482034de6e0767ddae2fe75e74bf98b` | `592c32955435153a221400faf15b70cf7881dc3fe84f09158b29da2458e816e7` |
+| BlastEm, source commit `2230addc...` | 12,983,672 | `a9a6c104c29f7b1c0725bbe8b6d0bbf06f8b5f50d74e12b456861b7a98277fa3` | `208b420abe72708e2e9f3dbd81a996e19c48b81a9d687f4f514b8fe22e48d868` |
+
+Actual source archive sizes: bsnes **4,149,913 bytes**,
+BlastEm **2,101,747 bytes**. Actual native source research
+Artifacts: `13608134617` (bsnes) and `13609406024` (BlastEm).
+Each contains original source `tar.gz`, native Linux `.so`,
+original GPL notice, full manifest, `SHA256SUMS.txt` and its
+native audio/video reports (plus diagnostic screenshots).
+
+Native original homebrew results in those exact authenticated artifacts:
+**SNES** original PPU/SPC pass using new bsnes; **Genesis** original
+source-authored *no-unconditional-TMSS* variant, **Master System**,
+**Game Gear**, and **SG-1000** each pass real nonblank/changing video,
+nonzero audio, and child exit 0 using new BlastEm. As documented above,
+the *unmodified* Genesis startup on hardware without TMSS fails, and
+that is neither concealed nor asserted to pass.
+
+**This does not make stable 3.0 publishable:** the original preview still
+uses unmodified Snes9x and Genesis Plus GX; newly compiled versions are
+research alternatives. This study covers Linux only and cannot prove
+their Windows/macOS builds or actual user ROM/save/peripheral compatibility.
+No independent complete build-chain/source reproduction or combined
+GPLv2-only and GPLv3 distribution rights determination has been issued.
+All source/rights/public release/physical QA boolean approvals stay FALSE.
