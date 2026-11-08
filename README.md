@@ -20,7 +20,7 @@ Camera-powered games · Local, private controls · Windows, macOS and Linux
 | **3.0.0 Preview** | **In development, not a public release** | 18 console profiles, 11 native cores in complete test installers; manual compatibility and compliance QA still required |
 
 **3.0 is release-candidate engineering, not yet a public stable binary release.**
-The [complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42437133733)
+The [latest complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42455076101)
 passed on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. All
 four developer installers contain **18 console profiles**, **11 Libretro cores**
 and Dolphin system assets. The maintainer reports successful Linux GameCube
@@ -43,6 +43,13 @@ resolved before publishing the combined stable installer. Automated
 packaging does not independently establish redistribution rights.
 The [release evidence](docs/V3_DISTRIBUTION_READINESS.md) and
 [continuation checkpoint](CONTINUE_HERE.md) track the exact state.
+The newest complete test-only installers were independently rehashed against
+their SHA-256 manifests on all four architectures at commit
+`7004115e7b9d57a3ef8f44062e134a3b55410f25`.
+[Private owner hardware QA instructions](docs/V3_PHYSICAL_QA_RUNBOOK.md)
+include a [frozen four-installer fingerprint catalog](config/v3.0-owner-qa-preview-hashes-unapproved.json)
+for that exact test build. No public distribution approval or physical gameplay
+has been inferred from these build checks.
 
 ## What does Anything Plays do?
 
@@ -54,7 +61,7 @@ camera processing happens locally.
 
 ## How version 3.0 distributes emulators
 
-**Full offline developer preview:** [Four-platform test installers](https://github.com/MasynNay/anything-plays/actions/runs/42437133733) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
+**Full offline developer preview:** [Latest four-platform full test installers](https://github.com/MasynNay/anything-plays/actions/runs/42455076101) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
 
 **Build variants:** Lightweight, mGBA-only application artifacts are for development diagnostics, not the planned stable 3.0 distribution. The intended stable 3.0 installer is the complete offline package with the already-selected emulator lineup. No separate RetroArch or Dolphin download is expected. Future in-app core updates remain optional and must use reviewed, verifiable packages.
 
