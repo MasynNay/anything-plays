@@ -134,6 +134,11 @@ if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   if [[ "${AP_V30_PINNED_PCE:-0}" == "1" ]]; then
     cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/"
   fi
+  if [[ "${AP_V30_PINNED_N64:-0}" == "1" ]]; then
+    for suffix in 01 02 03 04 05 06 07 08 09 10 11; do
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-N64-NOTICE-${suffix}.txt" "$LICENSE_DIR/"
+    done
+  fi
   if [[ "${AP_V30_PINNED_MGBA:-0}" == "1" ]]; then
     cp "${AP_CORE_ARCHIVE_DIR}/MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt" "$LICENSE_DIR/"
   fi
