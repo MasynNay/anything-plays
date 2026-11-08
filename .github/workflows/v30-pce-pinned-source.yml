@@ -87,7 +87,12 @@ jobs:
       - name: Build source-pinned macOS PCE Fast core
         if: runner.os == 'macOS'
         shell: bash
-        run: make -C "$PCE_SOURCE_DIR" -j 3 platform=osx
+        # Bundled zlib 1.2.11 zutil.h defines fdopen() as a NULL macro
+        # when modern Apple SDK exposes TARGET_OS_MAC. Force-import the
+        # system stdio declarations FIRST, before the legacy zutil.h macro.
+        # EXTRA_INCLUDES appends a compiler flag; source remains pristine,
+        # retaining a verifiable Git commit and exact GPL source archive.
+        run: make -C "$PCE_SOURCE_DIR" -j 3 platform=osx EXTRA_INCLUDES="-include stdio.h"
       - name: Build source-pinned Windows x64 PCE Fast core
         if: runner.os == 'Windows'
         shell: msys2 {0}
