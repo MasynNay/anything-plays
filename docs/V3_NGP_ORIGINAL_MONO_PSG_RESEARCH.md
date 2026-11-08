@@ -68,8 +68,27 @@ The new `tools/probe_v30_ngp_mono_native_av.py` runs only an original
 temporarily generated 0x00 mono cartridge in the real NeoPop CoreSession
 with native PCM, frame and manual/camera callback measurements.
 `.github/workflows/v30-ngp-mono-native-av.yml` retains **only reviewer
-JSON + SHA256SUMS**. The source-only proof is not promoted until its
-**real changing video and full A/V/input results** are inspected. The
-per-platform physical gameplay, genuine battery/flash persistence,
+JSON + SHA256SUMS**. **The real Linux test did pass:** [CI run 42450691159](https://github.com/MasynNay/anything-plays/actions/runs/42450691159)
+recorded 147 qualifying nonblank frames, 35 distinct nonblank frames and
+531,622 actually nonzero PCM samples. The real native audio, changing
+K1GE video and Libretro input callback gates all passed together on that
+one Linux test core. [PR #65](https://github.com/MasynNay/anything-plays/pull/65)
+merged at `1533a21c869d856464a726ffbdf5a0bc0850c722`.
+This establishes one-platform native homebrew evidence, not physical retail
+game compatibility or flash saves. To strengthen this exact original source result, the dedicated workflow
+has a 4-way native matrix: `linux-x64`, `windows-x64`,
+`macos-arm64`, `macos-x64`. Each runner independently downloads its
+actual architecture-specific test NeoPop binary, verifies core SHA-256,
+creates the same original genuine 0x00 mono cartridge *temporarily*, and
+checks actual K1GE frames, genuine sound PCM and manual/camera queries.
+Only two unapproved reviewer files (JSON + SHA256SUMS) may be uploaded
+per OS, no native library, ROM or app. Individual matrix jobs are not
+allowed to hide failures, and the schema keeps `all_four_platforms_verified`
+false until a separate reviewer independently reconciles all four real
+passing reports and exact source revision. Green CI does **not** clear
+physical install/retail game acceptance, save persistence or combined-core
+license rights.
+
+The per-platform physical gameplay, genuine battery/flash persistence,
 license/source and binary redistribution gates stay **false** regardless
 of a green research job.
