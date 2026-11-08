@@ -255,6 +255,44 @@ audio or physical QA true. The independent NGPC color StarGunner evidence is
 not invalidated. All public distribution and source correspondence gates
 remain unchanged.
 
+## Required NGP/NGPC native video, audio and input: authentic mono cartridges
+
+The previous required 3.0 Neo Geo Pocket CI used a .ngp-named upstream
+MIT homebrew with a real COLOR cartridge header (byte 0x23 = 0x10), so
+it could never establish genuine monochrome sound or video. All fourteen
+source-audited upstream .ngp calibration examples share that same color
+header, despite their filenames.
+
+Source research [PR #64](https://github.com/MasynNay/anything-plays/pull/64)
+corrected PSG activation and stopped Z80 before native direct tone writes,
+producing 4/4 positive real mono 0x00 native PCM tests. [PR #65](https://github.com/MasynNay/anything-plays/pull/65)
+combined that proven mono sound with a genuinely changing monochrome K1GE
+grayscale window. The real [Linux run 42450691159](https://github.com/MasynNay/anything-plays/actions/runs/42450691159)
+measured 147 nonblank native video frames, 35 genuinely distinct frames,
+531,622 actual nonzero PCM samples and positive native manual/camera input
+callback queries, all passing.
+
+The required eight-runner .github/workflows/v30-ngp.yml now has **separate
+source-authentic system paths**. The four NGP mono runners each build a
+temporary original 0x00-header K1GE/PSG cartridge (never distribute game
+bytes), verify real native frame/audio/input callbacks and fail closed
+on native failure. The four NGPC color runners keep the real pinned
+MIT StarGunner .ngc with 0x10 color header, exact original Git source
+blob and size validation and the existing native A/V/input checks.
+
+The full original cross-OS [run 42450853117](https://github.com/MasynNay/anything-plays/actions/runs/42450853117)
+had native audio/video/input success on all four targets, but Windows
+checksum verification failed because Git Bash treated a CRLF report file
+as having a trailing carriage return in the filename. The corrected
+source now writes an exact LF-only SHA256SUMS; [run 42450947315](https://github.com/MasynNay/anything-plays/actions/runs/42450947315)
+is the final four-platform research evidence.
+
+These real native homebrew results do NOT establish retail game
+compatibility, game-driven control feedback, cartridge flash persistence,
+physical speakers, a long-running desktop installation, build/source
+correspondence or combined GPL/noncommercial redistribution rights.
+None of those release acceptance flags should be cleared by this test.
+
 ## Publication blockers and required evidence
 
 1. **Freeze exact bytes.** Current full-preview build runs with `AP_RELEASE_BUILD=0` and `AP_V30_TEST_CORES=1`. The acquisition path can fetch Libretro `latest` cores. Preserve each archive, its SHA-256, target architecture, reported revision and exact final packaged native binary hash. The old approved v2.0 lock does not cover the additional 3.0 cores.
