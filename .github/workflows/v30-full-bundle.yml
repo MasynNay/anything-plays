@@ -36,6 +36,8 @@ on:
       - 'tools/render_v21_icon.py'
       - 'assets/anything_plays_v21.webp'
       - 'tests/test_v30_icon_matte.py'
+      - 'anything_plays/ui_zones.py'
+      - 'tests/test_zone_label_sizing.py'
       - 'anything_plays/ui_profiles.py'
       - 'anything_plays/ui_camera.py'
       - 'anything_plays/ui_gameplay.py'
