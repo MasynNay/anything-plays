@@ -65,6 +65,53 @@ python3 -m tools.v30_physical_qa record \
   --system gamecube --check audible_audio --result pass
 ```
 
+
+## Current independently fingerprinted complete owner-test installers
+
+The **current exact complete 18-profile/11-core four-platform test-only**
+build is [GitHub Actions run 42455076101](https://github.com/MasynNay/anything-plays/actions/runs/42455076101),
+from source commit
+`7004115e7b9d57a3ef8f44062e134a3b55410f25`.
+All four native package jobs **passed**. The archived installer bytes for
+Windows x64, Linux x64, Mac ARM64 and Mac Intel were **downloaded and
+independently SHA-256/byte-length checked** against their respective
+`FULL_PREVIEW_INFO.json` and `SHA256SUMS.txt`, and their real
+`offline-runtime-*.json` verified 18/18 core resolution and 11/11
+native-library hashes per platform with no runtime emulator download.
+
+Their exact SHA-256, archive basenames and byte lengths are pinned to:
+[config/v3.0-owner-qa-preview-hashes-unapproved.json](../config/v3.0-owner-qa-preview-hashes-unapproved.json).
+All four owner-test installers are **NOT approved** for public binary
+distribution or claimed as passed on physical game/speaker/camera hardware.
+
+**Simplest testing workflow for this exact build:** download the
+`FULL-TEST-ONLY` artifact for your actual operating system from the
+linked Actions run, install the original preview, and create your
+local QA report using the source commit above, NOT the later GitHub branch
+head after documentation-only changes. Use its actual installer path
+in the `init` command. Each platform owner exports exactly the local
+two-file QA packet when it is ready. The final four-machine reviewer
+can use the already-verified repository catalog **without downloading
+all four big installers again**, by running:
+
+```bash
+python -m tools.v30_physical_qa_matrix reconcile \
+  --catalog config/v3.0-owner-qa-preview-hashes-unapproved.json \
+  --packets "$HOME/anything-plays-qa-packets" \
+  --output "$HOME/anything-plays-four-os-owner-qa-review" \
+  --require-complete
+```
+
+The `--packets` directory layout is documented below. Missing real
+hardware observations cause `--require-complete` to **fail** and preserve
+a detailed private unapproved diagnostic summary; a full 600/600 owner
+self-report still does NOT replace independent physical observation,
+license review, source-to-binary proof or production release authorization.
+The Actions artifacts are time-limited and may require GitHub sign-in.
+After artifact expiry, rebuild a newly pinned *TEST ONLY* set and use its
+own exact SHA evidence: never silently reuse this frozen catalog for a
+different installer.
+
 ## Required physical checks
 
 There are **six** host/installer checks and **eight** system checks for
