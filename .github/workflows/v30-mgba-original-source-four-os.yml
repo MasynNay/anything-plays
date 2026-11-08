@@ -94,7 +94,7 @@ jobs:
             -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_GL=OFF \
             -DBUILD_GLES2=OFF -DBUILD_GLES3=OFF \
             -DDISABLE_DEPS=ON -DBUILD_STATIC=ON -DBUILD_TEST=OFF \
-            -DBUILD_SUITE=OFF -DBUILD_PERF=OFF
+            -DBUILD_SUITE=OFF -DBUILD_PERF=OFF -DLIBMGBA_ONLY=ON
           cmake --build original-mgba-build --target mgba_libretro --parallel 3
           test -s "original-mgba-build/mgba_libretro.$ORIGINAL_EXTENSION"
       - name: Preserve exact Git-source TAR original MPL and compiled core SHA
