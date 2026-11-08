@@ -115,10 +115,10 @@ def check_original_five_artifact(folder, name, target, extension):
         n=folder/"ORIGINAL_UPSTREAM_GPL_NOTICE.txt"
         notice=original(n.name, info.get("original_license_notice_sha256"),
                         n.stat().st_size, 1024*1024)
-        if b"GNU GENERAL PUBLIC LICENSE" not in notice or b"Version 2" not in notice:
+        if b"general public license" not in notice.lower() or b"version 2" not in notice.lower():
             raise ValueError("Original GPLv2 notice lost")
     elif info.get("original_license_notice_sha256") is not None:
-        raise ValueError("Stella original source license cannot be falsely inferred")
+        raise ValueError("Unidentified original source license cannot be falsely inferred")
     for report in reports:
         row=json.loads((folder/report).read_text("utf-8"))
         details=row.get("details")
