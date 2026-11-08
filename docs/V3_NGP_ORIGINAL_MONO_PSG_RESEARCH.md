@@ -2,7 +2,7 @@
 
 **Status: experimental, not public 3.0 release approval.**
 
-[The verified 14-cartridge native survey](https://github.com/MasynNay/anything-plays/actions/runs/42448817220) found **0/14** pinned original MIT monochrome calibration cartridges emitted qualifying nonzero native audio, despite passing source-integrity checks. This indicates an unsuitable test corpus for *audible acceptance*, not a proved NeoPop sound defect. That survey was merged through [PR #61](https://github.com/MasynNay/anything-plays/pull/61).
+[The verified 14-cartridge native survey](https://github.com/MasynNay/anything-plays/actions/runs/42448817220) found **0/14** pinned original MIT `.ngp`-named calibration cartridges emitted qualifying native nonzero audio, despite passing source-integrity checks. An independent audit of all 14 original Git blobs also found **all 14 actual header byte `0x23 = 0x10` (color mode)**, so they were never valid original monochrome cartridge fixtures in the first place. This identifies both an unsuitable silent sample set and a **misclassification caused by trusting a file extension**. Neither proves a genuine mono sound defect in NeoPop. That survey was merged through [PR #61](https://github.com/MasynNay/anything-plays/pull/61).
 
 ## New original audible-fixture approach
 
@@ -14,7 +14,7 @@ Reference hardware facts: [NgpCraft audio memory map and T6W28 format](https://t
 
 ## Proof standard and CI isolation
 
-The dedicated research workflow `.github/workflows/v30-ngp-original-mono-psg.yml` generates each .ngp solely in a temporary build directory, then passes it into the **real NeoPop Libretro CoreSession** through the existing strict `tools/probe_ngp_mit_homebrew.py --child` path. Only measured **nonzero native PCM** is allowed to set the audio diagnostic true. Real native changing video and camera/manual input are separate requirements and can still fail even if this ROM successfully tests PSG hardware; this minimal tone ROM intentionally does not implement a polished video demo.
+The dedicated research workflow `.github/workflows/v30-ngp-original-mono-psg.yml` generates each 0x00-header .ngp solely in a temporary build directory, then passes it into the **real NeoPop Libretro CoreSession** through the existing strict `tools/probe_ngp_mit_homebrew.py --child` path. [Original-ROM real-native CI 42449197364](https://github.com/MasynNay/anything-plays/actions/runs/42449197364) tested all four PSG initialization variants: **0/4 produced nonzero PCM, and 0/4 produced nonblank video**, despite native input callbacks and save-state API responses. The original generated headers were authentically 0x00 but execution/sound remains unproven. Only measured **nonzero native PCM** is allowed to set the audio diagnostic true. Real native changing video and camera/manual input are separate requirements and can still fail even if this ROM successfully tests PSG hardware; this minimal tone ROM intentionally does not implement a polished video demo.
 
 The workflow retains only `NGP_ORIGINAL_MONO_PSG_UNAPPROVED.json` and `SHA256SUMS.txt`, not cartridge output, screenshots, native cores or game assets. A green research job means the experiments ran and their results were audited; it **does not imply actual sound was produced**. If it produces real PCM but not video, extend the original cartridge with a genuine changing monochrome display and native input logic in a later, independently verified experiment. If no sound is produced, investigate boot/PSG initialization and CPU execution before asserting an emulator audio defect.
 

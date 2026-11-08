@@ -229,6 +229,32 @@ therefore become **true**, with an immutable run/source link; this does *not*
 satisfy actual complete real-game tests, physical clean installs, longer runs,
 or any third-party distribution/source licensing requirement.
 
+## True Neo Geo Pocket monochrome acceptance: cartridge header is not an extension
+
+The original pinned `hw_calibration/a_align_calib_v12.ngp` homebrew file used
+by the NGP/NGPC CI matrix is **NOT a genuine monochrome 0x00-header cartridge**.
+Its original immutable MIT Git blob has cartridge byte `0x23=0x10` (Color).
+An independent verification of **all fourteen** pinned
+`Tixul/Ngpcraft_emulator` `a_*.ngp` files confirmed the same 0x10 value
+for **14/14**, despite the `.ngp` suffix. They yielded 0/14 qualifying
+native PCM in [the real 14-file diagnostic run 42448817220](https://github.com/MasynNay/anything-plays/actions/runs/42448817220);
+this is a mislabeled fixture *and* a silent test corpus, not proof of sound
+incompatibility with all genuine monochrome games.
+
+The independent [four-variant original 0x00-header source-built sound test
+42449197364](https://github.com/MasynNay/anything-plays/actions/runs/42449197364)
+used truly monochrome-generated cartridge headers but yielded **0/4 true
+nonzero PCM and 0/4 changing video**. That experimental program still needs
+correct startup/display/sound-driver validation. It cannot be promoted.
+
+Native mono acceptance now requires **both** an authentic `0x23=0x00`
+cartridge and the existing strict actual video/PCM/input gates; the fixture
+loader verifies Git blob hashes, byte lengths and declared header mode. The
+previous color-header `.ngp` must never be used to mark NGP monochrome
+audio or physical QA true. The independent NGPC color StarGunner evidence is
+not invalidated. All public distribution and source correspondence gates
+remain unchanged.
+
 ## Publication blockers and required evidence
 
 1. **Freeze exact bytes.** Current full-preview build runs with `AP_RELEASE_BUILD=0` and `AP_V30_TEST_CORES=1`. The acquisition path can fetch Libretro `latest` cores. Preserve each archive, its SHA-256, target architecture, reported revision and exact final packaged native binary hash. The old approved v2.0 lock does not cover the additional 3.0 cores.

@@ -332,6 +332,11 @@ def _parent(system, core, report, seconds):
                 outcome["native_exit_code"] == 0
                 and isinstance(outcome["details"], dict)
                 and outcome["details"].get("passed") is True
+                # A .ngp extension is insufficient: the previous pinned
+                # upstream .ngp fixture declares 0x10 COLOR in header[0x23].
+                # Native sound/video/input from a color-header cartridge
+                # must never satisfy MONO console release acceptance.
+                and outcome["fixture"].get("header_matches_test_target") is True
             )
     except Exception as exc:
         outcome["error"] = f"{type(exc).__name__}: {exc}"
