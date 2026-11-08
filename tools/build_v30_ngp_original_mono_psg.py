@@ -51,15 +51,27 @@ def original_mono_psg_code(variant: str) -> bytes:
     if variant not in VARIANTS:
         raise ValueError("Unknown original monochrome native PSG research mode")
     code = bytearray()
-    if variant != "direct-tone":
-        # Main CPU 0xB8/0xB9 combined 16-bit sound-control register.
-        # 0xAAAA resets the Z80; this is one of several research strategies.
-        code += io16(0xB8, 0xAAAA)
-        if variant == "restart-z80-tone":
-            code += io16(0xB8, 0x5555)
-    # 0xB9 = 0x55 activates the PSG. Without audio activation the sound chip
-    # can stay mute regardless of individual tone register writes.
-    code += io8(0xB9, 0x55)
+    # IMPORTANT: the ACTUAL shipped Beetle/Mednafen NeoPop source in
+    # mednafen/ngp/mem.c shows:
+    #     0xB8 = 0x55: PSG enabled; 0xB8 = 0xAA: PSG disabled
+    #     0xB9 = 0x55: Z80 enabled; 0xB9 = 0xAA: Z80 stopped.
+    # For TLCS-900 direct sound writes to 0xA0/0xA1, the Z80 MUST be OFF.
+    # NeoPop's storeB() ignores those writes while Z80_IsEnabled() is true.
+    # Prior diagnostic variants accidentally enabled Z80 and disabled PSG,
+    # guaranteeing all four emitted silence; those results are superseded.
+    # See upstream: https://github.com/libretro/beetle-ngp-libretro/blob/master/mednafen/ngp/mem.c
+    if variant == "direct-tone":
+        # Ordered bytes: stop Z80 before turning on sound and writing PSG.
+        code += io8(0xB9, 0xAA)
+        code += io8(0xB8, 0x55)
+    elif variant == "restart-z80-tone":
+        # Start both in word mode, then STOP Z80 before direct PSG writes.
+        code += io16(0xB8, 0x5555)
+        code += io8(0xB9, 0xAA)
+    else:
+        # One 16-bit store: little-endian low B8=55 -> PSG ON,
+        # high B9=AA -> Z80 OFF, exactly as NeoPop storeW() requires.
+        code += io16(0xB8, 0xAA55)
 
     # Direct TLCS-900 write to 0xA1 reaches T6W28 tone registers (not the
     # Z80's 0x4000/0x4001 bus). Tone1 divider 218 -> ~440 Hz at 3.072 MHz:
