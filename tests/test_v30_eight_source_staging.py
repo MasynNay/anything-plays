@@ -82,7 +82,7 @@ class EightOriginalCoreOfflineContracts(unittest.TestCase):
         self.assertEqual(FIVE_ORIGINAL_SOURCE_COMMITS,PINNED_COMMITS)
         self.assertEqual(len(FAMILIES),5)
         self.assertEqual(len(LEFT_UNCHANGED),3)
-        self.assertEqual(ORIGINAL_RUN,42513615955)
+        self.assertEqual(ORIGINAL_RUN,42515151314)
 
     def test_five_original_sources_and_native_true_identity(self):
         with TemporaryDirectory() as temp:
@@ -152,7 +152,7 @@ class EightOriginalCoreOfflineContracts(unittest.TestCase):
         for name in FAMILIES:
             self.assertIn("AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED",yml)
             self.assertIn("--"+name.replace("_","-")+"-dir",yml)
-        self.assertIn("42513615955",yml)
+        self.assertIn("42515151314",yml)
         self.assertIn("AP_V30_PINNED_FIVE: '1'",yml)
         self.assertIn("original_unchanged_core_archives",yml)
         self.assertIn("ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json",yml)
