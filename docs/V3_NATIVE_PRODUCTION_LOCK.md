@@ -59,9 +59,12 @@ approved binaries. It emits exactly one canonical stable installer and one
 `PRODUCTION_PROVENANCE.json` per target after rechecking source, lock, bundle
 and installer hashes. The separate manual publisher reads these four artifacts.
 
-**Additional production tasks remain:** a separately approved immutable 11-core
-input lock, final stable OS installer identities (the current scripts still
-default to preview branding), a four-platform reviewed production build
-workflow, final signing/notarization disclosure and the manual
-[publication runbook](V3_PUBLICATION_RUNBOOK.md). These are release gates;
-this native preflight does not itself generate or publish a public release.
+**Additional production tasks remain:** independent approval and population
+of the immutable 11-core lock, corresponding-source inventories (including
+submodules and an identifiable PCE Fast source), GPL/noncommercial rights review,
+final signing/notarization disclosures, and actual platform/audio/gameplay
+acceptance. The Windows/macOS/Linux packaging scripts now have separate stable
+production identities alongside unchanged preview mode, and the four-platform
+candidate producer exists, but both fail closed until all evidence is reviewed.
+The distinct manual [publication runbook](V3_PUBLICATION_RUNBOOK.md) controls
+the final release, not these build scripts.
