@@ -178,8 +178,8 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
     if remaining is not None:
         if (not isinstance(remaining, dict)
                 or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
-                or info.get("total_source_built_core_families") != (9 if info.get("source_built_mgba") is not None else 8)
-                or info.get("original_unchanged_core_archives") != (2 if info.get("source_built_mgba") is not None else 3)
+                or info.get("total_source_built_core_families") != (10 if info.get("source_built_n64") is not None else 9 if info.get("source_built_mgba") is not None else 8)
+                or info.get("original_unchanged_core_archives") != (1 if info.get("source_built_n64") is not None else 2 if info.get("source_built_mgba") is not None else 3)
                 or info.get("five_source_family_run_id") != 42515151314
                 or pce is None):
             raise ValueError("Eight source-built families are not complete and exact")
@@ -240,6 +240,38 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                     or not 50000 < native.stat().st_size < 70 * 1024 * 1024
                     or hashlib.sha256(native.read_bytes()).hexdigest() != mgba["native_sha256"]):
                 raise ValueError("Installed ninth original source-built mGBA binary is not authentic")
+    # The tenth source-built core is genuine upstream ParaLLEl-N64, not
+    # the earlier buildbot library with an assumed source revision.
+    n64 = info.get("source_built_n64")
+    if n64 is not None:
+        if (remaining is None or pce is None or mgba is None or not isinstance(n64, dict)
+                or n64.get("source_repository") != "https://github.com/libretro/parallel-n64"
+                or n64.get("source_commit") != "e0ef5d673257e2e83bf9b7cffe62eda141af8493"
+                or n64.get("native_filename") != f"parallel_n64_libretro{extension}"
+                or n64.get("source_build_run_id") != 42534736496
+                or n64.get("old_unverified_buildbot_replaced") is not True):
+            raise ValueError("Unverified tenth source-built ParaLLEl-N64 original")
+        for key in ("native_sha256","original_source_sha256",
+                    "original_native_av_sha256","native_archive_sha256"):
+            value = n64.get(key)
+            if not isinstance(value,str) or len(value)!=64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError(f"Missing exact original source-built N64 fingerprint: {key}")
+        notices = n64.get("original_notice_sha256")
+        names = {f"GPL-TRIAL-N64-NOTICE-{i:02}.txt" for i in range(1,12)}
+        if (not isinstance(notices,dict) or set(notices)!=names
+                or not isinstance(n64.get("original_notice_sources"),dict)
+                or set(n64["original_notice_sources"])!=names
+                or len(set(n64["original_notice_sources"].values()))!=11):
+            raise ValueError("Incomplete eleven original N64 GPL/LGPL/MIT notices")
+        for name,value in notices.items():
+            if not isinstance(value,str) or len(value)!=64 or any(c not in "0123456789abcdef" for c in value):
+                raise ValueError(f"Missing original N64 license blob: {name}")
+        if verify_native:
+            native=root/n64["native_filename"]
+            if (native.is_symlink() or not native.is_file()
+                    or not 100000<native.stat().st_size<120*1024*1024
+                    or hashlib.sha256(native.read_bytes()).hexdigest()!=n64["native_sha256"]):
+                raise ValueError("Modified tenth original source-built N64 core")
     _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):

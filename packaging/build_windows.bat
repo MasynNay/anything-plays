@@ -135,6 +135,12 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
     copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
     if errorlevel 1 exit /b 1
   )
+  if "%AP_V30_PINNED_N64%"=="1" (
+    for %%I in (01 02 03 04 05 06 07 08 09 10 11) do (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\\GPL-TRIAL-N64-NOTICE-%%I.txt" "dist\\AnythingPlays\\licenses\\" >nul
+      if errorlevel 1 exit /b 1
+    )
+  )
   if "%AP_V30_PINNED_MGBA%"=="1" (
     copy /Y "%AP_CORE_ARCHIVE_DIR%\\MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt" "dist\\AnythingPlays\\licenses\\" >nul
     if errorlevel 1 exit /b 1

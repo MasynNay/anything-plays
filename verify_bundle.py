@@ -252,6 +252,16 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 raise ValueError("Missing original MPL2 source license for the ninth core")
             if hashlib.sha256(original.read_bytes()).hexdigest() != mgba["original_license_notice_sha256"]:
                 raise ValueError("Original ninth source-built mGBA MPL2 license was modified")
+        n64 = trial_marker.get("source_built_n64")
+        if n64 is not None:
+            notices = n64["original_notice_sha256"]
+            if len(notices) != 11:
+                raise ValueError("Missing original source-built N64 license set")
+            for filename, exact_sha in notices.items():
+                original = licenses / filename
+                if (original.is_symlink() or not original.is_file()
+                        or hashlib.sha256(original.read_bytes()).hexdigest() != exact_sha):
+                    raise ValueError(f"Original source-built N64 license changed: {filename}")
         if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
             raise ValueError("Noncommercial core entered the GPL alternative test lineup")
         if platform_name == "windows":
