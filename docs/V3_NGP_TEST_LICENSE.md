@@ -31,6 +31,38 @@ monochrome vs. color mode; the true monochrome release gate requires 0x00.
 - Blob SHA-1: `27a06c37743460fcb85832b25b1754103b99e09d`.
 - License: MIT, Copyright (c) 2026 NGPC Template Contributors.
 
+## Genuine original monochrome-only native acceptance (no external game fixture)
+
+The four runner jobs for `system=ngp` in
+`.github/workflows/v30-ngp.yml` must no longer use the **color-header**
+alignment cartridge above for a monochrome acceptance claim. Instead, they
+run the *fully original source-generated* **0x00 monochrome cartridge**
+from `tools/build_v30_ngp_mono_native_av.py`, using
+`tools/probe_v30_ngp_mono_native_av.py` and each platform's genuine
+NeoPop Libretro binary.
+
+Its source is in this repository and produces a 64 KiB authentic
+monochrome header, a K1GE changing grayscale display, and actual PSG tone
+using B8=55 sound enable and B9=AA Z80 stopped. Real native
+`CoreSession` video/audio/input callbacks must all pass; an additional
+workflow step checks the actual source-built mode, distinct nonblank
+frames, nonzero PCM samples, manual A and camera B input callback counts,
+and exact JSON SHA-256. Source-generated ROM bytes are temporary **CI
+only**, not saved in Git, in an installer, or in a public test artifact.
+
+The four `system=ngpc` runners still use the independent pinned original
+MIT StarGunner **color** `.ngc` demo with full upstream blob, byte length,
+and original header checks. The old color-header `.ngp` calibration file
+remains in the research registry solely for transparency and is never
+accepted as real mono evidence.
+
+**Scope:** This is authentic native *homebrew core compatibility testing*,
+not proof of retail-game compatibility, end-user physical speakers,
+camera-zone behavior under actual hardware, cartridge flash save or
+long-run installed app operation. The exact in-process GPL/noncommercial
+combined-software licensing and 3.0 public distribution flags remain
+unapproved. Do not close either on a green native test alone.
+
 ## MIT permission and notice
 
 Each project's `LICENSE` grants permission, without charge, to use, copy,
