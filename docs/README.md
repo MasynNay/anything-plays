@@ -9,6 +9,7 @@ This directory is the index for technical and release evidence. The [repository 
 | Source code architecture | [Architecture](ARCHITECTURE.md) |
 | CI and operating-system test workflows | [Workflow guide](V3_CI_WORKFLOWS.md) |
 | Real-device and emulator QA | [QA checklist](QA_CHECKLIST.md) |
+| Exact 3.0 physical installer QA evidence and private offline recorder | [3.0 physical QA runbook](V3_PHYSICAL_QA_RUNBOOK.md) |
 | Packaging policy | [Release structure](V3_RELEASE_STRUCTURE.md) |
 | Third-party component attribution | [Notices](THIRD_PARTY_NOTICES.md) |
 | Release dependencies | [Third-party components](THIRD_PARTY_COMPONENTS.md) |
