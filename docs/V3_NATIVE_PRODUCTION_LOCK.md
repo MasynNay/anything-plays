@@ -112,6 +112,36 @@ retail-game/hardware acceptance is implied.** The technical core swap is
 evaluated in isolation and may be adopted for a future reviewed release
 only after independent evidence and rights decisions.
 
+## Strict per-core source-and-rights preflight for approved production
+
+Before an approved builder spends time compiling installers, it now runs
+`python -m tools.check_v30_source_gate`, then the production emitter
+checks the same record again against its actual staged native payloads.
+This check requires **all forty-four** individual native library entries
+(four OS architectures times eleven cores) to include exact matching
+native library SHA-256, original buildbot distribution ZIP SHA-256,
+source revision/repository, source archive SHA-256 and positive byte
+length, and three independent affirmative review decisions:
+
+- `source_build_dependencies_reviewed`
+- `source_to_binary_verified`
+- `redistribution_license_reviewed`
+
+The entire inventory must also explicitly attest independent source/binary
+matching and match the approved lock's source build-input revision.
+Each of the four Dolphin Sys archives requires matching ZIP hash **and
+byte length**, source correspondence, asset license review and approved
+asset redistribution. A changed archive or missing per-core decision
+fails the whole production job.
+
+The exact required fields and reviewer responsibilities are detailed in
+[V3_CORRESPONDING_SOURCE_REVIEW_SCHEMA.md](V3_CORRESPONDING_SOURCE_REVIEW_SCHEMA.md).
+All current research evidence remains `UNAPPROVED`, and the actual
+approved inventory and rights-review signoff have **not been created**.
+This is an engineering fail-closed improvement, **not** a legal finding
+that the combined GPL/noncommercial desktop application may be publicly
+distributed.
+
 ## Distinct release and development modes
 
 | Mode | Build environment | Effect |
