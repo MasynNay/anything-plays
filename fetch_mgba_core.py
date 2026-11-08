@@ -32,10 +32,27 @@ OPTIONAL_V21_CORES = (
     "stella2014", "prosystem", "mednafen_pce_fast",
     "mednafen_ngp", "mednafen_wswan",
 )
+# Explicit research-only full offline 3.0 preview: still 18 consoles and 11
+# native Libretro core slots, but NO Snes9x/Genesis Plus GX binary. The
+# replacement cores are validated source-built artifacts, never nightly.
+V30_GPL_TRIAL_CORES = (
+    "mgba", "mednafen_supafaust", "fceumm", "blastem", "parallel_n64",
+    "dolphin", "stella2014", "prosystem", "mednafen_pce_fast",
+    "mednafen_ngp", "mednafen_wswan",
+)
 
 
 def core_names_for_build():
     # Official 3.0 is a completely separate, 11-core release lane.
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        if (os.environ.get("AP_RELEASE_BUILD", "0") != "0"
+                or os.environ.get("AP_V30_APPROVED_RELEASE", "0") != "0"
+                or os.environ.get("AP_V30_TEST_CORES") != "1"
+                or not os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip()):
+            raise ValueError("GPL alternative trial requires offline, unapproved 11-core preview only")
+        if len(V30_GPL_TRIAL_CORES) != 11 or len(set(V30_GPL_TRIAL_CORES)) != 11:
+            raise ValueError("GPL alternative trial core inventory changed")
+        return V30_GPL_TRIAL_CORES
     # A tampered environment flag cannot substitute for the approved
     # per-architecture binary/source/license lock.
     if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
@@ -68,6 +85,8 @@ CORE_FOLDER = Path(__file__).resolve().parent / "cores"
 SOURCE_REPOSITORIES = {
     "mgba": "https://github.com/libretro/mgba",
     "snes9x": "https://github.com/libretro/snes9x",
+    "mednafen_supafaust": "https://github.com/libretro/supafaust",
+    "blastem": "https://github.com/libretro/blastem",
     "fceumm": "https://github.com/libretro/libretro-fceumm",
     "genesis_plus_gx": "https://github.com/libretro/Genesis-Plus-GX",
     "parallel_n64": "https://github.com/libretro/parallel-n64",
@@ -255,6 +274,11 @@ def fetch_core(name, destination=CORE_FOLDER):
     folder, extension = build_target()
     filename = f"{name}_libretro{extension}"
     url = f"{BUILD_BOT}/{folder}/{filename}.zip"
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1" and name in ("mednafen_supafaust", "blastem"):
+        # The trial inputs originate from original immutable upstream-source
+        # CI artifacts, NOT a mutable Libretro nightly/buildbot ZIP.
+        url = ("https://github.com/MasynNay/anything-plays/actions/runs/"
+               + ("42494297281" if name == "mednafen_supafaust" else "42496671418"))
     destination = Path(destination)
     print(f"Preparing {name}; upstream reference: {url}", flush=True)
 
@@ -359,6 +383,18 @@ def fetch_all(destination=CORE_FOLDER):
         (destination / "CORE_PROVENANCE.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
+    # Distinct, source-identical preview marker goes into installed core
+    # directory and is validated before packaging and on every trial launch.
+    # The production source/native lock cannot consume this trial mode.
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        from anything_plays.v30_gpl_trial import (
+            MARKER, validate_trial_core_directory,
+        )
+        archived = Path(os.environ["AP_CORE_ARCHIVE_DIR"]) / MARKER
+        if archived.is_symlink() or not archived.is_file():
+            raise ValueError("Original GPL alternative trial marker absent")
+        (destination / MARKER).write_bytes(archived.read_bytes())
+        validate_trial_core_directory(destination, build_target()[1])
     from tools.core_release_lock import (
         LOCK_PATH, candidate_fingerprint, verify_release_lock,
     )
