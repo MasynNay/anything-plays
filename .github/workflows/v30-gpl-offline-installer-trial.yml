@@ -8,6 +8,8 @@ on:
     paths:
       - '.github/workflows/v30-gpl-offline-installer-trial.yml'
       - 'tools/stage_v30_gpl_trial_inputs.py'
+      - 'tools/v30_pce_candidate.py'
+      - 'config/v3.0-pce-pinned-source-candidates.json'
       - 'tools/probe_v30_installed_switch.py'
       - 'tests/test_v30_installed_switch.py'
       - 'tests/test_v30_gpl_trial_lifetime.py'
@@ -44,6 +46,7 @@ jobs:
       AP_V30_APPROVED_RELEASE: '0'
       AP_V30_TEST_CORES: '1'
       AP_V30_GPL_TRIAL: '1'
+      AP_V30_PINNED_PCE: '1'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/gpl-trial-native-inputs
       GH_TOKEN: ${{ github.token }}
       TARGET: ${{ matrix.target }}
@@ -52,6 +55,7 @@ jobs:
       OLD_INPUT_RUN_ID: '42437133733'
       GPL_SNES_RUN_ID: '42494297281'
       GPL_SEGA_RUN_ID: '42496671418'
+      PINNED_PCE_RUN_ID: '42444367068'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,6 +70,8 @@ jobs:
           test "$(gh run view "$OLD_INPUT_RUN_ID" --json conclusion --jq .conclusion)" = "success"
           test "$(gh run view "$GPL_SNES_RUN_ID" --json conclusion --jq .conclusion)" = "success"
           test "$(gh run view "$GPL_SEGA_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$PINNED_PCE_RUN_ID" --json conclusion --jq .conclusion)" = "success"
+          test "$(gh run view "$PINNED_PCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | PCE pinned-source replacement research"
           test "$(gh run view "$OLD_INPUT_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Complete offline installer lab"
           test "$(gh run view "$GPL_SNES_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate"
           test "$(gh run view "$GPL_SEGA_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform pinned GPL candidate research"
@@ -79,6 +85,16 @@ jobs:
           gh run download "$OLD_INPUT_RUN_ID" --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" --dir original-native-inputs
           gh run download "$GPL_SNES_RUN_ID" --name "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" --dir source-built-snes
           gh run download "$GPL_SEGA_RUN_ID" --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" --dir source-built-sega
+          gh run download "$PINNED_PCE_RUN_ID" --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" --dir source-built-pce
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile,ZIP_STORED
+          source=Path("source-built-pce")
+          members=sorted(source.iterdir())
+          assert len(members)==6 and all(p.is_file() and not p.is_symlink() for p in members)
+          with ZipFile("original-source-built-pce.zip","w",ZIP_STORED) as z:
+              for p in members: z.write(p,arcname=p.name)
+          PY
           (cd source-built-snes && sha256sum -c SHA256SUMS.txt)
           (cd source-built-sega && sha256sum -c SHA256SUMS.txt)
       - name: Install exact Windows MinGW native runtime (source-built research dependency)
@@ -112,6 +128,7 @@ jobs:
             --original-dir original-native-inputs \
             --snes-dir source-built-snes --sega-dir source-built-sega \
             --target "$TARGET" \
+            --pce-artifact original-source-built-pce.zip \
             --output gpl-trial-native-inputs \
             --evidence test-evidence/ORIGINAL_GPL_ALTERNATIVE_NATIVE_STAGING_UNAPPROVED.json \
             ${WIN_RUNTIME_ARG:+$WIN_RUNTIME_ARG}
@@ -155,6 +172,9 @@ jobs:
           assert len(SYSTEMS)==18 and len(V30_GPL_TRIAL_CORES)==11
           trials=validate_trial_core_directory(cores,ext)
           assert trials["native_core_count"]==11 and trials["all_console_profiles"]==18
+          assert trials["original_unchanged_core_archives"]==8
+          assert trials["source_built_pce"]["old_unknown_source_nightly_substituted"] is True
+          assert trials["source_built_pce"]["source_commit"]=="2de1ce1c3f237b161c126c54ba407990bb86d1e9"
           manifest=json.loads((cores/"CORE_PROVENANCE.json").read_text("utf-8"))
           rows={record["name"]:record for record in manifest["cores"]}
           assert set(rows)==set(V30_GPL_TRIAL_CORES)
@@ -163,6 +183,7 @@ jobs:
               assert native.is_file() and hashlib.sha256(native.read_bytes()).hexdigest()==row["sha256"]
           for name in ("mednafen_supafaust","blastem"):
               assert rows[name]["sha256"]==trials["alternatives"][name]["native_sha256"]
+          assert rows["mednafen_pce_fast"]["sha256"] == trials["source_built_pce"]["native_sha256"]
           assert not list(cores.glob("snes9x_libretro.*"))
           assert not list(cores.glob("genesis_plus_gx_libretro.*"))
           for system,core in (("snes","mednafen_supafaust"),("genesis","blastem"),
@@ -229,6 +250,28 @@ jobs:
               assert item["passed"] is True and item["native_exit_code"]==0,path
               assert item["details"]["passed"] is True,path
           print("Five original, genuine source-built installed-core video and PCM probes passed")
+          PY
+      - name: Prove genuine source-built PC Engine sound and video from FULLY INSTALLED offline core
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_pce_homebrew.py \
+            --core "$CORE_DIR/mednafen_pce_fast_libretro.$EXT" \
+            --seconds 10 \
+            --report test-evidence/ACTUAL_INSTALLED_PINNED_PCE_NATIVE_AV_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("test-evidence/ACTUAL_INSTALLED_PINNED_PCE_NATIVE_AV_UNAPPROVED.json").read_text())
+          assert x["passed"] is True and x["details"]["passed"] is True
+          assert x["details"]["native_video_frames"] >= 30
+          assert x["details"]["native_nonzero_pcm_samples"] > 100
+          print("ACTUAL installed source-verified PCE original HuCard + PSG PCM passed")
           PY
       - name: Prove real installed application survives seven sequential SNES/Sega native restarts
         shell: bash
