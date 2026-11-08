@@ -43,10 +43,13 @@ def original_fixture(folder, target="linux-x64"):
     with tarfile.open(fileobj=stream,mode="w") as t:
         for i in range(11):
             path=f"upstream/component{i}/COPYING"
-            contents=(f"ORIGINAL SOURCE LICENSE #{i} NOT ACTUAL GPL ".encode()*100)
+            # The immutable original Git blob uses LF. On Windows Git's
+            # source export may present that same content as CRLF.
+            contents=(f"ORIGINAL SOURCE LICENSE #{i} NOT ACTUAL GPL ".encode()+b"\n")*100
+            exported=(contents.replace(b"\n",b"\r\n") if target=="windows-x64" else contents)
             info=tarfile.TarInfo(path)
-            info.size=len(contents)
-            t.addfile(info,io.BytesIO(contents))
+            info.size=len(exported)
+            t.addfile(info,io.BytesIO(exported))
             notes[path]={"sha256":sha(contents),"size_bytes":len(contents)}
     archive=stream.getvalue()
     archive_name=f"parallel-n64-{SOURCE_REVISION}-ORIGINAL-SOURCE.tar"
