@@ -25,7 +25,28 @@ class OriginalMonoPSGResearchContracts(unittest.TestCase):
                 self.assertEqual(struct.unpack_from("<I", rom, 0x1C)[0], ENTRY)
                 self.assertEqual(rom[HEADER_BYTES:HEADER_BYTES+len(original_mono_psg_code(name))],
                                  original_mono_psg_code(name))
-                self.assertIn(io8(0xB9, 0x55), rom)
+                # Sound ON must be B8=0x55; Z80 must be OFF at B9=0xAA
+                # before any direct PSG writes. Never confuse these registers.
+                self.assertNotIn(io8(0xB9, 0x55) +
+                                 io8(0xA1, 0x8A), rom)
+                if name == "direct-tone":
+                    self.assertTrue(
+                        original_mono_psg_code(name).startswith(
+                            io8(0xB9, 0xAA) + io8(0xB8, 0x55)
+                        )
+                    )
+                elif name == "restart-z80-tone":
+                    self.assertTrue(
+                        original_mono_psg_code(name).startswith(
+                            io16(0xB8, 0x5555) + io8(0xB9, 0xAA)
+                        )
+                    )
+                else:
+                    self.assertTrue(
+                        original_mono_psg_code(name).startswith(
+                            io16(0xB8, 0xAA55)
+                        )
+                    )
                 # Exact native PSG tone latch, divider data, loud attenuation.
                 self.assertIn(io8(0xA1, 0x8A) + io8(0xA1, 0x0D)
                               + io8(0xA1, 0x90), rom)
@@ -33,7 +54,9 @@ class OriginalMonoPSGResearchContracts(unittest.TestCase):
 
     def test_cpu_machine_encoding_and_loop_are_unchanged(self):
         self.assertEqual(io8(0xA1, 0x8A), bytes.fromhex("08a18a"))
-        self.assertEqual(io16(0xB8, 0xAAAA), bytes.fromhex("0ab8aaaa"))
+        self.assertEqual(io16(0xB8, 0xAA55), bytes.fromhex("0ab855aa"))
+        self.assertEqual(io8(0xB8, 0x55), bytes.fromhex("08b855"))
+        self.assertEqual(io8(0xB9, 0xAA), bytes.fromhex("08b9aa"))
         for name in VARIANTS:
             code = original_mono_psg_code(name)
             self.assertEqual(code[-5:], bytes.fromhex("086f4e68fb"))
