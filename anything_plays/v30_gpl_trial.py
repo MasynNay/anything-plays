@@ -32,7 +32,10 @@ EXPECTED_PROFILES = 18
 EXPECTED_CORES = 11
 WINDOWS_RUNTIME = "libwinpthread-1.dll"
 # Keep os.add_dll_directory handles alive for the loaded native cores.
-_WINDOWS_NATIVE_DLL_HANDLES = []
+# A list would add a new OS DLL-search directory handle on EVERY console
+# switch, leaking one native handle per ROM opened for the lifetime of the UI.
+# One verified canonical directory gets exactly one retained handle.
+_WINDOWS_NATIVE_DLL_HANDLES = {}
 
 
 def _verify_runtime_dependency(root, info, extension):
@@ -64,11 +67,26 @@ def enable_windows_trial_runtime(folder):
         return
     root = Path(folder)
     marker = root / MARKER
-    if marker.is_symlink() or not marker.is_file():
-        raise ValueError("Missing Windows original source-built trial marker")
+    if (marker.is_symlink() or not marker.is_file()
+            or marker.stat().st_size > 32768):
+        raise ValueError("Missing/unsafe Windows original source-built trial marker")
     info = json.loads(marker.read_text("utf-8"))
+    _register_windows_runtime_directory(root, info)
+
+
+def _register_windows_runtime_directory(root, info):
+    """Verify native dependency EVERY call, but register its directory ONCE.
+
+    This helper is deliberately independent of os.name so the handle-lifetime
+    contract can be tested on Linux/macOS without loading any Windows DLLs.
+    """
+    root = Path(root)
     _verify_runtime_dependency(root, info, ".dll")
-    _WINDOWS_NATIVE_DLL_HANDLES.append(os.add_dll_directory(str(root.resolve())))
+    canonical = str(root.resolve(strict=True))
+    if canonical not in _WINDOWS_NATIVE_DLL_HANDLES:
+        # Registration takes place only after the runtime's native bytes have
+        # passed the original source-built manifest's exact SHA-256 check.
+        _WINDOWS_NATIVE_DLL_HANDLES[canonical] = os.add_dll_directory(canonical)
 
 
 def validate_trial_core_directory(folder, extension, *, verify_native=True):
