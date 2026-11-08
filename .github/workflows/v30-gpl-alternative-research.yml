@@ -70,23 +70,53 @@ jobs:
           assert d['details']['distinct_rgb_frames']>=2
           print('Real source-built homebrew SNES native A/V passed')
           PY
-      - name: Verify original Genesis and all three 8-bit Sega homebrews with BlastEm
+      - name: Independently diagnose original Genesis instruction phases AND all Sega 8-bit profiles
         if: matrix.candidate == 'sega'
         run: |
-          set -euo pipefail
-          xvfb-run -a python tools/probe_genesis_homebrew.py --core candidate/blastem_libretro.so --seconds 12 --report evidence/blastem-genesis-original-homebrew.json
+          set -uo pipefail
+          # Each probe is an isolated Python/native Libretro child; preserve
+          # EVERY report rather than losing SMS/GG/SG-1000 when Genesis fails.
+          for phase in idle tmss vdp patterns tiles palette tone; do
+            xvfb-run -a python tools/probe_genesis_homebrew.py \
+              --phase "$phase" --smoke-only \
+              --core candidate/blastem_libretro.so \
+              --seconds 4 --report "evidence/blastem-phase-$phase.json" \
+              || echo "Sega diagnostic phase $phase failed (captured)"
+          done
+          xvfb-run -a python tools/probe_genesis_homebrew.py \
+            --core candidate/blastem_libretro.so \
+            --seconds 12 --report evidence/blastem-genesis-original-homebrew.json \
+            || echo "Genesis full A/V failed (captured)"
           for system in mastersystem gamegear sg1000; do
-            xvfb-run -a python tools/probe_sega8_homebrew.py --system "$system" --core candidate/blastem_libretro.so --seconds 12 --report "evidence/blastem-$system-original-homebrew.json"
+            xvfb-run -a python tools/probe_sega8_homebrew.py \
+              --system "$system" --core candidate/blastem_libretro.so \
+              --seconds 12 --report "evidence/blastem-$system-original-homebrew.json" \
+              || echo "Sega system $system full A/V failed (captured)"
           done
           python - <<'PY'
           import json
           from pathlib import Path
-          reports=list(Path('evidence').glob('blastem-*-original-homebrew.json'))
-          assert len(reports)==4
-          for f in reports:
-              data=json.loads(f.read_text())
-              assert data['passed'] and data['native_exit_code']==0 and data['details']['passed'],f.name
-              print('Original Sega homebrew real native A/V passed:',f.name)
+          original=['genesis','mastersystem','gamegear','sg1000']
+          failed=[]
+          for system in original:
+              p=Path(f'evidence/blastem-{system}-original-homebrew.json')
+              if not p.is_file():
+                  print('MISSING original Sega proof:',system)
+                  failed.append(system)
+                  continue
+              item=json.loads(p.read_text())
+              passed=bool(item.get('passed') and item.get('native_exit_code')==0
+                          and isinstance(item.get('details'),dict)
+                          and item['details'].get('passed'))
+              print(f"REAL Sega A/V: {system}: {'PASS' if passed else 'FAIL'}, "+
+                    f"child exit={item.get('native_exit_code')}")
+              if not passed:
+                  failed.append(system)
+          for p in sorted(Path('evidence').glob('blastem-phase-*.json')):
+              item=json.loads(p.read_text())
+              print('Isolated Genesis phase:',p.stem,
+                    'smoke=',item.get('passed'),'exit=',item.get('native_exit_code'))
+          assert not failed, 'GPL alternative NOT a compatible four-profile replacement: '+', '.join(failed)
           PY
       - name: Keep only candidate SHA and test observations, NO native binaries/ROMs
         if: always()
