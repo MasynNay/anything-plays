@@ -76,16 +76,38 @@ jobs:
           gh run download "$GPL_SEGA_RUN_ID" --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" --dir source-built-sega
           (cd source-built-snes && sha256sum -c SHA256SUMS.txt)
           (cd source-built-sega && sha256sum -c SHA256SUMS.txt)
+      - name: Install exact Windows MinGW native runtime (source-built research dependency)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Preserve original native winpthread runtime in explicit trial input directory
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          test -s /mingw64/bin/libwinpthread-1.dll
+          cp /mingw64/bin/libwinpthread-1.dll research-winpthread-1.dll
+          test -s research-winpthread-1.dll
       - name: Replace exactly two NC core families with genuine separately named GPL source-built originals
         shell: bash
         run: |
           set -euo pipefail
+          EXTRA_ARGS=()
+          if [[ "$TARGET" == "windows-x64" ]]; then
+            EXTRA_ARGS=(--windows-runtime research-winpthread-1.dll)
+          fi
           python -m tools.stage_v30_gpl_trial_inputs \
             --original-dir original-native-inputs \
             --snes-dir source-built-snes --sega-dir source-built-sega \
             --target "$TARGET" \
             --output gpl-trial-native-inputs \
-            --evidence test-evidence/ORIGINAL_GPL_ALTERNATIVE_NATIVE_STAGING_UNAPPROVED.json
+            --evidence test-evidence/ORIGINAL_GPL_ALTERNATIVE_NATIVE_STAGING_UNAPPROVED.json \
+            "${EXTRA_ARGS[@]}"
       - name: Install Windows source-accurate packaging compiler
         if: runner.os == 'Windows'
         shell: pwsh
@@ -159,10 +181,18 @@ jobs:
           Path("test-evidence/INSTALLED_GPL_ALTERNATIVE_PROVENANCE_UNAPPROVED.json").write_text(
               json.dumps(evidence,indent=2,sort_keys=True)+"\n","utf-8")
           PY
+      - name: Install original project-native A/V test dependencies (the packaged app already built)
+        run: python -m pip install -r requirements.txt
       - name: Run original native SNES PPU/SPC and four Sega VDP/PSG from ACTUAL installed images
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$TARGET" == "windows-x64" ]]; then
+            # Test against the SHA-checked PACKAGED runtime only, not an
+            # accidentally preinstalled system-wide MSYS2 dependency.
+            export AP_V30_MINGW_CI_DLL_DIR="$(python -c 'import os;print(os.path.join(os.getcwd(),"dist","AnythingPlays","cores"))')"
+            export PYTHONPATH="$(python -c 'import os;print(os.path.join(os.getcwd(),"tools","v30_windows_gpl_lab"))')"
+          fi
           if [[ "$TARGET" == macos-* ]]; then
             CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
           else
