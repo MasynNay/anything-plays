@@ -53,3 +53,18 @@ The newly compiled Windows Supafaust and BlastEm libraries require the MinGW `li
 ### QA and rights still strictly withheld
 
 The test-only marker includes explicit `public_binary_distribution_approved=false`, `combined_gpl_license_reviewed=false`, `production_core_substitution_approved=false`, `physical_qa_approved=false`. Neither the source GPLv2+/GPLv3 test successes nor a permissively licensed MinGW runtime resolve the separate GPLv2-only vs GPLv3-only library compatibility review for other emulators. The exact source correspondence for the other nine binaries plus full Dolphin Sys still needs final review. The app cannot be called a production release until genuine physical camera/controller/speaker/save/endurance review and complete source/license decisions. **No outside repository contacts or permission requests are made.**
+
+### Final post-notice original evidence — merged implementation
+
+[PR #87](https://github.com/MasynNay/anything-plays/pull/87) was **squash merged** at `01e1ac7f52bfac13f5c4ebe5ab92bd45b9ca83bd` after the final notice-verified workflow [42503875717](https://github.com/MasynNay/anything-plays/actions/runs/42503875717) **passed Windows/Linux/Mac ARM/Mac Intel 4/4**, normal complete offline lab [42503875902](https://github.com/MasynNay/anything-plays/actions/runs/42503875902) **passed**, and [source CI 42503875701](https://github.com/MasynNay/anything-plays/actions/runs/42503875701) **passed**.
+
+Independently downloaded and parsed the ORIGINAL final four artifacts again (distinct from earlier green run 42503215322). Each original ZIP contains exactly seven original research JSON files: five genuine installed-native SNES/Genesis/SMS/GG/SG1000 video+PCM results (each `passed=true`, `native_exit_code=0`), one exact native staging/source record and one complete packaged-core manifest. Each proves **11 original/alternative core slots, 18 profiles, Dolphin Sys present, original Snes9x/Genesis Plus GX native binaries absent, and ALL public distribution/legal/physical flags FALSE**.
+
+| Target | Original FINAL Actions artifact ID | Original FINAL downloaded ZIP SHA-256 | Native installed test evidence |
+| --- | ---: | --- | --- |
+| Windows x64 | 13626379191 | `7477192c1f636f315806b95dbe2a3ebf1b4221a30be9437f926a6454920f713d` | 5/5 original source homebrew A/V pass; original `libwinpthread-1.dll` runtime SHA-256 `98a4fea591385952cad1c532f4a92606358630976e9ede5fcf115ab945305a09` |
+| Linux x64 | 13626523554 | `575ee1b775f13a99421c91f155a1e0f604da2219a3c249197f37b96d47e806e7` | 5/5 original source homebrew A/V pass |
+| Mac ARM64 | 13626239586 | `e88aa8f3a1e606dbf49d788f53dfbdaa51d266f817d2ad81eaa963abb798c5ca` | 5/5 original source homebrew A/V pass |
+| Mac Intel | 13626896888 | `a516df606c422bc4bc23c41d0a6fa5a8f2ce5a3810c1a8c840d7776f7cc9ecd6` | 5/5 original source homebrew A/V pass |
+
+These four archives are **small JSON reviewer evidence only**. The four actual working, unapproved prototype installers were compiled on their native CI runners but were *not uploaded as public binaries*, because a full GPL combined-work/component-specific license review, corresponding source/dependency audit and physical user acceptance have NOT been completed. Do not retrospectively reclassify their evidence as permission to release a full 3.0 installer.
