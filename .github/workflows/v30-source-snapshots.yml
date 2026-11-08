@@ -1,0 +1,57 @@
+name: Anything Plays 3.0 | Preserve reported upstream sources
+
+# Source-only Actions evidence, not a public GitHub Release.
+# A matching upstream Git SHA is NOT a reproducible-build or license clearance.
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-source-snapshots.yml'
+      - 'tools/capture_v30_source_snapshots.py'
+      - 'tests/test_v30_source_archive_audit.py'
+      - 'config/v3.0-preview-candidate-integrity.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-v30-source-snapshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preserve-unapproved-sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify 11-core source provenance requirements
+        run: python -m unittest discover -s tests -p 'test_v30_source_archive_audit.py' -v
+      - name: Capture exact reported Git source commits (never distribution approval)
+        run: python tools/capture_v30_source_snapshots.py --output source-snapshots
+      - name: Confirm capture does not claim GPL/noncommercial clearance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p = Path("source-snapshots/SOURCE_SNAPSHOTS_UNAPPROVED.json")
+          record = json.loads(p.read_text("utf-8"))
+          assert record["approved_for_binary_distribution"] is False
+          assert record["independent_binary_to_source_match_proven"] is False
+          assert len(record["cores"]) == 11
+          assert sum(x.get("archive_file") is not None for x in record["cores"].values()) == 10
+          assert record["cores"]["mednafen_pce_fast"]["status"] == "NO_REPORTED_SOURCE_REVISION"
+          print("Source archive candidate capture completed with unsatisfied rights/source gates")
+          PY
+      - name: Retain corresponding-source CANDIDATES as unapproved Actions evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-SOURCE-SNAPSHOTS-UNAPPROVED
+          path: source-snapshots/*
+          if-no-files-found: error
+          retention-days: 90
