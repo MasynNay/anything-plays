@@ -75,6 +75,19 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 
 The explicit release-readiness work is in [#28](https://github.com/MasynNay/anything-plays/issues/28). **Stable 2.0 stays available throughout this work.**
 
+## Repository cleanup at the 3.0 release
+
+Repository hygiene is a **release deliverable**, not an invitation to delete historic work. Once the stable 3.0 binaries, corresponding source, license review and hardware acceptance are actually approved and published:
+
+- [ ] Merge any verified 3.0 pull requests and close superseded proposals with an explanation. Retain the review and commit history.
+- [ ] Audit old release, experiment, test and research branches against `main` and the published 3.0 release tag; delete only branches that are demonstrably redundant or archived after preserving unique work. Preserve `main`, the active development branch and anything not yet merged.
+- [ ] Close completed 3.0 issues with links to the fix and supporting checks; move genuinely unfinished work to clearly labelled maintenance or future-version issues. Keep post-3.0 proposals #29 and #30 as intentional roadmap items.
+- [ ] Consolidate obsolete build experiments, temporary project files, duplicated workflows and stale documentation without disrupting stable 2.0 or required license/source evidence.
+- [ ] Perform a final editorial pass on `README.md`, `ROADMAP.md`, screenshots, support and install instructions, release notes, changelog and GitHub Pages showcase.
+- [ ] Confirm stable 3.0 is the actual public release with four valid installer links and matching published checksums; clean up stale drafts without deleting old releases.
+
+Current pre-release inventory (November 8, 2026): **111 branches, seven open issues and no open pull requests following PR #102**. This is an audit baseline, **not** a claim that stable 3.0 has shipped or that cleanup has been carried out.
+
 ## Ideas for after 3.0 — proposals, not commitments
 
 These are opportunities to investigate **after stability and compliance**, not features promised for 3.0.
