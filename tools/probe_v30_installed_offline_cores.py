@@ -20,6 +20,8 @@ from tempfile import TemporaryDirectory
 from unittest import mock
 
 from anything_plays import core_locator, core_packs
+from anything_plays.n64_software import find_parallel_n64_core
+from anything_plays.gamecube_software import find_dolphin_core
 from anything_plays.systems import SYSTEMS
 from tools.v30_release_lock import CORE_NAMES
 
@@ -92,7 +94,17 @@ def check_offline_bundle(core_dir, target, *, lookup=None):
     if not handler.is_file() or handler.is_symlink() or handler.stat().st_size == 0:
         raise ValueError("Dolphin required Sys files missing")
 
-    resolve = lookup or core_locator.find_core
+    def application_resolver(system):
+        # Match Emulator.find_system_core(), including its two intentional
+        # non-generic native backends. Systems.n64 describes the legacy
+        # external RetroArch path; actual in-panel N64 uses ParaLLEl-N64.
+        if system == "n64":
+            return find_parallel_n64_core()
+        if system == "gamecube":
+            return find_dolphin_core()
+        return core_locator.find_core(system)
+
+    resolve = lookup if lookup is not None else application_resolver
     resolved = {}
     with TemporaryDirectory(prefix="anything-plays-v30-fresh-core-store-") as folder:
         with ExitStack() as patches:
@@ -103,6 +115,14 @@ def check_offline_bundle(core_dir, target, *, lookup=None):
                 return_value=[core_dir],
             ))
             # A never-before-launched user has no managed core-pack overlay.
+            patches.enter_context(mock.patch(
+                "anything_plays.n64_software._search_directories",
+                return_value=[core_dir],
+            ))
+            patches.enter_context(mock.patch(
+                "anything_plays.gamecube_software._search_directories",
+                return_value=[core_dir],
+            ))
             patches.enter_context(mock.patch(
                 "anything_plays.core_packs.managed_core_root",
                 return_value=Path(folder) / "uninitialized-core-overlays",
@@ -126,10 +146,11 @@ def check_offline_bundle(core_dir, target, *, lookup=None):
                 actual = path.resolve()
                 if actual.parent != core_dir:
                     raise ValueError(f"{system}: runtime selected external emulator")
-                expected_file = core_dir / records[config.core]["name"]
+                actual_core = "parallel_n64" if system == "n64" else config.core
+                expected_file = core_dir / records[actual_core]["name"]
                 if actual != expected_file:
                     raise ValueError(f"{system}: runtime selected the wrong core")
-                resolved[system] = config.core
+                resolved[system] = actual_core
     return {
         "schema_version": 1,
         "status": STATUS,
