@@ -8,6 +8,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from tools.emit_v30_production_provenance import (
     NATIVE_MAP, prepare_production_artifact, validate_source_inventory,
@@ -145,6 +146,33 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
             self.assertEqual(record["release_mode"], "APPROVED-IMMUTABLE-PRODUCTION")
             self.assertTrue(record["public_binary_distribution_approved"])
             self.assertEqual(record["native_cores_bundled"], 11)
+            self.assertEqual(record["reviewed_application_source_commit"], "b" * 40)
+            self.assertTrue(record["runtime_build_inputs_unchanged_since_approved_source"])
+
+    def test_new_approval_commit_may_differ_only_after_actual_git_tree_verification(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as temp:
+            folder = Path(temp)
+            installer = folder / expected_installers("3.0.0")[3]
+            installer.write_bytes(b"synthetic ADMIN ONLY release approval " * 45000)
+            with patch(
+                "tools.emit_v30_production_provenance.verify_runtime_code_unchanged",
+                return_value={"runtime_and_packaging_source_unchanged": True},
+            ) as proof:
+                result = prepare_production_artifact(
+                    target="linux-x64", version="3.0.0",
+                    source_commit="c" * 40, installer=installer,
+                    bundle_manifest=bundle_manifest(lock, "linux-x64"),
+                    lock=lock, inventory=source,
+                    review_text=("APPROVED-3.0-DISTRIBUTION "
+                                 + "TEST ONLY EXTERNAL REVIEW " * 20),
+                    output=folder / "production",
+                    lock_digest="b" * 64, source_digest="c" * 64,
+                )
+            proof.assert_called_once_with("b" * 40, "c" * 40)
+            self.assertEqual(result["source_revision"], "c" * 40)
+            self.assertEqual(result["reviewed_application_source_commit"], "b" * 40)
+            self.assertTrue(result["runtime_build_inputs_unchanged_since_approved_source"])
 
     def test_different_application_revision_cannot_reuse_approved_native_source(self):
         lock, source = synthetic_evidence()
