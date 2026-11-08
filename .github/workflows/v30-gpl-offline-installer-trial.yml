@@ -75,7 +75,10 @@ jobs:
           test "$(gh run view "$OLD_INPUT_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Complete offline installer lab"
           test "$(gh run view "$GPL_SNES_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate"
           test "$(gh run view "$GPL_SEGA_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform pinned GPL candidate research"
-          python -m unittest discover -s tests -p 'test_v30_gpl_full_offline_trial.py' -v
+          # Regression of the original two-family trial must remain valid
+          # without a pinned PCE original research artifact supplied.
+          AP_V30_PINNED_PCE=0 python -m unittest discover -s tests -p 'test_v30_gpl_full_offline_trial.py' -v
+          python -m unittest discover -s tests -p 'test_v30_gpl_pce_pinned_full_trial.py' -v
           python -m unittest discover -s tests -p 'test_v30_installed_switch.py' -v
           python -m unittest discover -s tests -p 'test_v30_gpl_trial_lifetime.py' -v
       - name: Retrieve 12 verified original offline build inputs and both source-built GPL alternative core families
