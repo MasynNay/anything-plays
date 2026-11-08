@@ -170,6 +170,19 @@ def verify_bundle(bundle, platform_name, check_native=False):
         cores = bundle / "cores"
 
     expected_cores = core_names_for_build()
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        # Never mistake test-only noncommercial-core substitutions for an
+        # approved 3.0 production input. Validate the actual installed native
+        # images, unapproved marker and source identities before inspecting DLLs.
+        from anything_plays.v30_gpl_trial import validate_trial_core_directory
+        validate_trial_core_directory(cores, EXTENSIONS[platform_name])
+        for name in ("GPL-TRIAL-Supafaust-COPYING.txt",
+                     "GPL-TRIAL-BlastEm-COPYING.txt"):
+            notice = licenses / name
+            if notice.is_symlink() or not notice.is_file() or not notice.read_bytes().strip():
+                raise ValueError(f"GPL trial missing original license: {name}")
+        if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
+            raise ValueError("Noncommercial core entered the GPL alternative test lineup")
     if len(expected_cores) > len(CORE_NAMES):
         verify_v21_artwork(bundle)
     required_notices = (
