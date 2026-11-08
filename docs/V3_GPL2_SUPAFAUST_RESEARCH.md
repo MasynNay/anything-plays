@@ -101,3 +101,41 @@ relabel research-only binaries as approved shipping emulator cores.
 Passing the lab is **not** evidence of real keyboard/camera/save, physical
 speaker, retail game compatibility, or the legal compatibility of the
 entire combined 11-core 3.0 installer. Research only.
+
+### Reproducing the exact macOS compatibility change
+
+The first untouched upstream macOS source builds correctly **failed**
+because `mednafen/config.h` defined `HAVE_SEM_TIMEDWAIT` for Darwin,
+although the Apple SDK has no `sem_timedwait`. The same upstream
+`mednafen/mthreading/MThreading_POSIX.cpp` already implements a
+pthread-condition-variable-backed semaphore fallback.
+
+`tools/patch_v30_supafaust_macos_semaphore.py` performs exactly this
+single-line source modification **only** in the temporary checked-out
+Git source for the two Mac builds:
+
+```diff
+-#if !defined(__SWITCH__) && !defined(HAVE_LIBNX)
++#if !defined(__SWITCH__) && !defined(HAVE_LIBNX) && !defined(__APPLE__)
+```
+
+The script refuses the wrong upstream commit, origin URL, dirty original
+tree or unexpected header contents. Before original source/native
+preservation, `tools/capture_v30_supafaust_source.py` **independently
+compares the entire changed header to the pristine original Git blob with
+only that one replacement**, rejects any other changed tracked file,
+retains the authentic original source `git archive` **plus** exact
+`git diff` as `SUPAFAUST_MACOS_SOURCE_PATCH_UNAPPROVED.diff`,
+and adds the patch SHA-256 to its unapproved native/source manifest.
+That makes the modified research build reproducible without falsely
+claiming that unpatched upstream source built the Mac binary. The patch
+is GPL-licensed source research and is **not** legal approval to bundle
+that emulator with Anything Plays.
+
+The independent Windows source build also found that native
+`Path.write_text()` created CRLF `SHA256SUMS.txt` lines, which GNU
+`sha256sum -c` interpreted as \r in filenames. The research capture
+writes **byte-exact LF-only checksums** on all platforms now and tests
+the actual raw checksum bytes. Neither platform issue is masked or
+excluded from the four-platform required native audio/video matrix.
+
