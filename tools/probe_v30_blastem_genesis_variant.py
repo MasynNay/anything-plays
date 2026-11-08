@@ -18,9 +18,11 @@ import subprocess
 import sys
 import tempfile
 
-from tools.genesis_homebrew_fixture import ENTRY, build_genesis_probe_rom
-
 ROOT = Path(__file__).resolve().parents[1]
+# Standalone script invocations in the Linux CI runner must import the
+# project's existing fixture package without a user-specific PYTHONPATH.
+sys.path.insert(0, str(ROOT))
+from tools.genesis_homebrew_fixture import ENTRY, build_genesis_probe_rom
 TMSS = bytes.fromhex("23fc 53454741 00a14000")
 NOP = bytes.fromhex("4e71") * 5
 OFFSET = ENTRY + 4
