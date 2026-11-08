@@ -227,6 +227,18 @@ def verify_bundle(bundle, platform_name, check_native=False):
             expected_sha = pinned_pce["notice_sha256"]
             if hashlib.sha256(source_notice.read_bytes()).hexdigest() != expected_sha:
                 raise ValueError("Wrong original pinned-source PCE GPL2 notice")
+        remaining = trial_marker.get("source_built_remaining_five")
+        if remaining is not None:
+            if set(remaining) != {
+                "fceumm", "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan",
+            }:
+                raise ValueError("Incomplete five original source-built GPL notices")
+            for name,row in remaining.items():
+                original = licenses / f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
+                if original.is_symlink() or not original.is_file():
+                    raise ValueError(f"Original source-built GPL notice missing: {name}")
+                if hashlib.sha256(original.read_bytes()).hexdigest()!=row["original_license_notice_sha256"]:
+                    raise ValueError(f"Wrong original 3.0 GPL license notice: {name}")
         if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
             raise ValueError("Noncommercial core entered the GPL alternative test lineup")
         if platform_name == "windows":
