@@ -1,0 +1,108 @@
+name: Anything Plays 3.0 | Source-built monochrome NGP PSG native sound experiment
+
+# Never publish any generated cartridge, BIOS, native library or installer.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-ngp-original-mono-psg.yml'
+      - 'tools/build_v30_ngp_original_mono_psg.py'
+      - 'tools/probe_v30_ngp_original_mono_psg.py'
+      - 'tests/test_v30_ngp_original_mono_psg.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-ngp-original-mono-psg.yml'
+      - 'tools/build_v30_ngp_original_mono_psg.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-built-mono-psg-research-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-native-original-mono-audio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native runtime audio/video dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Verify original assembler byte encodings and prohibit synthetic PCM or ROM publication
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_ngp_original_mono_psg.py' -v
+          python -m unittest discover -s tests -p 'test_v30_ngp_mono_audio_matrix.py' -v
+      - name: Obtain a test-only real NeoPop native core and print the exact SHA-256
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+          test -s cores/mednafen_ngp_libretro.so
+          sha256sum cores/mednafen_ngp_libretro.so
+      - name: Test four original source-built true-mono PSG variants using real native CoreSession
+        run: |
+          python -m tools.probe_v30_ngp_original_mono_psg \
+            --core cores/mednafen_ngp_libretro.so \
+            --output native-mono-research \
+            --seconds 10
+      - name: Validate original ROM disappeared and actual native PCM results are not fabricated
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd native-mono-research && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d = Path('native-mono-research')
+          j = json.loads((d/'NGP_ORIGINAL_MONO_PSG_UNAPPROVED.json').read_text('utf-8'))
+          assert j['status'] == 'ORIGINAL-MONO-PSG-NATIVE-EXPERIMENT-NO-RELEASE-APPROVAL'
+          assert j['generated_from_original_locally_auditable_source'] is True
+          assert j['compiled_with_proprietary_toshiba_toolchain'] is False
+          assert j['header_uses_actual_monochrome_system_byte'] is True
+          assert len(j['variants']) == 4
+          assert all(j[x] is False for x in (
+              'public_release_approved',
+              'combined_license_review_complete',
+              'binary_redistribution_approved',
+              'physical_speakers_or_retail_games_verified',
+          ))
+          for variant, row in j['variants'].items():
+              m = row['real_native_metrics']
+              assert row['rom_size_bytes'] == 65536
+              assert row['source_generated_monochrome_compatibility_byte'] == 0
+              assert row['real_native_audio_gate_passed'] is bool(m and m['audio_gate_passed'])
+              assert row['real_native_full_av_input_passed'] is bool(
+                  m and m['passed'] and row['native_process_exit_code'] == 0)
+              if row['real_native_audio_gate_passed']:
+                  assert m['native_nonzero_pcm_values'] > 100
+                  assert m['native_audio_frames'] > 1000
+                  assert m['native_audio_peak'] > 0
+          assert {p.name for p in d.iterdir()} == {
+              'NGP_ORIGINAL_MONO_PSG_UNAPPROVED.json', 'SHA256SUMS.txt'}
+          print('ACTUAL native mono ROM audio variants:', len(j['native_pcm_pass_variants']))
+          print('ACTUAL full video/audio/input variants:',
+                len(j['full_native_video_pcm_input_pass_variants']))
+          if not j['native_pcm_pass_variants']:
+              print('NO PCM PROVEN BY THIS EXPERIMENT. Do not release or mark NGP audio verified.')
+          PY
+      - name: Retain ONLY non-game research JSON and checksum, no ROM/BIOS/emulator
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-SOURCE-BUILT-MONO-PSG-UNAPPROVED
+          path: |
+            native-mono-research/NGP_ORIGINAL_MONO_PSG_UNAPPROVED.json
+            native-mono-research/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 60
