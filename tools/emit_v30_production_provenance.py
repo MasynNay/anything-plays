@@ -19,6 +19,7 @@ from tools.collect_v30_production_assets import TARGETS
 from tools.stage_v30_release_assets import expected_installers
 from tools.v30_release_lock import CORE_NAMES, TARGETS as NATIVE_TARGETS, load_approved_lock, verify_native_bundle
 from tools.check_v30_release import ACCEPTANCE_FILE, release_blockers
+from tools.verify_v30_reviewed_runtime_code import verify_runtime_code_unchanged
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK_FILE = ROOT / "config/v3.0-core-lock.json"
@@ -125,17 +126,14 @@ def prepare_production_artifact(*, target, version, source_commit, installer,
         if not isinstance(value, str) or not SHA256.fullmatch(value):
             raise ValueError(f"Missing signed-off {name} digest")
     validate_source_inventory(lock, inventory)
-    # The approved native/source snapshot MUST belong to this exact source
-    # checkout. Before this check, an approved 44-binary inventory for an
-    # earlier revision could be reused while stamping a NEWER GitHub SHA
-    # into the production installer provenance. The individual core hashes
-    # alone cannot prove what application source built that installer.
-    if (source_commit != lock.get("source_commit")
-            or source_commit != inventory.get("source_commit")):
-        raise ValueError(
-            "Production application source revision does not match "
-            "the independently approved native/source lock"
-        )
+    # An approval manifest cannot embed the SHA of its own Git commit:
+    # changing that manifest changes the SHA (cryptographic self-reference).
+    # Pin a BEFORE-approval application source commit, and verify that the
+    # actual production checkout differs ONLY in exact approval files.
+    # This is a real Git comparison, never a self-reported JSON boolean.
+    reviewed_code_commit = lock["source_commit"]
+    if source_commit != reviewed_code_commit:
+        verify_runtime_code_unchanged(reviewed_code_commit, source_commit)
     installed = verify_native_bundle(lock, bundle_manifest)
     if installed != NATIVE_MAP[target]:
         raise ValueError("Installed native core bundle belongs to another target")
@@ -154,6 +152,8 @@ def prepare_production_artifact(*, target, version, source_commit, installer,
     record = {
         "target": target,
         "source_revision": source_commit,
+        "reviewed_application_source_commit": reviewed_code_commit,
+        "runtime_build_inputs_unchanged_since_approved_source": True,
         "installer_name": names[target],
         "installer_sha256": installer_sha,
         "release_mode": "APPROVED-IMMUTABLE-PRODUCTION",
