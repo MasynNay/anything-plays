@@ -180,7 +180,7 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                 or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
                 or info.get("total_source_built_core_families") != 8
                 or info.get("original_unchanged_core_archives") != 3
-                or info.get("five_source_family_run_id") != 42513615955
+                or info.get("five_source_family_run_id") != 42515151314
                 or pce is None):
             raise ValueError("Eight source-built families are not complete and exact")
         for name, revision in FIVE_ORIGINAL_SOURCE_COMMITS.items():
@@ -189,7 +189,7 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                     or row.get("source_repository") != FIVE_ORIGINAL_SOURCE_REPOSITORIES[name]
                     or row.get("source_commit") != revision
                     or row.get("native_filename") != f"{name}_libretro{extension}"
-                    or row.get("source_build_run_id") != 42513615955
+                    or row.get("source_build_run_id") != 42515151314
                     or row.get("old_unknown_source_buildbot_replaced") is not True
                     or row.get("original_license_notice_copied") is not True):
                 raise ValueError(f"Wrong original source-built core family: {name}")
