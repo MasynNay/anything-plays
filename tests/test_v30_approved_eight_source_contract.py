@@ -77,13 +77,14 @@ def eight_synthetic_review(root):
 class EightRealSourceApprovalContracts(unittest.TestCase):
     def test_real_repository_source_license_and_physical_rights_remain_unapproved(self):
         with TemporaryDirectory() as tmp:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(SystemExit) as blocked:
                 staging.main([
                     "--target","linux-x86_64","--original-dir",tmp,
                     "--snes-dir",tmp,"--sega-dir",tmp,
                     "--pce-artifact",str(Path(tmp)/"pce.zip"),
                     "--output-dir",str(Path(tmp)/"out"),
                 ])
+            self.assertEqual(blocked.exception.code,1)
             self.assertFalse((Path(tmp)/"out").exists())
 
     def test_only_exact_true_eight_source_lock_can_enable_eight_mode(self):
