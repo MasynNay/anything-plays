@@ -134,6 +134,11 @@ if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   if [[ "${AP_V30_PINNED_PCE:-0}" == "1" ]]; then
     cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/"
   fi
+  if [[ "${AP_V30_PINNED_FIVE:-0}" == "1" ]]; then
+    for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-${name}-ORIGINAL-COPYING.txt" "$LICENSE_DIR/"
+    done
+  fi
 fi
 if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUCTION_CORE_MAP.json ]]; then
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" "$LICENSE_DIR/Supafaust-COPYING.txt"
