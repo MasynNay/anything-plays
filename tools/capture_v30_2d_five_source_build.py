@@ -21,7 +21,7 @@ import sys
 
 CANDIDATES = {
     "fceumm": ("libretro/libretro-fceumm", "Copying"),
-    "stella2014": ("libretro/stella2014-libretro", None),
+    "stella2014": ("libretro/stella2014-libretro", "stella/license.txt"),
     "prosystem": ("libretro/prosystem-libretro", "License.txt"),
     "mednafen_ngp": ("libretro/beetle-ngp-libretro", "COPYING"),
     "mednafen_wswan": ("libretro/beetle-wswan-libretro", "COPYING"),
@@ -89,7 +89,7 @@ def capture(source, native, candidate, target, expected_commit, output):
         if orig.is_symlink() or not orig.is_file():
             raise ValueError("Source-verified original GPL notice missing")
         notice = orig.read_bytes()
-        if b"GENERAL PUBLIC LICENSE" not in notice or b"Version 2" not in notice:
+        if b"general public license" not in notice.lower() or b"version 2" not in notice.lower():
             raise ValueError("Original core GPL2 source notice is wrong")
     dst.mkdir(parents=True)
     archive_name = f"{candidate}-{expected_commit}-SOURCE.tar"
