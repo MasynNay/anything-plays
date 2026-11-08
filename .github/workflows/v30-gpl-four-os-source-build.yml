@@ -98,7 +98,10 @@ jobs:
             # Later EXTRA_INCLUDES compiler flag overrides that obsolete 10.1
             # target without modifying one byte of the reviewed upstream tree.
             if [[ "$V30_TARGET" == macos-x64 ]]; then
-              make -C research/bsnes-src -j 3 platform=osx EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE"
+              # Apple Xcode 16.4's newer ld assertion-fails when linking
+              # this pinned, unchanged 2019 Intel bsnes source. Select the
+              # Apple-maintained classic ld for this isolated older build.
+              make -C research/bsnes-src -j 3 platform=osx EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE" LDFLAGS="-fPIC -dynamiclib -Wl,-ld_classic"
             else
               make -C research/bsnes-src -j 3 platform=osx
             fi
@@ -118,6 +121,17 @@ jobs:
           else
             make -C research/blastem-src -f Makefile.libretro -j 3 core
           fi
+      - name: Expose MinGW runtime DLL dependencies to actual Windows Python native loader
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d /c/msys64/mingw64/bin
+          # MSYS2's GCC core links against libgomp/libwinpthread, which a
+          # standard GitHub-hosted Python process cannot find by default.
+          # This alters only the native loader search PATH, not ELF/DLL bytes
+          # or the pinned source. No emulator installer is made public.
+          echo 'C:/msys64/mingw64/bin' >> "$GITHUB_PATH"
       - name: Preserve source-built native library, immutable Git source TAR and exact GPLv3 notice
         shell: bash
         run: |
