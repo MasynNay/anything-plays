@@ -1,0 +1,98 @@
+name: Anything Plays 3.0 | GPLv3 SNES and Sega replacement research
+# Only ephemeral original GPL alternative binaries, never a public 3.0 release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-gpl-alternative-research.yml'
+      - 'tools/stage_v30_gpl_alternative_candidates.py'
+      - 'tests/test_v30_gpl_alternative_candidates.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v30-gpl-alternatives-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact candidate-only governance
+        run: python -m unittest discover -s tests -p 'test_v30_gpl_alternative_candidates.py' -v
+
+  original-libretro-homebrew-candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - candidate: snes
+          - candidate: sega
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Linux graphics and sound dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Stage isolated unapproved native core from original Libretro CI
+        env:
+          CANDIDATE: ${{ matrix.candidate }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python -m tools.stage_v30_gpl_alternative_candidates --candidate "$CANDIDATE" --output candidate
+          cp candidate/UNAPPROVED_CANDIDATE.json "evidence/$CANDIDATE-candidate-unapproved.json"
+      - name: Verify real native SNES PPU video and SPC sound using bsnes
+        if: matrix.candidate == 'snes'
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_snes_homebrew.py --core candidate/bsnes_libretro.so --seconds 12 --report evidence/bsnes-snes-original-ppu-spc.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/bsnes-snes-original-ppu-spc.json').read_text())
+          assert d['passed'] and d['native_exit_code']==0
+          assert d['details']['native_video_frames']>=30
+          assert d['details']['native_nonzero_pcm_values']>100
+          assert d['details']['distinct_rgb_frames']>=2
+          print('Real source-built homebrew SNES native A/V passed')
+          PY
+      - name: Verify original Genesis and all three 8-bit Sega homebrews with BlastEm
+        if: matrix.candidate == 'sega'
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_genesis_homebrew.py --core candidate/blastem_libretro.so --seconds 12 --report evidence/blastem-genesis-original-homebrew.json
+          for system in mastersystem gamegear sg1000; do
+            xvfb-run -a python tools/probe_sega8_homebrew.py --system "$system" --core candidate/blastem_libretro.so --seconds 12 --report "evidence/blastem-$system-original-homebrew.json"
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          reports=list(Path('evidence').glob('blastem-*-original-homebrew.json'))
+          assert len(reports)==4
+          for f in reports:
+              data=json.loads(f.read_text())
+              assert data['passed'] and data['native_exit_code']==0 and data['details']['passed'],f.name
+              print('Original Sega homebrew real native A/V passed:',f.name)
+          PY
+      - name: Keep only candidate SHA and test observations, NO native binaries/ROMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-GPL-ALTERNATIVE-${{ matrix.candidate }}-UNAPPROVED
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 45
