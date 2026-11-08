@@ -68,3 +68,20 @@ Independently downloaded and parsed the ORIGINAL final four artifacts again (dis
 | Mac Intel | 13626896888 | `a516df606c422bc4bc23c41d0a6fa5a8f2ce5a3810c1a8c840d7776f7cc9ecd6` | 5/5 original source homebrew A/V pass |
 
 These four archives are **small JSON reviewer evidence only**. The four actual working, unapproved prototype installers were compiled on their native CI runners but were *not uploaded as public binaries*, because a full GPL combined-work/component-specific license review, corresponding source/dependency audit and physical user acceptance have NOT been completed. Do not retrospectively reclassify their evidence as permission to release a full 3.0 installer.
+
+## Current three-family complete offline candidate — merged PR #90 (November 8, 2026)
+
+Earlier sections document the historical two-family SNES/Sega trial. **The latest four-platform candidate additionally replaced the old PC Engine Fast nightly with an independently source-built core**, retaining the identical 18 console profiles and 11 native core slots. Exactly **eight** other original core ZIPs and the original Dolphin Sys archive remain unchanged. The exact original source revision for that **replacement** is `libretro/beetle-pce-fast-libretro@2de1ce1c3f237b161c126c54ba407990bb86d1e9`; this does **not** invent or claim an upstream source revision for the discarded old PCE nightly.
+
+[PR #90](https://github.com/MasynNay/anything-plays/pull/90) merged at `11a08722a6406add1267975d36fd34a9385ecd6f` after [original full four-platform offline installer build 42508423915](https://github.com/MasynNay/anything-plays/actions/runs/42508423915) and [source checks 42508423910](https://github.com/MasynNay/anything-plays/actions/runs/42508423910) **both passed**. Every real CI OS independently verified the three source-built family identities, the other eight originals, Dolphin Sys, full installed-native 18/11 provenance and the absence of the two noncommercial original native files. Each actual installed original-source PC Engine HuCard program delivered real changing video and nonzero native PSG PCM; original installed SNES/four Sega AV and seven serial SNES/Sega relaunch cycles also passed.
+
+| Actual OS | Original research JSON ZIP artifact ID | Independently downloaded original ZIP SHA-256 | Source-built installed PCE video frames / nonzero PCM samples |
+| --- | ---: | --- | --- |
+| Windows x64 | 13627784169 | `bc073bcda66e399b534dcd8fa25aec334331dcaffa1bafb37827d9d4321ac664` | 599 / 879,369 |
+| Linux x64 | 13628298006 | `00fcda178eecfac4724e588c56b545b525438b79cc99f3900121c0a25c693868` | 598 / 877,899 |
+| Apple Silicon | 13628567397 | `6f7bc86a52732ad341dba6e925b736e68bbad465c69a37151766074301a3305a` | 599 / 879,369 |
+| Intel Mac | 13628905898 | `f9d070987bf643a8f9a38e4d564e002697c98e9a75a4d075ec26a2164859533c` | 595 / 873,493 |
+
+Each originally downloaded ZIP contains exactly **9 JSON evidence files** and no emulator library, actual installer, BIOS or game ROM. Every repeated-switch result is `passed=true` with seven sessions and child exit code 0. Explicit release, source/legal compatibility and physical acceptance flags stay **FALSE**. The test-only complete Windows/Linux/macOS installer files were built in CI but were **not published or uploaded**.
+
+Source-reviewed 3.0 production core selection now supports the genuine GPL-alternative names thanks to [merged PR #89](https://github.com/MasynNay/anything-plays/pull/89), but the current approved-production workflow still has an **unimplemented original-native input and installed-runtime handoff** for those alternative binaries. The full combined GPL2/GPL3 rights/source audit (including the eight remaining original native libraries, Dolphin Sys and transitive dependencies) and real-device acceptance are still incomplete. **No outside rights-holder requests, external repository submissions or user GameCube/N64 repeat tests.** No public 3.0 release approval is claimed.
