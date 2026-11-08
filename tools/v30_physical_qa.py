@@ -42,6 +42,12 @@ SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 COMMIT = re.compile(r"[0-9a-f]{40}\Z")
 
 
+REPORT_STATEMENT = (
+    "Manual owner-reported observations only. Not automated gameplay proof, "
+    "legal clearance, signed installer evidence or authorization for a public release."
+)
+
+
 def now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -110,13 +116,40 @@ def create_report(installer, *, commit, target=None):
         "production_approval": False,
         "public_release_approved": False,
         "contains_rom_names_paths_or_game_files": False,
-        "statement": ("Manual owner-reported observations only. Not automated "
-                      "gameplay proof, legal clearance, signed installer "
-                      "evidence or authorization for a public release."),
+        "statement": REPORT_STATEMENT,
     }
 
 
+REQUIRED_REPORT_KEYS = frozenset((
+    "schema_version", "status", "source_revision", "target",
+    "installer_filename", "installer_sha256", "installer_size_bytes",
+    "created_utc", "last_updated_utc", "host_checks", "console_checks",
+    "independent_hardware_reviewed", "external_license_redistribution_reviewed",
+    "source_to_binary_correspondence_reviewed", "production_approval",
+    "public_release_approved", "contains_rom_names_paths_or_game_files",
+    "statement",
+))
+
+
 def validate_report(report):
+    # Privacy is part of the evidence format, not just the CLI. Reject
+    # unexpected keys (e.g., ROM paths or private photos) even if someone
+    # directly edits a report before export or four-host reconciliation.
+    if not isinstance(report, dict) or set(report) != REQUIRED_REPORT_KEYS:
+        raise ValueError("Physical QA report includes missing or private extra fields")
+    if report.get("statement") != REPORT_STATEMENT:
+        raise ValueError("QA report statement cannot contain private user information")
+    name = report.get("installer_filename")
+    if (not isinstance(name, str)
+            or len(name) > 180
+            or not re.fullmatch(r"[A-Za-z0-9_.() -]+\.(?:exe|deb|dmg)", name)
+            or name in (".", "..")):
+        raise ValueError("Physical QA installer name must be a private-safe basename")
+    expected_ext = (".exe" if report.get("target") == "windows-x64" else
+                    ".deb" if report.get("target") == "linux-x64" else
+                    ".dmg")
+    if not name.endswith(expected_ext):
+        raise ValueError("Physical QA filename does not match the target platform")
     if (not isinstance(report, dict) or report.get("schema_version") != 1
             or report.get("status") != STATUS
             or report.get("target") not in TARGETS
