@@ -17,7 +17,7 @@ import sys
 
 from tools.collect_v30_production_assets import TARGETS
 from tools.stage_v30_release_assets import expected_installers
-from tools.v30_release_lock import CORE_NAMES, TARGETS as NATIVE_TARGETS, load_approved_lock, verify_native_bundle
+from tools.v30_release_lock import TARGETS as NATIVE_TARGETS, load_approved_lock, selected_core_set, verify_native_bundle
 from tools.check_v30_release import ACCEPTANCE_FILE, release_blockers
 from tools.verify_v30_reviewed_runtime_code import verify_runtime_code_unchanged
 
@@ -61,15 +61,16 @@ def validate_source_inventory(lock, inventory):
     if (not isinstance(revision, str) or not COMMIT.fullmatch(revision)
             or inventory.get("source_commit") != revision):
         raise ValueError("Corresponding-source inventory is not for the locked build commit")
+    expected_cores = selected_core_set(lock)
     rows = inventory.get("targets")
     if not isinstance(rows, dict) or set(rows) != NATIVE_TARGETS:
         raise ValueError("Source inventory must cover all four target architectures")
     for target in NATIVE_TARGETS:
         cores = rows[target].get("cores") if isinstance(rows[target], dict) else None
-        if not isinstance(cores, dict) or set(cores) != CORE_NAMES:
+        if not isinstance(cores, dict) or set(cores) != expected_cores:
             raise ValueError(f"Missing source inventory cores: {target}")
         approved = lock["targets"][target]["cores"]
-        for name in CORE_NAMES:
+        for name in expected_cores:
             evidence = cores[name]
             if not isinstance(evidence, dict):
                 raise ValueError(f"Missing verified corresponding source: {target}/{name}")
