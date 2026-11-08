@@ -71,5 +71,16 @@ cartridge header, and the main `tools/probe_ngp_mit_homebrew.py` parent
 **rejects even a native-positive report for a color-header `.ngp`**
 when testing the real mono target. The fourteen-ROM research workflow
 remains diagnostic only and **explicitly reports zero genuine mono
-candidates**. The genuine mono blocker in issue #41 remains OPEN;
-NGPC color acceptance continues separately and is not demoted.
+candidates**. **Historical note: superseded by corrected source-built mono tests.**
+The old alignment cartridge was not a valid mono-mode test fixture
+(it declared color header 0x10). [Issue #41](https://github.com/MasynNay/anything-plays/issues/41)
+is now **CLOSED**: original source-built 0x00 K1GE monochrome video,
+PSG nonzero audio, and native input queries passed across Windows, Linux,
+Apple Silicon and Intel Mac in [four-platform native run
+42450947315](https://github.com/MasynNay/anything-plays/actions/runs/42450947315).
+The corrected **required** NGP/NGPC workflow
+[42451407552](https://github.com/MasynNay/anything-plays/actions/runs/42451407552)
+passed all 11 jobs (eight native system/platform rows plus state recovery
+and regression jobs). This does **not** replace physical camera/gameplay,
+audible computer speakers, save/reload or endurance tests: document those
+with the [offline installed-app QA kit](V3_PHYSICAL_QA_RUNBOOK.md).
