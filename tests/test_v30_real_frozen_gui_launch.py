@@ -118,8 +118,9 @@ class RealFrozenAppLaunchContracts(unittest.TestCase):
         self.assertIn("--ap-v30-ui-smoke",code)
         self.assertIn("root.mainloop()",code)
         self.assertIn("App(root)",code)
-        self.assertIn('"frozen_binary"',code)
-        self.assertIn("AP_V30_UI_SMOKE_CHECK",code)
+        smoke=(base/"anything_plays/frozen_gui_smoke.py").read_text("utf-8")
+        self.assertIn('"frozen_binary"',smoke)
+        self.assertIn("AP_V30_UI_SMOKE_CHECK",smoke)
 
 
 if __name__ == "__main__":
