@@ -1,6 +1,6 @@
 name: Anything Plays 3.0 | Preserve reported upstream sources
 
-# Source-only private Actions evidence. Never creates GitHub Releases.
+# Source-only Actions evidence, not a public GitHub Release.
 # A matching upstream Git SHA is NOT a reproducible-build or license clearance.
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
           assert record["cores"]["mednafen_pce_fast"]["status"] == "NO_REPORTED_SOURCE_REVISION"
           print("Source archive candidate capture completed with unsatisfied rights/source gates")
           PY
-      - name: Retain corresponding-source CANDIDATES for private review
+      - name: Retain corresponding-source CANDIDATES as unapproved Actions evidence
         uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-3.0.0-SOURCE-SNAPSHOTS-UNAPPROVED
