@@ -30,11 +30,20 @@ MANIFEST_NAME = "DOLPHIN_SYS_PROVENANCE.json"
 
 def read_system_archive():
     """Allow test builds to use a preserved local archive instead of the net."""
-    if os.environ.get("AP_RELEASE_BUILD") == "1":
-        raise ValueError(
-            "Public builds require independently approved/pinned Dolphin "
-            "system assets; nightly assets are test-only."
-        )
+    is_release = os.environ.get("AP_RELEASE_BUILD") == "1"
+    v30_release = os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
+    if is_release:
+        if not v30_release:
+            raise ValueError(
+                "Dolphin Sys is not approved for the historical v2.0 release"
+            )
+        if not os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip():
+            raise ValueError(
+                "3.0 official release needs preserved, reviewed Dolphin.zip"
+            )
+        # Do not access the mutable upstream URL in release mode.
+        from tools.v30_release_lock import load_approved_lock
+        load_approved_lock()
     cached = os.environ.get("AP_CORE_ARCHIVE_DIR", "").strip()
     if cached:
         local = Path(cached).expanduser() / ARCHIVE_NAME
@@ -51,6 +60,14 @@ def read_system_archive():
             data = response.read(MAX_DOWNLOAD_BYTES + 1)
     if not data or len(data) > MAX_DOWNLOAD_BYTES:
         raise ValueError("Dolphin system ZIP is empty or too large")
+    if is_release:
+        # Do not extract unapproved native Sys data.
+        import platform
+        import sys
+        from tools.v30_release_lock import verify_dolphin_archive
+        verify_dolphin_archive(
+            load_approved_lock(), sys.platform, platform.machine(), data,
+        )
     # Preserve exactly the upstream bytes that were verified and installed.
     # Future release candidates must reuse reviewed archives, not a newer
     # nightly served from the same mutable buildbot URL.
