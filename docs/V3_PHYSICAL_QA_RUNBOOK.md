@@ -105,6 +105,74 @@ a green result to finish a checklist. If the result is `fail`, preserve
 the issue before retesting; the next release build requires a fresh,
 checksum-identified QA record.
 
+
+## Reconcile all four actual computers against the same installer revision
+
+After each physical tester completes or partially completes their local
+150-observation QA session and runs `export`, place the **two exported
+evidence files** from each machine in its own target-named folder.
+The reconciliation tool rejects missing targets, additional files, changed
+checksum bytes, filenames with private paths, and any report that
+describes a different actual installer hash or source revision.
+
+```text
+~/anything-plays-qa-packets/
+  windows-x64/
+    V30_PHYSICAL_QA_OWNER_REPORTED_UNREVIEWED.json
+    SHA256SUMS.txt
+  linux-x64/
+    V30_PHYSICAL_QA_OWNER_REPORTED_UNREVIEWED.json
+    SHA256SUMS.txt
+  macos-arm64/
+    V30_PHYSICAL_QA_OWNER_REPORTED_UNREVIEWED.json
+    SHA256SUMS.txt
+  macos-x86_64/
+    V30_PHYSICAL_QA_OWNER_REPORTED_UNREVIEWED.json
+    SHA256SUMS.txt
+```
+
+On a trusted review computer, separately download the **exact four
+installer files** that the four testers used. Hash those actual bytes into
+a *new unapproved catalog* (this does not install or execute them):
+
+```bash
+python -m tools.v30_physical_qa_matrix hash-installers \
+  --source-commit "EXACT_FULL_40_CHARACTER_INSTALLER_SOURCE_COMMIT" \
+  --installer "windows-x64=/review/installers/AnythingPlaysPreview.exe" \
+  --installer "linux-x64=/review/installers/anything-plays_preview_amd64.deb" \
+  --installer "macos-arm64=/review/installers/AnythingPlaysPreview-arm64.dmg" \
+  --installer "macos-x86_64=/review/installers/AnythingPlaysPreview-x64.dmg" \
+  --out "$HOME/v30-four-installers-unapproved.json"
+
+python -m tools.v30_physical_qa_matrix reconcile \
+  --catalog "$HOME/v30-four-installers-unapproved.json" \
+  --packets "$HOME/anything-plays-qa-packets" \
+  --output "$HOME/v30-four-host-review-evidence"
+```
+
+The sample filenames above are placeholders, **not verified existing
+downloads**. Replace them with paths to the exact tested installers.
+The tool independently calculates their SHA-256 and size. For both macOS
+variants, the `.dmg` extension alone is insufficient: their different
+target-specific exact fingerprints are strictly compared.
+
+The output is just an `UNAPPROVED` reviewer JSON and `SHA256SUMS.txt`.
+It reports all **600 required owner observations** in four groups of 150,
+including **every** missing/failed check. One missing, wrong-architecture,
+tampered or stale evidence packet rejects the whole reconciliation.
+Use `--require-complete` with `reconcile` to return a failing exit code
+unless every single reported observation is `pass`; in that mode
+the private diagnostic report is still emitted for remediation.
+
+A checksum proves the exported JSON has not changed after it was saved.
+It **cannot prove** that a human really performed the tests, or that the
+code used to build an arbitrary installer actually matches the Git revision
+typed into the command. Those are independent reviewer and original
+production-provenance responsibilities. Most importantly, a 600/600
+owner-reported green result **does not** set any source/license/rights,
+independent hardware, production or public release approval flag.
+The release gate must stay blocked without the other evidence.
+
 ## Evidence safety and next review
 
 The local report stores only status selections, installer base filename,
