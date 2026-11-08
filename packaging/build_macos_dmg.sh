@@ -144,6 +144,11 @@ if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUC
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" "$LICENSE_DIR/Supafaust-COPYING.txt"
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" "$LICENSE_DIR/BlastEm-COPYING.txt"
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" "$LICENSE_DIR/PCE-COPYING.txt"
+  if [[ "${AP_V30_APPROVED_EIGHT:-0}" == "1" ]]; then
+    for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-${name}-ORIGINAL-COPYING.txt" "$LICENSE_DIR/"
+    done
+  fi
 fi
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
