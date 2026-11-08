@@ -2,10 +2,10 @@
 
 **If it moves, it plays.** Anything Plays turns camera-detected motion into local video-game controls. This roadmap describes shipped work, the **active 3.0 development preview**, and the evidence required before the next public release.
 
-**Last reviewed:** November 7, 2026  
+**Last reviewed:** November 8, 2026  
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
-**Current focus:** Linux physical re-test of the corrected GameCube/startup package, Windows follow-up QA, and GameCube performance  
+**Current focus:** Final 3.0 binary redistribution/source compliance and packaging publication; owner has already manually tested Windows, Linux and macOS. Do not ask for repeat N64/GameCube gameplay tests.  
 **Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
 
 > **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
@@ -16,15 +16,20 @@
 | --- | --- | --- |
 | 2.0 supported consoles (GB, GBC, GBA, SNES) | **Released** | [Stable v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) |
 | Modular desktop UI, themes, ROM shelf, object-based controls | **Implemented in 3.0 preview** | [3.0 source branch](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) |
-| 18 console profiles, 11 bundled native cores, four installer targets | **Automated packaging passed** | [Full-bundle CI](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) |
+| 18 console profiles, 11 native cores, four installer targets | **Built, native-tested and frozen desktop launched on four CI hosts** | [Actual installed desktop launches](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
 | Simultaneous object/color tracking, local P1/P2 inputs | **Automated simulation passed** | [Camera-to-controller simulation](https://github.com/MasynNay/anything-plays/actions/runs/42402602944) |
 | N64 ROM unload/reload without quitting the app | **Fixed and owner-verified on Apple Silicon** | [Four-platform 3× native restart CI](https://github.com/MasynNay/anything-plays/actions/runs/42415242942) |
-| Windows real-device clean install and regression | **Partial hardware smoke passed; broader QA open** | [#26](https://github.com/MasynNay/anything-plays/issues/26) |
-| Linux real-device clean install and regression | **Physical permission regression found; fix passed installed-app CI; re-test pending** | [#25](https://github.com/MasynNay/anything-plays/issues/25) |
+| Windows real-device clean install and regression | **Owner tested Windows and confirmed app/emulator behavior; exhaustive acceptance not claimed** | [#26](https://github.com/MasynNay/anything-plays/issues/26) |
+| Linux real-device clean install and regression | **Owner tested Linux; historical GameCube permission failure fixed; frozen Linux app starts in CI** | [Real GUI launch CI](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
 | GameCube GPU smoothness and long-session behavior | **In progress** | [#27](https://github.com/MasynNay/anything-plays/issues/27) |
 | Third-party licenses, signing, clean-install release gates | **Blocking stable 3.0** | [#28](https://github.com/MasynNay/anything-plays/issues/28) |
 
-## Latest verified activity — November 7, 2026
+## Latest verified activity — November 8, 2026
+
+- **Maintainer cross-platform acceptance:** the author has already personally tested the application on **Windows, Linux and macOS**, and reported working **N64 and GameCube** emulation. **Do not request those same OS/core retests again.** This is truthful owner-observed gameplay, not a claim that all 18 profiles or peripheral combinations were exhaustively accepted.
+- **Real installed app startup, not just emulator DLLs:** the actual frozen desktop window, App initialization and Tk event loop passed on **Windows x64, Linux x64, Apple Silicon and Intel Mac**. [Original CI proof](https://github.com/MasynNay/anything-plays/actions/runs/42529022383).
+- **Native source provenance:** the full 18-profile/11-core engineering installer has **eight independently source-built integrated core families** across the four CI architectures, with nine source-built families demonstrated when separately tested mGBA is counted. [Source-integrated four-OS installer](https://github.com/MasynNay/anything-plays/actions/runs/42519987017) · [Original mGBA source checks](https://github.com/MasynNay/anything-plays/actions/runs/42527449154).
+- **Public release reality:** GitHub v2.0.0 is still the latest published stable download. The *full offline 3.0 binary* is **not yet public**, because the original third-party emulator license/source-bundle requirements and controlled production approval have not been completed. This is **not** waiting for the owner to repeat successful gameplay tests.
 
 - **Apple Silicon:** Maintainer confirmed repeated Nintendo 64 ROM switching without relaunching Anything Plays after the per-game native lifecycle fix.
 - **Windows:** Maintainer reported that the real application worked without issues in the features tested. This is **partial QA**, not certification of every core, game, camera or save workflow.
