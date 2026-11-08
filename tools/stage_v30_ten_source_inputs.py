@@ -118,11 +118,22 @@ def check_original_n64_artifact(folder, target):
                 if not member.isfile() or member.issym() or member.islnk():
                     raise ValueError("Original N64 license is not a regular Git file")
                 stream = tar.extractfile(member)
-                if stream is None or member.size != identity["size_bytes"]:
-                    raise ValueError("Original N64 license TAR member size changed")
-                data = stream.read(identity["size_bytes"] + 1)
+                if stream is None or not 0 < member.size <= 1024 * 1024:
+                    raise ValueError("Original N64 license TAR member missing or oversized")
+                data = stream.read(member.size + 1)
+                if len(data) != member.size:
+                    raise ValueError("Original N64 source TAR license was truncated")
+                # Git-for-Windows can export text files with CRLF. The
+                # research capture hashed the EXACT Git blob (LF) using
+                # 'git show HEAD:<path>'. Permit newline conversion only
+                # when normalizing yields the exact independently attested
+                # original Git blob length AND SHA. Anything else fails.
                 if len(data) != identity["size_bytes"] or digest(data) != identity.get("sha256"):
-                    raise ValueError(f"Original N64 GPL/LGPL/MIT notice mismatch: {path}")
+                    normalized = data.replace(b"\\r\\n",b"\\n")
+                    if (normalized == data or len(normalized) != identity["size_bytes"]
+                            or digest(normalized) != identity.get("sha256")):
+                        raise ValueError(f"Original N64 GPL/LGPL/MIT notice mismatch: {path}")
+                    data = normalized
                 filename = NOTICE_NAMES[i]
                 copied[filename] = data
                 notice_sources[filename] = path
