@@ -49,7 +49,7 @@ mkdir -p dist/AnythingPlays30Preview.app/Contents/Resources/cores
 CORE_LIST=(mgba snes9x)
 if [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]]; then
   CORE_LIST=(mgba)
-elif [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+elif [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   CORE_LIST+=(fceumm genesis_plus_gx parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
 for name in "${CORE_LIST[@]}"; do
@@ -59,7 +59,7 @@ for name in "${CORE_LIST[@]}"; do
 done
 # Include a hash manifest identifying the exact nightly cores in this build.
 cp cores/CORE_PROVENANCE.json dist/AnythingPlays30Preview.app/Contents/Resources/cores/
-if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   # Dolphin's self-contained core needs compatibility tables under Sys/.
   # Ship them with the signed app; never ask the player to download them.
   [[ -f cores/dolphin-emu/Sys/codehandler.bin ]] || { echo 'Missing Dolphin Sys'; exit 1; }
@@ -84,7 +84,7 @@ cp licenses/*.txt "$LICENSE_DIR/"
 .build-venv/bin/python tools/collect_python_notices.py "$LICENSE_DIR"
 
 "$PYTHON" verify_bundle.py --check-native macos dist/AnythingPlays30Preview.app
-if [[ "${AP_V30_TEST_CORES:-0}" == "1" ]]; then
+if [[ "${AP_V30_TEST_CORES:-0}" == "1" || "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   .build-venv/bin/python tools/probe_embedded_3d.py macos dist/AnythingPlays30Preview.app
 fi
 # Sign the outer application only. --deep would mutate nested Libretro dylibs
