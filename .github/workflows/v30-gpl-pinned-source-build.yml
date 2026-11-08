@@ -1,0 +1,115 @@
+name: Anything Plays 3.0 | Pinned GPLv3 alternative source-build research
+# Original source + native test-only artifacts; no release distribution right.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-gpl-pinned-source-build.yml'
+      - 'tools/capture_v30_gpl_alternative_source_build.py'
+      - 'tests/test_v30_gpl_pinned_source_build.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v30-gpl-pinned-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-pinned-gpl-core-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { candidate: bsnes, repository: libretro/bsnes, ref: '63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7', path: research/bsnes-src, native: bsnes_libretro.so }
+          - { candidate: blastem, repository: libretro/blastem, ref: '2230addc4dd74dd094fd264987fd808abba32d0e', path: research/blastem-src, native: blastem_libretro.so }
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+      CANDIDATE: ${{ matrix.candidate }}
+      SOURCE_ROOT: ${{ matrix.path }}
+      NATIVE_NAME: ${{ matrix.native }}
+      PINNED_REVISION: ${{ matrix.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: ${{ matrix.path }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Strict source and exact original license checks
+        run: |
+          set -euo pipefail
+          test "$(git -C "$SOURCE_ROOT" rev-parse HEAD)" = "$PINNED_REVISION"
+          if [[ "$CANDIDATE" == bsnes ]]; then
+            grep -i 'version 3 of the license' "$SOURCE_ROOT/LICENSE.txt"
+          else
+            grep 'Version 3' "$SOURCE_ROOT/COPYING"
+          fi
+          python -m unittest discover -s tests -p 'test_v30_gpl_pinned_source_build.py' -v
+      - name: Install native compiler and headless actual emulator frontend dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends make g++ gcc xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Compile original pinned bsnes GPLv3 Libretro native source
+        if: matrix.candidate == 'bsnes'
+        run: make -C research/bsnes-src -j 3 platform=unix
+      - name: Compile original pinned BlastEm GPLv3 Libretro native source
+        if: matrix.candidate == 'blastem'
+        run: make -C research/blastem-src -f Makefile.libretro -j 3 core
+      - name: Archive exact pinned Git source, actual freshly built native and original GPL license
+        run: |
+          python -m tools.capture_v30_gpl_alternative_source_build \
+            --source "$SOURCE_ROOT" --native "$SOURCE_ROOT/$NATIVE_NAME" \
+            --candidate "$CANDIDATE" --target linux-x64 \
+            --output "test-evidence/$CANDIDATE"
+          (cd "test-evidence/$CANDIDATE" && sha256sum -c SHA256SUMS.txt)
+      - name: Real production Libretro SNES frontend from freshly source-built bsnes
+        if: matrix.candidate == 'bsnes'
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_snes_homebrew.py --core "$SOURCE_ROOT/$NATIVE_NAME" --seconds 12 --report "test-evidence/$CANDIDATE/SNES_NATIVE_AV_UNAPPROVED.json"
+      - name: Real native original BlastEm Genesis no-TMSS and 3 Sega8 profiles
+        if: matrix.candidate == 'blastem'
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_v30_blastem_genesis_variant.py --core "$SOURCE_ROOT/$NATIVE_NAME" --seconds 12 --report "test-evidence/$CANDIDATE/GENESIS_NATIVE_AV_UNAPPROVED.json"
+          for console in mastersystem gamegear sg1000; do
+            xvfb-run -a python tools/probe_sega8_homebrew.py --system "$console" --core "$SOURCE_ROOT/$NATIVE_NAME" --seconds 12 --report "test-evidence/$CANDIDATE/$console-NATIVE_AV_UNAPPROVED.json"
+          done
+      - name: Reconcile compiled source identity and original native A-V without claiming release rights
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path('test-evidence')/os.environ['CANDIDATE']
+          source=json.loads((root/'PINNED_GPL_ALTERNATIVE_SOURCE_BUILD_UNAPPROVED.json').read_text())
+          assert source['source_commit']==os.environ['PINNED_REVISION']
+          assert source['compiled_from_exact_pinned_source_checkout'] is True
+          assert source['public_binary_distribution_approved'] is False
+          assert source['combined_gpl_2_and_gpl_3_license_reviewed'] is False
+          assert source['3_0_native_core_substitution_approved'] is False
+          reports=sorted(root.glob('*_AV_UNAPPROVED.json'))
+          assert len(reports)==(1 if os.environ['CANDIDATE']=='bsnes' else 4)
+          for p in reports:
+              result=json.loads(p.read_text())
+              assert result['passed'] is True and result['native_exit_code']==0,p.name
+              assert result.get('details',{}).get('passed') is True,p.name
+              print('EXACT SOURCE-BUILT NATIVE A/V:',p.name,'passed, GPL rights unapproved')
+          PY
+      - name: Retain researcher-only original GPL source + same-source binary and evidence (NOT an installer)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-GPL-PINNED-${{ matrix.candidate }}-linux-x64-UNAPPROVED
+          path: test-evidence/${{ matrix.candidate }}/
+          if-no-files-found: warn
+          retention-days: 30
