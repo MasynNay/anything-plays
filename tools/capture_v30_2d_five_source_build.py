@@ -26,6 +26,15 @@ CANDIDATES = {
     "mednafen_ngp": ("libretro/beetle-ngp-libretro", "COPYING"),
     "mednafen_wswan": ("libretro/beetle-wswan-libretro", "COPYING"),
 }
+# The immutable source revisions actually built and tested 20/20 in run
+# 42513615955; never attribute an unrelated old buildbot ZIP to these commits.
+PINNED_COMMITS = {
+    "fceumm": "e0f3086a8104f8fbbe49a2615b10401504a9533f",
+    "stella2014": "7d1361e407e63f29e52892655069e5fb4096e691",
+    "prosystem": "8a88014287c7a01cd568067e5a557d0a2b2a051f",
+    "mednafen_ngp": "a50d5ac288a81f2104ddf43195a4efdd15c72227",
+    "mednafen_wswan": "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd",
+}
 EXTENSIONS = {
     "windows-x64": ".dll",
     "linux-x64": ".so",
