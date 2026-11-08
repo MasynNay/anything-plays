@@ -10,6 +10,12 @@ on:
       - '.github/workflows/v30-pce-pinned-source.yml'
       - 'tools/capture_v30_pce_source_build.py'
       - 'tests/test_v30_pce_source_capture.py'
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-pinned-source.yml'
+      - 'tools/capture_v30_pce_source_build.py'
+      - 'tests/test_v30_pce_source_capture.py'
   workflow_dispatch:
 
 permissions:
