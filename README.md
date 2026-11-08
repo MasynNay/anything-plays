@@ -8,7 +8,7 @@
 
 Camera-powered games · Local, private controls · Windows, macOS and Linux
 
-[Latest stable release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Roadmap](ROADMAP.md) · [3.0 development](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
+[Stable 2.0 download](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [3.0 engineering status](ROADMAP.md) · [Code architecture](docs/ARCHITECTURE.md) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
@@ -19,7 +19,22 @@ Camera-powered games · Local, private controls · Windows, macOS and Linux
 | **2.0.0** | Published, stable | Original supported consoles; existing user installations are unchanged |
 | **3.0.0 Preview** | **In development, not a public release** | 18 console profiles, 11 native cores in complete test installers; manual compatibility and compliance QA still required |
 
-**3.0 preview is not finished.** [Complete offline preview packaging](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) has passed on Windows, Linux, Intel Mac and Apple Silicon with **18 console profiles and 11 native emulator cores**. The maintainer has verified N64 ROM switching on Apple Silicon; [native repeated-launch CI](https://github.com/MasynNay/anything-plays/actions/runs/42415242942) passes on four platforms. Partial physical Windows and Linux testing has been reported, including a successful Linux Dolphin/GameCube launch; full clean-install acceptance remains open. GameCube sustained real-GPU performance, some console-specific audio coverage, native-core redistribution licensing and release validation remain release gates. The left-hand camera label-size slider and per-zone text-fit fix are merged into the 3.0 source and passed source checks; new installers remain unverified. See the [development roadmap](ROADMAP.md).
+**3.0 is release-candidate engineering, not yet a public stable binary release.**
+The [complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42437133733)
+passed on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. All
+four developer installers contain **18 console profiles**, **11 Libretro cores**
+and Dolphin system assets. The maintainer reports successful Linux GameCube
+playback. The **Control label size** slider sits beneath the camera preview,
+retains per-console settings and fits long names inside their own zones.
+
+The remaining launch requirements are exact native source/license
+compatibility, selected real-device/audio/endurance acceptance, and a
+verified production release. The documented [GPL/noncommercial core
+compatibility issue](docs/V3_LICENSE_COMPATIBILITY_GATE.md) must be
+resolved before publishing the combined stable installer. Automated
+packaging does not independently establish redistribution rights.
+The [release evidence](docs/V3_DISTRIBUTION_READINESS.md) and
+[continuation checkpoint](CONTINUE_HERE.md) track the exact state.
 
 ## What does Anything Plays do?
 
@@ -31,11 +46,11 @@ camera processing happens locally.
 
 ## How version 3.0 distributes emulators
 
-**Full offline developer preview:** [Four-platform test installers](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
+**Full offline developer preview:** [Four-platform test installers](https://github.com/MasynNay/anything-plays/actions/runs/42437133733) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
 
-**Starter application / managed updates:** The smaller application workflow packages mGBA initially. Other cores can be installed or updated through the app only when suitable reviewed packs are available. Both packaging models are intentionally separate: the full test packages demonstrate offline bundle feasibility, not legal approval or compatibility for every existing game.
+**Build variants:** Lightweight, mGBA-only application artifacts are for development diagnostics, not the planned stable 3.0 distribution. The intended stable 3.0 installer is the complete offline package with the already-selected emulator lineup. No separate RetroArch or Dolphin download is expected. Future in-app core updates remain optional and must use reviewed, verifiable packages.
 
-Real-world testing, native-core license/source obligations, physical GPU performance and signing/notarization are tracked in the [roadmap](ROADMAP.md), with the [3.0 release-specific distribution audit](docs/V3_DISTRIBUTION_READINESS.md) and [draft launch notes](docs/V3_RELEASE_NOTES_DRAFT.md). The complete four-platform offline installer workflow passed on the merged slider fix in [run 42426209611](https://github.com/MasynNay/anything-plays/actions/runs/42426209611), but these test installers are not approved public distribution assets.
+The [3.0 distribution audit](docs/V3_DISTRIBUTION_READINESS.md), [draft notes](docs/V3_RELEASE_NOTES_DRAFT.md), and [package provenance records](config/v3.0-preview-candidate-integrity.json) are retained for review. The original emulator and Dolphin ZIP archives are preserved as test-only CI artifacts. No unapproved developer artifacts should be relabeled as stable 3.0 downloads.
 
 ## Console library plan
 
@@ -55,7 +70,7 @@ All eleven cores below are included in the **full offline 3.0 developer preview*
 | ParaLLEl-N64 | Nintendo 64 | **Repeat-launch fix** passed 3 cycles on four OS builds; owner tested switching on Apple Silicon |
 | Dolphin Libretro | GameCube | Bundled in experimental preview; **GPU performance/real-game acceptance incomplete** |
 
-See [roadmap](ROADMAP.md) and [#24](https://github.com/MasynNay/anything-plays/issues/24) for the distinction between implemented code, native homebrew diagnostics and release approval.
+See [3.0 engineering status](ROADMAP.md) and [#24](https://github.com/MasynNay/anything-plays/issues/24) for the distinction between implemented code, native homebrew diagnostics and release approval.
 
 ## Downloading a release
 
@@ -94,7 +109,7 @@ anything-plays/
 
 The core acquisition and bundle-verification entry points stay at the root
 because existing Python tests, developer automation and release tooling
-import them directly. Generated PyInstaller `.spec` files are not tracked.
+import them directly. Generated PyInstaller `.spec` files are not tracked. CI also enforces a clean root and excludes generated installers, third-party emulator binaries, and game ROMs through the [repository hygiene checker](tools/check_repository_hygiene.py).
 
 ## Developing
 
@@ -121,9 +136,9 @@ directories so they cannot overwrite the published 2.0 application.
 
 ## Community and security
 
-See the [public roadmap](ROADMAP.md) and open [3.0 tracking issues](https://github.com/MasynNay/anything-plays/issues) for current work.
+See the [3.0 engineering status](ROADMAP.md) and open [3.0 tracking issues](https://github.com/MasynNay/anything-plays/issues) for current work.
 
-See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md),
+See the [documentation index](docs/README.md), [workflow guide](.github/README.md), [Contributing](CONTRIBUTING.md), [Security](SECURITY.md),
 [Code of Conduct](CODE_OF_CONDUCT.md),
 [Third-party licenses](docs/THIRD_PARTY_NOTICES.md) and the
 [3.0 release organization policy](docs/V3_RELEASE_STRUCTURE.md).
