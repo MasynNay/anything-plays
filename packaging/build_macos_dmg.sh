@@ -81,6 +81,13 @@ if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   [[ "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" ]] || exit 1
   CORE_LIST=(mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
 fi
+# The complete GPL-alternative engineering test is distinct from PRODUCTION.
+# Production core names come ONLY from the fully rights-reviewed native lock.
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+  reviewed_names="$("$PYTHON" -m tools.v30_release_lock --print-approved-core-names)" || exit 1
+  read -r -a CORE_LIST <<< "$reviewed_names"
+  [[ "${#CORE_LIST[@]}" == 11 ]] || { echo "Wrong approved 3.0 core list"; exit 1; }
+fi
 for name in "${CORE_LIST[@]}"; do
   core="cores/${name}_libretro.dylib"
   [[ -f "$core" ]] || { echo "Missing required core: $core"; exit 1; }

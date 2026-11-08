@@ -21,11 +21,58 @@ CORE_NAMES = frozenset((
     "stella2014", "prosystem", "mednafen_pce_fast", "mednafen_ngp",
     "mednafen_wswan",
 ))
+# The legacy original preview (Snes9x + Genesis Plus GX) stays readable for
+# existing exact-lock regression tests. An independently reviewed production
+# candidate MAY select the genuinely differently named, source-built GPL
+# alternative once its full per-native licensing/source evidence exists.
+# This does not itself approve any binary or convert the trial into release.
+ALTERNATIVE_CORE_ORDER = (
+    "mgba", "mednafen_supafaust", "fceumm", "blastem", "parallel_n64",
+    "dolphin", "stella2014", "prosystem", "mednafen_pce_fast",
+    "mednafen_ngp", "mednafen_wswan",
+)
+ALTERNATIVE_CORE_NAMES = frozenset(ALTERNATIVE_CORE_ORDER)
+ORIGINAL_CORE_ORDER = (
+    "mgba", "snes9x", "fceumm", "genesis_plus_gx", "parallel_n64",
+    "dolphin", "stella2014", "prosystem", "mednafen_pce_fast",
+    "mednafen_ngp", "mednafen_wswan",
+)
+assert frozenset(ORIGINAL_CORE_ORDER) == CORE_NAMES
+assert len(ALTERNATIVE_CORE_ORDER) == len(ALTERNATIVE_CORE_NAMES) == 11
+
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SOURCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
 TARGETS = frozenset((
     "windows-x86_64", "linux-x86_64", "macos-arm64", "macos-x86_64",
 ))
+
+
+def selected_core_set(lock):
+    """Know exactly which source-reviewed 11 core names a future lock approves.
+
+    The current tracked lock has NO approvals and cannot pass load_approved_lock.
+    A future alternative choice cannot be enabled by a build env flag or an
+    unapproved research marker; the fully reviewed approval record must bind
+    the exact source-built identities and document absent NC libraries.
+    """
+    if not isinstance(lock, dict):
+        raise ValueError("Missing reviewed 3.0 native lock")
+    mode = lock.get("core_set_id", "legacy-noncommercial")
+    if mode == "legacy-noncommercial":
+        return CORE_NAMES
+    if mode != "gpl-source-built-alternative":
+        raise ValueError("Unknown 3.0 release core set")
+    if (lock.get("legacy_noncommercial_native_binaries_excluded") is not True
+            or lock.get("source_built_alternative_binary_rights_reviewed") is not True):
+        raise ValueError("GPL-alternative release rights/exclusion not approved")
+    return ALTERNATIVE_CORE_NAMES
+
+
+def ordered_core_names_for_lock(lock):
+    names = selected_core_set(lock)
+    if names == ALTERNATIVE_CORE_NAMES:
+        return ALTERNATIVE_CORE_ORDER
+    return ORIGINAL_CORE_ORDER
 
 
 def load_approved_lock(path=LOCK_PATH):
@@ -45,6 +92,7 @@ def load_approved_lock(path=LOCK_PATH):
             raise ValueError(f"3.0 redistribution blocked: {name} not approved")
     if lock.get("native_core_count") != 11 or lock.get("system_profile_count") != 18:
         raise ValueError("3.0 native lock inventory mismatch")
+    names = selected_core_set(lock)
     records = lock.get("targets")
     if not isinstance(records, dict) or set(records) != TARGETS:
         raise ValueError("Approved 3.0 lock must include all four architectures")
@@ -52,7 +100,7 @@ def load_approved_lock(path=LOCK_PATH):
         if not isinstance(row, dict) or row.get("approved_for_distribution") is not True:
             raise ValueError(f"{target}: native distribution unapproved")
         cores = row.get("cores")
-        if not isinstance(cores, dict) or set(cores) != CORE_NAMES:
+        if not isinstance(cores, dict) or set(cores) != names:
             raise ValueError(f"{target}: approved core count mismatch")
         for name, core in cores.items():
             if not isinstance(core, dict):
@@ -95,8 +143,8 @@ def load_approved_lock(path=LOCK_PATH):
 
 def native_for_target(lock, platform_name, architecture, name):
     target = release_target(platform_name, architecture)
-    if name not in CORE_NAMES:
-        raise ValueError(f"Unknown 3.0 emulator core: {name}")
+    if name not in selected_core_set(lock):
+        raise ValueError(f"Unknown 3.0 approved emulator core: {name}")
     return target, lock["targets"][target]["cores"][name]
 
 
@@ -133,8 +181,8 @@ def verify_native_bundle(lock, manifest):
     if not isinstance(actual, list) or len(actual) != 11:
         raise ValueError("3.0 native bundle must contain eleven cores")
     observed = {row.get("name"): row for row in actual}
-    if set(observed) != CORE_NAMES:
-        raise ValueError("3.0 native bundle core set incomplete")
+    if set(observed) != selected_core_set(lock):
+        raise ValueError("3.0 native bundle core set incomplete or wrong release lineup")
     for name, record in data.items():
         core = observed[name]
         checks = {
@@ -159,3 +207,22 @@ def verify_native_bundle(lock, manifest):
         if source.get(field) != pinned:
             raise ValueError(f"3.0 bundle Dolphin Sys changed: {target}/{field}")
     return target
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(description="Print fully approved 3.0 frozen core identities")
+    parser.add_argument("--print-approved-core-names", action="store_true")
+    args = parser.parse_args(argv)
+    if not args.print_approved_core_names:
+        parser.error("Choose --print-approved-core-names")
+    try:
+        lock = load_approved_lock()
+        names = ordered_core_names_for_lock(lock)
+    except (OSError, ValueError, TypeError) as exc:
+        parser.exit(1, f"Unapproved 3.0 native core lineup: {exc}\n")
+    print(" ".join(names))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

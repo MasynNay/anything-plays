@@ -58,9 +58,9 @@ def core_names_for_build():
     if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
         if os.environ.get("AP_RELEASE_BUILD") != "1":
             raise ValueError("3.0 approved cores require release build mode")
-        from tools.v30_release_lock import load_approved_lock
-        load_approved_lock()
-        return (*CORE_NAMES, *OPTIONAL_V21_CORES)
+        from tools.v30_release_lock import load_approved_lock, ordered_core_names_for_lock
+        reviewed = load_approved_lock()
+        return ordered_core_names_for_lock(reviewed)
     # Optional downloadable cores are packaged separately. Never fetch
     # Dolphin here: it depends on system assets and failed gameplay QA.
     if any(os.environ.get(flag, "") == "1" for flag in ("AP_V30_CORE_PACK_BUILD", "AP_V21_CORE_PACK_BUILD")):
