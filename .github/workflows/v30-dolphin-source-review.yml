@@ -1,0 +1,91 @@
+name: Anything Plays 3.0 | Reconcile all 34 immutable Dolphin source snapshots
+
+# Review evidence only: no public binary distribution or release clearance.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-source-review.yml'
+      - 'tools/reconcile_v30_dolphin_source_archives.py'
+      - 'tests/test_v30_dolphin_source_review.py'
+      - 'tools/capture_v30_dolphin_submodule_sources.py'
+      - 'config/v3.0-dolphin-submodule-candidates.json'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-source-review.yml'
+      - 'tools/reconcile_v30_dolphin_source_archives.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-dolphin-source-34-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile-original-source-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CAPTURE_RUN: '42446758270'
+      CAPTURE_SOURCE_COMMIT: '410359cecd0f1283d24b0fed7d05c41ebfd1deb2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact six-shard source capture provenance is successful
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$SOURCE_CAPTURE_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$SOURCE_CAPTURE_RUN" --json name --jq .name)" = "Anything Plays 3.0 | Audit pinned Dolphin submodule source archives"
+          test "$(gh run view "$SOURCE_CAPTURE_RUN" --json headSha --jq .headSha)" = "$CAPTURE_SOURCE_COMMIT"
+          python -m unittest discover -s tests -p 'test_v30_dolphin_source_review.py' -v
+          python -m unittest discover -s tests -p 'test_v30_dolphin_submodule_source_capture.py' -v
+      - name: Acquire all six original, unapproved source archives (no binaries or games)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for shard in 0 1 2 3 4 5; do
+            gh run download "$SOURCE_CAPTURE_RUN" \
+              --name "AnythingPlays-3.0.0-DOLPHIN-SOURCE-UNAPPROVED-shard-$shard" \
+              --dir "shards/shard-$shard"
+          done
+      - name: Independently verify 34 exact Gitlinks and archive SHA-256, then retain only reviewer JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.reconcile_v30_dolphin_source_archives \
+            --input shards --output review-only
+          (cd review-only && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          report=json.loads(Path('review-only/DOLPHIN_34_SOURCE_ARCHIVE_REVIEW_UNAPPROVED.json').read_text('utf-8'))
+          assert report['captured_source_archive_count']==34
+          assert report['verified_shard_count']==6
+          assert len(report['submodules'])==34
+          assert all(report[key] is False for key in (
+              'approved_for_binary_distribution',
+              'source_to_shipped_binary_correspondence_verified',
+              'complete_corresponding_source_and_build_dependencies_verified',
+              'independent_license_review_complete',
+              'dolphin_sys_source_and_rights_verified',
+          ))
+          print('34/34 source candidates independently rehashed, all rights gates FALSE')
+          PY
+          test "$(find review-only -maxdepth 1 -type f | wc -l)" -eq 2
+      - name: Retain two UNAPPROVED reviewer files (no source tarballs or native binaries)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-DOLPHIN-34-SOURCE-REVIEW-UNAPPROVED
+          path: review-only/*
+          if-no-files-found: error
+          retention-days: 90
