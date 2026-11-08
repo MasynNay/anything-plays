@@ -41,3 +41,35 @@ The dedicated research workflow `.github/workflows/v30-ngp-original-mono-psg.yml
 The workflow retains only `NGP_ORIGINAL_MONO_PSG_UNAPPROVED.json` and `SHA256SUMS.txt`, not cartridge output, screenshots, native cores or game assets. A green research job means the experiments ran and their results were audited; it **does not imply actual sound was produced**. If it produces real PCM but not video, extend the original cartridge with a genuine changing monochrome display and native input logic in a later, independently verified experiment. If no sound is produced, investigate boot/PSG initialization and CPU execution before asserting an emulator audio defect.
 
 No 3.0 release-acceptance audio, physical QA, corresponding source, third-party licensing, or public binary distribution approval flags are changed. The application remains at 18 console profiles and 11 cores with v2.0 public unchanged.
+
+## Verified original monochrome PSG and source-built changing K1GE video
+
+[PR #64](https://github.com/MasynNay/anything-plays/pull/64) merged after
+the [real native run 42450342688](https://github.com/MasynNay/anything-plays/actions/runs/42450342688)
+confirmed **all four corrected genuine 0x00 monochrome PSG programs emitted
+qualifying nonzero native PCM**. The original sound path is therefore
+validated on the Linux test core for sound callbacks, but the four tone-only
+cartridges did **not** draw changing nonblank K1GE video; no full monochrome
+video/audio/input acceptance or public-redistribution approval followed.
+
+The next exact original-source-only experiment uses
+`tools/build_v30_ngp_mono_native_av.py`. It retains the byte-exact proven
+B8=55/B9=AA chip+Z80 sound initialization and direct T6W28 tone. It writes
+the **native K1GE** (not K2GE color) window origin/size registers at
+`0x8002..0x8005` and `BG_COL` at `0x8118` via documented TLCS-900/H
+`LD A,#imm` / `LD (abs16),A`. The background alternates two visible
+monochrome shades (`0x83` and `0x87`) inside the defined window while
+preserving the outside margin, using bounded byte-register DEC/JR loops and
+watchdog refreshes. The actual native NeoPop graphics implementation
+in `mednafen/ngp/gfx.c` independently confirms these K1GE memory-mapped
+addresses and background grayscale behavior.
+
+The new `tools/probe_v30_ngp_mono_native_av.py` runs only an original
+temporarily generated 0x00 mono cartridge in the real NeoPop CoreSession
+with native PCM, frame and manual/camera callback measurements.
+`.github/workflows/v30-ngp-mono-native-av.yml` retains **only reviewer
+JSON + SHA256SUMS**. The source-only proof is not promoted until its
+**real changing video and full A/V/input results** are inspected. The
+per-platform physical gameplay, genuine battery/flash persistence,
+license/source and binary redistribution gates stay **false** regardless
+of a green research job.

@@ -11,6 +11,7 @@ GitHub requires workflow definitions under this folder. Different files delibera
 | **v30-ngp.yml** | Dedicated NGP/NGPC audio, video, controls and save tests |
 | **v30-ngp-mono-mit-matrix.yml** | Research-only survey of 14 original pinned MIT mono NGP cartridges using true native NeoPop PCM, video and input (no ROM artifacts or release approval) |
 | **v30-ngp-original-mono-psg.yml** | Research-only source-built authentic monochrome PSG tone cartridge; actual native NeoPop PCM measured, no ROM artifacts or release authorization |
+| **v30-ngp-mono-native-av.yml** | Research-only original authentic K1GE changing mono video, native PSG PCM and camera/manual inputs; no ROM binaries or 3.0 release approval |
 | **v30-pce-pinned-source.yml** | Experimental four-platform PCE core built from exact GPL source and tested with original HuCard PCM/video |
 | **v30-pce-offline-integration.yml** | Test all 18 profiles and 11 offline native cores using a verified source-built PCE replacement while retaining original other-core ZIPs |
 | **v30-pce-source-delta.yml** | Assemble 11-source review matrix from four verified integrated PCE trial artifacts, retaining unknown old nightly and unapproved rights flags |
