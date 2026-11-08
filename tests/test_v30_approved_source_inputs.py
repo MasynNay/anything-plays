@@ -317,7 +317,7 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
         self.assertIn("42494297281", yml)
         self.assertIn("42496671418", yml)
         self.assertIn("42444367068", yml)
-        self.assertIn("reviewed source", yml.lower())
+        self.assertIn("source-built", yml.lower())
         self.assertIn("--pce-artifact original-source-built-pce.zip", yml)
         self.assertIn("--output-dir \"$AP_CORE_ARCHIVE_DIR\"", yml)
         self.assertNotIn("gh release create", yml)
