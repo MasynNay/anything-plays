@@ -1,7 +1,7 @@
 """Isolated original monochrome NGP audio hunt across immutable MIT homebrew.
 
 Research only: run the real native NeoPop CoreSession (including actual
-native PCM callbacks) on ALL fourteen original mono .ngp calibration ROMs.
+native PCM callbacks) on ALL fourteen original .ngp-named calibration ROMs, which are ALL color-header 0x10.
 No ROMs, native emulator libraries, music, BIOS or screenshots are committed,
 attached, or included in the product. Never reinterpret silence as success.
 """
@@ -28,12 +28,14 @@ GIT_SHA = re.compile(r"[0-9a-f]{40}\Z")
 def validate_index(index):
     if (not isinstance(index, dict)
             or index.get("schema_version") != 1
-            or index.get("status") != "UNTESTED-MIT-MONO-RESEARCH-ONLY"
+            or index.get("status") != "NGP-EXTENSION-COLOR-HEADER-CALIBRATION-RESEARCH-ONLY"
             or index.get("source_repository") != "Tixul/Ngpcraft_emulator"
             or index.get("source_license") != "MIT"
             or index.get("source_commit") != "93b1fd666ff375afcbb48079fbcf61dbb99b86b4"
             or index.get("tree_sha1") != index.get("source_commit")
-            or index.get("total_monochrome_candidates") != 14
+            or index.get("total_ngp_extension_candidates") != 14
+            or index.get("genuine_monochrome_header_candidates") != 0
+            or index.get("header_examination") != "ALL-14-PINNED-UPSTREAM-GIT-BLOBS-HAVE-0x10-COLOR-COMPATIBILITY"
             or index.get("candidate_native_audio_verified") is not False
             or index.get("public_release_approved") is not False
             or index.get("distribution_in_app") is not False):
@@ -44,7 +46,8 @@ def validate_index(index):
     paths = []
     for entry in candidates:
         if not isinstance(entry, dict) or set(entry) != {
-            "path", "git_blob_sha1", "size_bytes"
+            "path", "git_blob_sha1", "size_bytes", "header_mode_byte",
+            "genuine_monochrome_header"
         }:
             raise ValueError("Malformed source registry row")
         p = entry["path"]
@@ -52,7 +55,9 @@ def validate_index(index):
                 or not re.fullmatch(r"hw_calibration/a_[a-z0-9_]+\.ngp", p)
                 or not GIT_SHA.fullmatch(str(entry["git_blob_sha1"]))
                 or type(entry["size_bytes"]) is not int
-                or not 1000 < entry["size_bytes"] < MAX_ROM):
+                or not 1000 < entry["size_bytes"] < MAX_ROM
+                or entry["header_mode_byte"] != 0x10
+                or entry["genuine_monochrome_header"] is not False):
             raise ValueError("Unsafe/unspecified original NGP source candidate")
         paths.append(p)
     if paths != sorted(set(paths)):
@@ -79,13 +84,16 @@ def fetch_candidate(index, entry, destination, opener=urlopen):
     git_blob = b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload
     if hashlib.sha1(git_blob).hexdigest() != entry["git_blob_sha1"]:
         raise ValueError(f"{entry['path']}: pinned Git blob SHA-1 mismatch")
+    if len(payload) < 64 or payload[0x23] != entry["header_mode_byte"]:
+        raise ValueError("Pinned .ngp-name source unexpectedly changed cartridge header")
     path = Path(destination)
     if path.is_symlink() or path.suffix != ".ngp":
         raise ValueError("Unsafe mono research fixture destination")
     path.write_bytes(payload)
     return {"url": url, "size_bytes": len(payload),
             "source_blob_sha1": entry["git_blob_sha1"],
-            "candidate_sha256": hashlib.sha256(payload).hexdigest()}
+            "candidate_sha256": hashlib.sha256(payload).hexdigest(),
+            "header_mode_byte": payload[0x23]}
 
 
 def _check_native_child(child):
@@ -139,6 +147,8 @@ def scan(index, core, output, *, seconds=10, fetcher=fetch_candidate, runner=sub
         "attempted_original_mono_cartridges": 0,
         "total_pinned_original_mono_cartridges": 14,
         "source_downloads_integrity_verified": 0,
+        "genuine_monochrome_header_candidates": 0,
+        "all_pinned_files_color_header_despite_ngp_extension": True,
         "native_audio_pass_candidates": [],
         "full_native_av_input_pass_candidates": [],
         "all_source_candidate_downloads_verified": False,
@@ -153,7 +163,9 @@ def scan(index, core, output, *, seconds=10, fetcher=fetch_candidate, runner=sub
             root = Path(tmp)
             rom = root / "original-mono.ngp"
             meta = fetcher(index, entry, rom)
-            if not isinstance(meta, dict) or meta.get("source_blob_sha1") != entry["git_blob_sha1"]:
+            if (not isinstance(meta, dict)
+                    or meta.get("source_blob_sha1") != entry["git_blob_sha1"]
+                    or meta.get("header_mode_byte") != entry["header_mode_byte"]):
                 raise ValueError("Original NGP test cartridge integrity not established")
             report["source_downloads_integrity_verified"] += 1
             child_path = root / "native-result.json"
@@ -179,22 +191,34 @@ def scan(index, core, output, *, seconds=10, fetcher=fetch_candidate, runner=sub
                 "source_size_bytes": meta.get("size_bytes"),
                 "native_exit_code": exit_code,
                 "native_report_available": native is not None,
+                "declared_cartridge_header_mode": meta["header_mode_byte"],
+                "genuine_monochrome_header": meta["header_mode_byte"] == 0x00,
+                "native_audio_observed_but_color_header": bool(
+                    meta["header_mode_byte"] == 0x10
+                    and native and native["audio_gate_passed"]
+                ),
                 "native_measured_metrics": native,
                 "diagnostic_tail": output_tail,
-                "verified_audio": bool(native and native["audio_gate_passed"]),
+                "verified_audio": bool(
+                    meta["header_mode_byte"] == 0x00 and native and native["audio_gate_passed"]
+                ),
                 "verified_full_native_av_input": bool(
-                    native and native["passed"] and exit_code == 0
+                    meta["header_mode_byte"] == 0x00 and native and native["passed"] and exit_code == 0
                 ),
             }
             report["per_cartridge"][entry["path"]] = row
             report["attempted_original_mono_cartridges"] += 1
+            if row["genuine_monochrome_header"]:
+                report["genuine_monochrome_header_candidates"] += 1
             if row["verified_audio"]:
                 report["native_audio_pass_candidates"].append(entry["path"])
             if row["verified_full_native_av_input"]:
                 report["full_native_av_input_pass_candidates"].append(entry["path"])
             print(f"{idx + 1}/14 {entry['path']}: "
                   f"native PCM={native['native_nonzero_pcm_values'] if native else 'no report'}; "
-                  f"audio={row['verified_audio']}; full={row['verified_full_native_av_input']}",
+                  f"header=0x{row['declared_cartridge_header_mode']:02X} "
+                  f"(not genuine mono); accepted mono audio={row['verified_audio']}; "
+                  f"full={row['verified_full_native_av_input']}",
                   flush=True)
     report["all_source_candidate_downloads_verified"] = (
         report["attempted_original_mono_cartridges"] == 14
@@ -219,9 +243,10 @@ def main(argv=None):
         outcome = scan(index, args.core, args.output, seconds=args.seconds)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
         parser.exit(1, f"NGP mono research incomplete: {error}\n")
-    print(f"REAL NATIVE RESULT: {len(outcome['native_audio_pass_candidates'])}/14 "
-          f"produced passing native PCM. {len(outcome['full_native_av_input_pass_candidates'])}/14 "
-          "passed native video/audio/input. This is CI research, NOT 3.0 distribution approval.")
+    print(f"HEADER AUDIT: {outcome['genuine_monochrome_header_candidates']}/14 "
+          "pinned .ngp-named sources actually declare mono mode 0x00. "
+          "All fourteen declare color mode 0x10; none can certify real mono. "
+          "Native audio observations remain research-only.")
     return 0
 
 
