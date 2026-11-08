@@ -175,12 +175,21 @@ def verify_bundle(bundle, platform_name, check_native=False):
         # approved 3.0 production input. Validate the actual installed native
         # images, unapproved marker and source identities before inspecting DLLs.
         from anything_plays.v30_gpl_trial import validate_trial_core_directory
-        validate_trial_core_directory(cores, EXTENSIONS[platform_name])
-        for name in ("GPL-TRIAL-Supafaust-COPYING.txt",
-                     "GPL-TRIAL-BlastEm-COPYING.txt"):
+        trial_marker = validate_trial_core_directory(cores, EXTENSIONS[platform_name])
+        notices = ["GPL-TRIAL-Supafaust-COPYING.txt",
+                   "GPL-TRIAL-BlastEm-COPYING.txt"]
+        pinned_pce = trial_marker.get("source_built_pce")
+        if pinned_pce is not None:
+            notices.append("GPL-TRIAL-PCE-COPYING.txt")
+        for name in notices:
             notice = licenses / name
             if notice.is_symlink() or not notice.is_file() or not notice.read_bytes().strip():
                 raise ValueError(f"GPL trial missing original license: {name}")
+        if pinned_pce is not None:
+            source_notice = licenses / "GPL-TRIAL-PCE-COPYING.txt"
+            expected_sha = pinned_pce["notice_sha256"]
+            if hashlib.sha256(source_notice.read_bytes()).hexdigest() != expected_sha:
+                raise ValueError("Wrong original pinned-source PCE GPL2 notice")
         if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
             raise ValueError("Noncommercial core entered the GPL alternative test lineup")
         if platform_name == "windows":
