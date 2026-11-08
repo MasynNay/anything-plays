@@ -78,7 +78,12 @@ def capture_source_built_candidate(*, source, native, output, candidate, target)
     if not lic.is_file() or lic.is_symlink():
         raise ValueError("Missing original license text")
     licdata=lic.read_bytes()
-    if b"GNU GENERAL PUBLIC LICENSE" not in licdata or b"version 3" not in licdata.lower():
+    # Upstream bsnes' original short licensing notice spells this
+    # "GNU General Public License"; BlastEm's full COPYING uses capitals.
+    # Compare the canonical terms case-insensitively while retaining and
+    # hashing the exact original license bytes (never rewriting legal text).
+    lower_license=licdata.lower()
+    if b"gnu general public license" not in lower_license or b"version 3" not in lower_license:
         raise ValueError("Unverified original GPLv3 license notice")
     native_bytes=native.read_bytes()
     if not any(native_bytes.startswith(sig) for sig in MAGIC[EXT[target]]):
