@@ -291,7 +291,7 @@ jobs:
               "source_core_provenance": manifest,
           }
           (archive_dir / "PRESERVED_NATIVE_INPUTS.json").write_text(
-              json.dumps(result, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+              json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           print(f"{target}: preserved {len(files)} matching immutable native input archives")
           PY
       - name: Retain original upstream native ZIP inputs (test only)
