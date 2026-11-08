@@ -61,7 +61,7 @@ def package_native_zip(name, ext, data):
     return buffer.getvalue()
 
 
-def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target):
+def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target, windows_runtime=None):
     if (os.environ.get("AP_V30_GPL_TRIAL") != "1"
             or os.environ.get("AP_V30_TEST_CORES") != "1"
             or os.environ.get("AP_RELEASE_BUILD", "0") != "0"
@@ -72,6 +72,9 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target):
     if len(V30_GPL_TRIAL_CORES) != 11 or len(set(V30_GPL_TRIAL_CORES)) != 11:
         raise ValueError("Trial must keep all 11 native core slots")
     ext = TARGET_EXT[target]
+    if ((target == "windows-x64" and windows_runtime is None)
+            or (target != "windows-x64" and windows_runtime is not None)):
+        raise ValueError("Windows offline runtime must be supplied exactly on Windows")
     if ((sys.platform == "win32" and ext != ".dll")
             or (sys.platform == "darwin" and ext != ".dylib")
             or (sys.platform.startswith("linux") and ext != ".so")):
@@ -153,6 +156,17 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target):
     expected.add("Dolphin.zip")
     if set(preserved) != expected or len(preserved) != 12:
         raise ValueError("GPL alternatives must preserve 11 cores, 18 profiles and Sys")
+    runtime_dependencies = {}
+    if windows_runtime is not None:
+        path = Path(windows_runtime).expanduser()
+        if (path.is_symlink() or not path.is_file()
+                or not 10000 < path.stat().st_size < 8 * 1024 * 1024):
+            raise ValueError("Windows source-built native dependency missing")
+        data = path.read_bytes()
+        if not data.startswith(b"MZ"):
+            raise ValueError("Windows native runtime is not a real Windows PE DLL")
+        preserved["libwinpthread-1.dll"] = data
+        runtime_dependencies["libwinpthread-1.dll"] = sha256(data)
     marker = {
         "schema_version": 1,
         "status": STATUS,
@@ -163,6 +177,7 @@ def stage_inputs(original_dir, snes_dir, sega_dir, output, evidence, target):
         "original_unchanged_core_archives": 9,
         "original_dolphin_sys_archive_unchanged": True,
         "original_native_inputs_sha256": sha256(record_path.read_bytes()),
+        "runtime_dependencies": runtime_dependencies,
         "public_binary_distribution_approved": False,
         "combined_gpl_license_reviewed": False,
         "physical_qa_approved": False,
@@ -188,10 +203,13 @@ def main(argv=None):
     ap.add_argument("--output", required=True, type=Path)
     ap.add_argument("--evidence", required=True, type=Path)
     ap.add_argument("--target", required=True, choices=tuple(TARGET_EXT))
+    ap.add_argument("--windows-runtime", type=Path,
+                    help="Exact original Windows DLL from MSYS2 MINGW64 on Windows only")
     args = ap.parse_args(argv)
     try:
         result = stage_inputs(args.original_dir, args.snes_dir, args.sega_dir,
-                              args.output, args.evidence, args.target)
+                              args.output, args.evidence, args.target,
+                              windows_runtime=args.windows_runtime)
     except (ValueError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         ap.exit(1, f"GPL alternative offline installer trial BLOCKED: {exc}\n")
     print(f"{result['target']}: exact 18-profile/11-core GPL alternative input set staged, NOT approved")
