@@ -1,0 +1,138 @@
+name: Anything Plays 3.0 | PCE pinned-source replacement research
+
+# This lab compiles a NEW core from pinned GPLv2 source to replace UNKNOWN
+# upstream buildbot provenance. It never substitutes files in existing
+# installers, publishes releases, or approves mixed-license distribution.
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-pinned-source.yml'
+      - 'tools/capture_v30_pce_source_build.py'
+      - 'tests/test_v30_pce_source_capture.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-pce-pinned-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-pce-build-and-native-av:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, extension: so}
+          - {runner: windows-2025, target: windows-x64, extension: dll}
+          - {runner: macos-15, target: macos-arm64, extension: dylib}
+          - {runner: macos-15-intel, target: macos-x64, extension: dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      PCE_SOURCE_COMMIT: '2de1ce1c3f237b161c126c54ba407990bb86d1e9'
+      PCE_SOURCE_DIR: research/pce-fast-source
+      PCE_CORE_FILE: mednafen_pce_fast_libretro.${{ matrix.extension }}
+      PCE_TARGET: ${{ matrix.target }}
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - name: Check out Anything Plays test and homebrew source
+        uses: actions/checkout@v4
+      - name: Check out exact original GPLv2 PCE Fast source revision
+        uses: actions/checkout@v4
+        with:
+          repository: libretro/beetle-pce-fast-libretro
+          ref: 2de1ce1c3f237b161c126c54ba407990bb86d1e9
+          path: research/pce-fast-source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Confirm independent upstream source is exactly pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$PCE_SOURCE_DIR" rev-parse HEAD)" = "$PCE_SOURCE_COMMIT"
+          test -s "$PCE_SOURCE_DIR/COPYING"
+          test -s "$PCE_SOURCE_DIR/Makefile"
+          echo "Verified original upstream source commit $PCE_SOURCE_COMMIT"
+      - name: Install Linux build and native audio/video dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y \
+            --no-install-recommends make g++ libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Initialize Windows x64 source-build compiler
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make git
+            mingw-w64-ucrt-x86_64-gcc
+      - name: Build source-pinned Linux PCE Fast core
+        if: runner.os == 'Linux'
+        shell: bash
+        run: make -C "$PCE_SOURCE_DIR" -j 3 platform=unix
+      - name: Build source-pinned macOS PCE Fast core
+        if: runner.os == 'macOS'
+        shell: bash
+        run: make -C "$PCE_SOURCE_DIR" -j 3 platform=osx
+      - name: Build source-pinned Windows x64 PCE Fast core
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C research/pce-fast-source -j 3 platform=win
+      - name: Capture matching source archive, GPL notice and immutable native hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$PCE_SOURCE_DIR/$PCE_CORE_FILE"
+          python -m tools.capture_v30_pce_source_build \
+            --source "$PCE_SOURCE_DIR" \
+            --native-core "$PCE_SOURCE_DIR/$PCE_CORE_FILE" \
+            --target "$PCE_TARGET" \
+            --output "test-evidence/pce-original-source"
+      - name: Install native frontend's standard test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test the NEW pinned-source native core with real original HuCard video and PCM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/probe_pce_homebrew.py \
+            --core "test-evidence/pce-original-source/$PCE_CORE_FILE" \
+            --seconds 12 \
+            --report test-evidence/pce-original-source/PCE_ORIGINAL_HUCARD_NATIVE_AV.json
+      - name: Bind actual native AV result to exact source-build candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path("test-evidence/pce-original-source")
+          probe = root/"PCE_ORIGINAL_HUCARD_NATIVE_AV.json"
+          data = json.loads(probe.read_text("utf-8"))
+          details = data.get("details")
+          assert data.get("passed") is True and isinstance(details, dict) and details.get("passed") is True
+          assert details.get("native_nonzero_pcm_samples", 0) > 100
+          manifest = root/"PCE_SOURCE_BUILD_UNAPPROVED.json"
+          origin = json.loads(manifest.read_text("utf-8"))
+          assert origin["third_party_distribution_approved"] is False
+          assert origin["mixed_core_licenses_reviewed"] is False
+          origin["gameplay_native_video_audio_verified"] = True
+          origin["original_hucard_test_sha256"] = hashlib.sha256(probe.read_bytes()).hexdigest()
+          manifest.write_text(json.dumps(origin, indent=2, sort_keys=True)+"\n", encoding="utf-8")
+          print("Exact pinned-source PCE candidate demonstrated native video and nonzero PCM; distribution still blocked")
+          PY
+      - name: Retain original source + source-built native PCE candidate (not a public release)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-PCE-PINNED-SOURCE-${{ matrix.target }}-UNAPPROVED
+          path: test-evidence/pce-original-source/
+          if-no-files-found: warn
+          retention-days: 30
