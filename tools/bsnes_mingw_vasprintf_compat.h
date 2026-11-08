@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <errno.h>
 static inline int ap_v30_bsnes_mingw_vasprintf(char **result,
                                                 const char *fmt,
