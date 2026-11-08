@@ -2,6 +2,23 @@
 setlocal EnableExtensions
 cd /d "%~dp0.."
 set "VERSION=3.0.0-alpha.1"
+REM Stable 3.0 production is a separate fail-closed release mode.
+REM Never publish the preview identity with a stable filename.
+if "%AP_V30_APPROVED_RELEASE%"=="1" (
+  if not "%AP_RELEASE_BUILD%"=="1" (
+    echo Production 3.0 requires AP_RELEASE_BUILD=1
+    exit /b 1
+  )
+  if not defined AP_CORE_ARCHIVE_DIR (
+    echo Production 3.0 needs immutable AP_CORE_ARCHIVE_DIR
+    exit /b 1
+  )
+  python tools\check_v30_release.py
+  if errorlevel 1 exit /b 1
+  python -c "from tools.v30_release_lock import load_approved_lock; load_approved_lock()"
+  if errorlevel 1 exit /b 1
+  set "VERSION=3.0.0"
+)
 REM Both CI preview and fully approved 3.0 builds include all 11 cores.
 REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
 set "AP_FULL_CORE_BUILD=0"
@@ -104,7 +121,11 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-"%ISCC%" /DAppVersion=%VERSION% packaging\installer.iss
+if "%AP_V30_APPROVED_RELEASE%"=="1" (
+  "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else (
+  "%ISCC%" /DAppVersion=%VERSION% packaging\installer.iss
+)
 if errorlevel 1 exit /b 1
 echo.
 echo SUCCESS: release\AnythingPlaysSetup-%VERSION%.exe
