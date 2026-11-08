@@ -8,6 +8,9 @@ on:
     paths:
       - '.github/workflows/v30-gpl-offline-installer-trial.yml'
       - 'tools/stage_v30_gpl_trial_inputs.py'
+      - 'tools/probe_v30_installed_switch.py'
+      - 'tests/test_v30_installed_switch.py'
+      - 'tests/test_v30_gpl_trial_lifetime.py'
       - 'anything_plays/v30_gpl_trial.py'
       - 'anything_plays/core_locator.py'
       - 'fetch_mgba_core.py'
@@ -67,6 +70,8 @@ jobs:
           test "$(gh run view "$GPL_SNES_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate"
           test "$(gh run view "$GPL_SEGA_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform pinned GPL candidate research"
           python -m unittest discover -s tests -p 'test_v30_gpl_full_offline_trial.py' -v
+          python -m unittest discover -s tests -p 'test_v30_installed_switch.py' -v
+          python -m unittest discover -s tests -p 'test_v30_gpl_trial_lifetime.py' -v
       - name: Retrieve 12 verified original offline build inputs and both source-built GPL alternative core families
         shell: bash
         run: |
@@ -224,6 +229,39 @@ jobs:
               assert item["passed"] is True and item["native_exit_code"]==0,path
               assert item["details"]["passed"] is True,path
           print("Five original, genuine source-built installed-core video and PCM probes passed")
+          PY
+      - name: Prove real installed application survives seven sequential SNES/Sega native restarts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == macos-* ]]; then
+            CORE_DIR=dist/AnythingPlays30Preview.app/Contents/Resources/cores
+          else
+            CORE_DIR=dist/AnythingPlays/cores
+          fi
+          python tools/probe_v30_installed_switch.py \
+            --cores "$CORE_DIR" --target "$TARGET" --seconds 5 \
+            --report test-evidence/ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("test-evidence/ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json").read_text())
+          assert x["passed"] is True, x.get("child_console_tail")
+          assert x["actual_installed_native_cores"] == 11
+          assert x["full_console_profiles"] == 18
+          assert x["sessions_completed"] == x["sessions_expected"] == 7
+          assert [r["system"] for r in x["real_native_session_details"]["cycles"]] == [
+            "snes", "mastersystem", "gamegear", "sg1000",
+            "genesis", "snes", "mastersystem",
+          ]
+          assert all(r["passed"] and r["core_nonzero_pcm_values"] > 100
+                     and r["distinct_rgb_frames"] >= 2
+                     for r in x["real_native_session_details"]["cycles"])
+          assert x["native_child_exit_code"] == 0 and x["timed_out"] is False
+          for key in ("combined_gpl_license_reviewed", "public_binary_distribution_approved",
+                      "physical_audio_camera_save_qa_approved", "release_approved"):
+              assert x[key] is False
+          print("Genuine source-built INSTALLED GUI CORE repeated 7/7 native A/V passes; public rights OFF")
           PY
       - name: Preserve only authenticated package integrity and test reports (NEVER installers/ROMs/cores)
         if: always()
