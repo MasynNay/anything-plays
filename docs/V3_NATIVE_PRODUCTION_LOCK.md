@@ -55,6 +55,30 @@ completed with source and license evidence, and reviewed before it can be
 proposed for the approved production path. Its automatically produced flags
 are deliberately **all false**.
 
+## Eleventh source review identity from successful complete PCE trial
+
+The [original, real-data 10/11 source-review run](https://github.com/MasynNay/anything-plays/actions/runs/42444450521)
+and [successful four-platform 18-profile PCE integration run](https://github.com/MasynNay/anything-plays/actions/runs/42445580786)
+can now be reconciled by `tools/create_v30_pce_source_review_delta.py`.
+The workflow `.github/workflows/v30-pce-source-delta.yml` automatically
+retrieves the original integrity-checked review matrix and all four passed
+integrated PCE gameplay reports, then outputs the additional source-built
+PCE source identity and exact new core ZIP SHA-256 on each OS.
+
+**Precisely preserved:** the other ten cores' source identities remain
+byte-for-byte unchanged in the 11/11 review output, as do the Dolphin Sys
+records; the four superseded nightly PCE native SHA values are retained
+separately with unknown source commits. Only the **new source-built PCE
+replacement candidate** now has a known 11th source identity and original
+HuCard-native video/audio evidence. This does **not** prove the original
+unversioned nightly PCE binary corresponds to that source.
+
+**Release gates remain closed:** absent independent mixed GPL/noncommercial
+redistribution review, full Dolphin source/submodules, complete source-build
+dependencies, source/native confirmation and real-device long-run testing,
+the final 3.0 production lock cannot be approved. This review artifact does
+not replace the final release-approval inventory.
+
 ## Source-built PCE Fast integrated preview trial (no release approval)
 
 The separate [four-platform PCE source-build lab](https://github.com/MasynNay/anything-plays/actions/runs/42444367068)
