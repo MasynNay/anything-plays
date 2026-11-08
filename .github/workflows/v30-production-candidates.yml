@@ -62,6 +62,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # An approval commit's SHA cannot equal its own lock-file value.
+          # Fetch the earlier source-reviewed commit to diff exact Git blobs.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -87,6 +90,18 @@ jobs:
           # matching source inventory and each core's redistribution review.
           # This fails before expensive installer builders ever run.
           python -m tools.check_v30_source_gate
+          # The reviewed app code may predate the final approval records.
+          # Confirm the actual production checkout changed ONLY six exact
+          # approval metadata files, never native/app/build/dependency inputs.
+          reviewed_source_commit="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('config/v3.0-core-lock.json').read_text('utf-8'))['source_commit'])
+          PY
+          )"
+          python -m tools.verify_v30_reviewed_runtime_code \
+            --reviewed-source-commit "$reviewed_source_commit" \
+            --actual-build-commit "$GITHUB_SHA"
           run_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
           run_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
           if [[ "$run_name" != "Anything Plays 3.0 | Complete offline installer lab" || "$run_status" != success ]]; then

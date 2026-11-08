@@ -112,26 +112,56 @@ retail-game/hardware acceptance is implied.** The technical core swap is
 evaluated in isolation and may be adopted for a future reviewed release
 only after independent evidence and rights decisions.
 
-### Release application revision must equal independently approved source revision
+### A reviewed application source commit, followed by metadata-only approval
 
-The production artifact emitter must compare **all three** sources of the
-application's build identity before copying any final installer:
+A Git commit **cannot** contain the SHA of its own Git commit in a tracked
+JSON file: writing that SHA changes the commit identity. The earlier
+all-three-commit-equality check added in PR #75 was too strict; an approved
+manifest stored inside Git could never equal the final commit containing it.
 
-1. The actual checkout supplied as `--source-commit "$GITHUB_SHA"`.
-2. The independently approved `config/v3.0-core-lock.json` top-level
-   `source_commit`.
-3. The independently verified `config/v3.0-corresponding-source-inventory.json`
-   top-level `source_commit`.
+The corrected **Git-backed** production gate instead requires:
 
-A mismatch rejects the production artifact even when all **44 core hashes**
-and Dolphin Sys native archives match. An approved native snapshot from
-one application version does **not** authorize a newer desktop application's
-bundle simply because the native code is byte-for-byte identical.
-The source-only synthetic regression
-`tests/test_v30_production_provenance.py`
-reproduces and blocks an attempt to stamp a new GitHub commit onto an
-older approved native/source lock. This is a source-integrity guard, not
-an automatic license permission determination.
+1. Freeze and independently review the **actual application and packaging
+   source commit**, before adding the final 3.0 approval records. Put this
+   full 40-digit SHA into `config/v3.0-core-lock.json` as `source_commit`.
+2. Independently review the 44 native binaries, their complete corresponding
+   sources, all license obligations, and all four real machine acceptance
+   packets; set the approved 3.0 source inventory's `source_commit` to
+   the **same earlier reviewed application source SHA**.
+3. Make a final approval commit on reviewed `main`, with changes **only**
+   to the six whitelisted administrative evidence files:
+   `config/v3.0-core-lock.json`,
+   `config/v3.0-release-acceptance.json`,
+   `config/v3.0-corresponding-source-inventory.json`,
+   `docs/V3_LICENSE_COMPATIBILITY_APPROVED.md`,
+   `docs/V3_RELEASE_NOTES_APPROVED.md`, and `CONTINUE_HERE.md`.
+4. The production workflow checks out the actual final approved commit with
+   **full Git history** (`actions/checkout@v4 fetch-depth:0`) and invokes
+   `python -m tools.verify_v30_reviewed_runtime_code` against the reviewed
+   commit and current actual `$GITHUB_SHA`.
+5. The verifier confirms both real Git commits and actual checkout HEAD,
+   rejects any uncommitted tracked modifications, and uses **Git byte tree
+   comparisons** to forbid **ANY** changed code, packaged asset, build
+   dependency, compiler/installer configuration, CI workflow or other
+   source file outside those six exact approval paths. Renames and deletions
+   count as changed. It does NOT rely on the review file saying
+   `source_unchanged=true`.
+6. The production artifact emitter checks source equivalence again and
+   records **both** the actual installer checkout `source_revision` and
+   `reviewed_application_source_commit` in
+   `PRODUCTION_PROVENANCE.json`. The original native library and source
+   SHA validations and release-signoff gates continue unchanged.
+
+This removes the impossible circular Git SHA constraint **without allowing
+an unreviewed revision of Anything Plays into a stable installer**. A change
+to `app.py`, `anything_plays/`, `packaging/`, `requirements.txt`,
+`tools/`, `licenses/`, arbitrary docs or the Actions workflows after
+the source freeze must cause the review to start again at the new source
+commit. The independent human rights and physical approvals are still
+mandatory: this check never grants a GPL exception or a redistribution
+license. The literal six-path whitelist and negative regression tests are in
+`tools/verify_v30_reviewed_runtime_code.py` and
+`tests/test_v30_reviewed_runtime_git_snapshot.py`.
 
 ## Strict per-core source-and-rights preflight for approved production
 
