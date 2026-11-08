@@ -14,6 +14,33 @@ This is the 3.0-specific audit trail. The earlier [v2.0 distribution decision](R
 - The maintainer separately reports Dolphin/GameCube now works on a physical Linux system. The precise tested installer SHA, 30-minute endurance and full control/save matrix remain unrecorded.
 - The camera-side label-size slider, persistent size preference and zone-constrained rendering are merged. Their source checks and the complete offline installer lab passed.
 
+## Independently verified four-platform PCE source-built candidate fingerprints
+
+After the [successful four-platform original homebrew video/audio run
+42444367068](https://github.com/MasynNay/anything-plays/actions/runs/42444367068),
+the four original GitHub Actions archives were downloaded and their **native
+binary SHA-256, byte sizes, exact pinned source tarball SHA-256, and native
+audio/video test reports** rechecked. The resulting compact manifest is
+[config/v3.0-pce-source-built-candidates.json](../config/v3.0-pce-source-built-candidates.json).
+It gives each target an immutable native SHA and archived source SHA without
+committing any third-party emulator libraries, game ROMs, or large source
+tarballs to Git. The newly compiled pinned-source PCE cores passed original
+HuCard playback on each target (more than a million nonzero PCM values and
+hundreds of video frames each).
+
+The Windows source tarball has a different exact byte digest than Linux and
+the two Macs because its source checkout uses Windows line endings. Those
+differences are recorded **per platform**, not hidden by assigning a
+nonmatching universal hash. All four builds check out the exact same Git
+commit; platform-specific archive hashes are evidence of the actual captured
+bytes, not proof of a cross-platform reproducible binary build.
+
+**This is a candidate for replacing the UNVERSIONED OLD PCE buildbot binary,**
+not an automatic swap or approval for the old core. The working 3.0 preview,
+reviewed stable production lock, and user ROM library are unchanged. All
+third-party distribution permissions and mixed GPL/noncommercial compliance
+flags remain false.
+
 ## Source-built Beetle PCE Fast — separate experimental candidate
 
 The original 3.0 developer-preview Beetle PCE Fast buildbot binary identifies
