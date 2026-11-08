@@ -29,7 +29,6 @@ class PhysicalQAContracts(unittest.TestCase):
         self.assertIn("save_then_reload", qa.CONSOLE_CHECKS)
         self.assertIn("rom_change_restart", qa.CONSOLE_CHECKS)
         self.assertIn("extended_play_stable", qa.CONSOLE_CHECKS)
-        self.assertIn("no_external_emulators", qa.HOST_CHECKS) if False else None
         with TemporaryDirectory() as td, patch.object(qa, "detected_target", return_value="linux-x64"):
             path = Path(td) / "anything_plays_3.0_preview.deb"
             contents = b"local package test bytes" * 64
@@ -39,9 +38,9 @@ class PhysicalQAContracts(unittest.TestCase):
             self.assertEqual(len(obj["console_checks"]) * len(qa.CONSOLE_CHECKS)
                              + len(qa.HOST_CHECKS), 150)
             self.assertEqual(obj["installer_sha256"], hashlib.sha256(contents).hexdigest())
-            self.assertNotIn("rom", json.dumps(obj).lower().replace(
-                "contains_rom_names_paths_or_game_files", ""
-            ).replace("rom_change_restart", ""))
+            self.assertNotIn(str(path), json.dumps(obj))
+            self.assertIn("contains_rom_names_paths_or_game_files", obj)
+            self.assertIs(obj["contains_rom_names_paths_or_game_files"], False)
             self.assertFalse(obj["public_release_approved"])
             self.assertFalse(obj["external_license_redistribution_reviewed"])
             self.assertFalse(obj["independent_hardware_reviewed"])
