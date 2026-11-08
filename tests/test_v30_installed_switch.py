@@ -44,7 +44,7 @@ def synthetic_install(root):
     (root / "CORE_PROVENANCE.json").write_text(
         json.dumps({"cores": rows}), "utf-8")
     dolphin = root / "dolphin-emu" / "Sys"
-    dolphin.mkdir(parents=True)
+    dolphin.mkdir(parents=True, exist_ok=True)
     (dolphin / "codehandler.bin").write_bytes(b"original sys test data")
     entries = {}
     for name, source_commit in EXPECTED_SOURCE_COMMITS.items():
