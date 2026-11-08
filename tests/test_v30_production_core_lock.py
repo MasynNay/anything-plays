@@ -62,6 +62,25 @@ def eligible_synthetic_lock():
 
 
 class V30ProductionCoreLockTests(unittest.TestCase):
+    def test_approved_3_0_is_treated_as_full_offline_bundle_on_all_platforms(self):
+        root = Path(__file__).resolve().parents[1]
+        for path in (
+            "packaging/build_linux_deb.sh",
+            "packaging/build_macos_dmg.sh",
+            "packaging/build_windows.bat",
+        ):
+            with self.subTest(platform=path):
+                source = (root / path).read_text(encoding="utf-8")
+                self.assertIn("AP_V30_APPROVED_RELEASE", source)
+                self.assertIn("dolphin", source)
+                self.assertIn("mednafen_wswan", source)
+        source = (root / "fetch_mgba_core.py").read_text(encoding="utf-8")
+        self.assertIn("verify_core_archive", source)
+        self.assertIn("verify_core_payload", source)
+        self.assertIn("verify_native_bundle", source)
+        dolphin = (root / "tools/fetch_dolphin_sys.py").read_text("utf-8")
+        self.assertIn("verify_dolphin_archive", dolphin)
+
     def test_checked_in_release_lock_is_not_approved(self):
         self.assertEqual(V2_CORE_NAMES, ("mgba", "snes9x"))
         self.assertEqual(len(CORE_NAMES), 11)
