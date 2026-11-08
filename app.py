@@ -9,7 +9,6 @@ import copy
 import os
 import sys
 import tkinter as tk
-
 from anything_plays.gba_emulator import Emulator
 from anything_plays.systems import SYSTEMS
 from anything_plays.settings_defaults import DEFAULT
@@ -35,7 +34,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
           VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
           ShortcutsMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
-
     def __init__(self, root):
         self.root = root
         root.title('Anything Plays 3.0 · Preview')
@@ -157,7 +155,8 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.bind('<F11>', self.toggle_fullscreen)
         root.bind('<Control-Shift-m>', self.toggle_game_mute)
         root.protocol('WM_DELETE_WINDOW', self.close)
-        root.after(100, self.scan_cameras)
+        if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":
+            root.after(100, self.scan_cameras)
         # Keep exactly one camera timer and one game timer alive. Record their
         # identifiers so all pending callbacks can be cancelled on shutdown.
         self._camera_tick_job = root.after(45, self.tick)
@@ -165,7 +164,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self._updates_start_job = root.after(
             8000, self.schedule_emulator_update_checks
         )
-
     def uses_embedded_emulator(self, system=None):
         """Choose in-panel video for each console; keep GPU fallback explicit."""
         key = self.system_key.get() if system is None else system
@@ -176,7 +174,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         if key == 'gamecube':
             return self.gamecube_embedded.get()
         return False
-
     def close(self):
         """Persist settings, release devices, and stop scheduling UI callbacks."""
         if self._closing:
@@ -209,13 +206,11 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
                 callback()
             except Exception as exc:
                 print(f"Shutdown {label}: {exc}", file=sys.stderr)
-
         for job_name in ('shelf_button_job', 'shelf_animation_job',
                          'shelf_momentum_job'):
             job = getattr(self, job_name, None)
             if job is not None:
                 cleanup(job_name, lambda job=job: self.root.after_cancel(job))
-
         cleanup("manual input", self.deactivate_manual)
         cleanup("camera controls", self.stop_controls)
         capture, self.cap = self.cap, None
@@ -237,13 +232,17 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
                 self.root.destroy()
             except tk.TclError:
                 pass
-
 def main():
     """Start the Tkinter event loop when launched from source or a bundle."""
+    if "--ap-v30-ui-smoke" in sys.argv:
+        from anything_plays.frozen_gui_smoke import run_smoke_gui
+        return run_smoke_gui(App, SYSTEMS)
     root = tk.Tk()
     App(root)
     root.mainloop()
+    return 0
+
 
 if __name__ == '__main__':
     __import__('multiprocessing').freeze_support()
-    main()
+    raise SystemExit(main())
