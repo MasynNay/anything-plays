@@ -48,6 +48,26 @@ def evaluate_video_probe(error, frames, nonblank, elapsed):
     }
 
 
+def evaluate_interactive_playback(*, error, exercise_controls, decoded_frames,
+                                  unique_nonblank_frames, input_callback_calls,
+                                  nonzero_input_samples, native_steps, video_evidence):
+    """One authoritative verdict for real changing frames AND controller activity.
+
+    Source-built Dolphin can execute thousands of retro_run calls without
+    emitting a single frame. A high CPU-loop rate or an unchanging video
+    stream must never become a successful playback report.
+    """
+    interactive = (
+        error is None and bool(exercise_controls) and decoded_frames >= 3
+        and unique_nonblank_frames >= 3 and input_callback_calls >= 100
+        and nonzero_input_samples >= 10 and native_steps >= 100
+    )
+    return {
+        "static_homebrew_interactive_passed": interactive,
+        "playback_probe_passed": interactive and video_evidence["fps_target_met"],
+    }
+
+
 class SilentProbeAudio:
     """Avoid requiring a physical audio device for video-only CI evidence."""
 
@@ -271,10 +291,13 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
     elapsed = round(time.monotonic() - start, 3)
     evidence = evaluate_video_probe(error, decoded_frames, nonblank_frames, elapsed)
     native_steps = getattr(session.native, "_runs", 0)
-    interactive_valid = (
-        error is None and exercise_controls and decoded_frames >= 3
-        and len(unique_nonblank_frames) >= 3 and input_callback_calls >= 100
-        and nonzero_input_samples >= 10 and native_steps >= 100
+    verdict = evaluate_interactive_playback(
+        error=error, exercise_controls=exercise_controls,
+        decoded_frames=decoded_frames,
+        unique_nonblank_frames=len(unique_nonblank_frames),
+        input_callback_calls=input_callback_calls,
+        nonzero_input_samples=nonzero_input_samples,
+        native_steps=native_steps, video_evidence=evidence,
     )
     result = {
         "system": "gamecube",
@@ -291,7 +314,7 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         "fastmem_disabled": disable_fastmem,
         "core_emulation_steps": native_steps,
         "emulation_steps_per_second": round(native_steps / max(elapsed, 0.001), 2),
-        "static_homebrew_interactive_passed": interactive_valid,
+        "static_homebrew_interactive_passed": verdict["static_homebrew_interactive_passed"],
         "input_callback_calls": input_callback_calls,
         "nonzero_gamecube_input_samples": nonzero_input_samples,
         "last_rgb_shape": last_shape,
@@ -299,7 +322,10 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         **evidence,
         "audio_tested": False,
         "camera_actuation_tested": False,
-        "playback_probe_passed": evidence["fps_target_met"],
+        # A fast stream of blank or unchanging frames is not interactive
+        # gameplay. Keep the probe verdict aligned with the workflow's
+        # controller + changing-video acceptance, not FPS alone.
+        "playback_probe_passed": verdict["playback_probe_passed"],
         "error": error,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
