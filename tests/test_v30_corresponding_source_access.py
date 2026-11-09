@@ -30,7 +30,7 @@ class OriginalSourceArchiveTests(unittest.TestCase):
             checkout = self.make_checkouts(root)
             packet = archive_all(checkout, root / "out", verify_git=False)
             self.assertEqual(packet["core_count"], 11)
-            self.assertFalse(packet["native_binaries_included"])
+            self.assertFalse(packet["newly_compiled_libretro_core_outputs_included"])
             self.assertFalse(packet["public_binary_distribution_approved"])
             self.assertEqual(set(packet["sources"]), set(ELEVEN_EXPECTED))
             for row in packet["sources"].values():
