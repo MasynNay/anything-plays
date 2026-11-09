@@ -23,6 +23,7 @@ from test_v30_approved_alternative_contract import synthetic_approved, sha
 
 def synthetic_eleven():
     lock, inventory = synthetic_approved()
+    fake_windows_runtime = "SYNTHETIC-NOT-REAL-WINDOWS-DLL" * 500
     lock.update(
         core_set_id="gpl-source-built-eleven",
         eleven_source_built_families_reviewed=True,
@@ -40,7 +41,7 @@ def synthetic_eleven():
         )
         if target.startswith("windows"):
             row["runtime_dependency_source_reviewed"]=True
-            row["runtime_dependencies"]={"libwinpthread-1.dll":sha("synthetic winpthread")}
+            row["runtime_dependencies"]={"libwinpthread-1.dll":sha(fake_windows_runtime)}
         else:
             row["runtime_dependencies"]={}
     return lock, inventory
@@ -74,6 +75,9 @@ class AllElevenSourceReleaseContract(unittest.TestCase):
             self.assertNotIn("genesis_plus_gx",data["cores"])
             with TemporaryDirectory() as temp:
                 (Path(temp)/MARKER).write_text(json.dumps(data))
+                if target.startswith("windows"):
+                    (Path(temp)/"libwinpthread-1.dll").write_bytes(
+                        ("SYNTHETIC-NOT-REAL-WINDOWS-DLL" * 500).encode("utf-8"))
                 validated=validate_installed_map(temp,
                     ".dll" if target.startswith("windows") else
                     ".dylib" if target.startswith("macos") else ".so",
