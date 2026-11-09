@@ -374,10 +374,15 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
             dolphin = folder / "dolphin_sys"; dolphin.mkdir()
             evidence = [folder / "original", snes, sega, *five.values(),
                         mgba, n64, dolphin]
-            with patch.dict(os.environ, {
-                "AP_RELEASE_BUILD": "1", "AP_V30_APPROVED_RELEASE": "1",
-                "AP_V30_GPL_TRIAL": "0", "AP_V30_TEST_CORES": "0",
-            }, clear=True):
+            # This regression isolates the pre-write filesystem guard.
+            # The full source/rights contract is independently exercised by
+            # the synthetic four-platform staging tests below.
+            with patch.object(staging, "validate_source_inventory", return_value=True), \
+                 patch.object(staging, "approved_core_map_from_lock", return_value={}), \
+                 patch.dict(os.environ, {
+                     "AP_RELEASE_BUILD": "1", "AP_V30_APPROVED_RELEASE": "1",
+                     "AP_V30_GPL_TRIAL": "0", "AP_V30_TEST_CORES": "0",
+                 }, clear=True):
                 for protected in evidence:
                     marker = protected / "immutable-source-proof.txt"
                     marker.write_text("original", encoding="utf-8")
