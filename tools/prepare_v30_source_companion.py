@@ -120,7 +120,7 @@ def prepare_source_companion(source_dir: Path, output_dir: Path, version: str):
         f"Anything Plays {version} — pinned original emulator sources\n"
         + ("Atari2600 uses original GPL2-or-later Tia in place of old Stella2014.\n"
            if captured.get("source_set_id") == "original-eleven-gpl2plus-tia" else "")
-        "Eleven upstream Git source trees with recursive submodule checkout.\n"
+        + "Eleven upstream Git source trees with recursive submodule checkout.\n"
         "The corresponding application source, packaging scripts, patches and\n"
         f"build workflows are available at the Anything Plays v{version} tag.\n"
         "Core source content remains under each upstream project's own license.\n"
