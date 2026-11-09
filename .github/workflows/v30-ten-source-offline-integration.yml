@@ -127,7 +127,10 @@ jobs:
           gh run download "$MGBA_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-mgba
           gh run download "$N64_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-n64
           gh run download "$SOURCE_SYS_RUN_ID" --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" --dir original-source-sys
-          (cd original-source-sys && sha256sum --check SHA256SUMS.txt)
+          # Windows Python normalizes artifact checksum lines to CRLF; GNU sha256sum
+          # otherwise mistakes the carriage return for part of each filename.
+          # Normalize line endings for the checker, never the archived file hashes.
+          (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
               --name "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
