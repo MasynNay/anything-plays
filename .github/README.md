@@ -1,36 +1,25 @@
-# GitHub Actions organization
+# Anything Plays — GitHub Actions
 
-GitHub requires workflow definitions under this folder. Different files deliberately separate four-platform packaging from individual emulator acceptance and historical releases.
+Actions are grouped by purpose. Routine development, platform integration, and publication are separate so a passing exploratory test is not confused with a published release.
 
-| Workflow | Job |
+| Purpose | Main workflows |
 | --- | --- |
-| **ci.yml** | Source tests, GUI smoke, repository hygiene and release-branch package checks |
-| **v30-full-bundle.yml** | Four-platform, 11-core offline preview installers and original archive capture |
-| **v30-app.yml** | Lightweight application previews |
-| **v30-cores.yml** | Native emulator and update verification |
-| **v30-ngp.yml** | Dedicated NGP/NGPC audio, video, controls and save tests |
-| **v30-ngp-mono-mit-matrix.yml** | Research-only survey of 14 original pinned MIT mono NGP cartridges using true native NeoPop PCM, video and input (no ROM artifacts or release approval) |
-| **v30-ngp-original-mono-psg.yml** | Research-only source-built authentic monochrome PSG tone cartridge; actual native NeoPop PCM measured, no ROM artifacts or release authorization |
-| **v30-ngp-mono-native-av.yml** | Research-only original authentic K1GE changing mono video, native PSG PCM and camera/manual inputs; no ROM binaries or 3.0 release approval |
-| **v30-pce-pinned-source.yml** | Experimental four-platform PCE core built from exact GPL source and tested with original HuCard PCM/video |
-| **v30-pce-offline-integration.yml** | Test all 18 profiles and 11 offline native cores using a verified source-built PCE replacement while retaining original other-core ZIPs |
-| **v30-pce-source-delta.yml** | Assemble 11-source review matrix from four verified integrated PCE trial artifacts, retaining unknown old nightly and unapproved rights flags |
-| **v30-dolphin-submodule-sources.yml** | Research-only capture of 34 pinned Dolphin Gitlink source candidates in six bounded, checksum-verified CI shards (never public-release approval) |
-| **v30-dolphin-source-review.yml** | Independently rehash the six original Dolphin source artifacts and produce a 34-dependency reviewer-only JSON/checksum inventory (no binaries or rights approval) |
-| **v30-dolphin-nested-sources.yml** | Verify actual nested Gitlinks under the pinned Cubeb/libadrenotools source trees and capture three additional immutable source candidates with checksums; still unapproved |
-| **v30-parallel-n64-source-audit.yml** | Rehash the original pinned ParaLLEl-N64 source TAR, verify zero actual Gitlinks and 11 exact embedded source notices against Git SHA-1; no release/rights approval |
-| **v30-endurance.yml** | Stability and long-session checks |
-| **v30-n64-restart.yml** | N64 repeated-launch checks |
-| **v30-virtual-aquarium.yml** | Camera control simulation |
-| **v30-lab.yml** | Experimental emulator diagnostics |
-| **capture-sources.yml** | Source provenance |
-| **candidate-draft.yml**, **release.yml** | Historical, controlled 2.0 release workflows |
-| **v30-publish-approved.yml** | Manual only, verified production-only 3.0 release publication (fail closed) |
-| **v30-production-candidates.yml** | Manual only, four-target immutable 3.0 installer producer; cannot publish releases |
-| **v30-source-snapshots.yml** | Preserve reported upstream source revisions as unapproved Actions evidence |
-| **v30-freeze-inputs.yml** | Manually produce an unapproved four-platform 48-archive fingerprint record from saved native inputs |
-| **v30-source-review-matrix.yml** | Join all 44 binary identities with ten pinned source archives into a 3.0 review-only artifact, approval flags false |
+| **Code quality** | `ci.yml`: Python regression tests, repository hygiene and package checks |
+| **Portfolio site** | `pages.yml`: build and deploy the static site from `site/` |
+| **Original emulator source integrity** | `v30-current-tia-source-proof.yml`: cross-check all 44 installed native libraries against 11 pinned upstream Git source trees and 37 Dolphin Gitlink sources |
+| **Complete four-platform desktop build** | `v30-retain-four-offline-v3-installers.yml`: source-build, install and test all 18 profiles and save real installer artifacts |
+| **Public 3.0 publication** | `v30-publish-source-first-public-3-0.yml`: publish the original source archive first, then verified genuine `3.0.0` installers once the exact successful four-platform run is available |
+| **Production approval research** | `v30-production-candidates.yml`, `v30-publish-approved.yml`: stricter historical/manual release-lock route retained for audit |
+| **Specialized regression tests** | `v30-n64-restart.yml`, `v30-ngp.yml`, `v30-endurance.yml`, `v30-virtual-aquarium.yml` and other targeted native playback workflows |
 
-Every workflow has different evidence boundaries. Passing a preview build does not authorize a stable release. Native redistribution, required sources, signing and real-device QA are tracked in [release readiness](../../docs/V3_DISTRIBUTION_READINESS.md) and the [fail-closed release checker](../../tools/check_v30_release.py).
+The many additional `v30-*` files record historical experiments, isolated core builds, platform diagnostics, and earlier license/source investigations. They are retained for reproducibility, **not** endorsements of whichever core names were in the older experiments. For the selected 3.0 core lineup, use the [current original-source report](../docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md).
 
-The 3.0 working branch is **feature/v3.0-unified-test**. Do not publish directly from a mutable nightly download or treat a passing developer test as legal approval.
+## Release safety
+
+- A successful CI run verifies the specific conditions tested, not every commercial game or physical device.
+- The current 3.0 application uses eleven original-source-built native emulator libraries, including Tia rather than the old Stella2014 build.
+- Public assets must have matching binary hashes, corresponding source code and accurate release notes. The source-first publisher is distinct from private draft creation.
+- **Published downloads:** [GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest). Private draft and workflow artifacts are not public releases.
+- Older public version 2.0 installers remain separate and unchanged.
+
+For local development, see [Contributing](../CONTRIBUTING.md), [Architecture](../docs/ARCHITECTURE.md), and [technical documentation](../docs/README.md). Detailed CI reproduction and license provenance belong in those documents, not the repository landing page.
