@@ -28,7 +28,7 @@ class MalformedPreservedProvenanceTests(unittest.TestCase):
                     },
                     "files": [{"name": f"synthetic-{index}"} for index in range(12)],
                 }
-                if platform == "linux-x64":
+                if platform == "windows-x64":
                     if broken_field == "cores":
                         record["source_core_provenance"]["cores"][0] = bad_value
                     else:
