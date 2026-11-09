@@ -33,7 +33,22 @@ REPOSITORIES = {
 }
 EIGHT_EXPECTED = {**EXPECTED, **FIVE_ORIGINAL_SOURCE_COMMITS}
 EIGHT_REPOSITORIES = {**REPOSITORIES, **FIVE_ORIGINAL_SOURCE_REPOSITORIES}
+# Exact independently pinned original native builds in four-platform research.
+# These constants describe identity only; no public redistribution approval.
+TEN_EXPECTED = {
+    **EIGHT_EXPECTED,
+    "mgba": "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6",
+    "parallel_n64": "e0ef5d673257e2e83bf9b7cffe62eda141af8493",
+}
+TEN_REPOSITORIES = {
+    **EIGHT_REPOSITORIES,
+    "mgba": "https://github.com/libretro/mgba",
+    "parallel_n64": "https://github.com/libretro/parallel-n64",
+}
+assert len(TEN_EXPECTED) == len(TEN_REPOSITORIES) == 10
 ADDITIONAL_SYSTEMS = {
+    "gb": "mgba", "gbc": "mgba", "gba": "mgba",
+    "n64": "parallel_n64",
     "nes":"fceumm", "atari2600":"stella2014",
     "atari7800":"prosystem", "ngp":"mednafen_ngp",
     "ngpc":"mednafen_ngp", "ws":"mednafen_wswan",
@@ -58,18 +73,21 @@ def validate_installed_map(folder, extension, *, verify_native=True):
     info = json.loads(marker.read_text("utf-8"))
     if (not isinstance(info, dict) or info.get("schema_version") != 1
             or info.get("status") != STATUS
-            or info.get("core_set_id") not in ("gpl-source-built-alternative", "gpl-source-built-eight")
+            or info.get("core_set_id") not in ("gpl-source-built-alternative", "gpl-source-built-eight", "gpl-source-built-ten")
             or info.get("all_console_profiles") != 18
             or info.get("native_core_count") != 11
             or info.get("legacy_noncommercial_native_binaries_excluded") is not True):
         raise ValueError("Incorrect source-built production core identity")
     rows = info.get("cores")
     eight = info["core_set_id"] == "gpl-source-built-eight"
-    expected = EIGHT_EXPECTED if eight else EXPECTED
-    repositories = EIGHT_REPOSITORIES if eight else REPOSITORIES
+    ten = info["core_set_id"] == "gpl-source-built-ten"
+    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
+    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
     if (not isinstance(rows, dict) or set(rows) != set(expected)
             or (eight and info.get("eight_source_built_families_reviewed") is not True)
-            or (eight and info.get("three_unchanged_native_families_reviewed") is not True)):
+            or (eight and info.get("three_unchanged_native_families_reviewed") is not True)
+            or (ten and info.get("ten_source_built_families_reviewed") is not True)
+            or (ten and info.get("one_unchanged_dolphin_family_reviewed") is not True)):
         raise ValueError("Reviewed 3.0 original source-built library families incomplete")
     for name, revision in expected.items():
         row = rows[name]
