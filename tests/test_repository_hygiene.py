@@ -12,6 +12,7 @@ class RepositoryHygieneTests(unittest.TestCase):
         self.assertIn("README.md", ROOT_FILES)
         self.assertIn("packaging", ROOT_DIRECTORIES)
         self.assertIn("anything_plays", ROOT_DIRECTORIES)
+        self.assertIn("site", ROOT_DIRECTORIES)
         self.assertEqual(scan_tracked_paths([
             "README.md",
             "app.py",
@@ -23,6 +24,9 @@ class RepositoryHygieneTests(unittest.TestCase):
             "cores/.gitkeep",
             "assets/anything_plays_v21.webp",
             "packaging/installer.iss",
+            "site/index.html",
+            "site/assets/anything-plays-original.webp",
+            "site/CNAME",
         ]), [])
 
     def test_reject_unorganized_files_and_directories(self):
@@ -40,6 +44,7 @@ class RepositoryHygieneTests(unittest.TestCase):
             "tests/fixtures/proprietary-game.ngp",
             "release/AnythingPlaysSetup-3.0.0.exe",
             "tools/__pycache__/bad.pyc",
+            "site/assets/illegally-bundled-game.gcm",
         ])
         self.assertTrue(any("Downloaded core data" in item for item in violations))
         self.assertTrue(any("binary checked in" in item for item in violations))
