@@ -172,12 +172,45 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                 raise ValueError("Missing source-built PC Engine native core")
             if hashlib.sha256(native.read_bytes()).hexdigest() != pce["native_sha256"]:
                 raise ValueError("Source-built PC Engine native hash mismatch")
+    # A separately original-source-built GPL2+ Atari Tia replacement occupies
+    # the SAME 2600 core slot and eliminates the GPL2-only Stella2014 binary.
+    # It does NOT approve any other third-party rights or production install.
+    tia = info.get("source_built_tia")
+    if tia is not None:
+        if (not isinstance(tia, dict)
+                or tia.get("source_repository") != "https://github.com/warmenhoven/tia"
+                or tia.get("source_commit") != "6ae5bf998fe7a7842294089db17fc86fd73db1f0"
+                or tia.get("native_filename") != f"tia_libretro{extension}"
+                or tia.get("source_build_run_id") != 42625769973
+                or tia.get("source_file_grants_gpl_2_or_later") is not True
+                or tia.get("original_license_notice_copied") is not True
+                or tia.get("all_games_and_mappers_compatible") is not False
+                or tia.get("public_binary_distribution_approved") is not False
+                or info.get("original_stella2014_native_excluded") is not True
+                or info.get("stella2014_source_license_gpl2_only_replaced") is not True):
+            raise ValueError("No independently pinned GPLv2-or-later Tia source replacement")
+        for key in ("native_sha256", "native_archive_sha256",
+                    "source_archive_sha256", "original_license_notice_sha256",
+                    "native_playback_report_sha256", "original_source_spdx_sha256"):
+            value = tia.get(key)
+            if (not isinstance(value, str) or len(value) != 64
+                    or any(c not in "0123456789abcdef" for c in value)):
+                raise ValueError(f"Missing original Tia source/native identity: {key}")
+        if (root / f"stella2014_libretro{extension}").exists():
+            raise ValueError("GPL2-only Stella2014 core remains with GPL3 BlastEm")
     # Source-built 8/11 integrated complete offline variant. These are
     # NEW original source builds, never relabeled historical native-nightlies.
     remaining = info.get("source_built_remaining_five")
+    alternative_commits = dict(FIVE_ORIGINAL_SOURCE_COMMITS)
+    alternative_repos = dict(FIVE_ORIGINAL_SOURCE_REPOSITORIES)
+    if tia is not None:
+        del alternative_commits["stella2014"]
+        del alternative_repos["stella2014"]
+        alternative_commits["tia"] = "6ae5bf998fe7a7842294089db17fc86fd73db1f0"
+        alternative_repos["tia"] = "https://github.com/warmenhoven/tia"
     if remaining is not None:
         if (not isinstance(remaining, dict)
-                or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
+                or set(remaining) != set(alternative_commits)
                 or info.get("total_source_built_core_families") != (
                     11 if info.get("source_built_dolphin") is not None else
                     10 if info.get("source_built_n64") is not None else
@@ -189,13 +222,15 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                 or info.get("five_source_family_run_id") != 42515151314
                 or pce is None):
             raise ValueError("Eight source-built families are not complete and exact")
-        for name, revision in FIVE_ORIGINAL_SOURCE_COMMITS.items():
+        if tia is not None and remaining.get("tia") != tia:
+            raise ValueError("Original Tia source/native proof differs from complete core lineup")
+        for name, revision in alternative_commits.items():
             row=remaining[name]
             if (not isinstance(row, dict)
-                    or row.get("source_repository") != FIVE_ORIGINAL_SOURCE_REPOSITORIES[name]
+                    or row.get("source_repository") != alternative_repos[name]
                     or row.get("source_commit") != revision
                     or row.get("native_filename") != f"{name}_libretro{extension}"
-                    or row.get("source_build_run_id") != 42515151314
+                    or row.get("source_build_run_id") != (42625769973 if name == "tia" else 42515151314)
                     or row.get("old_unknown_source_buildbot_replaced") is not True
                     or row.get("original_license_notice_copied") is not True):
                 raise ValueError(f"Wrong original source-built core family: {name}")
@@ -345,7 +380,7 @@ def find_trial_core(directories, system, extension):
     optional developer/user-managed packs for only the five test profiles.
     Normal releases without the marker do not enter this pathway.
     """
-    if system not in PROFILE_TO_CORE:
+    if system not in PROFILE_TO_CORE and system != "atari2600":
         return False, None
     for folder in directories:
         root = Path(folder)
@@ -355,6 +390,13 @@ def find_trial_core(directories, system, extension):
         if marker.exists():
             info = validate_trial_core_directory(root, extension)
             enable_windows_trial_runtime(root)
+            if system == "atari2600":
+                # Only intercept Atari when a 4OS-proven pinned Tia identity is
+                # actually installed. Old previews still route to Stella.
+                alt = info.get("source_built_tia")
+                if alt is not None:
+                    return True, str(root / alt["native_filename"])
+                return False, None
             name = PROFILE_TO_CORE[system]
             return True, str(root / info["alternatives"][name]["native_filename"])
     return False, None

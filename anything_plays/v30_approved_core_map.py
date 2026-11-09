@@ -49,6 +49,18 @@ assert len(TEN_EXPECTED) == len(TEN_REPOSITORIES) == 10
 ELEVEN_EXPECTED = {**TEN_EXPECTED, "dolphin": "32c61f9d0e933331bb7087ba57e96883241b4960"}
 ELEVEN_REPOSITORIES = {**TEN_REPOSITORIES, "dolphin": "https://github.com/libretro/dolphin"}
 assert len(ELEVEN_EXPECTED) == len(ELEVEN_REPOSITORIES) == 11
+# Same eighteen console profiles/eleven native cores with GPLv2-or-later
+# Tia substituted for the pinned GPLv2-only Stella2014. This describes
+# original-source identity, never a grant of public release permission.
+ELEVEN_TIA_EXPECTED = {name: sha for name, sha in ELEVEN_EXPECTED.items()
+                       if name != "stella2014"}
+ELEVEN_TIA_EXPECTED["tia"] = "6ae5bf998fe7a7842294089db17fc86fd73db1f0"
+ELEVEN_TIA_REPOSITORIES = {name: repo for name, repo in ELEVEN_REPOSITORIES.items()
+                           if name != "stella2014"}
+ELEVEN_TIA_REPOSITORIES["tia"] = "https://github.com/warmenhoven/tia"
+assert len(ELEVEN_TIA_EXPECTED) == len(ELEVEN_TIA_REPOSITORIES) == 11
+assert "stella2014" not in ELEVEN_TIA_EXPECTED
+
 ADDITIONAL_SYSTEMS = {
     "gb": "mgba", "gbc": "mgba", "gba": "mgba",
     "n64": "parallel_n64",

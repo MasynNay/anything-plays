@@ -46,6 +46,9 @@ fi
 if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   [[ "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" ]] || exit 1
   CORE_LIST=(mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
+  if [[ "${AP_V30_TIA_TRIAL:-0}" == "1" ]]; then
+    CORE_LIST=(mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin tia prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan)
+  fi
 fi
 # The complete GPL-alternative engineering test is distinct from PRODUCTION.
 # Production core names come ONLY from the fully rights-reviewed native lock.
@@ -115,9 +118,16 @@ if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
     cp "${AP_CORE_ARCHIVE_DIR}/MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt" dist/AnythingPlays/licenses/
   fi
   if [[ "${AP_V30_PINNED_FIVE:-0}" == "1" ]]; then
-    for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+    remaining_names=(fceumm stella2014 prosystem mednafen_ngp mednafen_wswan)
+    if [[ "${AP_V30_TIA_TRIAL:-0}" == "1" ]]; then
+      remaining_names=(fceumm tia prosystem mednafen_ngp mednafen_wswan)
+    fi
+    for name in "${remaining_names[@]}"; do
       cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-${name}-ORIGINAL-COPYING.txt" dist/AnythingPlays/licenses/
     done
+    if [[ "${AP_V30_TIA_TRIAL:-0}" == "1" ]]; then
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-tia-ORIGINAL-SPDX.txt" dist/AnythingPlays/licenses/
+    fi
   fi
 fi
 # A reviewed production alternative needs ORIGINAL source license texts, not

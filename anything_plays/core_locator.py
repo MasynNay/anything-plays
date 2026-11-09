@@ -75,7 +75,7 @@ def find_core(system="gba"):
     # a marker and exact source-built GPL images must be present in the
     # installed bundle. No implicit downloads and no fallback to NC cores.
     from anything_plays.v30_gpl_trial import find_trial_core
-    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000"):
+    if system in ("snes", "genesis", "mastersystem", "gamegear", "sg1000", "atari2600"):
         try:
             trial, trial_path = find_trial_core(
                 _search_directories(), system, _library_extension())
