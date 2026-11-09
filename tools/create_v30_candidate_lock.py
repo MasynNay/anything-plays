@@ -49,6 +49,8 @@ def build_candidate(artifact_paths):
             if "PRESERVED_NATIVE_INPUTS.json" not in files:
                 raise ValueError(f"{platform}: preserved provenance is missing")
             record = json.loads(outer.read("PRESERVED_NATIVE_INPUTS.json"))
+            if not isinstance(record, dict):
+                raise ValueError(f"{platform}: preserved provenance must be a JSON object")
             source_sha = record.get("source_revision")
             if not isinstance(source_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", source_sha):
                 raise ValueError(f"{platform}: missing source revision")
@@ -69,7 +71,9 @@ def build_candidate(artifact_paths):
                 raise ValueError(f"{platform}: expected 11 native core records")
             if any(not isinstance(row, dict) for row in names):
                 raise ValueError(f"{platform}: malformed native core provenance row")
-            by_name = {x.get("name"): x for x in names}
+            if any(not isinstance(row.get("name"), str) for row in names):
+                raise ValueError(f"{platform}: native core name must be a string")
+            by_name = {x["name"]: x for x in names}
             if set(by_name) != CORES or len(by_name) != len(names):
                 raise ValueError(f"{platform}: missing or unexpected emulator core")
             file_table = record.get("files")
@@ -77,7 +81,9 @@ def build_candidate(artifact_paths):
                 raise ValueError(f"{platform}: expected 12 original archives")
             if any(not isinstance(row, dict) for row in file_table):
                 raise ValueError(f"{platform}: malformed original archive record")
-            archive_index = {x.get("name"): x for x in file_table}
+            if any(not isinstance(row.get("name"), str) for row in file_table):
+                raise ValueError(f"{platform}: archive name must be a string")
+            archive_index = {x["name"]: x for x in file_table}
             if len(archive_index) != 12 or set(outer.namelist()) != set(archive_index) | {"PRESERVED_NATIVE_INPUTS.json"}:
                 raise ValueError(f"{platform}: unrecognized original input file")
             locked = {}

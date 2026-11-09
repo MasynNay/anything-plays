@@ -171,3 +171,7 @@ The corrected [four-platform complete offline installer lab](https://github.com/
 ### November 9, 2026 — verified source evidence validation
 
 [PR #130](https://github.com/MasynNay/anything-plays/pull/130) is **merged** (`ea6e3d50`) after [source checks 42643395148](https://github.com/MasynNay/anything-plays/actions/runs/42643395148) passed Python 3.12, Python 3.13, and native mGBA compatibility. Two synthetic malformed provenance record regression tests now enforce controlled fail-closed errors in candidate source-lock creation. The [unapproved four-platform review matrix 42643395146](https://github.com/MasynNay/anything-plays/actions/runs/42643395146) also succeeded. These checks do **not** approve native distribution. Source-built Tia remains an unintegrated alternative; full installer substitution and legal/source/production acceptance are still pending. Stable public v2.0 remains unchanged; v3.0 has not been published.
+
+### November 9, 2026 — candidate-lock malformed source evidence
+
+Following the merged and CI-passing PR #130, a focused follow-up adds controlled rejection of non-object top-level source provenance and unhashable core/archive names, with synthetic regression tests. **CI pending; not yet merged into the 3.0 development branch.** This improves rejection of malformed review artifacts only. It does not approve third-party redistribution, complete Dolphin corresponding-source obligations, or authorize a public 3.0 release. Stable v2.0 remains unchanged.
