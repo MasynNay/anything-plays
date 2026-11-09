@@ -70,6 +70,7 @@ jobs:
       FIVE_SOURCE_RUN_ID: '42515151314'
       MGBA_SOURCE_RUN_ID: '42527449154'
       N64_SOURCE_RUN_ID: '42534736496'
+      ORIGINAL_SOURCE_SYS_RUN_ID: '42553978214'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -137,7 +138,8 @@ jobs:
             "$PINNED_PCE_RUN_ID|Anything Plays 3.0 | PCE pinned-source replacement research" \
             "$FIVE_SOURCE_RUN_ID|Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)" \
             "$MGBA_SOURCE_RUN_ID|Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)" \
-            "$N64_SOURCE_RUN_ID|Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64"; do
+            "$N64_SOURCE_RUN_ID|Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64" \
+            "$ORIGINAL_SOURCE_SYS_RUN_ID|Anything Plays 3.0 | Original pinned Dolphin Sys from exact Git source"; do
             run_id="${pair%%|*}"
             expected_name="${pair#*|}"
             [[ "$(gh run view "$run_id" --json conclusion --jq .conclusion)" == success ]] || exit 1
@@ -175,6 +177,10 @@ jobs:
           gh run download "$N64_SOURCE_RUN_ID" \
             --name "AnythingPlays-3.0-PARALLEL-N64-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED" \
             --dir source-built-n64
+          gh run download "$ORIGINAL_SOURCE_SYS_RUN_ID" \
+            --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-${{ matrix.target }}-UNAPPROVED" \
+            --dir original-source-sys
+          (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
               --name "AnythingPlays-3.0-PINNED-REMAINING-$name-${{ matrix.target }}-UNAPPROVED" \
@@ -233,6 +239,7 @@ jobs:
             --mednafen-wswan-dir original-five-source/mednafen_wswan \
             --mgba-dir source-built-mgba \
             --n64-dir source-built-n64 \
+            --dolphin-sys-dir original-source-sys \
             --output-dir "$AP_CORE_ARCHIVE_DIR" \
             ${WIN_DLL:+$WIN_DLL}
           # This receipt is strictly source/native provenance; it is NOT a
@@ -250,6 +257,8 @@ jobs:
           assert manifest["unchanged_original_core_count"] == 1
           assert manifest["native_approval_comes_from_separately_reviewed_lock"] is True
           assert manifest["auto_granted_license_rights"] is False
+          assert manifest["source_exact_dolphin_sys_evidence"]["original_git_data_sys_tree_sha1"] == "6abd87498928d5362d83f698a562e956072b8700"
+          assert manifest["source_exact_dolphin_sys_evidence"]["public_distribution_approved"] is False
           assert set(manifest["source_built_families"]) == {
               "mednafen_supafaust","blastem","mednafen_pce_fast",
               "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan",
