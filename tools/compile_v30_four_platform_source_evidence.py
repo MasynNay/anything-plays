@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 
 from anything_plays.v30_approved_core_map import ELEVEN_EXPECTED, ELEVEN_REPOSITORIES
+from tools.stage_v30_eleven_source_inputs import NOTICE_PATHS
 
 RUN_ID = re.compile(r"[1-9][0-9]*\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -101,8 +102,22 @@ def consolidate_evidence(artifacts_dir: Path, run_id: str) -> dict:
             raise ValueError(f"{target}: exact original Dolphin source proof missing")
         if _hash(dolphin.get("native_sha256"), target + "/Dolphin") != digest_map["dolphin"]:
             raise ValueError(f"{target}: original-source Dolphin binary does not match installed core")
-        if not isinstance(dolphin.get("original_source_notices"), dict) or len(dolphin["original_source_notices"]) != 5:
+        # Verify the actual source notice identities, not merely the number
+        # of keys. A five-entry fabricated dictionary previously passed.
+        notices = dolphin.get("original_source_notices")
+        if not isinstance(notices, dict) or set(notices) != set(NOTICE_PATHS.values()):
             raise ValueError(f"{target}: five original Dolphin source notices missing")
+        for upstream, archived_name in NOTICE_PATHS.items():
+            notice = notices[archived_name]
+            if (not isinstance(notice, dict) or notice.get("source_path") != upstream):
+                raise ValueError(f"{target}: incorrect original Dolphin notice path: {archived_name}")
+            _hash(notice.get("sha256"), target + "/notice/" + archived_name)
+        for flag in ("production_hardware_gameplay_reviewed",
+                     "full_corresponding_source_and_transitive_rights_reviewed"):
+            if dolphin.get(flag) is not False:
+                raise ValueError(f"{target}: source staging cannot assert approval: {flag}")
+        for field in ("native_archive_sha256", "source_build_report_sha256"):
+            _hash(dolphin.get(field), target + "/Dolphin/" + field)
         cores = {}
         for name in sorted(ELEVEN_EXPECTED):
             cores[name] = {
