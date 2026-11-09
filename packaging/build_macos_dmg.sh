@@ -205,18 +205,23 @@ trap 'hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" >/
 # at this exact attach step despite a valid, already-created image. Retry the
 # REAL mount, never skip the installed app's checksum/license verification.
 MOUNT_OK=0
-for ATTEMPT in 1 2 3 4 5 6; do
+for ATTEMPT in 1 2 3 4 5 6 7 8 9 10; do
   if hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT_DIR" "$DMG"; then
     MOUNT_OK=1
     break
   fi
-  echo "macOS DiskImages mount refused attempt $ATTEMPT of 6; retrying" >&2
+  echo "macOS DiskImages mount refused attempt $ATTEMPT of 10; retrying" >&2
   # A partially created mount is not proof of a verified disk image.
   hdiutil detach "$MOUNT_DIR" >/dev/null 2>&1 || true
-  sleep "$((ATTEMPT * 2))"
+  # Hosted Apple Silicon DiskImages can remain busy for >42 seconds after
+  # creation. Back off without touching the immutable signed app/DMG bytes.
+  # Cap individual waits to avoid unbounded runner time.
+  WAIT_SECONDS=$((ATTEMPT * 4))
+  if (( WAIT_SECONDS > 20 )); then WAIT_SECONDS=20; fi
+  sleep "$WAIT_SECONDS"
 done
 [[ "$MOUNT_OK" == "1" ]] || {
-  echo "DMG validation BLOCKED: unable to attach after six attempts" >&2
+  echo "DMG validation BLOCKED: unable to attach after ten attempts" >&2
   exit 1
 }
 "$PYTHON" verify_bundle.py --check-native macos "$MOUNT_DIR/${BUNDLE_FILE}"
