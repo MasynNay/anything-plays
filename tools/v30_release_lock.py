@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 
 from tools.core_release_lock import release_target
+from tools.prepare_v30_dolphin_source_sys import DOLPHIN_REV, PINNED_SYS_TREE_SHA1
 
 LOCK_PATH = Path(__file__).resolve().parents[1] / "config/v3.0-core-lock.json"
 CORE_NAMES = frozenset((
@@ -170,6 +171,12 @@ def load_approved_lock(path=LOCK_PATH):
             raise ValueError(f"{target}: Dolphin Sys archive hash missing")
         if type(sys.get("original_archive_size_bytes")) is not int or sys["original_archive_size_bytes"] <= 0:
             raise ValueError(f"{target}: Dolphin Sys archive size missing")
+        if lock.get("core_set_id") == "gpl-source-built-ten":
+            # No legacy mutable Dolphin Sys may be shipped in the intended
+            # ten-source production mode, even if other approvals are true.
+            if (sys.get("original_upstream_source_commit") != DOLPHIN_REV
+                    or sys.get("original_git_data_sys_tree_sha1") != PINNED_SYS_TREE_SHA1):
+                raise ValueError(f"{target}: original Dolphin Git Sys source identity unreviewed")
     return lock
 
 
