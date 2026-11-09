@@ -90,7 +90,8 @@ def validate_parent_archive(archive):
     present = set()
     with tarfile.open(archive, "r:gz") as tar:
         for member in tar:
-            name = member.name
+            # GitHub archives contain directory entries with a trailing slash.
+            name = member.name.rstrip("/")
             if (name.startswith("/") or "\\" in name or
                     any(segment in ("", ".", "..") for segment in name.split("/"))):
                 raise ValueError("Unsafe Dolphin source TAR entry")
