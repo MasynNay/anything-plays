@@ -126,3 +126,9 @@ Found a reproducible issue or have a useful idea? [Open an issue](https://github
 ---
 
 *Roadmap status is maintained manually and is subject to change based on user testing, compatibility, security and third-party license requirements. There is no public 3.0 release date until these gates are satisfied.*
+
+### November 9, 2026 — Source-built Dolphin runtime evidence
+
+The original pinned Dolphin Linux source now **compiles and links**, but the newly compiled binary is **not yet a validated replacement** for the owner's working core. Actual GameCube homebrew playback [run 42563978868](https://github.com/MasynNay/anything-plays/actions/runs/42563978868) loaded and executed 1,232 native frame loops and received controller inputs, yet produced **zero video callbacks**. The previous SIGSEGV is no longer the observed failure in that configuration; usable software video remains blocked. [PR #117](https://github.com/MasynNay/anything-plays/pull/117) tightens the test verdict to require changing video and real controls, with explicit regressions, and is pending source checks. Neither compilation nor this negative QA result authorizes a public release. The existing four-platform preview installers retain their original owner-tested Dolphin until an actual replacement passes.
+
+The public `main` source history now includes release-staging PR #114, but this is **source integration only**, not binary distribution approval. The existing v2.0.0 tag and assets remain the stable release. Exact 11-core/four-platform rights, corresponding source, source-built GameCube video, immutable release inputs, and production acceptance remain prerequisites for v3.0.0.
