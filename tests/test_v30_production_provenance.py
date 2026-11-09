@@ -149,6 +149,86 @@ class ProductionArtifactEvidenceTests(unittest.TestCase):
             self.assertEqual(record["reviewed_application_source_commit"], "b" * 40)
             self.assertTrue(record["runtime_build_inputs_unchanged_since_approved_source"])
 
+    def test_production_staging_cleans_partial_copy_and_allows_retry(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            installer = root / expected_installers("3.0.0")[3]
+            installer.write_bytes(b"synthetic installer " * 70000)
+            output = root / "production"
+            common = dict(
+                target="linux-x64", version="3.0.0", source_commit="b" * 40,
+                installer=installer, bundle_manifest=bundle_manifest(lock, "linux-x64"),
+                lock=lock, inventory=source,
+                review_text="APPROVED-3.0-DISTRIBUTION " + "SYNTHETIC TEST " * 25,
+                output=output, lock_digest="b" * 64, source_digest="c" * 64,
+            )
+
+            def interrupted_copy(src, dst):
+                Path(dst).write_bytes(b"partial installer bytes")
+                raise OSError("simulated copy interruption")
+
+            with patch("tools.emit_v30_production_provenance.shutil.copyfile",
+                       side_effect=interrupted_copy):
+                with self.assertRaisesRegex(OSError, "copy interruption"):
+                    prepare_production_artifact(**common)
+            self.assertEqual(list(output.iterdir()), [])
+            prepare_production_artifact(**common)
+            self.assertEqual(
+                {p.name for p in output.iterdir()},
+                {installer.name, "PRODUCTION_PROVENANCE.json"},
+            )
+
+    def test_production_staging_cleans_partial_manifest_and_allows_retry(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            installer = root / expected_installers("3.0.0")[3]
+            installer.write_bytes(b"synthetic installer " * 70000)
+            output = root / "production"
+            common = dict(
+                target="linux-x64", version="3.0.0", source_commit="b" * 40,
+                installer=installer, bundle_manifest=bundle_manifest(lock, "linux-x64"),
+                lock=lock, inventory=source,
+                review_text="APPROVED-3.0-DISTRIBUTION " + "SYNTHETIC TEST " * 25,
+                output=output, lock_digest="b" * 64, source_digest="c" * 64,
+            )
+            original_write = Path.write_text
+
+            def interrupted_manifest(path, content, *args, **kwargs):
+                if Path(path).name == "PRODUCTION_PROVENANCE.json":
+                    original_write(path, '{"partial":', *args, **kwargs)
+                    raise OSError("simulated manifest interruption")
+                return original_write(path, content, *args, **kwargs)
+
+            with patch.object(Path, "write_text", interrupted_manifest):
+                with self.assertRaisesRegex(OSError, "manifest interruption"):
+                    prepare_production_artifact(**common)
+            self.assertEqual(list(output.iterdir()), [])
+            prepare_production_artifact(**common)
+            self.assertEqual(
+                {p.name for p in output.iterdir()},
+                {installer.name, "PRODUCTION_PROVENANCE.json"},
+            )
+
+    def test_production_staging_rejects_existing_file_as_output(self):
+        lock, source = synthetic_evidence()
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            installer = root / expected_installers("3.0.0")[3]
+            installer.write_bytes(b"synthetic installer " * 70000)
+            output = root / "not-a-directory"
+            output.write_text("preserve existing evidence", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "new or empty"):
+                prepare_production_artifact(
+                    target="linux-x64", version="3.0.0", source_commit="b" * 40,
+                    installer=installer, bundle_manifest=bundle_manifest(lock, "linux-x64"),
+                    lock=lock, inventory=source,
+                    review_text="APPROVED-3.0-DISTRIBUTION " + "SYNTHETIC TEST " * 25,
+                    output=output, lock_digest="b" * 64, source_digest="c" * 64,
+                )
+            self.assertEqual(output.read_text(encoding="utf-8"), "preserve existing evidence")
+
     def test_new_approval_commit_may_differ_only_after_actual_git_tree_verification(self):
         lock, source = synthetic_evidence()
         with TemporaryDirectory() as temp:
