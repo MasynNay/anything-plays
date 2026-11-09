@@ -165,6 +165,14 @@ if "%AP_V30_APPROVED_RELEASE%"=="1" if exist "cores\V30_SOURCE_BUILT_PRODUCTION_
       if errorlevel 1 exit /b 1
     )
   )
+  if "%AP_V30_APPROVED_TEN%"=="1" (
+    copy /Y "%AP_CORE_ARCHIVE_DIR%\MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt" "dist\AnythingPlays\licenses\" >nul
+    if errorlevel 1 exit /b 1
+    for %%I in (01 02 03 04 05 06 07 08 09 10 11) do (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-N64-NOTICE-%%I.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    )
+  )
 )
 .build-venv\Scripts\python.exe tools\collect_python_notices.py dist\AnythingPlays\licenses
 if errorlevel 1 exit /b 1
