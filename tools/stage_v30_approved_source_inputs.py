@@ -44,6 +44,8 @@ from anything_plays.v30_approved_core_map import (
 from tools.stage_v30_eight_source_inputs import check_original_five_artifact
 from tools.stage_v30_nine_source_inputs import inspect_original_mgba
 from tools.stage_v30_ten_source_inputs import check_original_n64_artifact
+from tools.stage_v30_original_dolphin_sys import exact_original_sys_artifact
+from tools.prepare_v30_dolphin_source_sys import DOLPHIN_REV, PINNED_SYS_TREE_SHA1
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
 FIVE_FAMILY_SOURCE_RUN = 42515151314
@@ -151,7 +153,7 @@ def _source_original_family(root, name, target, extension):
 def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              snes_dir, sega_dir, pce_artifact, output_dir,
                              windows_runtime=None, five_dirs=None,
-                             mgba_dir=None, n64_dir=None):
+                             mgba_dir=None, n64_dir=None, dolphin_sys_dir=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -179,6 +181,8 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         raise ValueError("Ten-source production requires BOTH separately captured original mGBA and N64 artifacts")
     if not ten and (mgba_dir is not None or n64_dir is not None):
         raise ValueError("Unreviewed mGBA or N64 research artifacts in older production variant")
+    if ten != (dolphin_sys_dir is not None):
+        raise ValueError("Ten-source production must use exact original-source Dolphin Sys artifact")
     retained = UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
     expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
     repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
@@ -210,7 +214,19 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         f"{name}_libretro{ext}.zip": original[f"{name}_libretro{ext}.zip"]
         for name in retained
     }
-    payload["Dolphin.zip"] = original["Dolphin.zip"]
+    if ten:
+        original_sys_data, original_sys_proof = exact_original_sys_artifact(dolphin_sys_dir)
+        approved_sys = lock["targets"][target]["dolphin_sys"]
+        if (approved_sys.get("original_upstream_source_commit") != DOLPHIN_REV
+                or approved_sys.get("original_git_data_sys_tree_sha1") != PINNED_SYS_TREE_SHA1
+                or original_sys_proof["original_git_data_sys_tree_sha1"] != PINNED_SYS_TREE_SHA1
+                or original_sys_proof["public_distribution_approved"] is not False
+                or original_sys_proof["source_asset_rights_independently_approved"] is not False):
+            raise ValueError("Exact upstream Dolphin Sys tree not reviewed in release lock")
+        payload["Dolphin.zip"] = original_sys_data
+    else:
+        original_sys_proof = None
+        payload["Dolphin.zip"] = original["Dolphin.zip"]
     # Verifies exact immutable core ZIP (and Dolphin) identities from LOCK.
     for name in retained:
         verify_core_archive(lock, _sys_platform(target), _architecture(target),
@@ -355,6 +371,7 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         },
         "source_built_families": sources,
         "original_dolphin_sys_sha256": sha(payload["Dolphin.zip"]),
+        "source_exact_dolphin_sys_evidence": original_sys_proof,
         "native_approval_comes_from_separately_reviewed_lock": True,
         "auto_granted_license_rights": False,
         "generated_by": "tools.stage_v30_approved_source_inputs",
@@ -385,6 +402,7 @@ def main(argv=None):
     parser.add_argument("--windows-runtime", type=Path)
     parser.add_argument("--mgba-dir", type=Path)
     parser.add_argument("--n64-dir", type=Path)
+    parser.add_argument("--dolphin-sys-dir", type=Path)
     for name in sorted(SOURCE_BUILT_FIVE):
         parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
@@ -406,7 +424,8 @@ def main(argv=None):
             sega_dir=args.sega_dir, pce_artifact=args.pce_artifact,
             output_dir=args.output_dir, windows_runtime=args.windows_runtime,
             five_dirs=five if wants_eight else None,
-            mgba_dir=args["mgba_dir"], n64_dir=args["n64_dir"],
+            mgba_dir=args.mgba_dir, n64_dir=args.n64_dir,
+            dolphin_sys_dir=args.dolphin_sys_dir,
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")
