@@ -136,53 +136,64 @@ def create_pinned_sys(source_tar, output_zip, output_manifest, *,
         )
     output_zip.parent.mkdir(parents=True, exist_ok=True)
     output_manifest.parent.mkdir(parents=True, exist_ok=True)
-    # Reproducible ZIP: alphabetical order, no local timestamps or machine-specific
-    # compressor metadata, and no rights-changing source modification.
-    with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED,
-                         compresslevel=7, allowZip64=False) as out:
-        for relative in sorted(entries):
-            data, executable = entries[relative]
-            info = zipfile.ZipInfo(ZIP_PREFIX + relative,
-                                   date_time=(1980, 1, 1, 0, 0, 0))
-            info.create_system = 3
-            info.external_attr = ((0o100755 if executable else 0o100644) << 16)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            out.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED,
-                         compresslevel=7)
-    if output_zip.stat().st_size > MAX_ZIP_BYTES:
-        output_zip.unlink(missing_ok=True)
-        raise ValueError("Pinned source Sys ZIP exceeds existing offline installer size budget")
-    with zipfile.ZipFile(output_zip) as check:
-        names = check.namelist()
-        if len(names) != len(entries) or len(set(names)) != len(entries):
-            raise ValueError("Generated Sys zip failed source file inventory check")
-        for name, (body, _) in entries.items():
-            if check.read(ZIP_PREFIX + name) != body:
-                raise ValueError(f"Generated pinned source Sys bytes changed: {name}")
-    zip_sha = hashlib.sha256(output_zip.read_bytes()).hexdigest()
-    manifest = {
-        "schema_version": 1,
-        "status": "UNAPPROVED-SOURCE-EXACT-DOLPHIN-SYS-CANDIDATE",
-        "upstream_source_repository": "https://github.com/libretro/dolphin",
-        "original_parent_source_commit": DOLPHIN_REV,
-        "original_parent_source_tar_sha256": source_sha,
-        "pinned_git_data_sys_tree_sha1": expected_tree,
-        "independently_reconstructed_git_data_sys_tree_sha1": actual_tree,
-        "dolphin_sys_zip_sha256": zip_sha,
-        "dolphin_sys_zip_size": output_zip.stat().st_size,
-        "dolphin_sys_file_count": len(entries),
-        "dolphin_sys_extracted_bytes": sum(len(data) for data, _ in entries.values()),
-        "files": {
-            name: {"size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-            for name, (data, _) in sorted(entries.items())
-        },
-        "matches_original_source_bytes": True,
-        "binary_to_source_compilation_verified": False,
-        "all_third_party_fonts_and_asset_rights_independently_reviewed": False,
-        "public_binary_distribution_approved": False,
-    }
-    output_manifest.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n",
-                               encoding="utf-8")
+    # Never leave a partially written ZIP or an apparently usable review JSON
+    # after compression, source-byte verification, or manifest I/O fails.
+    # Both paths were verified absent above, so these are exclusively outputs
+    # created by this invocation. An incomplete candidate must not be reused.
+    completed = False
+    try:
+        # Reproducible ZIP: alphabetical order, no local timestamps or machine-specific
+        # compressor metadata, and no rights-changing source modification.
+        with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED,
+                             compresslevel=7, allowZip64=False) as out:
+            for relative in sorted(entries):
+                data, executable = entries[relative]
+                info = zipfile.ZipInfo(ZIP_PREFIX + relative,
+                                       date_time=(1980, 1, 1, 0, 0, 0))
+                info.create_system = 3
+                info.external_attr = ((0o100755 if executable else 0o100644) << 16)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                out.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED,
+                             compresslevel=7)
+        if output_zip.stat().st_size > MAX_ZIP_BYTES:
+            output_zip.unlink(missing_ok=True)
+            raise ValueError("Pinned source Sys ZIP exceeds existing offline installer size budget")
+        with zipfile.ZipFile(output_zip) as check:
+            names = check.namelist()
+            if len(names) != len(entries) or len(set(names)) != len(entries):
+                raise ValueError("Generated Sys zip failed source file inventory check")
+            for name, (body, _) in entries.items():
+                if check.read(ZIP_PREFIX + name) != body:
+                    raise ValueError(f"Generated pinned source Sys bytes changed: {name}")
+        zip_sha = hashlib.sha256(output_zip.read_bytes()).hexdigest()
+        manifest = {
+            "schema_version": 1,
+            "status": "UNAPPROVED-SOURCE-EXACT-DOLPHIN-SYS-CANDIDATE",
+            "upstream_source_repository": "https://github.com/libretro/dolphin",
+            "original_parent_source_commit": DOLPHIN_REV,
+            "original_parent_source_tar_sha256": source_sha,
+            "pinned_git_data_sys_tree_sha1": expected_tree,
+            "independently_reconstructed_git_data_sys_tree_sha1": actual_tree,
+            "dolphin_sys_zip_sha256": zip_sha,
+            "dolphin_sys_zip_size": output_zip.stat().st_size,
+            "dolphin_sys_file_count": len(entries),
+            "dolphin_sys_extracted_bytes": sum(len(data) for data, _ in entries.values()),
+            "files": {
+                name: {"size_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                for name, (data, _) in sorted(entries.items())
+            },
+            "matches_original_source_bytes": True,
+            "binary_to_source_compilation_verified": False,
+            "all_third_party_fonts_and_asset_rights_independently_reviewed": False,
+            "public_binary_distribution_approved": False,
+        }
+        output_manifest.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n",
+                                   encoding="utf-8")
+        completed = True
+    finally:
+        if not completed:
+            output_zip.unlink(missing_ok=True)
+            output_manifest.unlink(missing_ok=True)
     return manifest
 
 
