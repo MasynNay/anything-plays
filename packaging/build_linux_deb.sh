@@ -137,7 +137,12 @@ if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUC
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" dist/AnythingPlays/licenses/BlastEm-COPYING.txt
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-PCE-COPYING.txt" dist/AnythingPlays/licenses/PCE-COPYING.txt
   if [[ "${AP_V30_APPROVED_EIGHT:-0}" == "1" ]]; then
-    for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+    reviewed_five=(fceumm stella2014 prosystem mednafen_ngp mednafen_wswan)
+    if [[ " ${CORE_LIST[*]} " == *" tia "* ]]; then
+      reviewed_five=(fceumm tia prosystem mednafen_ngp mednafen_wswan)
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-tia-ORIGINAL-SPDX.txt" dist/AnythingPlays/licenses/
+    fi
+    for name in "${reviewed_five[@]}"; do
       cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-${name}-ORIGINAL-COPYING.txt" dist/AnythingPlays/licenses/
     done
   fi
