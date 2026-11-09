@@ -108,6 +108,14 @@ def stage_tia(*, baseline: Path, source: Path, native: Path,
         names = set(tar.getnames())
         if not {"COPYING", "README.md", "src/libretro.c"} <= names:
             raise ValueError("Source archive not the full pinned Tia copyright tree")
+        expected_source = {"COPYING": copying, "src/libretro.c": spdx,
+                           "README.md": _bytes(source / "README.md", max_bytes=256*1024)}
+        for filename, expected in expected_source.items():
+            member = tar.getmember(filename)
+            if (not member.isfile() or member.issym() or member.islnk()
+                    or member.size != len(expected)
+                    or tar.extractfile(member).read() != expected):
+                raise ValueError(f"Tia original source TAR differs from pinned Git checkout: {filename}")
     expected_name = f"tia_libretro{ext}"
     if native.name != expected_name:
         raise ValueError("Wrong original Tia native target filename")
