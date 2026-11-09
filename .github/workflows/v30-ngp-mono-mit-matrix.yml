@@ -1,0 +1,108 @@
+name: Anything Plays 3.0 | Audit header modes of 14 MIT NGP-named native PCM fixtures
+
+# Diagnostic only: all 14 .ngp-named upstream blobs actually declare Color mode.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-ngp-mono-mit-matrix.yml'
+      - 'config/v3.0-ngp-mono-mit-candidates.json'
+      - 'tools/probe_v30_ngp_mono_candidates.py'
+      - 'tests/test_v30_ngp_mono_audio_matrix.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-ngp-mono-mit-matrix.yml'
+      - 'tools/probe_v30_ngp_mono_candidates.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ngp-mono-real-audio-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe-real-original-mono-sound:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native test prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Strict pinned 14-ROM provenance, anti-falsification and native-test contracts
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_ngp_mono_audio_matrix.py' -v
+          python -m unittest discover -s tests -p 'test_v30_ngp_mit_homebrew.py' -v
+      - name: Download test-only native NeoPop core; report actual SHA-256 identity
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+          test -s cores/mednafen_ngp_libretro.so
+          sha256sum cores/mednafen_ngp_libretro.so
+      - name: Probe all 14 original pinned MIT color-header .ngp-named ROMs with native PCM
+        run: |
+          python -m tools.probe_v30_ngp_mono_candidates \
+            --core cores/mednafen_ngp_libretro.so \
+            --output ngp-mono-research \
+            --seconds 10
+      - name: Verify no silent ROM is passed as audible and all distribution flags remain false
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd ngp-mono-research && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('ngp-mono-research')
+          report = json.loads((root / 'NGP_MONO_NATIVE_AUDIO_RESEARCH_UNAPPROVED.json').read_text('utf-8'))
+          assert report['status'] == 'NGP-MONO-ALL-14-RESEARCH-CANDIDATES-UNAPPROVED'
+          assert report['attempted_original_mono_cartridges'] == 14
+          assert report['source_downloads_integrity_verified'] == 14
+          assert report['all_source_candidate_downloads_verified'] is True
+          assert report['genuine_monochrome_header_candidates'] == 0
+          assert report['all_pinned_files_color_header_despite_ngp_extension'] is True
+          assert report['native_audio_pass_candidates'] == []
+          assert report['full_native_av_input_pass_candidates'] == []
+          assert len(report['per_cartridge']) == 14
+          assert report['public_release_approved'] is False
+          assert report['core_binary_corresponding_source_verified'] is False
+          assert report['license_compatibility_approved'] is False
+          assert report['real_game_compatibility_verified'] is False
+          for path, row in report['per_cartridge'].items():
+              native = row['native_measured_metrics']
+              assert row['declared_cartridge_header_mode'] == 0x10, path
+              assert row['genuine_monochrome_header'] is False, path
+              assert row['verified_audio'] is False, path
+              assert row['verified_full_native_av_input'] is False, path
+              assert row['native_audio_observed_but_color_header'] is bool(
+                  native and native['audio_gate_passed'])
+              if row['verified_audio']:
+                  assert native['native_audio_frames'] > 1000
+                  assert native['native_nonzero_pcm_values'] > 100
+                  assert native['native_audio_peak'] > 0
+          assert {p.name for p in root.iterdir()} == {
+              'NGP_MONO_NATIVE_AUDIO_RESEARCH_UNAPPROVED.json', 'SHA256SUMS.txt'}
+          print('Verified: 14/14 .ngp-named pinned upstream blobs use COLOR header 0x10.')
+          print('No true mono/0x00 program tested; genuine mono audio release gate OPEN.')
+          PY
+      - name: Preserve only reviewer metrics and checksum, no games, screenshots or native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-NGP-MONO-14-PCM-RESEARCH-UNAPPROVED
+          path: |
+            ngp-mono-research/NGP_MONO_NATIVE_AUDIO_RESEARCH_UNAPPROVED.json
+            ngp-mono-research/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 60

@@ -1,0 +1,136 @@
+name: Anything Plays 3.0 | Assemble unapproved source review matrix
+
+# Research artifact only. No native binaries, no public release, no false flags.
+on:
+  # Research-only PR verification from two *known, completed* archived runs.
+  # Never automatically approve rights or upload native binaries to a release.
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-source-review-matrix.yml'
+      - 'tools/create_v30_source_review_inventory.py'
+      - 'tools/create_v30_candidate_lock.py'
+      - 'tests/test_v30_source_review_*.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-source-review-matrix.yml'
+      - 'tools/create_v30_source_review_inventory.py'
+      - 'tools/create_v30_candidate_lock.py'
+  workflow_dispatch:
+    inputs:
+      native_input_run_id:
+        description: Successful full offline lab with four original native ZIP bundles
+        required: true
+        type: string
+      source_snapshot_run_id:
+        description: Successful exact upstream source snapshot capture
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compile-source-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Fixed, previously successful original binary/source research inputs
+      # for PR/push validation. On manual runs the operator may pick different
+      # successful lab and snapshot run IDs; the strict validator rejects others.
+      NATIVE_RUN: ${{ inputs.native_input_run_id || '42437133733' }}
+      SOURCE_RUN: ${{ inputs.source_snapshot_run_id || '42441448884' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject non-lab or incomplete source snapshot runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for id in "$NATIVE_RUN" "$SOURCE_RUN"; do
+            [[ "$id" =~ ^[0-9]+$ ]] || { echo "::error::Non-numeric reviewed run ID"; exit 1; }
+            [[ "$(gh run view "$id" --json conclusion --jq '.conclusion')" == success ]] || {
+              echo "::error::Only successful source-capture runs are accepted"
+              exit 1
+            }
+          done
+          [[ "$(gh run view "$NATIVE_RUN" --json name --jq '.name')" == "Anything Plays 3.0 | Complete offline installer lab" ]] || exit 1
+          [[ "$(gh run view "$SOURCE_RUN" --json name --jq '.name')" == "Anything Plays 3.0 | Preserve reported upstream sources" ]] || exit 1
+      - name: Retrieve exact 48 native archives and 10 upstream source tarballs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for platform in windows-x64 macos-arm64 macos-x64 linux-x64; do
+            gh run download "$NATIVE_RUN" \
+              --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$platform" \
+              --dir "unapproved-native/$platform"
+          done
+          gh run download "$SOURCE_RUN" \
+            --name "AnythingPlays-3.0.0-SOURCE-SNAPSHOTS-UNAPPROVED" \
+            --dir unapproved-upstream
+      - name: Rewrap original artifacts without modifying source/native payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZIP_STORED, ZipFile
+          out = Path("review-inputs")
+          out.mkdir(exist_ok=True)
+          for platform in ("windows-x64", "macos-arm64", "macos-x64", "linux-x64"):
+              files = sorted((Path("unapproved-native") / platform).iterdir())
+              assert len(files) == 13 and all(p.is_file() and not p.is_symlink() for p in files), platform
+              assert sum(p.name.endswith(".zip") for p in files) == 12, platform
+              assert sum(p.name == "PRESERVED_NATIVE_INPUTS.json" for p in files) == 1, platform
+              with ZipFile(out / (platform + ".zip"), "w", ZIP_STORED) as artifact:
+                  for file in files:
+                      artifact.write(file, arcname=file.name)
+          source_files = sorted(Path("unapproved-upstream").iterdir())
+          assert len(source_files) == 11 and all(p.is_file() and not p.is_symlink() for p in source_files)
+          assert sum(p.name.endswith(".tar.gz") for p in source_files) == 10
+          assert sum(p.name == "SOURCE_SNAPSHOTS_UNAPPROVED.json" for p in source_files) == 1
+          with ZipFile(out / "upstream-sources.zip", "w", ZIP_STORED) as artifact:
+              for file in source_files:
+                  artifact.write(file, arcname=file.name)
+          PY
+      - name: Check original ZIP/native identities and join with 10 real upstream sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p review-results
+          python -m tools.create_v30_candidate_lock \
+            --windows-x64 review-inputs/windows-x64.zip \
+            --macos-arm64 review-inputs/macos-arm64.zip \
+            --macos-x64 review-inputs/macos-x64.zip \
+            --linux-x64 review-inputs/linux-x64.zip \
+            --output review-results/v3.0.0-native-candidates-UNAPPROVED.json
+          python -m tools.create_v30_source_review_inventory \
+            --native-candidate review-results/v3.0.0-native-candidates-UNAPPROVED.json \
+            --source-snapshots review-inputs/upstream-sources.zip \
+            --output review-results/v3.0.0-corresponding-source-review-UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path("review-results/v3.0.0-corresponding-source-review-UNAPPROVED.json").read_text())
+          assert x["approved_for_public_binary_distribution"] is False
+          assert x["corresponding_source_inventory_verified"] is False
+          assert x["source_snapshots_captured"] == 10
+          assert set(x["targets"]) == {"windows-x86_64", "macos-arm64", "macos-x86_64", "linux-x86_64"}
+          assert all(len(t["cores"]) == 11 for t in x["targets"].values())
+          assert all(t["cores"]["mednafen_pce_fast"]["source_commit_sha"] is None for t in x["targets"].values())
+          print("44 native binaries linked to 10 source snapshots; all source/license approvals still false")
+          PY
+          cd review-results
+          sha256sum *.json > SHA256SUMS.txt
+      - name: Retain review manifests only, never test binaries or public release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-SOURCE-REVIEW-UNAPPROVED
+          path: review-results/*
+          if-no-files-found: error
+          retention-days: 90

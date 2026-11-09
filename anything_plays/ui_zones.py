@@ -19,6 +19,28 @@ class ZonesMixin:
     and ``LayoutMixin.build``. They are not standalone widgets.
     """
 
+    def set_zone_label_size(self, size):
+        """Apply the camera label size without altering tracking geometry."""
+        self.zone_font_size.set(max(8, min(160, int(size))))
+        self.schedule_zone_label_size_save()
+
+    def schedule_zone_label_size_save(self, _value=None):
+        """Debounce profile writes while a user drags the preview slider."""
+        previous = getattr(self, '_zone_label_save_job', None)
+        if previous is not None:
+            self.root.after_cancel(previous)
+        self._zone_label_save_job = self.root.after(
+            350, self.save_zone_label_size,
+        )
+
+    def save_zone_label_size(self):
+        """Keep the chosen label size in the active console's profile."""
+        self._zone_label_save_job = None
+        if getattr(self, '_closing', False):
+            return
+        self.read_settings()
+        self.profile_store.put(self.system_key.get(), self.cfg)
+
     def choose_zone_art(self):
         path = filedialog.askopenfilename(title='Choose zone artwork',
                                           filetypes=[('PNG images', '*.png')])
@@ -54,6 +76,7 @@ class ZonesMixin:
 
     def load_zone_art(self, silent=False):
         self._zone_art = None
+        self._zone_thumbnail_cache.clear()
         path = self.zone_image_path.get()
         if not path:
             return
@@ -70,6 +93,7 @@ class ZonesMixin:
     def clear_zone_art(self):
         self.zone_image_path.set('')
         self._zone_art = None
+        self._zone_thumbnail_cache.clear()
 
     def update_shuffle_visibility(self):
         """The checkbox controls whether the tracked Shuffle zone is active/visible."""
@@ -87,7 +111,11 @@ class ZonesMixin:
         fit_to_grid(self.cfg, self.system_key.get())
         self._shuffle_latched = False
         self.profile_store.put(self.system_key.get(), self.cfg)
-        self.status.set('Enabled buttons fitted to an even grid for this console.')
+        self.status.set(
+            'Enabled buttons and Shuffle snapped to an even grid.'
+            if self.shuffle_enabled.get() else
+            'Enabled buttons snapped to an even grid; hidden Shuffle preserved.'
+        )
 
     def shuffle_zones(self):
         """Shuffle every visible control, including the camera-triggered Shuffle zone."""
@@ -114,6 +142,9 @@ class ZonesMixin:
             opacity=self.zone_opacity.get(),
             size=self.zone_font_size.get(),
             style=self.zone_style.get(),
+            border_width=self.zone_border_width.get(),
+            label_position=self.zone_label_position.get(),
             artwork=self._zone_art,
             shuffle_enabled=self.shuffle_enabled.get(),
+            artwork_cache=self._zone_thumbnail_cache,
         )

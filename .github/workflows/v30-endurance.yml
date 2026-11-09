@@ -1,0 +1,103 @@
+name: Anything Plays 3.0 | Sustained endurance lab
+
+# On-demand and code-change-only: neither test constitutes physical GPU or
+# real camera/speaker certification. Do not upload native test game binaries.
+on:
+  # Exercise the real 10/15-minute long-run test BEFORE merging a change.
+  # The jobs remain research-only; GPU simulation and synthetic camera do
+  # not certify physical speakers, real games or four-platform hardware.
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-endurance.yml'
+      - 'tests/soak_gui.py'
+      - 'tools/probe_gamecube_app.py'
+      - 'tests/test_v30_endurance_ci.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-endurance.yml'
+      - 'tests/soak_gui.py'
+      - 'tools/probe_gamecube_app.py'
+      - 'anything_plays/libretro_audio.py'
+      - 'tests/test_input_and_audio.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v30-endurance-${{ github.ref }}
+  # Keep the newest verified commit; do not report a superseded run
+  # as accepted hardware evidence.
+  cancel-in-progress: true
+
+jobs:
+  gui-15-minute-soak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install desktop dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends xvfb python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Require sustained UI canvas, camera and Tk timer bounded memory
+        timeout-minutes: 20
+        run: |
+          mkdir -p test-evidence
+          PYTHONPATH=. xvfb-run -a python tests/soak_gui.py --seconds 900 --max-growth-mb 96 --report test-evidence/ui-15minute-rss.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-UI-endurance-evidence
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 21
+
+  gamecube-10-minute-native-soak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native graphics and audio requirements
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Compile original GameCube 3D and sound homebrew
+        run: |
+          docker run --rm -v "$PWD/tools/gamecube-3d-homebrew:/project" \
+            -w /project -e TARGET_CONSOLE=gamecube -u "$(id -u):$(id -g)" \
+            devkitpro/devkitppc make
+          test -s tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+      - name: Stage native Dolphin core and matching Sys test data
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Require 600 seconds of changing GPU frames, sound and bounded RAM
+        timeout-minutes: 14
+        run: |
+          mkdir -p test-evidence
+          xvfb-run -a python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so \
+            --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
+            --require-animated --require-audio --require-controller-effect --seconds 600 \
+            --max-growth-mb 192 \
+            --report test-evidence/gamecube-10minute-rss.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-endurance-evidence
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 21

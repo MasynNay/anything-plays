@@ -12,11 +12,12 @@ MAX_GAMES = 2_000
 COVER_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 
 
-def scan_rom_directory(folder, extensions):
-    """Return a stable, alphabetized list of matching ROMs below *folder*.
+def scan_rom_directory(folder, extensions, cancelled=None):
+    """Return a bounded, alphabetized list of matching ROMs below *folder*.
 
-    A missing directory produces an empty shelf rather than an exception.
-    Paths are returned intact; the scanner never loads or edits game content.
+    The optional callback permits the UI to cancel a large scan immediately
+    when someone changes or clears a mistakenly selected directory. No files
+    are opened, modified, or followed through symlinks.
     """
     if not folder:
         return []
@@ -31,6 +32,8 @@ def scan_rom_directory(folder, extensions):
         for index, (root, folders, files) in enumerate(
             os.walk(directory, followlinks=False), start=1
         ):
+            if (cancelled is not None and cancelled()):
+                return []
             if index > MAX_DIRECTORIES or len(games) >= MAX_GAMES:
                 break
             folders[:] = sorted(
@@ -39,6 +42,8 @@ def scan_rom_directory(folder, extensions):
                 and not (Path(root) / folder).is_symlink()
             )
             for name in files:
+                if cancelled is not None and cancelled():
+                    return []
                 path = Path(root) / name
                 if path.suffix.lower() in supported and path.is_file():
                     games.append(path)

@@ -1,0 +1,726 @@
+name: Anything Plays 3.0 | Experimental emulator lab
+
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-lab.yml'
+      - 'anything_plays/gamecube_software.py'
+      - 'anything_plays/gba_emulator.py'
+      - 'anything_plays/gamecube_*'
+      - 'anything_plays/libretro_gpu_portable.py'
+      - 'anything_plays/libretro_gpu_egl.py'
+      - 'tools/probe_gamecube*'
+      - 'tools/probe_dolphin_package.py'
+      - 'tools/gamecube-av-homebrew/**'
+      - 'anything_plays/dolphin_pack.py'
+      - 'tools/create_dolphin_core_pack.py'
+      - 'tools/smoke_gamecube_crossplatform.py'
+      - 'tools/genesis_homebrew_fixture.py'
+      - 'tools/probe_genesis_homebrew.py'
+      - 'tools/build_patched_dolphin_core.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+
+jobs:
+  gamecube-runtime-diagnostics:
+    # Expected experimental failures are still uploaded with full evidence.
+    # Publishing remains separately blocked by check_v30_release.py.
+    continue-on-error: true
+    # Separate fast native test: unlike installer packaging, this fails when
+    # a REAL open-source GameCube game crashes or never produces video.
+    # A release with eight embedded consoles cannot ignore this red job.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V30_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Dolphin native debug dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            gdb xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Prepare exact test cores and Dolphin Sys data
+        run: python fetch_mgba_core.py
+      - name: Boot licensed GameCube homebrew inside Dolphin and capture native backtrace
+        id: dolphin_default
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core cores/dolphin_libretro.so --seconds 12 \
+            --debugger --report test-evidence/gamecube-homebrew-gdb.json
+      - name: Compare cached interpreter against default crash
+        id: dolphin_cached
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core cores/dolphin_libretro.so --seconds 12 --cpu-core 5 \
+            --debugger --report test-evidence/gamecube-homebrew-cached-gdb.json
+      - name: Require actual playable GameCube output
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          candidates = [
+              Path("test-evidence/gamecube-homebrew-gdb.json"),
+              Path("test-evidence/gamecube-homebrew-cached-gdb.json"),
+          ]
+          for candidate in candidates:
+              if not candidate.is_file():
+                  print("Missing GameCube native diagnostic:", candidate)
+                  continue
+              evidence = json.loads(candidate.read_text())
+              details = evidence.get("details") or {}
+              print(candidate.name, "exit=", evidence.get("child_returncode"),
+                    "timeout=", evidence.get("timed_out"),
+                    "frames=", details.get("video_callback_frames"),
+                    "nonblank=", details.get("nonblank_sampled_frames"),
+                    "fps=", details.get("frames_per_second_observed"),
+                    "pass=", evidence.get("probe_passed"))
+          if not any(
+              json.loads(candidate.read_text()).get("probe_passed") is True
+              for candidate in candidates if candidate.is_file()
+          ):
+              raise SystemExit("Dolphin GameCube native playback remains unverified")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-native-debug-evidence
+          path: |
+            test-evidence/gamecube-homebrew-gdb.json
+            test-evidence/gamecube-homebrew-cached-gdb.json
+            test-evidence/gamecube-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 21
+
+  gamecube-opengl-experiment:
+    # Expected experimental failures are still uploaded with full evidence.
+    # Publishing remains separately blocked by check_v30_release.py.
+    continue-on-error: true
+    # Research-only Linux frontend: hidden EGL core GL context + FBO readback.
+    # Tests the already bundled *unmodified* Dolphin Libretro core. Never
+    # silently toggles real player settings or publishes experimental cores.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(gl)') || contains(github.event.head_commit.message, 'fix(dolphin)') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AP_V30_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      MESA_GL_VERSION_OVERRIDE: '4.5'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated EGL/GL test prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libxi6 libxrandr2 libportaudio2
+          python -m pip install -r requirements.txt
+          mkdir -p test-evidence
+      - name: Smoke-test real offscreen OpenGL context and owned framebuffer
+        run: |
+          PYTHONPATH=. xvfb-run -a python -X faulthandler tools/smoke_gamecube_opengl.py
+      - name: Retrieve bundled Dolphin and its Sys files (CI only)
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores > test-evidence/gc-opengl-sys-source.json
+      - name: Validate actual in-app GameCube GPU session with native PCM
+        id: gamecube_in_app
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so --seconds 15 \
+            --report test-evidence/gamecube-production-embedded.json
+      - name: Probe accelerated Dolphin homebrew with default JIT
+        id: accelerated_jit
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --seconds 20 --exercise-controls \
+            --report test-evidence/gamecube-opengl-jit.json
+      - name: Probe accelerated Dolphin with cached interpreter (diagnostic)
+        id: accelerated_interpreter
+        if: always() && steps.accelerated_jit.outcome != 'cancelled'
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --cpu-core 5 --seconds 15 --exercise-controls \
+            --report test-evidence/gamecube-opengl-cached.json
+      - name: Diagnose frame-step synchronization with single-core JIT
+        id: accelerated_single_jit
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --single-core --seconds 20 --exercise-controls \
+            --report test-evidence/gamecube-opengl-single-jit.json
+      - name: Diagnose single-core cached interpreter as fallback
+        id: accelerated_single_cached
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          PYTHONUNBUFFERED=1 PYTHONPATH=. xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_gl.py \
+            --core cores/dolphin_libretro.so --single-core --cpu-core 5 --seconds 20 --exercise-controls \
+            --report test-evidence/gamecube-opengl-single-cached.json
+      - name: Require real nonblank playable-speed GameCube frames
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          reports = [
+              Path("test-evidence/gamecube-opengl-jit.json"),
+              Path("test-evidence/gamecube-opengl-cached.json"),
+              Path("test-evidence/gamecube-opengl-single-jit.json"),
+              Path("test-evidence/gamecube-opengl-single-cached.json"),
+          ]
+          for report in reports:
+              if not report.is_file():
+                  print("Missing experimental evidence:", report)
+                  continue
+              data = json.loads(report.read_text())
+              print(report, "passed=", data.get("passed"),
+                    "details=", data.get("details"))
+          if not any(
+              json.loads(path.read_text()).get("passed") is True
+              for path in reports if path.is_file()
+          ):
+              raise SystemExit("OpenGL GameCube rendering remains unverified")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-offscreen-OpenGL-experiment
+          path: |
+            test-evidence/gamecube-opengl-jit.json
+            test-evidence/gamecube-opengl-cached.json
+            test-evidence/gamecube-opengl-single-jit.json
+            test-evidence/gamecube-opengl-single-cached.json
+            test-evidence/gamecube-opengl-frame-*.png
+            test-evidence/gamecube-opengl-first-*.png
+            test-evidence/gc-opengl-sys-source.json
+            test-evidence/gamecube-production-embedded.json
+            test-evidence/gamecube-app-accelerated-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-patched-native-experiment:
+    # Expected experimental failures are still uploaded with full evidence.
+    # Publishing remains separately blocked by check_v30_release.py.
+    continue-on-error: true
+    # Compile from GPL source only when a native(dolphin) change is submitted.
+    # This is a developer test; it does not add unaudited modified binaries
+    # to any public Anything Plays installer.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'native(dolphin)') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      AP_DOLPHIN_BUILD_JOBS: '2'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned Dolphin source-build prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config git gdb xvfb \
+            libgl1-mesa-dev libegl1-mesa-dev libx11-dev libxi-dev libxrandr-dev \
+            libudev-dev libusb-1.0-0-dev libcurl4-openssl-dev \
+            liblzma-dev zlib1g-dev libportaudio2 ccache
+          python -m pip install -r requirements.txt
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: dolphin-v30-ubuntu24-${{ github.sha }}
+          restore-keys: |
+            dolphin-v30-ubuntu24-
+      - name: Limit and report native compiler cache
+        run: |
+          ccache -M 1G
+          ccache -s
+      - name: Build patched Dolphin Libretro from reviewed upstream GPL source
+        id: build_dolphin
+        timeout-minutes: 70
+        run: |
+          mkdir -p test-evidence
+          # Retain compiler diagnostics even when this experimental build fails.
+          set -o pipefail
+          bash tools/build_patched_dolphin_core.sh 2>&1 | tee test-evidence/gamecube-native-build.log
+      - name: Probe modified Dolphin with pinned GameCube homebrew
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --debugger \
+            --report test-evidence/gamecube-patched-homebrew.json
+      - name: Diagnose generated-JIT crash with cached interpreter (not a release pass)
+        if: always() && steps.build_dolphin.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --cpu-core 5 --exercise-controls --debugger \
+            --report test-evidence/gamecube-cached-interpreter.json
+      - name: Probe patched software renderer with synchronous CPU/GPU and controller stimuli
+        if: always() && steps.build_dolphin.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --cpu-core 5 --single-core --exercise-controls --debugger \
+            --report test-evidence/gamecube-singlecore-cached.json
+      - name: Stress software renderer with rapid real GameCube input
+        if: always() && steps.build_dolphin.outcome == 'success'
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 20 --cpu-core 5 --fast-controls --debugger \
+            --report test-evidence/gamecube-fast-controller-rendering.json
+      - name: Diagnose JIT with fastmem disabled and a connected controller
+        if: always() && steps.build_dolphin.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 4
+        run: |
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_gamecube_homebrew.py \
+            --core "$RUNNER_TEMP/anything-plays-dolphin-native/cores/dolphin_libretro.so" \
+            --seconds 18 --cpu-core 1 --disable-fastmem --single-core --fast-controls --debugger \
+            --report test-evidence/gamecube-jit-without-fastmem.json
+      - uses: actions/cache/save@v4
+        if: always()
+        continue-on-error: true
+        with:
+          path: ~/.cache/ccache
+          key: dolphin-v30-ubuntu24-${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-patched-Dolphin-experiment-evidence
+          path: |
+            test-evidence/gamecube-native-build.log
+            test-evidence/gamecube-patched-homebrew.json
+            test-evidence/gamecube-cached-interpreter.json
+            test-evidence/gamecube-singlecore-cached.json
+            test-evidence/gamecube-fast-controller-rendering.json
+            test-evidence/gamecube-jit-without-fastmem.json
+            test-evidence/gamecube-homebrew-frame.png
+            ${{ runner.temp }}/anything-plays-dolphin-native/dolphin-core-sha256.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  genesis-original-homebrew-video-audio-experiment:
+    # Diagnostic-only M68000 homebrew; independent, noncommercial,
+    # source-generated ROM. Until the picture/audio pass, this should
+    # not claim Genesis Plus GX is release-approved.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Libretro dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends gdb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve actual Genesis Plus GX core for testing
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
+      - name: Isolate crash across every original 68000 initialization phase
+        run: |
+          mkdir -p test-evidence
+          python tools/probe_genesis_phases.py \
+            --core cores/genesis_plus_gx_libretro.so \
+            --report test-evidence/genesis-phase-isolation.json \
+            --seconds 3
+      - name: Probe generated Genesis VDP frames and actual PSG PCM
+        run: |
+          mkdir -p test-evidence
+          python tools/probe_genesis_homebrew.py --debugger --core cores/genesis_plus_gx_libretro.so --report test-evidence/genesis-original-audio-video.json --seconds 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-experimental-Genesis-VDP-PSG
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-cross-platform-gpu:
+    # Hardware-context and real Dolphin player experiments only. This does
+    # not approve 3.0, and failures still publish machine-readable evidence.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics runtime and virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6
+      - name: Install runtime and platform GPU context library
+        run: python -m pip install -r requirements.txt
+      - name: Prove native hidden GPU context in emulator worker
+        if: runner.os != 'Linux'
+        continue-on-error: true
+        run: python tools/smoke_gamecube_crossplatform.py --report test-evidence/gpu-${{ matrix.target }}.json
+      - name: Prove native Linux EGL FBO
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a python tools/smoke_gamecube_crossplatform.py --report test-evidence/gpu-${{ matrix.target }}.json
+      - name: Retrieve actual Dolphin Libretro and compatible Sys resources
+        continue-on-error: true
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Exercise actual in-app GPU Dolphin on Windows and macOS
+        if: runner.os != 'Linux'
+        continue-on-error: true
+        run: python tools/probe_gamecube_app.py --core cores/dolphin_libretro.${{ matrix.ext }} --seconds 12 --report test-evidence/gamecube-app-${{ matrix.target }}.json
+      - name: Exercise actual in-app GPU Dolphin on Linux
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: xvfb-run -a python tools/probe_gamecube_app.py --core cores/dolphin_libretro.so --seconds 12 --report test-evidence/gamecube-app-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-real-paired-pack-playback:
+    # Ephemeral license-reviewed-shaped package fixture. This is NOT a
+    # published, redistribution-approved native Dolphin release.
+    # Verifies the identical native in-app install/launch/rollback path.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64}
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics runtime and virtual display
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+      - name: Install GameCube test runtime and native audio
+        run: python -m pip install -r requirements.txt
+      - name: Install, play, and roll back actual Linux Dolphin+Sys package
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a python tools/probe_dolphin_package.py --seconds 12 --report test-evidence/gamecube-paired-pack-${{ matrix.target }}.json
+      - name: Install, play, and roll back actual macOS Dolphin+Sys package
+        if: runner.os == 'macOS'
+        run: python tools/probe_dolphin_package.py --seconds 12 --report test-evidence/gamecube-paired-pack-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-OptionalPack-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-original-animated-video-and-dsp-tone:
+    # CI-only original homebrew, built from C source using devkitPPC.
+    # A static controller screen cannot verify continuous gameplay or audio.
+    # This gate demands nonzero *actual* native stereo PCM and >=20fps
+    # changing frames before GameCube sound is described as verified.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics and native audio dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Build original GameCube animated-and-audio homebrew (not distributed)
+        run: |
+          docker run --rm -v "$PWD/tools/gamecube-av-homebrew:/project" \
+            -w /project -e TARGET_CONSOLE=gamecube \
+            -u "$(id -u):$(id -g)" devkitpro/devkitppc make
+          test -s tools/gamecube-av-homebrew/anythingplays-gc-av-gamecube.dol
+      - name: Fetch native Dolphin and required Sys assets for CI
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Demand real continuously moving frames and audible-content PCM
+        run: |
+          mkdir -p test-evidence
+          xvfb-run -a python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so \
+            --rom tools/gamecube-av-homebrew/anythingplays-gc-av-gamecube.dol \
+            --require-animated --require-audio --seconds 12 \
+            --report test-evidence/gamecube-original-av-dsp.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-original-moving-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Save original GameCube A/V homebrew for Mac replay tests
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-AV-DOL
+          path: tools/gamecube-av-homebrew/anythingplays-gc-av-gamecube.dol
+          if-no-files-found: warn
+          retention-days: 3
+
+  gamecube-original-av-macos:
+    # Reuse original PowerPC binary built on Linux; this verifies nonzero
+    # emulated PCM and animated video on both Apple Silicon and Intel Macs.
+    needs: gamecube-original-animated-video-and-dsp-tone
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install runtime and native GPU/audio dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Download original GameCube homebrew DOL
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-AV-DOL
+          path: original-gc-av
+      - name: Retrieve Dolphin native core and system assets
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Demand original GameCube continuous graphics and nonzero audio
+        run: |
+          python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.dylib \
+            --rom original-gc-av/anythingplays-gc-av-gamecube.dol \
+            --require-animated --require-audio --seconds 12 \
+            --report test-evidence/gamecube-original-av-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-OriginalAV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-original-gx3d-gpu-playback:
+    # Original 3D cube: GPU position transforms, depth buffer, vertex colors,
+    # GameCube GX EFB -> XFB, and continuous original stereo PCM in the
+    # same native session. Not a commercial-game compatibility claim.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install host GPU/audio prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libgl1-mesa-dri libx11-6 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Compile original GameCube PowerPC GX 3D cube
+        run: |
+          docker run --rm -v "$PWD/tools/gamecube-3d-homebrew:/project" \
+            -w /project -e TARGET_CONSOLE=gamecube \
+            -u "$(id -u):$(id -g)" devkitpro/devkitppc make
+          test -s tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+      - name: Fetch Dolphin native core and Sys files
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Require moving GameCube 3D frames and nonzero native PCM
+        run: |
+          mkdir -p test-evidence
+          xvfb-run -a python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so \
+            --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
+            --require-animated --require-audio --seconds 12 \
+            --require-controller-effect \
+            --report test-evidence/gamecube-original-gx3d-linux.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-GameCube-original-GX3D
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Save original GX cube DOL for native macOS tests
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+          if-no-files-found: warn
+          retention-days: 3
+
+
+  gamecube-original-gx3d-windows:
+    # Run the SAME original PowerPC GX/ASND fixture from Linux on Windows.
+    # Hosted Windows GPU drivers may expose only OpenGL 1.1; explicitly
+    # record a native failure rather than treating a context mock as gameplay.
+    needs: gamecube-original-gx3d-gpu-playback
+    continue-on-error: true
+    runs-on: windows-2025
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native GPU and audio Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Download identical original GameCube 3D and audio test game
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: original-gx3d
+      - name: Retrieve Windows Dolphin core with matching system files
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Demand native Windows GameCube in-panel animated GX and PCM
+        run: |
+          python tools/probe_gamecube_app.py --core cores/dolphin_libretro.dll --rom original-gx3d/anythingplays-gc-gx-gamecube.dol --require-animated --require-audio --seconds 12 --report test-evidence/gamecube-original-gx3d-windows-x64.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GX3D-windows-x64
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gamecube-original-gx3d-macos:
+    # Cross-platform native GX transforms, vertex colors, and depth path.
+    # Uses the exact original GameCube GX binary from Linux devkitPPC CI.
+    needs: gamecube-original-gx3d-gpu-playback
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-15, target: macos-arm64}
+          - {os: macos-15-intel, target: macos-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native GPU and audio packages
+        run: python -m pip install -r requirements.txt
+      - name: Download identical original GX homebrew program
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.0-Original-GameCube-GX3D-DOL
+          path: original-gx3d
+      - name: Fetch test Dolphin core and matching Sys
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('dolphin')"
+          python tools/fetch_dolphin_sys.py cores
+      - name: Require simultaneous original GX 3D rendering and DSP audio on Mac
+        run: |
+          python tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.dylib \
+            --rom original-gx3d/anythingplays-gc-gx-gamecube.dol \
+            --require-animated --require-audio --seconds 12 \
+            --report test-evidence/gamecube-original-gx3d-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-GX3D-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14

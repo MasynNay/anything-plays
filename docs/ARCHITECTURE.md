@@ -1,4 +1,4 @@
-# Architecture · Anything Plays 2.0
+# Architecture · Anything Plays 2.0–3.0
 
 Anything Plays is a desktop UI wrapped around a deliberately small emulator
 integration layer. The application uses camera tracking as *gamepad input* and
@@ -16,7 +16,7 @@ does not send global keyboard events to the operating system.
 | Emulator facade | `anything_plays/gba_emulator.py` | Worker lifecycle and native core initialization |
 | Libretro adapters | `anything_plays/libretro_abi.py`, `anything_plays/core_locator.py`, `anything_plays/libretro_input.py`, `anything_plays/libretro_audio.py`, `anything_plays/libretro_video.py`, `anything_plays/libretro_save.py` | Native API, isolation, bounded queues, frame and save conversions |
 | Console map | `anything_plays/systems.py` | One source of truth for core IDs and ROM extensions |
-| Build and verification | `fetch_mgba_core.py`, `build_*`, `.github/workflows/`, `tests/` | Native packaging and regression protection |
+| Build and verification | `fetch_mgba_core.py`, `packaging/build_*`, `.github/workflows/`, `tools/`, `tests/` | Native packaging, provenance, regression and release acceptance |
 
 ## Why UI mixins?
 

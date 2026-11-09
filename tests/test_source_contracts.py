@@ -23,21 +23,36 @@ class SourceContracts(unittest.TestCase):
         self.assertTrue(callable(App.save_profile))
         self.assertTrue(callable(ProfileStore.get))
         self.assertIn("rgb", DEFAULT)
+        # 2.1 copies settings from the stable 2.0 path into a dedicated
+        # test directory rather than writing directly into the old location.
+        from anything_plays.test_preferences import (
+            LEGACY_DIR, TEST_DIR, prepare_test_preferences,
+        )
+        self.assertEqual(
+            LEGACY_DIR / "preferences.json",
+            Path(".config/fish-plays-pokemon-studio/preferences.json"),
+        )
+        self.assertEqual(
+            TEST_DIR / "preferences.json",
+            Path(".config/anything-plays-30-preview/preferences.json"),
+        )
+        self.assertNotEqual(LEGACY_DIR, TEST_DIR)
         source = (ROOT / "app.py").read_text(encoding="utf-8")
-        self.assertIn("'fish-plays-pokemon-studio' / 'preferences.json'", source)
+        self.assertIn("self.preferences_path = prepare_test_preferences()", source)
+        self.assertTrue(callable(prepare_test_preferences))
 
     def test_platform_build_scripts_retained(self):
         names = (
-            "build_windows.bat", "build_macos_dmg.sh", "build_linux_deb.sh",
-            "build_macos_linux.sh", "installer.iss", "AnythingPlays.spec",
+            "packaging/build_windows.bat", "packaging/build_macos_dmg.sh", "packaging/build_linux_deb.sh",
+            "packaging/build_macos_linux.sh", "packaging/installer.iss", 
         )
         for name in names:
             with self.subTest(name=name):
                 self.assertTrue((ROOT / name).is_file())
 
     def test_camera_only_wheel_requires_hash_check_on_all_targets(self):
-        for script_name in ("build_windows.bat", "build_macos_dmg.sh",
-                            "build_linux_deb.sh"):
+        for script_name in ("packaging/build_windows.bat", "packaging/build_macos_dmg.sh",
+                            "packaging/build_linux_deb.sh"):
             with self.subTest(script=script_name):
                 script = (ROOT / script_name).read_text(encoding="utf-8")
                 self.assertIn("AP_CUSTOM_OPENCV_WHEEL", script)
@@ -53,7 +68,7 @@ class SourceContracts(unittest.TestCase):
             self.assertIn(required, frozen)
         self.assertNotIn("opencv-python==", frozen)
         self.assertIn("opencv-python-headless", (ROOT / "requirements.txt").read_text())
-        for path in ("build_windows.bat", "build_macos_dmg.sh", "build_linux_deb.sh"):
+        for path in ("packaging/build_windows.bat", "packaging/build_macos_dmg.sh", "packaging/build_linux_deb.sh"):
             with self.subTest(script=path):
                 script = (ROOT / path).read_text(encoding="utf-8")
                 self.assertIn("-r requirements-build.txt", script)
@@ -63,7 +78,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_windows_build_uses_the_selected_python(self):
         """Windows packaging must not silently switch to py's default 3.15."""
-        script = (ROOT / "build_windows.bat").read_text(encoding="utf-8").lower()
+        script = (ROOT / "packaging/build_windows.bat").read_text(encoding="utf-8").lower()
         self.assertIn("python -m venv .build-venv", script)
         self.assertIn("python fetch_mgba_core.py", script)
         self.assertIn("python verify_bundle.py", script)
@@ -74,7 +89,7 @@ class SourceContracts(unittest.TestCase):
 
     def test_macos_core_hashes_are_checked_after_signing(self):
         """Ad-hoc signing must never change hashed Libretro dylibs unseen."""
-        script = (ROOT / "build_macos_dmg.sh").read_text(encoding="utf-8")
+        script = (ROOT / "packaging/build_macos_dmg.sh").read_text(encoding="utf-8")
         self.assertNotIn("codesign --force --deep --sign", script)
         signing = script.index("codesign --force --sign -")
         verification = script.index("verify_bundle.py --check-native macos", signing)
@@ -84,12 +99,16 @@ class SourceContracts(unittest.TestCase):
         self.assertIn("Contents/Resources/cores", script)
         self.assertNotIn("Contents/MacOS/cores", script)
         self.assertIn("hdiutil attach -readonly", script)
-        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/AnythingPlays.app"', script)
+        self.assertIn('BUNDLE_FILE="AnythingPlays30Preview.app"', script)
+        self.assertIn('BUNDLE_FILE="AnythingPlays.app"', script)
+        self.assertIn('verify_bundle.py --check-native macos "$MOUNT_DIR/${BUNDLE_FILE}"', script)
 
     def test_linux_verifies_extracted_debian_payload(self):
-        script = (ROOT / "build_linux_deb.sh").read_text(encoding="utf-8")
+        script = (ROOT / "packaging/build_linux_deb.sh").read_text(encoding="utf-8")
         self.assertIn('dpkg-deb -x', script)
-        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/anything-plays"', script)
+        self.assertIn('INSTALL_ID="anything-plays-30-preview"', script)
+        self.assertIn('INSTALL_ID="anything-plays"', script)
+        self.assertIn('verify_bundle.py --check-native linux "$AUDIT_DIR/opt/$INSTALL_ID"', script)
 
     def test_ui_boundary_is_explicit(self):
         from app import App

@@ -1,0 +1,113 @@
+name: Anything Plays 3.0 | Original pinned Dolphin Sys from exact Git source
+
+# Source-backed Sys bundle, not a legal review or approved public binary release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-pinned-source-sys.yml'
+      - 'tools/prepare_v30_dolphin_source_sys.py'
+      - 'tests/test_v30_dolphin_source_sys.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-pinned-original-dolphin-sys-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-sys-exact-source:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: linux-x64
+          - runner: windows-2025
+            target: windows-x64
+          - runner: macos-15
+            target: macos-arm64
+          - runner: macos-15-intel
+            target: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      DOLPHIN_SOURCE_COMMIT: '32c61f9d0e933331bb7087ba57e96883241b4960'
+      PINNED_SYS_GIT_TREE: '6abd87498928d5362d83f698a562e956072b8700'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify deterministic original source Sys, Git object tree and unsafe TAR rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v30_dolphin_source_sys.py' -v
+      - name: Retrieve the exact original pinned Dolphin source revision, no mutable asset ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 \
+            --connect-timeout 30 --max-time 600 \
+            "https://codeload.github.com/libretro/dolphin/tar.gz/$DOLPHIN_SOURCE_COMMIT" \
+            --output original-pinned-dolphin-parent.tar.gz
+          test -s original-pinned-dolphin-parent.tar.gz
+      - name: Independently reconstruct and authenticate original Git Data/Sys exact tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.prepare_v30_dolphin_source_sys \
+            --source-tar original-pinned-dolphin-parent.tar.gz \
+            --output-zip source-sys/Dolphin.zip \
+            --output-manifest source-sys/DOLPHIN_ORIGINAL_SOURCE_SYS_UNAPPROVED.json
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          from json import loads
+          from tools.fetch_dolphin_sys import extract_dolphin_sys
+          root = Path("source-sys")
+          record = loads((root/"DOLPHIN_ORIGINAL_SOURCE_SYS_UNAPPROVED.json").read_text("utf-8"))
+          assert record["pinned_git_data_sys_tree_sha1"] == "6abd87498928d5362d83f698a562e956072b8700"
+          assert record["independently_reconstructed_git_data_sys_tree_sha1"] == record["pinned_git_data_sys_tree_sha1"]
+          assert record["dolphin_sys_file_count"] > 2000
+          assert record["dolphin_sys_file_count"] <= 4000
+          assert record["matches_original_source_bytes"] is True
+          for flag in ("binary_to_source_compilation_verified",
+                       "all_third_party_fonts_and_asset_rights_independently_reviewed",
+                       "public_binary_distribution_approved"):
+              assert record[flag] is False, flag
+          payload=(root/"Dolphin.zip").read_bytes()
+          assert sha256(payload).hexdigest() == record["dolphin_sys_zip_sha256"]
+          extract = extract_dolphin_sys(payload,root/"installed")
+          assert extract["file_count"] == record["dolphin_sys_file_count"]
+          assert extract["archive_sha256"] == record["dolphin_sys_zip_sha256"]
+          for name, identity in record["files"].items():
+              installed=root/"installed"/"dolphin-emu"/"Sys"/name
+              assert installed.is_file()
+              assert sha256(installed.read_bytes()).hexdigest() == identity["sha256"]
+          print("Original exact pinned source Dolphin Sys works with existing offline runtime extractor")
+          PY
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          root = Path("source-sys")
+          files = ("Dolphin.zip", "DOLPHIN_ORIGINAL_SOURCE_SYS_UNAPPROVED.json")
+          (root/"SHA256SUMS.txt").write_text("".join(
+              f"{sha256((root/f).read_bytes()).hexdigest()}  {f}\n" for f in files
+          ),"ascii")
+          PY
+      - name: Archive original SOURCE-backed Sys candidate only, never approved distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-${{ matrix.target }}-UNAPPROVED
+          path: |
+            source-sys/Dolphin.zip
+            source-sys/DOLPHIN_ORIGINAL_SOURCE_SYS_UNAPPROVED.json
+            source-sys/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90

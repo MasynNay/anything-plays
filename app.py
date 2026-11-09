@@ -6,29 +6,37 @@ the layout or migrating a user's settings. No OS-level keyboard injection occurs
 """
 
 import copy
-from pathlib import Path
+import os
 import sys
 import tkinter as tk
-
 from anything_plays.gba_emulator import Emulator
+from anything_plays.systems import SYSTEMS
 from anything_plays.settings_defaults import DEFAULT
+from anything_plays.test_preferences import prepare_test_preferences
 from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
 from anything_plays.ui_gameplay import GameplayMixin
+from anything_plays.ui_volume import VolumeMixin
 from anything_plays.ui_layout import LayoutMixin
+from anything_plays.ui_panels import AuxiliaryPanelsMixin
 from anything_plays.ui_library import LibraryMixin
 from anything_plays.ui_profiles import ProfilesMixin
 from anything_plays.ui_theme import ThemeMixin
 from anything_plays.ui_zones import ZonesMixin
+from anything_plays.ui_view import ViewMixin
+from anything_plays.ui_shortcuts import ShortcutsMixin
+from anything_plays.ui_external import ExternalBackendMixin
+from anything_plays.ui_updates import UpdatesMixin
+from anything_plays.ui_icon import IconMixin
 
 
-class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
-          ProfilesMixin, LibraryMixin, ZonesMixin):
+class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
+          VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
+          ShortcutsMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
-
     def __init__(self, root):
         self.root = root
-        root.title('Anything Plays')
+        root.title('Anything Plays 3.0 · Preview')
         self.set_app_icon()
         root.geometry('1400x880')
         root.minsize(820, 540)
@@ -48,9 +56,49 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self._shuffle_latched = False
         self.armed = False
         self._closing = False
+        self._updates_busy = False
+        self._emulator_update_status = tk.StringVar(
+            value='Emulator update checks run automatically every 24 hours'
+        )
+        self._selected_emulator_status = tk.StringVar(value='')
+        self._core_install_busy = False
         self.emu = Emulator()
-        self.preferences_path = Path.home() / '.config' / 'fish-plays-pokemon-studio' / 'preferences.json'  # Preserve existing settings on upgrade
+        # Preserve stable 2.0 preferences; make an independent alpha copy.
+        self.preferences_path = prepare_test_preferences()
         self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
+        preferences = self.read_preferences()
+        self._shortcut_bindings = preferences.get('key_bindings', {})
+        if not isinstance(self._shortcut_bindings, dict):
+            self._shortcut_bindings = {}
+        self.external_emulators = preferences.get('external_emulators', {})
+        if not isinstance(self.external_emulators, dict):
+            self.external_emulators = {}
+        self.n64_core_override = preferences.get('n64_core_path', '')
+        if not isinstance(self.n64_core_override, str):
+            self.n64_core_override = ''
+        # Players need a single self-contained game window. External
+        # launchers remain an opt-in diagnostic for developers only.
+        self.external_fallback_enabled = (
+            os.environ.get("AP_V21_DEVELOPER_EXTERNAL", "") == "1"
+        )
+        self.n64_embedded = tk.BooleanVar(value=(
+            preferences.get("n64_embedded", True) is True
+            if self.external_fallback_enabled else True
+        ))
+        self.gamecube_embedded = tk.BooleanVar(value=(
+            preferences.get("gamecube_embedded", True) is True
+            if self.external_fallback_enabled else True
+        ))
+        self.external_process = None
+        self.external_input = None  # Local camera/keyboard bridge for N64
+        self._game_only_window = None
+        self._game_only_canvas = None
+        self._shortcut_window = None
+        self._windowed_geometry = root.geometry()
+        self._current_view_mode = 'Windowed'
+        self._view_transition = False
+        saved_view_mode = preferences.get('view_mode', 'Windowed')
+        self.view_mode = tk.StringVar(value=saved_view_mode if saved_view_mode in ('Windowed', 'Borderless', 'Fullscreen') else 'Windowed')
         self.theme_name = tk.StringVar(value=self.read_theme_preference())
         self.apply_theme(self.theme_name.get())
         self.system_key = tk.StringVar(value=self.read_selected_system())
@@ -73,68 +121,128 @@ class App(ThemeMixin, LayoutMixin, CameraMixin, GameplayMixin,
         self.camera_name = tk.StringVar()
         self.zone_name = tk.StringVar(value='Up')
         self.color_text = tk.StringVar()
+        self.color2_text = tk.StringVar()
+        self.color2_enabled = tk.BooleanVar(value=False)
+        self.color2_player = tk.StringVar(value="Player 2")
+        self.multi_fish_enabled = tk.BooleanVar(value=False)
+        self.camera_input_mode = tk.StringVar(value="Held while visible")
+        self._last_camera_pulses = {}
+        self.initialize_game_volume(preferences)
         self.mapping_vars = {}
         self.zone_font_size = tk.IntVar(value=44)
         self.zone_opacity = tk.IntVar(value=85)
-        self.zone_style = tk.StringVar(value='Outline')
+        self.zone_style = tk.StringVar(value='Bold')
+        self.zone_border_width = tk.IntVar(value=6)
+        self.zone_label_position = tk.StringVar(value='Center')
         self.shuffle_enabled = tk.BooleanVar(value=True)
         self.zone_image_path = tk.StringVar(value='')
         self._zone_art = None
+        self._zone_thumbnail_cache = {}  # Bounded to 12 resized assets.
         self.cfg = self.profile_store.get(self.system_key.get())
         self.build()
         self.refresh_settings()
         self.refresh_system_buttons()
+        self.update_external_setup()
+        self.refresh_selected_emulator_state()
+        self.show_external_placeholder()
         self._active_profile_system = self.system_key.get()
+        if self.view_mode.get() != 'Windowed':
+            self.set_view_mode(self.view_mode.get(), persist=False)
         root.bind('<Control-Alt-F11>', lambda _: self.toggle())
         root.bind('<Control-Alt-F12>', lambda _: self.stop_controls())
-        root.bind('<Escape>', lambda _: self.stop_controls())
+        root.bind('<Escape>', self.exit_view_or_stop)
+        root.bind('<F10>', self.toggle_borderless)
+        root.bind('<F11>', self.toggle_fullscreen)
+        root.bind('<Control-Shift-m>', self.toggle_game_mute)
         root.protocol('WM_DELETE_WINDOW', self.close)
-        root.after(100, self.scan_cameras)
-        root.after(45, self.tick)
-
-    def set_app_icon(self):
-        """Use the same branded icon for source and frozen applications."""
-        base = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
-        icon = base / 'assets' / 'anything_plays.png'
-        if icon.is_file():
-            try:
-                self._app_icon = tk.PhotoImage(file=str(icon))
-                self.root.iconphoto(True, self._app_icon)
-            except tk.TclError:
-                pass
-
+        if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":
+            root.after(100, self.scan_cameras)
+        # Keep exactly one camera timer and one game timer alive. Record their
+        # identifiers so all pending callbacks can be cancelled on shutdown.
+        self._camera_tick_job = root.after(45, self.tick)
+        self._game_tick_job = root.after(16, self.game_render_tick)
+        self._updates_start_job = root.after(
+            8000, self.schedule_emulator_update_checks
+        )
+    def uses_embedded_emulator(self, system=None):
+        """Choose in-panel video for each console; keep GPU fallback explicit."""
+        key = self.system_key.get() if system is None else system
+        if key in SYSTEMS and key not in ('n64', 'gamecube'):
+            return True
+        if key == 'n64':
+            return self.n64_embedded.get()
+        if key == 'gamecube':
+            return self.gamecube_embedded.get()
+        return False
     def close(self):
         """Persist settings, release devices, and stop scheduling UI callbacks."""
         if self._closing:
             return
         self._closing = True
-        try:
-            self.persist_system_profile()
-        except (OSError, ValueError, tk.TclError):
-            pass
-        self.deactivate_manual()
-        self.stop_controls()
-        if self.cap is not None:
-            self.cap.release()
-            self.cap = None
-        for job_name in ('shelf_button_job', 'shelf_animation_job',
-                         'shelf_momentum_job'):
+        # Stopping a camera manually or closing the app always cancels retries.
+        self.cancel_camera_reconnect()
+        # A long-lived window may have several pending after() callbacks.
+        # Cancel the periodic loops before destroying Tk widgets.
+        for job_name in ("_camera_tick_job", "_game_tick_job",
+                         "_updates_start_job", "_updates_repeat_job"):
             job = getattr(self, job_name, None)
             if job is not None:
                 try:
                     self.root.after_cancel(job)
                 except tk.TclError:
                     pass
-        self.emu.stop()
-        self.root.destroy()
-
-
+                setattr(self, job_name, None)
+        pending_rom_scan = getattr(self, "_rom_scan_cancel", None)
+        if pending_rom_scan is not None:
+            pending_rom_scan.set()
+        try:
+            self.persist_system_profile()
+        except (OSError, ValueError, tk.TclError):
+            pass
+        # Cleanup each driver separately: a USB camera can fail while
+        # releasing without blocking native emulators or Tk shutdown.
+        def cleanup(label, callback):
+            try:
+                callback()
+            except Exception as exc:
+                print(f"Shutdown {label}: {exc}", file=sys.stderr)
+        for job_name in ('shelf_button_job', 'shelf_animation_job',
+                         'shelf_momentum_job'):
+            job = getattr(self, job_name, None)
+            if job is not None:
+                cleanup(job_name, lambda job=job: self.root.after_cancel(job))
+        cleanup("manual input", self.deactivate_manual)
+        cleanup("camera controls", self.stop_controls)
+        capture, self.cap = self.cap, None
+        if capture is not None:
+            cleanup("camera", capture.release)
+        cleanup("embedded emulator", self.emu.stop)
+        cleanup("external emulator", self.stop_external_emulator)
+        try:
+            with self.emu.lock:
+                self.emu.frame = None
+            self.frame = None
+            self.game_photo = None
+            self.camera_photo = None
+            self._zone_art = None
+            self._zone_thumbnail_cache.clear()
+            self.library_images.clear()
+        finally:
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                pass
 def main():
     """Start the Tkinter event loop when launched from source or a bundle."""
+    if "--ap-v30-ui-smoke" in sys.argv:
+        from anything_plays.frozen_gui_smoke import run_smoke_gui
+        return run_smoke_gui(App, SYSTEMS)
     root = tk.Tk()
     App(root)
     root.mainloop()
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    __import__('multiprocessing').freeze_support()
+    raise SystemExit(main())

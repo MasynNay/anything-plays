@@ -1,0 +1,138 @@
+name: Anything Plays 3.0 | Approved stable publication
+
+# NEVER trigger on push or tag. This manual workflow is deliberately unusable
+# for test-only artifacts. Production publishing additionally requires a
+# completed, independently reviewed acceptance record and exact approved inputs.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable 3.0.x version (no alpha/beta/suffix)
+        required: true
+        default: '3.0.0'
+        type: string
+      candidate_run_id:
+        description: GitHub run ID with all four APPROVED production artifacts
+        required: true
+        type: string
+      publish_publicly:
+        description: Publish a real public release (false makes draft only)
+        required: true
+        default: false
+        type: boolean
+      confirmation:
+        description: Type APPROVED-3.0-DISTRIBUTION to confirm source and rights review
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-v3-publication
+  cancel-in-progress: false
+
+jobs:
+  approved-publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: stable-v3-publication
+    env:
+      VERSION: ${{ inputs.version }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      PUBLISH_PUBLICLY: ${{ inputs.publish_publicly }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require main branch, exact approved version and manual release confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Stable publication must be dispatched from main"
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^3\.0\.[0-9]+$ ]] || [[ ! "$CANDIDATE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid stable version or source run ID"
+            exit 1
+          fi
+          if [[ "$RELEASE_CONFIRMATION" != "APPROVED-3.0-DISTRIBUTION" ]]; then
+            echo "::error::Explicit approval phrase is required"
+            exit 1
+          fi
+          if [[ ! -f docs/V3_RELEASE_NOTES_APPROVED.md ]]; then
+            echo "::error::Approved final release notes are missing"
+            exit 1
+          fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag/release already exists. Refusing overwrite"
+            exit 1
+          fi
+      - name: Enforce strict real-device and redistribution acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/check_repository_hygiene.py
+          python tools/check_v30_release.py
+          python -m unittest discover -s tests -p 'test_v30_publication_contract.py' -v
+      - name: Verify original production candidate run has identical source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_sha="$(gh run view "$CANDIDATE_RUN_ID" --json headSha --jq '.headSha')"
+          run_status="$(gh run view "$CANDIDATE_RUN_ID" --json conclusion --jq '.conclusion')"
+          run_name="$(gh run view "$CANDIDATE_RUN_ID" --json name --jq '.name')"
+          if [[ "$run_sha" != "$GITHUB_SHA" || "$run_status" != "success" ]]; then
+            echo "::error::Candidate must succeed on exactly this reviewed main commit"
+            exit 1
+          fi
+          if [[ "$run_name" != "Anything Plays 3.0 | Approved production candidates" ]]; then
+            echo "::error::Developer preview and unrelated workflows are not production candidates"
+            exit 1
+          fi
+      - name: Download only four production-approved platform artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in windows-x64 macos-arm64 macos-x64 linux-x64; do
+            gh run download "$CANDIDATE_RUN_ID" \
+              --name "AnythingPlays-$VERSION-PRODUCTION-$target" \
+              --dir "candidate-platforms/$target"
+          done
+      - name: Revalidate original release-mode provenance and immutable installer checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.collect_v30_production_assets \
+            --version "$VERSION" \
+            --source-commit "$GITHUB_SHA" \
+            --input candidate-platforms --output production-input
+          python -m tools.stage_v30_release_assets \
+            --version "$VERSION" \
+            --input production-input --output public-release
+          cd public-release
+          sha256sum --check SHA256SUMS.txt
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 5
+      - name: Create a non-public draft first
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" public-release/* \
+            --title "Anything Plays $VERSION" \
+            --notes-file docs/V3_RELEASE_NOTES_APPROVED.md \
+            --target "$GITHUB_SHA" \
+            --draft
+      - name: Publish only after explicit public approval
+        if: ${{ inputs.publish_publicly }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "v$VERSION" --draft=false
+          gh release view "v$VERSION" --json isDraft --jq '.isDraft' | grep -qx false

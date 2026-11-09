@@ -1,0 +1,157 @@
+name: Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate
+# Four original pinned SNES source builds and homebrew playback, research ONLY.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-supafaust-four-os-source.yml'
+      - 'tools/capture_v30_supafaust_source.py'
+      - 'tools/patch_v30_supafaust_macos_semaphore.py'
+      - 'tests/test_v30_supafaust_four_os_source.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v30-supafaust-four-os-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-built-snes-candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, native: mednafen_supafaust_libretro.so}
+          - {runner: windows-2025, target: windows-x64, native: mednafen_supafaust_libretro.dll}
+          - {runner: macos-15, target: macos-arm64, native: mednafen_supafaust_libretro.dylib}
+          - {runner: macos-15-intel, target: macos-x64, native: mednafen_supafaust_libretro.dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+      SUPA_SRC: research/supafaust-src
+      SUPA_TARGET: ${{ matrix.target }}
+      SUPA_NATIVE: ${{ matrix.native }}
+      SUPA_COMMIT: '642d1d1b6684aa7e306a02a89885f3f5456a5157'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: libretro/supafaust
+          ref: 642d1d1b6684aa7e306a02a89885f3f5456a5157
+          path: research/supafaust-src
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify original unchanged GPLv2-or-later SNES source and compile inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$SUPA_SRC" rev-parse HEAD)" = "$SUPA_COMMIT"
+          grep 'Version 2' "$SUPA_SRC/COPYING"
+          grep 'either version 2' "$SUPA_SRC/mednafen/snes_faust/snes.cpp"
+          grep 'any later version' "$SUPA_SRC/mednafen/snes_faust/snes.cpp"
+          test -s "$SUPA_SRC/Makefile"
+      - name: Install Linux source compiler and actual native audio/video dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends make gcc g++ xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Initialize Windows MINGW64 GCC C++ toolchain
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Compile immutable source-built Linux native SNES libretro core
+        if: runner.os == 'Linux'
+        shell: bash
+        run: make -C research/supafaust-src -j 3 platform=unix
+      - name: Apply the EXACT documented macOS-only GPL source compatibility patch
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Upstream config.h mistakenly claims macOS has sem_timedwait.
+          # Its original MThreading_POSIX.cpp already contains a pthread
+          # condition-variable semaphore fallback. Only change one guard.
+          python -m tools.patch_v30_supafaust_macos_semaphore --source "$SUPA_SRC"
+          test "$(git -C "$SUPA_SRC" diff --name-only)" = "mednafen/config.h"
+      - name: Compile source-built macOS Intel / ARM SNES libretro core with archived exact one-file patch
+        if: runner.os == 'macOS'
+        shell: bash
+        run: make -C research/supafaust-src -j 3 platform=osx
+      - name: Compile immutable source-built Windows x64 SNES libretro core
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C research/supafaust-src -j 3 platform=win
+      - name: Capture actual compiled image, original immutable source TAR and GPL grant
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_supafaust_source \
+            --source "$SUPA_SRC" --native "$SUPA_SRC/$SUPA_NATIVE" \
+            --target "$SUPA_TARGET" \
+            --output "test-evidence/supafaust-$SUPA_TARGET"
+          (cd "test-evidence/supafaust-$SUPA_TARGET" && sha256sum -c SHA256SUMS.txt)
+      - name: Install desktop Libretro frontend test dependencies (not extra emulators)
+        run: python -m pip install -r requirements.txt
+      - name: Expose source-built MinGW runtime DLLs to nested Windows Python native probe
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          test -f /mingw64/bin/libwinpthread-1.dll
+          echo "AP_V30_MINGW_CI_DLL_DIR=$(cygpath -w /mingw64/bin)" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/tools/v30_windows_gpl_lab" >> "$GITHUB_ENV"
+      - name: Run original SNES PPU animated video + SPC audible PCM through actual Libretro frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/probe_snes_homebrew.py \
+            --core "$SUPA_SRC/$SUPA_NATIVE" --seconds 12 \
+            --report "test-evidence/supafaust-$SUPA_TARGET/SUPAFAUST_NATIVE_AV_UNAPPROVED.json"
+      - name: Require actual full 12-second SNES homebrew and retain all license flags FALSE
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path('test-evidence')/('supafaust-'+os.environ['SUPA_TARGET'])
+          m=json.loads((root/'SUPAFAUST_SOURCE_BUILD_UNAPPROVED.json').read_text())
+          test=json.loads((root/'SUPAFAUST_NATIVE_AV_UNAPPROVED.json').read_text())
+          assert m['target']==os.environ['SUPA_TARGET']
+          assert m['source_commit']==os.environ['SUPA_COMMIT']
+          assert m['compiled_from_exact_upstream_checkout'] is True
+          assert m['public_binary_redistribution_approved'] is False
+          assert m['complete_combined_core_license_reviewed'] is False
+          assert m['replaces_current_snes9x_in_app'] is False
+          assert test.get('passed') is True and test.get('native_exit_code')==0
+          av=test.get('details') or {}
+          assert av.get('passed') is True
+          assert av.get('native_video_frames',0)>=30
+          assert av.get('distinct_rgb_frames',0)>=2
+          assert av.get('native_nonzero_pcm_values',0)>100
+          print('Original pinned GPLv2-or-later SNES source-built audio/video passed on',
+                os.environ['SUPA_TARGET'],'; binary rights/public 3.0 still FALSE')
+          PY
+      - name: Archive ORIGINAL pinned GPLv2+ research inputs (not public shipping binaries)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-SUPAFAUST-${{ matrix.target }}-SOURCE-UNAPPROVED
+          path: test-evidence/supafaust-${{ matrix.target }}/
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "status": "UNAPPROVED-DOLPHIN-THREE-NESTED-GITLINK-SOURCE-CANDIDATES",
+  "dolphin_parent_commit": "32c61f9d0e933331bb7087ba57e96883241b4960",
+  "original_direct_gitlinks": 34,
+  "original_nested_parent_sources": 2,
+  "exact_nested_gitlinks": 3,
+  "approved_for_binary_distribution": false,
+  "complete_source_to_shipped_binary_verified": false,
+  "independent_combined_license_reviewed": false,
+  "transitive_build_dependency_correspondence_reviewed": false,
+  "parents": [
+    {
+      "parent_path": "Externals/cubeb/cubeb",
+      "parent_source_repository": "https://github.com/mozilla/cubeb.git",
+      "parent_gitlink_commit": "54217bca3f3e0cd53c073690a23dd25d83557909",
+      "nested": [
+        {
+          "path": "cmake/sanitizers-cmake",
+          "declared_source_url": "https://github.com/arsenm/sanitizers-cmake",
+          "source_repository": "https://github.com/arsenm/sanitizers-cmake",
+          "gitlink_commit": "aab6948fa863bc1cbe5d0850bc46b9ef02ed4c1a"
+        },
+        {
+          "path": "googletest",
+          "declared_source_url": "https://github.com/google/googletest",
+          "source_repository": "https://github.com/google/googletest",
+          "gitlink_commit": "40412d85124f7c6f3d88454583c4633e5e10fc8c"
+        }
+      ],
+      "parent_source_archive_sha256": "a795511bf56183ff7bad8fb2d2836ca5bb158e12ddd519caced62946ffa69c83",
+      "parent_source_archive_size_bytes": 228779
+    },
+    {
+      "parent_path": "Externals/libadrenotools",
+      "parent_source_repository": "https://github.com/bylaws/libadrenotools.git",
+      "parent_gitlink_commit": "8fae8ce254dfc1344527e05301e43f37dea2df80",
+      "nested": [
+        {
+          "path": "lib/linkernsbypass",
+          "declared_source_url": "https://github.com/bylaws/liblinkernsbypass/",
+          "source_repository": "https://github.com/bylaws/liblinkernsbypass",
+          "gitlink_commit": "aa3975893d83ef1bc84c321ec60c65fbf1287887"
+        }
+      ],
+      "parent_source_archive_sha256": "ceffce971676d4cfdf348a082df06fc92a1dca6d95bea892a480d63f200961cb",
+      "parent_source_archive_size_bytes": 88816
+    }
+  ],
+  "original_34_review_run": "42447184893"
+}

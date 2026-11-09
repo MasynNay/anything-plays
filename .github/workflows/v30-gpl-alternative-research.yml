@@ -1,0 +1,157 @@
+name: Anything Plays 3.0 | GPLv3 SNES and Sega replacement research
+# Only ephemeral original GPL alternative binaries, never a public 3.0 release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-gpl-alternative-research.yml'
+      - 'tools/stage_v30_gpl_alternative_candidates.py'
+      - 'tests/test_v30_gpl_alternative_candidates.py'
+      - 'tools/probe_v30_blastem_genesis_variant.py'
+      - 'tests/test_v30_blastem_genesis_variant.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v30-gpl-alternatives-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact candidate-only governance
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_gpl_alternative_candidates.py' -v
+          python -m unittest discover -s tests -p 'test_v30_blastem_genesis_variant.py' -v
+
+  original-libretro-homebrew-candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - candidate: snes
+          - candidate: sega
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Linux graphics and sound dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Stage isolated unapproved native core from original Libretro CI
+        env:
+          CANDIDATE: ${{ matrix.candidate }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python -m tools.stage_v30_gpl_alternative_candidates --candidate "$CANDIDATE" --output candidate
+          cp candidate/UNAPPROVED_CANDIDATE.json "evidence/$CANDIDATE-candidate-unapproved.json"
+      - name: Verify real native SNES PPU video and SPC sound using bsnes
+        if: matrix.candidate == 'snes'
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_snes_homebrew.py --core candidate/bsnes_libretro.so --seconds 12 --report evidence/bsnes-snes-original-ppu-spc.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/bsnes-snes-original-ppu-spc.json').read_text())
+          assert d['passed'] and d['native_exit_code']==0
+          assert d['details']['native_video_frames']>=30
+          assert d['details']['native_nonzero_pcm_values']>100
+          assert d['details']['distinct_rgb_frames']>=2
+          print('Real source-built homebrew SNES native A/V passed')
+          PY
+      - name: Independently diagnose original Genesis instruction phases AND all Sega 8-bit profiles
+        if: matrix.candidate == 'sega'
+        run: |
+          set -uo pipefail
+          # Each probe is an isolated Python/native Libretro child; preserve
+          # EVERY report rather than losing SMS/GG/SG-1000 when Genesis fails.
+          for phase in idle tmss vdp patterns tiles palette tone; do
+            xvfb-run -a python tools/probe_genesis_homebrew.py \
+              --phase "$phase" --smoke-only \
+              --core candidate/blastem_libretro.so \
+              --seconds 4 --report "evidence/blastem-phase-$phase.json" \
+              || echo "Sega diagnostic phase $phase failed (captured)"
+          done
+          xvfb-run -a python tools/probe_genesis_homebrew.py \
+            --core candidate/blastem_libretro.so \
+            --seconds 12 --report evidence/blastem-genesis-original-homebrew.json \
+            || echo "Genesis full A/V failed (captured)"
+          for system in mastersystem gamegear sg1000; do
+            xvfb-run -a python tools/probe_sega8_homebrew.py \
+              --system "$system" --core candidate/blastem_libretro.so \
+              --seconds 12 --report "evidence/blastem-$system-original-homebrew.json" \
+              || echo "Sega system $system full A/V failed (captured)"
+          done
+          # The original M68000 homebrew unconditionally writes the TMSS
+          # register even on a detected Genesis lacking TMSS; BlastEm
+          # deliberately freezes there. Run a byte-exact ORIGINAL source
+          # program variant that only NOPs this hardware-optional unlock.
+          # Preserve the unmodified failing report separately.
+          xvfb-run -a python tools/probe_v30_blastem_genesis_variant.py \
+            --core candidate/blastem_libretro.so --seconds 12 \
+            --report evidence/blastem-genesis-non-tmss-original-variant.json \
+            || echo "Non-TMSS native Genesis alternative still failed (captured)"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          original=['mastersystem','gamegear','sg1000']
+          failed=[]
+          for system in original:
+              p=Path(f'evidence/blastem-{system}-original-homebrew.json')
+              if not p.is_file():
+                  print('MISSING original Sega proof:',system)
+                  failed.append(system)
+                  continue
+              item=json.loads(p.read_text())
+              passed=bool(item.get('passed') and item.get('native_exit_code')==0
+                          and isinstance(item.get('details'),dict)
+                          and item['details'].get('passed'))
+              print(f"REAL Sega A/V: {system}: {'PASS' if passed else 'FAIL'}, "+
+                    f"child exit={item.get('native_exit_code')}")
+              if not passed:
+                  failed.append(system)
+          for p in sorted(Path('evidence').glob('blastem-phase-*.json')):
+              item=json.loads(p.read_text())
+              print('Isolated Genesis phase:',p.stem,
+                    'smoke=',item.get('passed'),'exit=',item.get('native_exit_code'))
+          original_genesis=json.loads(Path(
+              'evidence/blastem-genesis-original-homebrew.json').read_text())
+          variant_path=Path('evidence/blastem-genesis-non-tmss-original-variant.json')
+          if not variant_path.is_file():
+              failed.append('genesis-non-tmss-variant-missing')
+          else:
+              variant=json.loads(variant_path.read_text())
+              if not (variant.get('passed') and variant.get('native_exit_code') == 0
+                      and variant.get('details',{}).get('passed') is True):
+                  failed.append('genesis-non-tmss-native-av')
+              print('Genesis ORIGINAL unconditional TMSS startup:',
+                    original_genesis['passed'],
+                    '(preserve its failure; do NOT relabel as release proof)')
+              print('Genesis ORIGINAL non-TMSS hardware variant A/V:',
+                    variant.get('passed'),
+                    '(source-authored test-only; NOT retail compatibility)')
+          assert not failed, 'GPL candidate original A/V diagnostic failed: '+', '.join(failed)
+          PY
+      - name: Keep only candidate SHA and test observations, NO native binaries/ROMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-GPL-ALTERNATIVE-${{ matrix.candidate }}-UNAPPROVED
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 45

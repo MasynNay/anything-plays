@@ -1,0 +1,744 @@
+name: Anything Plays 3.0 | Emulator verification
+
+# Continuous pushes during emulator research should not consume the entire
+# Actions runner quota with obsolete cross-platform native jobs.
+concurrency:
+  group: emulator-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+
+jobs:
+  core-pack-cross-platform-tests:
+    # Verify the in-app updater's path, hash, rollback and approval gates on
+    # native Windows and both Mac architectures. Linux runs these tests in
+    # source-and-gui. This job downloads NO runnable emulator binary.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify approved core-pack installation and rollback off-line
+        run: |
+          python -m unittest discover -s tests -p "test_v21_core*.py" -v
+          python -m unittest discover -s tests -p "test_v21_create_core_packs.py" -v
+
+  n64-homebrew-playback:
+    # Independent playable-video evidence using Unlicensed/public-domain ROM;
+    # never include the fixture or download it in a player installation.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      AP_V30_TEST_CORES: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prepare bundled N64 test core and headless dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libx11-6 libxi6 libxrandr2 libportaudio2
+          python -m pip install -r requirements.txt
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('parallel_n64')"
+      - name: Boot pinned public-domain N64 homebrew and require nonblank video
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_n64_homebrew.py \
+            --core cores/parallel_n64_libretro.so --seconds 20 \
+            --report test-evidence/n64-homebrew-playback.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-N64-real-homebrew-evidence
+          path: |
+            test-evidence/n64-homebrew-playback.json
+            test-evidence/n64-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  n64-homebrew-cross-platform:
+    # Same pinned public-domain homebrew / in-panel software video path on
+    # Windows and both macOS architectures. Still not clean-installed game QA.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            ext: dll
+          - os: macos-15
+            ext: dylib
+          - os: macos-15-intel
+            ext: dylib
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test dependencies and platform-native bundled N64 core
+        run: |
+          python -m pip install -r requirements.txt
+          python -c "from fetch_mgba_core import fetch_core; fetch_core('parallel_n64')"
+      - name: Verify pinned public-domain N64 homebrew video in embedded core
+        timeout-minutes: 2
+        run: |
+          python -X faulthandler tools/probe_n64_homebrew.py --core cores/parallel_n64_libretro.${{ matrix.ext }} --seconds 20 --report test-evidence/n64-homebrew-playback.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-N64-${{ matrix.os }}-real-video-evidence
+          path: |
+            test-evidence/n64-homebrew-playback.json
+            test-evidence/n64-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  wonderswan-original-native-av:
+    # Two original NEC V30MZ 8086-compatible ROMs, real monochrome/color
+    # background tile graphics and hardware wavetable channel audio PCM.
+    # The generated ROMs are CI-only and not part of the player installer.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [ws, wsc]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native audio and graphics dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Fetch the pinned Mednafen WonderSwan core in CI only
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_wswan')"
+      - name: Demand original WonderSwan video and wavetable PCM
+        run: |
+          python tools/probe_wonderswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.so --seconds 8 --report test-evidence/${{ matrix.system }}-original-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-${{ matrix.system }}-native-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # NGP/NGPC verification was moved to .github/workflows/v30-ngp.yml.
+  # Its eight native RGB/PCM/control jobs and experimental cold-restart
+  # flash proof run independently, avoiding repeated cancellation behind
+  # the 80+ other emulator jobs in this cross-platform matrix.
+
+  wswan-original-screen-psg:
+    # Original V30MZ cartridges, no downloaded game assets, source-generated
+    # only during CI. Must show animated WonderSwan LCD and native PCM.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ws}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: wsc}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ws}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: wsc}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ws}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: wsc}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ws}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: wsc}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native graphics and audio libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python test requirements
+        run: python -m pip install -r requirements.txt
+      - name: Fetch native Mednafen WonderSwan core for temporary CI
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_wswan')"
+      - name: Test original WonderSwan tile-video and wavetable PCM
+        run: |
+          python tools/probe_wswan_homebrew.py --system ${{ matrix.system }} --core cores/mednafen_wswan_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-screen-psg.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-${{ matrix.system }}-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  pce-original-vdc-vce-psg-av:
+    # Native Mednafen PCE Fast executes an original HuC6280 HuCard.
+    # No CD firmware or commercial ROMs. Enforce real VDC/VCE output and
+    # nonzero core PSG PCM; no fake frontend image or audio.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless Linux native requirements
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python test requirements
+        run: python -m pip install -r requirements.txt
+      - name: Fetch PCE Fast Libretro candidate for CI only
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_pce_fast')"
+      - name: Demand original HuC6280 changing RGB frames and PSG PCM
+        run: |
+          python tools/probe_pce_homebrew.py --core cores/mednafen_pce_fast_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/pce-original-${{ matrix.target }}-vdc-vce-psg.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-PCE-HuC6280-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  atari7800-original-maria-tia-av:
+    # Original .a78 cartridge built at test time, optional BIOS omitted.
+    # Strict native ProSystem video and real TIA PCM acceptance (not a
+    # mere ROM load or simulated video frame).
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 14
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux graphics and audio dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Obtain optional ProSystem core for test
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('prosystem')"
+      - name: Require original MARIA changing video and nonzero TIA PCM
+        run: |
+          python tools/probe_atari7800_homebrew.py --core cores/prosystem_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/atari7800-original-${{ matrix.target }}-maria-tia.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-Atari7800-MARIA-TIA-${{ matrix.target }}-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  native-eleven-console-lifecycle-soak:
+    # One Python process, 132 native Libretro restarts across 11 console
+    # profiles (6 distinct native libraries). Guards failed teardown, leaked
+    # worker threads, stale buttons, missing game frames and RSS growth.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native dependencies for real in-panel emulators
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve six pinned Libretro engines in temporary CI environment
+        run: |
+          python -c "from fetch_mgba_core import fetch_core; [fetch_core(name) for name in ('mgba', 'snes9x', 'fceumm', 'genesis_plus_gx', 'stella2014', 'prosystem')]"
+      - name: Require 132 successful original-game boots and bounded resident memory
+        timeout-minutes: 12
+        run: |
+          mkdir -p test-evidence
+          python tools/probe_native_session_cycles.py --core-dir cores --cycles 12 --max-growth-mb 128 --report test-evidence/native-core-switch-132.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-132-real-native-console-restarts
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  snes-original-ppu-spc-audio:
+    # Generated 65816 LoROM and SPC IPL test tone, no copied game content.
+    # Must produce nonblank changing pixels AND native Snes9x DSP samples.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 14
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native graphics and audio requirements
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install test Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Retrieve Snes9x Libretro candidate for test, not installed game
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('snes9x')"
+      - name: Require original SNES mode-0 RGB and nonzero SPC DSP PCM
+        run: |
+          python tools/probe_snes_homebrew.py --core cores/snes9x_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/snes-original-ppu-spc-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-SNES-native-PPU-SPC-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  sega-8bit-original-native-av:
+    # Generated Z80 programs: real 8-bit Sega VDP video and native PSG PCM.
+    # These cartridges are original and never included in the installer.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: mastersystem}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: gamegear}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: sg1000}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: mastersystem}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: gamegear}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: sg1000}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: mastersystem}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: gamegear}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: sg1000}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: mastersystem}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: gamegear}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: sg1000}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 14
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native library requirements
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Retrieve pinned Genesis Plus GX test core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
+      - name: Require original Sega 8-bit graphics and native PSG audio
+        run: |
+          python tools/probe_sega8_homebrew.py --system ${{ matrix.system }} --core cores/genesis_plus_gx_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-${{ matrix.system }}-${{ matrix.target }}-video-audio
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gba-original-video-audio:
+    # Clean-room generated GBA ARM7TDMI Mode3 graphics + PSG test program.
+    # No game, BIOS or test ROM is published; proof runs the real mGBA core.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native graphics and audio prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python test requirements
+        run: python -m pip install -r requirements.txt
+      - name: Obtain the included mGBA native core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mgba')"
+      - name: Demand original ARM native GBA video and audio PCM
+        run: |
+          python tools/probe_gba_homebrew.py --core cores/mgba_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/gba-original-${{ matrix.target }}-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-GBA-native-video-audio-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  gb-gbc-original-video-audio:
+    # Original LR35902 ROM generated at test time, exercising mGBA.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: gb}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: gbc}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: gb}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: gbc}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: gb}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: gbc}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: gb}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: gbc}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless Linux native runtime
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Obtain native mGBA core for CI
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mgba')"
+      - name: Test original GB/GBC video and native APU sound
+        run: |
+          python tools/probe_gb_homebrew.py --system ${{ matrix.system }} --core cores/mgba_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.target }}-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-Original-${{ matrix.system }}-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  genesis-original-cross-platform-av:
+    # Original ROM from source opcodes; real Libretro video, PSG PCM and
+    # controls in the embedded CoreSession, not a loaded-library smoke.
+    # No third-party game files, emulator downloads at runtime, or ROM release.
+    # Record each platform separately before approving any 3.0 installer.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so}
+          - {os: windows-2025, target: windows-x64, ext: dll}
+          - {os: macos-15, target: macos-arm64, ext: dylib}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Libretro dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install production Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Fetch platform matched Genesis Plus GX Libretro candidate
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('genesis_plus_gx')"
+      - name: Require actual original 68000 video and nonzero PSG stereo PCM
+        run: |
+          python tools/probe_genesis_homebrew.py --core cores/genesis_plus_gx_libretro.${{ matrix.ext }} --seconds 8 --report test-evidence/genesis-original-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-Genesis-AV-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  optional-core-pack-candidates:
+    # Independent native-core downloads, NOT shipped inside the small installer.
+    # This workflow never marks a candidate as approved or publishes a release.
+    # Maintainers must individually audit sources, licenses, installed gameplay,
+    # audio, controls, saves and signatures before publishing official assets.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: windows-2025
+            target: windows-x64
+          - os: macos-15
+            target: macos-arm64
+          - os: macos-15-intel
+            target: macos-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      AP_V30_CORE_PACK_BUILD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Retrieve separate platform-matched native core candidates
+        run: python fetch_mgba_core.py
+      - name: Create checksum-verified UNAPPROVED optional packages
+        run: |
+          python tools/create_core_packs.py --release v3.0.0-alpha.2-cores --output release/core-packs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-UNAPPROVED-core-candidates-${{ matrix.target }}
+          path: release/core-packs/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  nes-video-audio-original-homebrew:
+    # Original iNES source-generated cartridge, no third-party game files.
+    # The core must produce changing nonblank RGB frames AND nonzero APU PCM
+    # through our real in-app Libretro callback plumbing, not just load.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless audio and video dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve the FCEUmm core independently of the starter installer
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('fceumm')"
+      - name: Verify NES graphics and actual generated APU audio samples
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_nes_homebrew.py \
+            --core cores/fceumm_libretro.so --seconds 8 \
+            --report test-evidence/nes-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-NES-video-audio-evidence
+          path: |
+            test-evidence/nes-video-audio.json
+            test-evidence/nes-test-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  atari2600-video-audio-original-homebrew:
+    # Test independent Stella 2014 core with original TIA/6507 ROM generated
+    # from our own source; require distinct frames and nonzero native PCM.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless camera audio and renderer prerequisites
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Retrieve standalone Stella 2014 optional core for test only
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('stella2014')"
+      - name: Verify original Atari 2600 changing video and generated TIA PCM
+        timeout-minutes: 2
+        run: |
+          mkdir -p test-evidence
+          PYTHONUNBUFFERED=1 xvfb-run -a python -X faulthandler \
+            tools/probe_atari_homebrew.py \
+            --core cores/stella2014_libretro.so --seconds 8 \
+            --report test-evidence/atari-video-audio.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-original-Atari-video-audio-evidence
+          path: |
+            test-evidence/atari-video-audio.json
+            test-evidence/atari-test-frame.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  optional-2d-native-video-and-audio:
+    # Independently validate native optional cores on EACH supported desktop OS.
+    # Source-created ROMs contain no commercial games; sound is actual emitted
+    # PCM captured through Libretro, not a physical speaker validation.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, extension: so, system: nes, core: fceumm}
+          - {os: windows-2025, extension: dll, system: nes, core: fceumm}
+          - {os: macos-15, extension: dylib, system: nes, core: fceumm}
+          - {os: macos-15-intel, extension: dylib, system: nes, core: fceumm}
+          - {os: ubuntu-24.04, extension: so, system: atari, core: stella2014}
+          - {os: windows-2025, extension: dll, system: atari, core: stella2014}
+          - {os: macos-15, extension: dylib, system: atari, core: stella2014}
+          - {os: macos-15-intel, extension: dylib, system: atari, core: stella2014}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install headless native core and audio prerequisites on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Prepare Python environment
+        run: python -m pip install -r requirements.txt
+      - name: Fetch platform-matched optional emulator (no standalone emulator)
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('${{ matrix.core }}')"
+      - name: Require generated changing graphics and nonzero emulator audio PCM
+        run: |
+          python tools/probe_${{ matrix.system }}_homebrew.py --core cores/${{ matrix.core }}_libretro.${{ matrix.extension }} --seconds 8 --report test-evidence/${{ matrix.system }}-${{ matrix.os }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-${{ matrix.system }}-${{ matrix.os }}-audio-video
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  optional-core-install-play-rollback:
+    # Uses a temporary *simulated approved* pack built from the real core;
+    # no release asset or bogus review attestation is ever published.
+    # Proves the updater's exact bytes, digest, activation, in-app playback
+    # and rollback before asking maintainers to publish approved packs.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, core: fceumm}
+          - {os: ubuntu-24.04, target: linux-x64, core: stella2014}
+          - {os: windows-2025, target: windows-x64, core: fceumm}
+          - {os: windows-2025, target: windows-x64, core: stella2014}
+          - {os: macos-15, target: macos-arm64, core: fceumm}
+          - {os: macos-15, target: macos-arm64, core: stella2014}
+          - {os: macos-15-intel, target: macos-x64, core: fceumm}
+          - {os: macos-15-intel, target: macos-x64, core: stella2014}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    env:
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install verified core pack, play original ROM, then roll back
+        run: |
+          python tools/validate_installable_core_pack.py --core ${{ matrix.core }} --seconds 8 --report test-evidence/install-play-rollback-${{ matrix.core }}-${{ matrix.target }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-pack-e2e-${{ matrix.core }}-${{ matrix.target }}
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+

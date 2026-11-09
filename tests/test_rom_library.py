@@ -21,6 +21,24 @@ class ROMLibraryTests(unittest.TestCase):
             result = scan_rom_directory(root, (".gba",))
             self.assertEqual([p.stem for p in result], ["A", "C"])
 
+    def test_mistaken_large_directory_scan_can_be_cancelled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for index in range(40):
+                folder = root / f"nested-{index}"
+                folder.mkdir()
+                (folder / "game.gba").write_bytes(b"synthetic")
+            self.assertEqual(
+                scan_rom_directory(root, (".gba",), cancelled=lambda: True), []
+            )
+
+    def test_normal_scan_still_returns_games_with_cancel_callback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "example.GBA").write_bytes(b"synthetic")
+            result = scan_rom_directory(root, (".gba",), cancelled=lambda: False)
+            self.assertEqual([rom.name for rom in result], ["example.GBA"])
+
     def test_cover_art_prefers_game_named_image(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

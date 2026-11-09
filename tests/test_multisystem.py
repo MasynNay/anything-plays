@@ -11,7 +11,16 @@ class MultiSystemContracts(unittest.TestCase):
         import sys
         sys.path.insert(0, str(ROOT))
         from anything_plays.systems import SYSTEMS
-        self.assertEqual(set(SYSTEMS), {'gb', 'gbc', 'gba', 'snes'})
+        self.assertEqual(set(SYSTEMS), {
+            'gb', 'gbc', 'gba', 'snes', 'nes', 'genesis', 'n64', 'gamecube',
+            'mastersystem', 'gamegear', 'sg1000', 'atari2600', 'atari7800',
+            'pce', 'ngp', 'ngpc', 'ws', 'wsc'
+        })
+        self.assertEqual(SYSTEMS['nes'].core, 'fceumm')
+        self.assertEqual(SYSTEMS['genesis'].core, 'genesis_plus_gx')
+        self.assertEqual(SYSTEMS['n64'].backend, 'retroarch')
+        self.assertEqual(SYSTEMS['gamecube'].backend, 'dolphin')
+        self.assertTrue({'.rvz', '.iso'} <= set(SYSTEMS['gamecube'].extensions))
         self.assertEqual(SYSTEMS['gb'].core, SYSTEMS['gbc'].core)
         self.assertEqual(SYSTEMS['gb'].core, 'mgba')
         self.assertEqual(SYSTEMS['gbc'].core, 'mgba')
@@ -26,8 +35,8 @@ class MultiSystemContracts(unittest.TestCase):
             self.assertIn(name, BUTTONS)
             self.assertIn(name, IDS)
 
-    def test_every_platform_bundles_all_cores(self):
-        for filename in ('build_windows.bat', 'build_macos_dmg.sh', 'build_linux_deb.sh'):
+    def test_every_platform_starter_exposes_mgba_and_optional_core_mode(self):
+        for filename in ('packaging/build_windows.bat', 'packaging/build_macos_dmg.sh', 'packaging/build_linux_deb.sh'):
             script = (ROOT / filename).read_text()
             for name in ('mgba', 'snes9x'):
                 with self.subTest(script=filename, core=name):

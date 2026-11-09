@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "status": "UNAPPROVED-PARALLEL-N64-REPORTED-SOURCE-AND-EMBEDDED-NOTICE-CANDIDATES",
+  "source_repository": "https://github.com/libretro/parallel-n64",
+  "reported_source_commit": "e0ef5d673257e2e83bf9b7cffe62eda141af8493",
+  "actual_source_tree_sha": "e0ef5d673257e2e83bf9b7cffe62eda141af8493",
+  "source_tree_truncated": false,
+  "source_tree_entry_count": 1970,
+  "gitmodules_blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+  "gitmodules_size_bytes": 0,
+  "gitlink_count": 0,
+  "license_notice_file_count": 11,
+  "archived_source_snapshot_sha256": "a8beb0a4aef9636479457237d3e12393c65425068e30c6d98f8f36faa4cb723e",
+  "archived_source_snapshot_size_bytes": 6877459,
+  "original_source_capture_run_id": 42441448884,
+  "source_to_native_binary_independently_verified": false,
+  "compiled_dependency_selection_reviewed": false,
+  "notices_and_copyleft_reviewed": false,
+  "in_process_mixed_license_compatibility_reviewed": false,
+  "public_binary_redistribution_approved": false,
+  "core_sha256_per_target": {
+    "windows-x86_64": "817dc28fc777cf27b316e0ce1c8b93b7a37c9d882c6e4be90cade7d2ba39ebc6",
+    "linux-x86_64": "43550714b4f7af271e60b2956ae00fd925d6f4ac38cc6d294b527b99e9df8333",
+    "macos-arm64": "f85a2ec279a59f6804618794dec61847b759f9b020640263fd86be894330bddf",
+    "macos-x86_64": "674d076ca8d788df6aeefc5f008cb73d5b17f291f016e3cbac2eec73c1eec9a5"
+  },
+  "notices": [
+    {
+      "path": "gles2n64/src/COPYING",
+      "git_blob_sha1": "518eaa2b7f82298daf78e4a8080052298be8e723",
+      "size_bytes": 7824,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-core/LICENSES",
+      "git_blob_sha1": "4e9f0affba9b25be75066040413036df9ace5790",
+      "size_bytes": 1959,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-cxd4/COPYING",
+      "git_blob_sha1": "0e259d42c996742e9e3cba14c677129b2c1b6311",
+      "size_bytes": 7048,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-hle/LICENSES",
+      "git_blob_sha1": "4319820ae103fad6407925b8436d697ffd02a0ab",
+      "size_bytes": 19353,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/LICENSE",
+      "git_blob_sha1": "03a00fcd4885cb0cc2663bd6f482d441c4867d9c",
+      "size_bytes": 364,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/LICENSE.LESSER",
+      "git_blob_sha1": "fc8a5de7edf437cdc98a216370faf7c757279bcb",
+      "size_bytes": 7639,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/LICENSE.MIT",
+      "git_blob_sha1": "62b163d73993df9fd94247c017934b30b1bc5e8f",
+      "size_bytes": 1065,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/lightning/COPYING",
+      "git_blob_sha1": "443254047416efc10bc53cb1adb5421680d5a647",
+      "size_bytes": 35068,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/lightning/COPYING.DOC",
+      "git_blob_sha1": "1a864561bd433440749df8deaa8335e0f98ae58e",
+      "size_bytes": 18114,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-rsp-paraLLEl/lightning/COPYING.LESSER",
+      "git_blob_sha1": "fc8a5de7edf437cdc98a216370faf7c757279bcb",
+      "size_bytes": 7639,
+      "notice_reviewed": false
+    },
+    {
+      "path": "mupen64plus-video-paraLLEl/parallel-rdp/LICENSE",
+      "git_blob_sha1": "c92e90094f7a058ada6a33c240405d9e56a0c0d5",
+      "size_bytes": 1054,
+      "notice_reviewed": false
+    }
+  ],
+  "note": "Original pinned source tree has .gitmodules empty and NO actual Gitlinks. These 11 embedded notice candidates and matching source TAR are not proof all components were compiled into the exact original binary, nor GPL/noncommercial combination rights."
+}

@@ -1,0 +1,191 @@
+name: Anything Plays 3.0 | Source-built PCE offline installer integration
+
+# Strict RESEARCH PREVIEW only. Tests complete 18-profile/11-core installers
+# with a new source-pinned PCE Fast binary. It does not publish installers,
+# change the 3.0 approved core lock, or certify third-party redistribution.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-offline-integration.yml'
+      - 'tools/v30_pce_candidate.py'
+      - 'tools/stage_v30_pce_trial_inputs.py'
+      - 'tests/test_v30_pce_integrated_trial.py'
+      - 'config/v3.0-pce-pinned-source-candidates.json'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-pce-offline-integration.yml'
+      - 'tools/v30_pce_candidate.py'
+      - 'tools/stage_v30_pce_trial_inputs.py'
+      - 'config/v3.0-pce-pinned-source-candidates.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-pce-integrated-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrated-pce-four-platform-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, target: windows-x64, ext: dll}
+          - {runner: ubuntu-24.04, target: linux-x64, ext: so}
+          - {runner: macos-15, target: macos-arm64, ext: dylib}
+          - {runner: macos-15-intel, target: macos-x64, ext: dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '1'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/trial-native-inputs
+      GH_TOKEN: ${{ github.token }}
+      OLD_INPUT_RUN_ID: '42437133733'
+      NEW_PCE_RUN_ID: '42444367068'
+      TARGET: ${{ matrix.target }}
+      EXT: ${{ matrix.ext }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require successful original 11-core lab and four-platform pinned PCE research
+        shell: bash
+        run: |
+          set -euo pipefail
+          for id in "$OLD_INPUT_RUN_ID" "$NEW_PCE_RUN_ID"; do
+            [[ "$(gh run view "$id" --json conclusion --jq .conclusion)" == "success" ]] || {
+              echo "::error::Required native research run is not successful"
+              exit 1
+            }
+          done
+          [[ "$(gh run view "$OLD_INPUT_RUN_ID" --json name --jq .name)" == "Anything Plays 3.0 | Complete offline installer lab" ]] || exit 1
+          [[ "$(gh run view "$NEW_PCE_RUN_ID" --json name --jq .name)" == "Anything Plays 3.0 | PCE pinned-source replacement research" ]] || exit 1
+          python -m unittest discover -s tests -p 'test_v30_pce_integrated_trial.py' -v
+      - name: Retrieve exact original 11 cores, Dolphin system assets, and new GPL PCE candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$OLD_INPUT_RUN_ID" \
+            --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" \
+            --dir original-native-inputs
+          gh run download "$NEW_PCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" \
+            --dir original-pce-source-build
+          # gh run download expands Actions archives. Wrap the unchanged six
+          # original members for the strict ZIP verifier (without rewriting
+          # the preserved underlying source tarball or native library).
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_STORED
+          paths = sorted(Path("original-pce-source-build").iterdir())
+          assert len(paths)==6 and all(p.is_file() and not p.is_symlink() for p in paths)
+          with ZipFile("original-source-built-pce.zip","w",ZIP_STORED) as archive:
+              for p in paths: archive.write(p,arcname=p.name)
+          PY
+      - name: Build a separate immutable offline core input directory with only source-pinned PCE substituted
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.v30_pce_candidate \
+            --artifact original-source-built-pce.zip --target "$TARGET"
+          python -m tools.stage_v30_pce_trial_inputs \
+            --original-dir original-native-inputs \
+            --candidate original-source-built-pce.zip \
+            --target "$TARGET" \
+            --output trial-native-inputs \
+            --evidence test-evidence/PCE_SOURCE_BUILT_TRIAL.json
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y \
+            --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Build genuine 18-profile, 11-core offline Windows preview with source-built PCE
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Build genuine 18-profile, 11-core offline Linux preview with source-built PCE
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build genuine 18-profile, 11-core offline Mac preview with source-built PCE
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Prove packed PCE core has exact source-built SHA and rest of core lineup unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
+          target=os.environ["TARGET"]; ext=os.environ["EXT"]
+          root=(Path("dist/AnythingPlays30Preview.app/Contents/Resources/cores")
+                if target.startswith("macos") else Path("dist/AnythingPlays/cores"))
+          provenance=json.loads((root/"CORE_PROVENANCE.json").read_text("utf-8"))
+          rows={row["name"]:row for row in provenance["cores"]}
+          expected=set((*CORE_NAMES,*OPTIONAL_V21_CORES))
+          assert len(expected)==11 and set(rows)==expected
+          for name in expected:
+              core=root/(name+"_libretro."+ext)
+              assert core.is_file(), core
+              assert hashlib.sha256(core.read_bytes()).hexdigest()==rows[name]["sha256"]
+          pinned=json.loads(Path("config/v3.0-pce-pinned-source-candidates.json").read_text())
+          candidate=pinned["targets"][target]
+          pce=rows["mednafen_pce_fast"]
+          assert pce["sha256"] == candidate["native_sha256"]
+          assert pce["size_bytes"] == candidate["native_bytes"]
+          assert provenance["dolphin_system_assets"]["archive_sha256"]
+          assert (root/"dolphin-emu/Sys/codehandler.bin").is_file()
+          assert pinned["approved_for_public_binary_distribution"] is False
+          print(target+": all eleven native libraries and Dolphin Sys are installed; PCE matches exact GPL source-built candidate")
+          PY
+      - name: Independently exercise PCE from the complete freshly built application
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PYTHON=.build-venv/Scripts/python.exe
+          else
+            PYTHON=.build-venv/bin/python
+          fi
+          "$PYTHON" tools/probe_pce_homebrew.py \
+            --core "cores/mednafen_pce_fast_libretro.$EXT" \
+            --seconds 12 \
+            --report test-evidence/PCE_INTEGRATED_NATIVE_AV.json
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path("test-evidence/PCE_INTEGRATED_NATIVE_AV.json")
+          r=json.loads(p.read_text(encoding="utf-8"))
+          d=r.get("details") or {}
+          assert r.get("passed") is True and d.get("passed") is True
+          assert d.get("native_video_frames",0)>=30
+          assert d.get("native_nonzero_pcm_samples",0)>100
+          assert r.get("fixture",{}).get("source","").startswith("original")
+          print("Native PC Engine video and PSG PCM are from the integrated source-built core")
+          PY
+      - name: Retain review-only integrity and native gameplay results, not unapproved installers
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0.0-PCE-INTEGRATED-UNAPPROVED-${{ matrix.target }}
+          path: test-evidence/*
+          if-no-files-found: warn
+          retention-days: 30

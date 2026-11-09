@@ -1,305 +1,173 @@
 <div align="center">
-  <img src="assets/anything_plays.png" alt="Anything Plays logo" width="136">
 
-  # Anything Plays
+<img src="assets/anything_plays_v21.webp" alt="Anything Plays fish holding a handheld console" width="132">
 
-  **If it moves, it plays.**
+# Anything Plays
 
-  Turn everyday movement into a controller for classic video games.
+**If it moves, it plays.**
 
-  **Camera-powered play · Four consoles · Windows, macOS & Linux**
+Camera-powered games · Local, private controls · Windows, macOS and Linux
 
-  [Website](https://anythingplays.masynnay.com/) ·
-  [Releases](https://github.com/MasynNay/anything-plays/releases) ·
-  [Get started](#get-started) ·
-  [Roadmap](ROADMAP.md) ·
-  [How it works](#how-it-works) ·
-  [Report an issue](https://github.com/MasynNay/anything-plays/issues)
+[Website](https://anythingplays.masynnay.com/) · [Stable 2.0 download](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [3.0 engineering status](ROADMAP.md) · [Code architecture](docs/ARCHITECTURE.md) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
+
 </div>
 
----
+## Release status
 
-## Play a game. Let something else hold the controller.
+| Version | State | Details |
+| --- | --- | --- |
+| **2.0.0** | Published, stable | Original supported consoles; existing user installations are unchanged |
+| **3.0.0 Preview** | **In development, not a public release** | 18 console profiles, 11 native cores in complete test installers; manual compatibility and compliance QA still required |
 
-Anything Plays follows a selected color through a webcam and translates movement
-into gamepad buttons. Divide the camera view into zones, then let a toy, a fish,
-a hand, or anything else you can track move between them. Each zone triggers a
-button inside an embedded emulator—**not a system-wide keyboard event**.
+**3.0 is working development software, not yet a licensed public stable binary release.**
+The most recent **ten-original-source-core** [complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260)
+passed on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. These
+four test-only developer installers contain **18 console profiles**, **11 native
+Libretro core families**, and bundled Dolphin Sys assets, with no separate
+emulator installation. Ten core families are compiled from pinned original
+sources; **Dolphin is the remaining family using an archived native binary**.
+The developer also personally confirmed working N64 games and repeated ROM
+switching, plus working Dolphin/GameCube gameplay on Windows, macOS and Linux
+following the Linux installation fix. These confirmed observations do not
+establish the right to redistribute the combined binaries.
+The **Control label size** slider sits beneath the camera preview, retains
+per-console settings and fits long names inside their own zones.
 
-Prefer a conventional controller? Click the game display and play using the
-keyboard. A webcam is optional for manual play.
+The remaining launch requirements are exact native source/license
+compatibility, selected real-device/audio/endurance acceptance, and a
+verified production release. The required [Neo Geo Pocket 11-job
+native acceptance run](https://github.com/MasynNay/anything-plays/actions/runs/42451407552)
+passed for genuine monochrome and color on all four operating systems.
+That is original homebrew/Libretro callback evidence, **not** a physical
+retail-game test. [Issue #41](https://github.com/MasynNay/anything-plays/issues/41)
+is closed; [release issue #28](https://github.com/MasynNay/anything-plays/issues/28)
+remains open. Testers can record actual installation, game video, audible
+sound, camera actions, save/reload and endurance using the [private, offline
+physical QA checklist](docs/V3_PHYSICAL_QA_RUNBOOK.md). The documented [GPL/noncommercial core
+compatibility issue](docs/V3_LICENSE_COMPATIBILITY_GATE.md) must be
+resolved before publishing the combined stable installer. Automated
+packaging does not independently establish redistribution rights.
+The [release evidence](docs/V3_DISTRIBUTION_READINESS.md) and
+[continuation checkpoint](CONTINUE_HERE.md) track the exact state.
+The newest complete test-only installers were independently rehashed against
+their SHA-256 manifests on all four architectures at commit
+`7004115e7b9d57a3ef8f44062e134a3b55410f25`.
+[Private owner hardware QA instructions](docs/V3_PHYSICAL_QA_RUNBOOK.md)
+include a [frozen four-installer fingerprint catalog](config/v3.0-owner-qa-preview-hashes-unapproved.json)
+for that exact test build. No public distribution approval or physical gameplay
+has been inferred from these build checks.
 
-> **Version 2.0 is released!** Download the verified
-> [Windows, Mac, or Linux installer](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)
-> from the official GitHub release. All four OS builds and their emulator core
-> hashes passed release validation, with
-> [exact RC6 checksums](docs/RC6_VERIFICATION.md) and
-> [source/license notices](docs/RELEASE_SOURCE_ACCESS.md) available.
-> The app includes no game ROMs or BIOS files.
+## What does Anything Plays do?
 
-## 3.0 engineering preview — tested, not yet a public installer
+Select a color in the webcam feed, draw control zones and move an object
+between zones to operate a game in the embedded player. Alternatively,
+click the game view and use configurable keyboard controls. Webcam use is
+optional. The application does not inject keys into other programs, and
+camera processing happens locally.
 
-The [3.0 development source](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) adds **18 console profiles across 11 embedded Libretro core families**, including Nintendo 64 and GameCube. The maintainer has already **personally tested Windows, Linux and macOS**, including working N64 and GameCube gameplay. These owner tests should not be requested again as a generic release prerequisite.
+## How version 3.0 distributes emulators
 
-The actual frozen desktop application, not just emulator libraries, opened and initialized its UI on **all four automated targets**: Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. See the [original four-platform installed application test](https://github.com/MasynNay/anything-plays/actions/runs/42529022383), the [full source-built-core regression](https://github.com/MasynNay/anything-plays/actions/runs/42519987017), and the [active roadmap](ROADMAP.md).
+**Full offline developer previews:** The [original full four-platform test build](https://github.com/MasynNay/anything-plays/actions/runs/42455076101) contained all 11 native core families and bundled Dolphin Sys for 18 profiles. A subsequent [ten-original-source-core full native lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed on all four platforms with the noncommercial SNES/Sega libraries replaced by original source-built alternatives, and original source-built N64 and mGBA cores. These are **different development candidates**, not approved public releases or interchangeable production downloads. The ten-core research run retains diagnostic evidence; do not assume its installation files are offered as a public release. Neither approach requires end users to separately install RetroArch or Dolphin. No ROMs or BIOS are bundled.
 
-**3.0.0 is not yet a published binary release.** The remaining blocker is third-party bundled emulator redistribution, compatible licensing and corresponding-source compliance, not unperformed repeat Windows/Linux/Mac gameplay tests. The stable [v2.0.0 installer](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) remains unchanged, and no commercial ROMs or BIOS are included in either line of development.
+**Build variants:** Lightweight, mGBA-only application artifacts are for development diagnostics, not the planned stable 3.0 distribution. The intended stable 3.0 installer is the complete offline package with the already-selected emulator lineup. No separate RetroArch or Dolphin download is expected. Future in-app core updates remain optional and must use reviewed, verifiable packages.
 
-## Supported consoles
+The [3.0 distribution audit](docs/V3_DISTRIBUTION_READINESS.md), [draft notes](docs/V3_RELEASE_NOTES_DRAFT.md), and [package provenance records](config/v3.0-preview-candidate-integrity.json) are retained for review. The original emulator and Dolphin ZIP archives are preserved as test-only CI artifacts. No unapproved developer artifacts should be relabeled as stable 3.0 downloads.
 
-| Console | Accepted ROMs | Libretro core |
-| :-- | :-- | :-- |
-| Game Boy | `.gb` | mGBA |
-| Game Boy Color | `.gbc` | mGBA |
-| Game Boy Advance | `.gba` | mGBA |
-| Super Nintendo | `.sfc`, `.smc` | Snes9x |
+## Console library plan
 
-The console selector chooses the matching emulator automatically. GB, GBC and GBA
-share the mGBA core while retaining independent game libraries and controls.
-Native cores are downloaded and bundled **at build time** for packaged
-applications.
-**No commercial game ROMs or BIOS files are distributed.** You supply your own
-legally usable game files.
+The table below describes the **most recently tested ten-original-source-core full 3.0 experimental installer** (18 profiles, 11 native families). Older full previews instead used Snes9x and Genesis Plus GX for SNES and Sega. Both variants are **test-only**. This inventory does not certify every game or authorize redistribution.
 
-## Features
+| Core | Console libraries | Readiness note |
+| --- | --- | --- |
+| mGBA | Game Boy, Game Boy Color, Game Boy Advance | Native gameplay tested; continue physical QA |
+| Mednafen Supafaust | Super Nintendo | Original pinned source-built replacement for Snes9x; real original homebrew audio/video CI on four OS |
+| FCEUmm | NES | Native audio/video verified with homebrew; continue real-device QA |
+| BlastEm | Genesis, Master System, Game Gear, SG-1000 | Original pinned source-built replacement for Genesis Plus GX; four Sega paths checked in native CI |
+| Stella 2014 | Atari 2600 | Native audio/video tests; real-game coverage pending |
+| ProSystem | Atari 7800 | Native homebrew tests; real-device coverage pending |
+| Beetle PCE Fast | TurboGrafx-16 / PC Engine HuCard | Native homebrew tests; real-device coverage pending |
+| Beetle NeoPop | Neo Geo Pocket and Color | Authentic monochrome and color native audio/video/input CI passed all four OSes; physical game/saves still need validation |
+| Beetle WonderSwan | WonderSwan and Color | Native homebrew AV checks; real-device coverage pending |
+| ParaLLEl-N64 | Nintendo 64 | Source-built original N64 native video passed four OS; maintainer confirmed gameplay and repeated ROM switching |
+| Dolphin Libretro | GameCube | Owner confirmed working on Windows, macOS and Linux; original source-to-distributed-binary correspondence and license review remain pending |
 
-- **Color-tracked camera controls.** Choose a webcam and target color; adjust
-  tolerance, minimum tracked area, camera mirroring, button duration, and cooldown.
-- **Control zones built your way.** Draw rectangles in the video feed, fit
-  active buttons to a balanced grid, disable individual mappings, or use a
-  Shuffle zone that rearranges the visible controls.
-- **Profiles for each console.** Independent control zones and mappings survive
-  switching between Game Boy, Color, Advance, and SNES. Older settings migrate
-  forward without resetting valid custom layouts.
-- **A tactile ROM shelf.** Browse games by console in a horizontal library with
-  locally rendered cartridge silhouettes and optional artwork stored alongside
-  your ROMs. Drag, flick, or use Previous and Next.
-- **Sixteen visual themes.** Choose light and dark palettes and customize the
-  on-video labels, tint strength, outlines, and optional PNG zone artwork.
-- **Keyboard play and game audio.** Play directly in the embedded display;
-  camera controls can be paused without disabling manual input.
-- **Local by design.** Tracking and gameplay run on your computer. The core
-  downloader needs internet access only when building or preparing source.
+See [3.0 engineering status](ROADMAP.md) and [#24](https://github.com/MasynNay/anything-plays/issues/24) for the distinction between implemented code, native homebrew diagnostics and release approval.
 
-## Get started
+## Downloading a release
 
-### Install a packaged application
+Use the [GitHub Releases page](https://github.com/MasynNay/anything-plays/releases).
+A future 3.0 *application* release will present four prominent downloads:
 
-Published builds will be listed on the
-[GitHub Releases page](https://github.com/MasynNay/anything-plays/releases).
-These **planned v2.0 filenames** must be verified against the final release:
+- Windows x64: `AnythingPlaysSetup-3.0.0.exe`
+- Mac with Apple Silicon: `AnythingPlays-3.0.0-macos-arm64.dmg`
+- Mac with Intel: `AnythingPlays-3.0.0-macos-x64.dmg`
+- Ubuntu / Debian x64: `anything-plays_3.0.0_amd64.deb`
 
-| Platform | Planned artifact |
-| :-- | :-- |
-| Windows x64 | `AnythingPlaysSetup-2.0.0.exe` |
-| macOS Apple Silicon | `AnythingPlays-2.0.0-macos-arm64.dmg` |
-| macOS Intel | `AnythingPlays-2.0.0-macos-x86_64.dmg` |
-| Ubuntu/Debian x64 | `anything-plays_2.0.0_amd64.deb` |
+A `SHA256SUMS.txt` is the fifth user-facing artifact. Reviewed emulator
+packs live under a **separate 3.0 emulator-pack catalog release**, so they
+do not clutter the main installer downloads. The release notes link to
+source/license details, while the installers carry the required notices.
+**These 3.0 filenames are planned; no stable 3.0 installers are published yet.**
 
-Packaged installations do not require separate Python setup. Windows builds are
-currently unsigned and may prompt SmartScreen. macOS builds are ad-hoc signed
-but not Apple Developer ID notarized, so Gatekeeper may require manual approval.
-Use the published checksums to verify any downloaded installer.
-
-### Run from source
-
-Python **3.12** is the locally tested development version; the CI workflow also
-checks Python 3.13. Install Tkinter and a compatible operating-system video
-backend. On macOS, Homebrew users may need `python-tk@3.12`; on Ubuntu/Debian,
-install `python3-tk`, `libgl1`, and `libportaudio2` if needed.
-
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python fetch_mgba_core.py
-python app.py
-```
-
-On Windows, create the environment with `py -3.12 -m venv .venv` and activate it
-with `.venv\Scripts\activate`. On platforms where your configured Python isn't
-named `python3.12`, use its actual executable. The downloader retrieves matching
-native libraries from the Libretro buildbot; it also creates
-`cores/CORE_PROVENANCE.json` with source URLs, SHA-256 hashes and the cores'
-reported version/source revision when available.
-
-### The first five minutes
-
-1. **Choose a console.** Pick GB, GBC, GBA, or SNES in the game panel.
-2. **Choose a ROM folder.** The shelf displays files supported by that console.
-3. **Open a game.** Click a cartridge or use *Open game ROM*.
-4. **Choose how to play.** Click the game screen to use the keyboard, or start a
-   webcam and click *Pick color from video* to sample the moving target.
-5. **Enable object controls.** Arrange the control zones and choose *Enable
-   object controls*. Press **Esc** or the prominent Stop button to halt camera
-   input immediately.
-
-Bright, even lighting and a target color that contrasts with its surroundings
-produce the most reliable tracking.
-
-### Manual keyboard controls
-
-| Key | In-game button |
-| :-- | :-- |
-| Arrow keys | D-pad |
-| Z / X | A / B |
-| A / S | Y / X (SNES) |
-| Q / W | L / R (GBA/SNES) |
-| Enter | Start |
-
-Click the game display first to give it keyboard focus. Select is available
-through the on-camera mapping controls; this version does not assign it a
-keyboard shortcut.
-
-## How it works
-
-```text
-Camera frame ──► HSV color tracker ──► Zone hit test ──► Timed joypad input ─┐
-                                                                           │
-Focused keyboard ───────────────────────────────► Manual joypad input ─────┤
-                                                                           ▼
-ROM library ─► System/core selection ─────────────────────────────► Libretro worker
-                                                                           │
-                                                   ┌───────────────────────┤
-                                                   ▼                       ▼
-                                             RGB video frame            Game audio
-                                                   │
-                                                   ▼
-                                              Tkinter display
-```
-
-The Tkinter event loop owns UI widgets and camera previews. A separate worker
-owns the emulator core, including its callback pointers, save files, and frame
-clock. Camera detection, audio queues, pixel conversion, and ROM discovery are
-split into testable modules. See [architecture guide](docs/ARCHITECTURE.md) for the design
-and threading invariants.
-
-## Repository structure
+## Repository layout
 
 ```text
 anything-plays/
-├── anything_plays/       Application, UI, tracking and Libretro adapters
-├── app.py                Desktop application entry point
-├── tests/                Unit, integration and headless UI tests
-├── assets/               Branded artwork and application icons
-├── licenses/             Third-party license texts
-├── docs/                 Architecture, release notes and compliance tracking
-│   └── history/          Archived development snapshots
-├── .github/workflows/    Continuous integration and release build workflow
-├── build_windows.bat     Windows installer
-├── build_macos_dmg.sh    macOS disk image
-├── build_linux_deb.sh    Debian package
-├── fetch_mgba_core.py    Build-time Libretro downloader
-└── verify_bundle.py      License-presence and core-integrity verification
+├── app.py                   # Desktop application entry point
+├── anything_plays/          # Emulators, camera controls, UI, storage
+├── assets/                  # Approved icons and art
+├── packaging/               # Windows, macOS, Linux builds + installer script
+├── tools/                   # Diagnostic, provenance and validation tooling
+├── tests/                   # Unit, integration and native playback tests
+├── config/                  # Fail-closed release acceptance records
+├── licenses/                # Third-party notices distributed with the app
+├── docs/                    # Architecture, release, QA and development guides
+├── .github/workflows/       # Automated build and verification pipelines
+├── fetch_mgba_core.py       # Core acquisition API, shared by CI and tooling
+├── verify_bundle.py         # Cross-platform installation audit API
+└── requirements*.txt        # Runtime and build dependencies
 ```
 
-The application logic is in the `anything_plays` Python package; `app.py`
-remains the stable launcher. Files in `docs/history/` describe past development,
-not the current build status. No ROMs, BIOS files or third-party core binaries
-are committed to this repository.
+The core acquisition and bundle-verification entry points stay at the root
+because existing Python tests, developer automation and release tooling
+import them directly. Generated PyInstaller `.spec` files are not tracked. CI also enforces a clean root and excludes generated installers, third-party emulator binaries, and game ROMs through the [repository hygiene checker](tools/check_repository_hygiene.py).
 
-## Develop and test
+## Developing
+
+Use Python 3.12 or 3.13 with Tkinter. From the repository root:
 
 ```bash
-python -m unittest discover -s tests -v
-python -m compileall -q app.py anything_plays fetch_mgba_core.py verify_bundle.py tests
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -p "test_*.py"
+python app.py
 ```
 
-On a Linux machine with Xvfb installed, you can also run the optional UI smoke
-check without a physical monitor:
-
-```bash
-PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
-```
-
-The tests cover console profiles, source compatibility, tracking, button timing,
-ROM discovery, cartridge artwork, audio buffering, video pixel formats, save
-files, and a small synthetic Libretro native integration test on Linux. **They
-are not a substitute for playing actual games with a real webcam on the target
-platforms.** Use the [QA checklist](docs/QA_CHECKLIST.md) before shipping.
-
-### Build for your platform
-
-| Host | Build command | Target |
-| :-- | :-- | :-- |
-| Windows | `build_windows.bat` | PyInstaller + Inno Setup installer |
-| macOS | `bash build_macos_dmg.sh` | `.app` and DMG |
-| Ubuntu/Debian | `bash build_linux_deb.sh` | `.deb` package |
-
-Build on the target OS and architecture. The scripts download both required emulator
-cores, package them with their provenance manifest, and fail if a required core
-cannot be retrieved. They also include installed Python distribution license
-files and a version inventory for third-party attribution review.
-**Development builds still use changing nightly archives.** Official release
-builds require an explicit [approved core lock](docs/CORE_RELEASE_PINNING.md)
-with matching hashes and corresponding source records; the initial lock is
-unapproved. Platform installers require an independent third-party
-redistribution review before public publication.
-
-Public release packaging and publishing are currently disabled in
-`.github/workflows/release.yml`, including automatic version-tag triggers.
-Source and native-core regression checks still run through CI. Do not create
-a v2.0 release tag until the bundled-core redistribution requirements are
-resolved and an intentional release approval process is enabled.
-
-## Settings and saves
-
-To keep existing installations compatible, Anything Plays intentionally retains
-its original preference location:
+Create a local 3.0 *starter preview* (not an approved public release) by
+setting `AP_V30_MINIMAL_CORE_BUILD=1`, then running the build script for
+your system:
 
 ```text
-~/.config/fish-plays-pokemon-studio/preferences.json
-~/.config/fish-plays-pokemon-studio/system_profiles.json
+Windows:  packaging\build_windows.bat
+macOS:    bash packaging/build_macos_dmg.sh
+Linux:    bash packaging/build_linux_deb.sh
 ```
 
-Each console remembers its ROM folder and profile independently. Battery-backed
-game progress is saved as `<rom-name>.sav` beside the source ROM. Back up your
-ROMs, `.sav` files, and settings before replacing an installed build.
+Test builds have independent installation identities and preference
+directories so they cannot overwrite the published 2.0 application.
 
-## Project resources
+## Community and security
 
-- [Public development roadmap](ROADMAP.md)
-- [Architecture and module boundaries](docs/ARCHITECTURE.md)
-- [Pre-release QA checklist](docs/QA_CHECKLIST.md)
-- [Release candidate notes](docs/RELEASE_NOTES.md)
-- [Historical refactor report](docs/history/REFACTOR_REPORT.md)
-- [Contributing guide](CONTRIBUTING.md)
-- [Security reporting](SECURITY.md)
-- [Third-party components and licensing](docs/THIRD_PARTY_COMPONENTS.md)
+See the [3.0 engineering status](ROADMAP.md) and open [3.0 tracking issues](https://github.com/MasynNay/anything-plays/issues) for current work.
 
-## Free and open source
+See the [documentation index](docs/README.md), [workflow guide](.github/README.md), [Contributing](CONTRIBUTING.md), [Security](SECURITY.md),
+[Code of Conduct](CODE_OF_CONDUCT.md),
+[Third-party licenses](docs/THIRD_PARTY_NOTICES.md) and the
+[3.0 release organization policy](docs/V3_RELEASE_STRUCTURE.md).
 
-Anything Plays is intended to remain **completely free of charge**,
-with no advertisements, donations, subscriptions, or paid functionality.
+Neither commercial game ROMs nor BIOS/firmware are supplied. Only use
+game files you are entitled to run. No automatic public release is permitted
+without a reviewed third-party source/license inventory and real packaged-app
+verification.
 
-Original Anything Plays source code is made available under the
-[MIT License](LICENSE), to the extent its contributors have the
-right to license it.
-
-The MIT License permits commercial reuse of MIT-covered code.
-This does not change the project's commitment to providing
-official releases free of charge.
-
-### Third-party emulator licenses
-
-Anything Plays uses independently developed emulator cores. Public binary
-builds use mGBA for GB/GBC/GBA and Snes9x for SNES:
-
-- **mGBA:** Mozilla Public License 2.0
-- **Snes9x:** Custom noncommercial license
-
-These components are not covered by the Anything Plays MIT License.
-**Only the project's original MIT-licensed code is represented as open source
-under MIT.** Because Snes9x has noncommercial restrictions, the complete
-bundled installer must not be described as wholly OSI-approved open source.
-Official Anything Plays downloads will nevertheless remain free of charge.
-
-See [Third-Party Notices](docs/THIRD_PARTY_NOTICES.md) for attribution,
-license information, and outstanding redistribution requirements.
-
-**Bundled installers are not approved for public release until
-third-party licensing and source distribution obligations have
-been resolved.**
-
-Anything Plays is an independent project and is not affiliated with or endorsed
-by Nintendo, Pokémon, Libretro, Gambatte, mGBA, or Snes9x.
+Licensed under [MIT](LICENSE) for project-owned code; native emulator cores
+retain their respective third-party licenses.

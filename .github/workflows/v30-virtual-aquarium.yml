@@ -1,0 +1,60 @@
+name: Anything Plays 3.0 | Virtual aquarium camera acceptance
+
+# Exercise the *real* application pipeline without depending on an aquarium,
+# a physical webcam or a commercial game ROM. Track multiple moving targets,
+# validate the optional checkbox, both joypad ports and STOP/disconnect.
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-virtual-aquarium.yml'
+      - 'tests/simulate_aquarium.py'
+      - 'app.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_gameplay.py'
+      - 'anything_plays/libretro_input.py'
+      - 'anything_plays/tracking.py'
+      - 'anything_plays/ui_panels.py'
+      - 'anything_plays/system_profiles.py'
+      - 'anything_plays/settings_defaults.py'
+      - 'anything_plays/zone_rendering.py'
+      - 'anything_plays/ui_profiles.py'
+      - 'anything_plays/ui_volume.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virtual-aquarium-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  virtual-aquarium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Provide headless Tk, OpenCV and audio library dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install application requirements
+        run: python -m pip install -r requirements.txt
+      - name: Simulate real Tk camera input and native controller callbacks
+        run: PYTHONPATH=. xvfb-run -a python tests/simulate_aquarium.py
+      - name: Preserve scenario results even after a test failure
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-VIRTUAL-AQUARIUM-ACCEPTANCE
+          path: test-evidence/virtual-aquarium-input.json
+          if-no-files-found: warn
+          retention-days: 30

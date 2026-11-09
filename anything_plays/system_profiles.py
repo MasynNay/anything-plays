@@ -10,12 +10,31 @@ import json
 import math
 from pathlib import Path
 
+from anything_plays.atomic_storage import write_json_atomically
+
 
 BUTTONS_BY_SYSTEM = {
     "gb": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
     "gbc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
     "gba": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "L", "R"),
     "snes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y", "L", "R"),
+    "nes": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "genesis": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "Mode", "C"),
+    "mastersystem": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "gamegear": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "sg1000": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "atari2600": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "atari7800": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "pce": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ngp": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ngpc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select"),
+    "ws": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y"),
+    "wsc": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Select", "X", "Y"),
+    # N64 and GameCube use camera-to-controller bridges while their 3D
+    # video is still rendered in an external GPU window.
+    "n64": ("Left", "Up", "Right", "A", "Start", "B", "Down", "Z", "L", "R", "C Up", "C Down", "C Left", "C Right"),
+    "gamecube": ("Left", "Up", "Right", "A", "Start", "B", "Down", "X", "Y", "Z", "L", "R",
+                 "C Up", "C Down", "C Left", "C Right"),
 }
 
 DISABLED_MAPPING = "(None)"
@@ -30,27 +49,54 @@ def enabled_zones(profile, system):
     ]
 
 
-def fit_to_grid(profile, system):
-    """Fit enabled buttons into equal cells, centering an incomplete last row.
+def _grid_cells(count):
+    """Return evenly sized, symmetric grid slots for enabled control zones.
 
-    Disabled buttons retain their saved rectangles so re-enabling them does
-    not discard the user's previous layout. Shuffle is handled separately.
+    Incomplete final rows occupy whole columns so Shuffle can never hang
+    outside the same grid or partially overlap a neighboring control.
     """
-    buttons = enabled_zones(profile, system)
-    if not buttons:
+    columns = 3 if count <= 11 else 5
+    rows = math.ceil(count / columns)
+    full_rows, remainder = divmod(count, columns)
+    positions = [
+        (column, row)
+        for row in range(full_rows)
+        for column in range(columns)
+    ]
+    if remainder:
+        if columns == 3 and remainder == 2:
+            final_columns = (0, 2)
+        elif columns == 5 and remainder == 2:
+            final_columns = (1, 3)
+        elif columns == 5 and remainder == 4:
+            final_columns = (0, 1, 3, 4)
+        else:
+            first = (columns - remainder) // 2
+            final_columns = range(first, first + remainder)
+        positions.extend((column, full_rows) for column in final_columns)
+    return columns, rows, positions
+
+
+def fit_to_grid(profile, system):
+    """Snap all visible controls, including Shuffle, into equal grid cells.
+
+    Disabled button zones and the hidden Shuffle zone retain their stored
+    rectangles so they can be enabled again without losing their positions.
+    """
+    names = enabled_zones(profile, system)
+    if profile.get("shuffle_enabled", True):
+        names.append("Shuffle")
+    if not names:
         return profile
 
-    columns = math.ceil(math.sqrt(len(buttons)))
-    rows = math.ceil(len(buttons) / columns)
+    columns, rows, positions = _grid_cells(len(names))
     zones = profile.setdefault("zones", {})
-
-    for index, button in enumerate(buttons):
-        row, column = divmod(index, columns)
-        buttons_in_row = min(columns, len(buttons) - row * columns)
-        offset = (columns - buttons_in_row) / 2
-        left = (column + offset) / columns
-        zones[button] = [
-            left, row / rows, left + 1 / columns, (row + 1) / rows
+    for name, (column, row) in zip(names, positions):
+        zones[name] = [
+            column / columns,
+            row / rows,
+            (column + 1) / columns,
+            (row + 1) / rows,
         ]
     return profile
 
@@ -59,28 +105,8 @@ def default_for(system, base):
     """Build an independent, horizontally balanced layout for one console."""
     profile = copy.deepcopy(base)
     buttons = BUTTONS_BY_SYSTEM[system]
-    cell_count = len(buttons) + 1  # Reserve a separate cell for Shuffle.
-    columns, rows = (
-        (3, 3) if cell_count == 9
-        else (3, 4) if cell_count == 11
-        else (5, 3)
-    )
-
-    full_rows, remainder = divmod(cell_count, columns)
-    positions = [
-        (column, row)
-        for row in range(full_rows)
-        for column in range(columns)
-    ]
-    if remainder:
-        # Two cells in a three-column row belong on opposite sides.
-        if columns == 3 and remainder == 2:
-            final_columns = (0, 2)
-        else:
-            first = (columns - remainder) // 2
-            final_columns = range(first, first + remainder)
-        positions.extend((column, full_rows) for column in final_columns)
-
+    count = len(buttons) + 1  # Shuffle has an equal-sized, separate grid cell.
+    columns, rows, positions = _grid_cells(count)
     profile["zones"] = {
         button: [column / columns, row / rows,
                  (column + 1) / columns, (row + 1) / rows]
@@ -128,6 +154,28 @@ def normalize(system, profile, base):
         for button in result["mapping"]:
             if mapping.get(button) in allowed:
                 result["mapping"][button] = mapping[button]
+
+    # Never let a malformed imported color/profile silently enable player 2
+    # or flood the camera driver. Older profiles inherit safe defaults.
+    rgb2 = profile.get("rgb2")
+    if (isinstance(rgb2, (list, tuple)) and len(rgb2) == 3
+            and all(type(x) is int and 0 <= x <= 255 for x in rgb2)):
+        result["rgb2"] = list(rgb2)
+    else:
+        result["rgb2"] = list(base.get("rgb2", [255, 30, 180]))
+    for key, default in (("color2_enabled", False),
+                         ("multi_fish_enabled", False)):
+        value = profile.get(key, default)
+        result[key] = value if type(value) is bool else default
+    player = profile.get("color2_player", "Player 2")
+    result["color2_player"] = (
+        player if player in ("Player 1", "Player 2") else "Player 2"
+    )
+    mode = profile.get("camera_input_mode", "Held while visible")
+    result["camera_input_mode"] = (
+        mode if mode in ("Held while visible", "Pulse (classic)")
+        else "Held while visible"
+    )
     return result
 
 
@@ -159,9 +207,4 @@ class ProfileStore:
     def put(self, system, profile):
         """Validate and persist a console profile without partial JSON writes."""
         self.profiles[system] = normalize(system, profile, self.base)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(self.profiles, indent=2), encoding="utf-8"
-        )
-        temporary.replace(self.path)
+        write_json_atomically(self.path, self.profiles)

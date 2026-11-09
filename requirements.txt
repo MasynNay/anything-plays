@@ -3,3 +3,5 @@ numpy>=1.26,<3
 Pillow>=10,<13
 pyobjc-framework-AVFoundation>=10; sys_platform == "darwin"
 sounddevice>=0.5,<1
+# Small native WGL/CGL backend for hidden GameCube GL on Windows/Mac
+glcontext==3.0.0

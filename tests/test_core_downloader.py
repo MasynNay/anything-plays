@@ -12,6 +12,7 @@ from fetch_mgba_core import (
     _validate_binary,
     build_target,
     reported_git_revision,
+    _inspect_core_identity_isolated,
 )
 
 
@@ -113,6 +114,37 @@ class DownloaderTests(unittest.TestCase):
             self.assertEqual(result["archive_sha256"],
                              hashlib.sha256(original).hexdigest())
             self.assertEqual(result["archive_size_bytes"], len(original))
+
+    def test_windows_native_metadata_probe_releases_dll_in_child_process(self):
+        import json
+        from subprocess import CompletedProcess
+
+        metadata = {
+            "libretro_library_name": "Stella 2014",
+            "libretro_library_version": "3.9",
+            "reported_source_revision": None,
+        }
+        output = "Native status message\nAP_NATIVE_IDENTITY=" + json.dumps(metadata) + "\n"
+        with patch("fetch_mgba_core.subprocess.run",
+                   return_value=CompletedProcess([], 0, output, "")) as run:
+            value = _inspect_core_identity_isolated(
+                Path("temporary-libretro.dll"), "stella2014"
+            )
+        self.assertEqual(value, metadata)
+        argv = run.call_args.args[0]
+        self.assertEqual(argv[1], "-c")
+        self.assertIn("_inspect_core_identity_in_process", argv[2])
+        self.assertEqual(argv[-1], "stella2014")
+        self.assertEqual(run.call_args.kwargs["timeout"], 20)
+
+    def test_windows_identity_subprocess_crash_fails_closed(self):
+        from subprocess import CompletedProcess
+        with patch("fetch_mgba_core.subprocess.run",
+                   return_value=CompletedProcess([], 1, "", "native crash")):
+            with self.assertRaisesRegex(RuntimeError, "native crash"):
+                _inspect_core_identity_isolated(
+                    Path("temporary-libretro.dll"), "stella2014"
+                )
 
     def test_unsupported_platform_rejected(self):
         with self.assertRaises(ValueError):

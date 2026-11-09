@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "policy": "All 18 listed consoles must play offline from a single installer containing their native emulators and required assets. No downloads of emulator applications, cores, or firmware after installation; separately approved in-app core updates remain optional. Require real video, sound, input, saves and long-run testing on each platform before release.",
+  "systems": {
+    "gb": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "gbc": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "gba": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "snes": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "nes": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "genesis": {
+      "bundled": true,
+      "in_app_video": true,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "n64": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": true,
+      "real_game_verified": false,
+      "notes": "Owner already confirmed real N64 gameplay and repeated ROM unload/reload without restarting the app, with successful cross-platform preview testing. These owner observations must not be erased or retested merely because the final production installer/source SHA has not been approved; formal final-installer input/audio/save/endurance matrix remains separately pending.",
+      "primary_runtime": "embedded-libretro-software",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "gamecube": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "Owner already confirmed Dolphin/GameCube works on macOS and Windows and later on Linux after the bundled Dolphin Sys permission fix. Do not ask the owner to repeat that working gameplay. Exact production build identity, full per-profile audio/input/save/endurance evidence and third-party source/license compliance remain separately pending.",
+      "primary_runtime": "embedded-libretro-hardware",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "mastersystem": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "gamegear": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "sg1000": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "atari2600": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "atari7800": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "pce": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "ngp": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "ngpc": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "ws": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    },
+    "wsc": {
+      "bundled": true,
+      "in_app_video": false,
+      "camera_controls": false,
+      "real_game_verified": false,
+      "notes": "New in-app 3.0 preview library. Packaging and real-game validation are still required.",
+      "audio_verified": false,
+      "bundled_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359 (18 profiles / 11 native cores / bundled Dolphin Sys; this is package inclusion only, not full compatibility)"
+    }
+  },
+  "platform_validation": {
+    "windows-x64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": true,
+      "offline_bundle_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359"
+    },
+    "macos-arm64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": true,
+      "offline_bundle_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359"
+    },
+    "macos-x86_64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": true,
+      "offline_bundle_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359"
+    },
+    "linux-x64": {
+      "clean_install": false,
+      "all_consoles_verified": false,
+      "long_run_verified": false,
+      "all_consoles_bundled_offline": true,
+      "offline_bundle_evidence": "https://github.com/MasynNay/anything-plays/actions/runs/42432952359"
+    }
+  },
+  "required_release_evidence": {
+    "third_party_license_audit_complete": false,
+    "no_external_emulator_setup_required": true,
+    "packaged_binary_integrity_verified": true,
+    "no_runtime_emulator_download_required": true,
+    "offline_runtime_evidence": {
+      "verification_type": "STAGED-NATIVE-RUNTIME-RESOLUTION-ONLY",
+      "workflow": "https://github.com/MasynNay/anything-plays/actions/runs/42448004780",
+      "verified_commit": "2b6e0c687577b8d847ed35dcb4f10b808e5b9367",
+      "profiles_resolved_per_platform": 18,
+      "native_sha256_verified_per_platform": 11,
+      "targets": [
+        "windows-x64",
+        "linux-x64",
+        "macos-arm64",
+        "macos-x64"
+      ],
+      "strict_network_denial": true,
+      "fresh_core_pack_store": true,
+      "third_party_emulator_needed": false,
+      "public_distribution_approved": false,
+      "physical_install_and_gameplay_verified": false,
+      "legal_redistribution_review_complete": false,
+      "statement": "All 4 actual installer lab jobs passed against staged native binaries; source-built and native runtime proof only, no real-game, physical install, or license approval."
+    }
+  },
+  "evidence_notes": "Four-platform staged installer native runtime selection proven for 18/18 system profiles and 11/11 SHA-256 matched cores per platform, from successful GitHub Actions run 42448004780 (commit 2b6e0c68). Two exact standalone setup/download flags now true; game video, audio, physical clean-install, NGP mono sound, cross-core legal compatibility, corresponding binary source, and release approval remain UNVERIFIED. Do not publish 3.0 until independent release gates succeed."
+}

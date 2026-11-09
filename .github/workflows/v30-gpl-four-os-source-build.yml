@@ -1,0 +1,229 @@
+name: Anything Plays 3.0 | Four-platform pinned GPL candidate research
+# Eight ORIGINAL source-built candidates, no public emulator/installer release.
+# GPLv3-only may be incompatible with other GPLv2-only embedded components.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-gpl-four-os-source-build.yml'
+      - 'tests/test_v30_gpl_four_os_research.py'
+      - 'tools/capture_v30_gpl_alternative_source_build.py'
+      - 'tools/probe_v30_blastem_genesis_variant.py'
+      - 'tools/bsnes_mingw_vasprintf_compat.h'
+      - 'tools/v30_windows_gpl_lab/sitecustomize.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v30-gpl-four-os-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-built-replacement-candidates:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, candidate: bsnes, repo: libretro/bsnes, ref: '63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7', path: research/bsnes-src, native: bsnes_libretro.so}
+          - {runner: ubuntu-24.04, target: linux-x64, candidate: blastem, repo: libretro/blastem, ref: '2230addc4dd74dd094fd264987fd808abba32d0e', path: research/blastem-src, native: blastem_libretro.so}
+          - {runner: windows-2025, target: windows-x64, candidate: bsnes, repo: libretro/bsnes, ref: '63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7', path: research/bsnes-src, native: bsnes_libretro.dll}
+          - {runner: windows-2025, target: windows-x64, candidate: blastem, repo: libretro/blastem, ref: '2230addc4dd74dd094fd264987fd808abba32d0e', path: research/blastem-src, native: blastem_libretro.dll}
+          - {runner: macos-15, target: macos-arm64, candidate: bsnes, repo: libretro/bsnes, ref: '63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7', path: research/bsnes-src, native: bsnes_libretro.dylib}
+          - {runner: macos-15, target: macos-arm64, candidate: blastem, repo: libretro/blastem, ref: '2230addc4dd74dd094fd264987fd808abba32d0e', path: research/blastem-src, native: blastem_libretro.dylib}
+          - {runner: macos-15-intel, target: macos-x64, candidate: bsnes, repo: libretro/bsnes, ref: '63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7', path: research/bsnes-src, native: bsnes_libretro.dylib}
+          - {runner: macos-15-intel, target: macos-x64, candidate: blastem, repo: libretro/blastem, ref: '2230addc4dd74dd094fd264987fd808abba32d0e', path: research/blastem-src, native: blastem_libretro.dylib}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    env:
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+      V30_CANDIDATE: ${{ matrix.candidate }}
+      V30_SOURCE_ROOT: ${{ matrix.path }}
+      V30_NATIVE_NAME: ${{ matrix.native }}
+      V30_TARGET: ${{ matrix.target }}
+      V30_PINNED_REV: ${{ matrix.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ matrix.ref }}
+          path: ${{ matrix.path }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact upstream checkout and original GPLv3 text
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$V30_SOURCE_ROOT" rev-parse HEAD)" = "$V30_PINNED_REV"
+          if [[ "$V30_CANDIDATE" == bsnes ]]; then
+            grep -i 'version 3 of the license' "$V30_SOURCE_ROOT/LICENSE.txt"
+          else
+            grep 'Version 3' "$V30_SOURCE_ROOT/COPYING"
+          fi
+      - name: Install Windows x64 upstream compiler (research only)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Install Linux compiler and original Libretro A-V dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends make gcc g++ xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Build pinned Linux GPLv3 native from original source
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [[ "$V30_CANDIDATE" == bsnes ]]; then
+            make -C research/bsnes-src -j 3 platform=unix
+          else
+            make -C research/blastem-src -f Makefile.libretro -j 3 core
+          fi
+      - name: Build pinned macOS native on genuine Apple Silicon or Intel runner
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [[ "$V30_CANDIDATE" == bsnes ]]; then
+            # The pinned 2019 makefile advertises a macOS 10.1 minimum,
+            # incompatible with modern Intel SDK struct stat declarations.
+            # Later EXTRA_INCLUDES compiler flag overrides that obsolete 10.1
+            # target without modifying one byte of the reviewed upstream tree.
+            if [[ "$V30_TARGET" == macos-x64 ]]; then
+              # Apple Xcode 16.4's newer ld assertion-fails when linking
+              # this pinned, unchanged 2019 Intel bsnes source. Select the
+              # Apple-maintained classic ld for this isolated older build.
+              make -C research/bsnes-src -j 3 platform=osx EXTRA_INCLUDES="-mmacosx-version-min=10.15 -D_DARWIN_C_SOURCE" LDFLAGS="-fPIC -dynamiclib -Wl,-ld_classic"
+            else
+              make -C research/bsnes-src -j 3 platform=osx
+            fi
+          else
+            make -C research/blastem-src -f Makefile.libretro -j 3 core
+          fi
+      - name: Build pinned Windows x64 native with MSYS2 MINGW64
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          if [[ "$V30_CANDIDATE" == bsnes ]]; then
+            # GNU make's EXTRA_INCLUDES is appended to both C and C++
+            # compilation. Only C receives a guarded legacy vasprintf shim.
+            # Original tracked bsnes source and GPL notice stay pristine.
+            make -C research/bsnes-src -j 3 platform=win EXTRA_INCLUDES="-include $(pwd)/tools/bsnes_mingw_vasprintf_compat.h"
+          else
+            make -C research/blastem-src -f Makefile.libretro -j 3 core
+          fi
+      - name: Preserve source-built native library, immutable Git source TAR and exact GPLv3 notice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_gpl_alternative_source_build \
+            --source "$V30_SOURCE_ROOT" --native "$V30_SOURCE_ROOT/$V30_NATIVE_NAME" \
+            --candidate "$V30_CANDIDATE" --target "$V30_TARGET" \
+            --output "test-evidence/$V30_CANDIDATE-$V30_TARGET"
+          (cd "test-evidence/$V30_CANDIDATE-$V30_TARGET" && sha256sum -c SHA256SUMS.txt)
+      - name: Install frontend and original homebrew audio/video dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Register actual MSYS2 DLL import directory inside nested Windows Python native probes
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          # Confirm the EXACT DLL imported by the original source-built
+          # bsnes PE image (independently inspected with objdump -p).
+          test -f /mingw64/bin/libwinpthread-1.dll
+          native_folder="$(cygpath -w /mingw64/bin)"
+          test -n "$native_folder"
+          echo "AP_V30_MINGW_CI_DLL_DIR=$native_folder" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/tools/v30_windows_gpl_lab" >> "$GITHUB_ENV"
+          echo "Loaded source-build toolchain DLL folder for research only"
+      - name: Test original SNES source-generated PPU/SPC gameplay with freshly built bsnes
+        if: matrix.candidate == 'bsnes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/probe_snes_homebrew.py --core "$V30_SOURCE_ROOT/$V30_NATIVE_NAME" \
+            --seconds 12 --report "test-evidence/$V30_CANDIDATE-$V30_TARGET/SNES_AV_UNAPPROVED.json"
+      - name: Test original Genesis TMSS-safe homebrew and Master System/Game Gear/SG1000 with freshly built BlastEm
+        if: matrix.candidate == 'blastem'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/probe_v30_blastem_genesis_variant.py --core "$V30_SOURCE_ROOT/$V30_NATIVE_NAME" \
+            --seconds 12 --report "test-evidence/$V30_CANDIDATE-$V30_TARGET/GENESIS_AV_UNAPPROVED.json"
+          for system in mastersystem gamegear sg1000; do
+            python tools/probe_sega8_homebrew.py --system "$system" \
+              --core "$V30_SOURCE_ROOT/$V30_NATIVE_NAME" \
+              --seconds 12 --report "test-evidence/$V30_CANDIDATE-$V30_TARGET/$system-AV_UNAPPROVED.json"
+          done
+      - name: Test two genuinely isolated Sega native child lifecycles and bounded video transport
+        if: matrix.candidate == 'blastem'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/probe_v30_isolated_sega_process.py \
+            --core "$V30_SOURCE_ROOT/$V30_NATIVE_NAME" --seconds 6 \
+            --report "test-evidence/$V30_CANDIDATE-$V30_TARGET/ISOLATED_SEGA_PROCESS_UNAPPROVED.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('test-evidence')/(os.environ['V30_CANDIDATE']+'-'+os.environ['V30_TARGET'])/'ISOLATED_SEGA_PROCESS_UNAPPROVED.json'
+          data=json.loads(p.read_text('utf-8'))
+          assert data['tested_system']=='mastersystem' and data['process_cycles']==2
+          assert data['passed'] is True and len(data['cycles'])==2
+          assert all(c['passed'] and c['worker_terminated'] and c['distinct_rgb_frames']>=2 for c in data['cycles'])
+          for flag in ('legal_separation_or_aggregation_approved','combined_license_review_complete',
+                       'public_binary_distribution_approved','physical_speaker_audio_verified',
+                       'physical_camera_controls_verified','save_reload_verified'):
+              assert data[flag] is False
+          print('Two true original Master System process lifecycles passed; rights approval FALSE')
+          PY
+      - name: Require actual native A-V and separately false combined licensing/release approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          where=Path('test-evidence')/(os.environ['V30_CANDIDATE']+'-'+os.environ['V30_TARGET'])
+          manifest=json.loads((where/'PINNED_GPL_ALTERNATIVE_SOURCE_BUILD_UNAPPROVED.json').read_text())
+          assert manifest['target']==os.environ['V30_TARGET']
+          assert manifest['source_commit']==os.environ['V30_PINNED_REV']
+          assert manifest['compiled_from_exact_pinned_source_checkout'] is True
+          for name in ('public_binary_distribution_approved','source_to_binary_independently_reproducible',
+                       '3_0_native_core_substitution_approved','combined_gpl_2_and_gpl_3_license_reviewed'):
+              assert manifest[name] is False
+          # Genesis uses an underscore; the three original Sega-8 reports
+          # use '-AV', so a single '*_AV' glob silently omits 3 REAL passes.
+          filenames=(['SNES_AV_UNAPPROVED.json'] if os.environ['V30_CANDIDATE']=='bsnes'
+                     else ['GENESIS_AV_UNAPPROVED.json',
+                           'mastersystem-AV_UNAPPROVED.json',
+                           'gamegear-AV_UNAPPROVED.json',
+                           'sg1000-AV_UNAPPROVED.json'])
+          reports=[where/name for name in filenames]
+          expect=1 if os.environ['V30_CANDIDATE']=='bsnes' else 4
+          assert len(reports)==expect and all(p.is_file() for p in reports), (expect,reports)
+          for p in reports:
+              row=json.loads(p.read_text())
+              assert row.get('passed') is True and row.get('native_exit_code')==0, p
+              assert row.get('details',{}).get('passed') is True,p
+              print('TRUE ORIGINAL SOURCE-BUILT NATIVE A/V:',p.name,os.environ['V30_TARGET'])
+          print('Research source/native evidence passed; public release approved: FALSE')
+          PY
+      - name: Retain authenticated original source + source-built native + license and A-V proof (UNAPPROVED)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-GPL-FOUR-OS-${{ matrix.candidate }}-${{ matrix.target }}-UNAPPROVED
+          path: test-evidence/${{ matrix.candidate }}-${{ matrix.target }}/
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "status": "DEVELOPER_PREVIEW_ONLY_NOT_PUBLIC_RELEASE_APPROVAL",
+  "reviewed_at": "2026-11-07",
+  "builder_run": "https://github.com/MasynNay/anything-plays/actions/runs/42426209611",
+  "source_commit": "43cc14b572b039b0d0074fa4726ed4d65ffd764b",
+  "statement": "Outer installer SHA-256 compared against each downloaded artifact's manifest; Linux core SHA-256 and byte sizes compared independently with its unpacked DEB and bundled CORE_PROVENANCE.json. Resolved upstream Git commits are verified Git objects, NOT proof of binary/source correspondence. NO third-party license or public distribution approval.",
+  "installers": {
+    "windows-x64": {
+      "filename": "AnythingPlaysSetup-3.0.0-alpha.1.exe",
+      "sha256": "4f2185a09cb4e10a56b43dac8e2d61d7d1b6d84439b1e649f75608de74ae1f6f",
+      "size_bytes": 67882762
+    },
+    "linux-x64": {
+      "filename": "anything-plays-preview_3.0.0~alpha1_amd64.deb",
+      "sha256": "125f53aadfca1b68ed833d07bfebd5763086b02529c8b6e9342a5df40bb26d8c",
+      "size_bytes": 100709588
+    },
+    "macos-arm64": {
+      "filename": "AnythingPlays-3.0.0-alpha.1.dmg",
+      "sha256": "8f786e76e05269a6c4b94092df3a263dfc183094ae95d6252106e842e252a483",
+      "size_bytes": 108444880
+    },
+    "macos-x64": {
+      "filename": "AnythingPlays-3.0.0-alpha.1.dmg",
+      "sha256": "0ffd191de1350a855765cc3c4dab2c6d2db63b6ac702405f2ca773b5405284ec",
+      "size_bytes": 93984240
+    }
+  },
+  "linux_native_cores": [
+    {
+      "name": "mgba",
+      "filename": "mgba_libretro.so",
+      "sha256": "c840f305825d07c9bec7a6ec18841073c4b539fd234f73623474f97c507f1cdc",
+      "size_bytes": 3314664,
+      "source_repository": "https://github.com/libretro/mgba",
+      "reported_source_commit": "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "snes9x",
+      "filename": "snes9x_libretro.so",
+      "sha256": "9b2b6ea9d88f96c156590443ddd05ee56aaf4e495329a889c979921942717a31",
+      "size_bytes": 2841720,
+      "source_repository": "https://github.com/libretro/snes9x",
+      "reported_source_commit": "fae2fea08f74180759ef540ee94259213f503480",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "fceumm",
+      "filename": "fceumm_libretro.so",
+      "sha256": "6a30a7b1c7991800db1ec312263fde47e93d74d9850344864bb92a7c12549dee",
+      "size_bytes": 4474744,
+      "source_repository": "https://github.com/libretro/libretro-fceumm",
+      "reported_source_commit": "e0f3086a8104f8fbbe49a2615b10401504a9533f",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "genesis_plus_gx",
+      "filename": "genesis_plus_gx_libretro.so",
+      "sha256": "eda9d0f8299e8e1347e471927edaf00988d73dbed2ea15dcb19ef90b5ddc928c",
+      "size_bytes": 12832952,
+      "source_repository": "https://github.com/libretro/Genesis-Plus-GX",
+      "reported_source_commit": "f27655b592ef43f317272d79883bcaa10d3ac8ad",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "parallel_n64",
+      "filename": "parallel_n64_libretro.so",
+      "sha256": "43550714b4f7af271e60b2956ae00fd925d6f4ac38cc6d294b527b99e9df8333",
+      "size_bytes": 9306080,
+      "source_repository": "https://github.com/libretro/parallel-n64",
+      "reported_source_commit": "e0ef5d673257e2e83bf9b7cffe62eda141af8493",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "dolphin",
+      "filename": "dolphin_libretro.so",
+      "sha256": "acd738fb0b996e34fdf359031a3dcc2e2ba5f93d77193af34d5f97f3b7950fdf",
+      "size_bytes": 16627848,
+      "source_repository": "https://github.com/libretro/dolphin",
+      "reported_source_commit": "32c61f9d0e933331bb7087ba57e96883241b4960",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "stella2014",
+      "filename": "stella2014_libretro.so",
+      "sha256": "d4ac4e8100e7be8363fc7293c28649f6ed4f4389ccfa20e352be9c244e7c9a47",
+      "size_bytes": 3054944,
+      "source_repository": "https://github.com/libretro/stella2014-libretro",
+      "reported_source_commit": "7d1361e407e63f29e52892655069e5fb4096e691",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "prosystem",
+      "filename": "prosystem_libretro.so",
+      "sha256": "5e11828417eaeafef64e842d6a1e2ddb8cd0b210b3daf7cba82d7a74b8efbe23",
+      "size_bytes": 189072,
+      "source_repository": "https://github.com/libretro/prosystem-libretro",
+      "reported_source_commit": "8a88014287c7a01cd568067e5a557d0a2b2a051f",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "mednafen_pce_fast",
+      "filename": "mednafen_pce_fast_libretro.so",
+      "sha256": "3567cfc975e3b2f67e3f2eaa69e77724e31874bb8cfeeb1584e63473556da3ad",
+      "size_bytes": 4556424,
+      "source_repository": "https://github.com/libretro/beetle-pce-fast-libretro",
+      "reported_source_commit": null,
+      "full_commit_exists_upstream": false,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "mednafen_ngp",
+      "filename": "mednafen_ngp_libretro.so",
+      "sha256": "76c214571948388493807f25966056058fda65450db666f10d58d2d084bab124",
+      "size_bytes": 338624,
+      "source_repository": "https://github.com/libretro/beetle-ngp-libretro",
+      "reported_source_commit": "a50d5ac288a81f2104ddf43195a4efdd15c72227",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    },
+    {
+      "name": "mednafen_wswan",
+      "filename": "mednafen_wswan_libretro.so",
+      "sha256": "e181289190fee462ad6d8f2cf6b0df2ab7f094710257995c50f95d2bf2baa174",
+      "size_bytes": 1165224,
+      "source_repository": "https://github.com/libretro/beetle-wswan-libretro",
+      "reported_source_commit": "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd",
+      "full_commit_exists_upstream": true,
+      "source_matches_binary_independently_verified": false
+    }
+  ],
+  "dolphin_sys_archive_sha256": "d176c564d5d6504fd95b18ca63a0a7502607d83cdc11a7958bccf47dc7fe9ad8",
+  "remaining_requirements": [
+    "11-core source/license compatibility audit",
+    "full source access obligations for exact binary and transitive assets",
+    "missing reported source revision for mednafen_pce_fast",
+    "real-device acceptance and long-run tests",
+    "immutable frozen build inputs for final production installers",
+    "final unsigned/signed status and manual release approval"
+  ],
+  "public_release_approved": false
+}

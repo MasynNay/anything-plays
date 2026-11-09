@@ -1,0 +1,100 @@
+name: Anything Plays 3.0 | Pinned GPLv2+ SNES Supafaust research
+
+# Research only. No core integration, installer, ROM, or public release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-supafaust-gpl2-source.yml'
+      - 'tools/capture_v30_supafaust_source.py'
+      - 'tests/test_v30_supafaust_gpl2_source.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v30-supafaust-gpl2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-snes-gpl2-plus-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ORIGINAL_SOURCE: research/supafaust-src
+      PINNED_COMMIT: 642d1d1b6684aa7e306a02a89885f3f5456a5157
+      AP_RELEASE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: libretro/supafaust
+          ref: 642d1d1b6684aa7e306a02a89885f3f5456a5157
+          path: research/supafaust-src
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Confirm exact source and BOTH GPLv2 license and GPLv2-or-later source-level grant
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$ORIGINAL_SOURCE" rev-parse HEAD)" = "$PINNED_COMMIT"
+          grep 'Version 2' "$ORIGINAL_SOURCE/COPYING"
+          grep 'either version 2' "$ORIGINAL_SOURCE/mednafen/snes_faust/snes.cpp"
+          grep 'any later version' "$ORIGINAL_SOURCE/mednafen/snes_faust/snes.cpp"
+          python -m unittest discover -s tests -p 'test_v30_supafaust_gpl2_source.py' -v
+      - name: Install GNU compiler and original native Libretro audio/video test dependencies
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends make g++ gcc xvfb libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Compile new original pinned GPLv2+ Libretro SNES ELF (no nightly binary)
+        run: make -C research/supafaust-src -j 3 platform=unix
+      - name: Capture immutable original source, freshly built library and its original GPL notice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_supafaust_source \
+            --source research/supafaust-src \
+            --native research/supafaust-src/mednafen_supafaust_libretro.so \
+            --output test-evidence/supafaust-source
+          (cd test-evidence/supafaust-source && sha256sum -c SHA256SUMS.txt)
+      - name: Test actual built-in Libretro interface with original SNES PPU/SPC homebrew
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a python tools/probe_snes_homebrew.py \
+            --core research/supafaust-src/mednafen_supafaust_libretro.so \
+            --seconds 12 \
+            --report test-evidence/supafaust-source/SUPAFAUST_ORIGINAL_SNES_AV.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('test-evidence/supafaust-source')
+          d=json.loads((root/'SUPAFAUST_ORIGINAL_SNES_AV.json').read_text())
+          assert d.get('passed') is True and d.get('native_exit_code') == 0
+          assert d['details']['passed'] is True
+          assert d['details']['native_video_frames'] >= 30
+          assert d['details']['distinct_rgb_frames'] >= 2
+          assert d['details']['native_nonzero_pcm_values'] > 100
+          origin=json.loads((root/'SUPAFAUST_SOURCE_BUILD_UNAPPROVED.json').read_text())
+          assert origin['compiled_from_exact_upstream_checkout'] is True
+          assert origin['public_binary_redistribution_approved'] is False
+          assert origin['complete_combined_core_license_reviewed'] is False
+          assert origin['replaces_current_snes9x_in_app'] is False
+          print('Native ORIGINAL GPLv2-or-later Supafaust A/V proven, no release approval')
+          PY
+      - name: Keep only source-built GPLv2+ candidate and homebrew evidence for private research
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-SUPAFAUST-GPL2PLUS-LINUX-SOURCE-UNAPPROVED
+          path: test-evidence/supafaust-source/
+          if-no-files-found: warn
+          retention-days: 30

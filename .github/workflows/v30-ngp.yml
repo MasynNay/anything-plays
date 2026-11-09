@@ -1,0 +1,205 @@
+name: Anything Plays 3.0 | Neo Geo Pocket native acceptance
+
+# The full multi-console emulator matrix is too large for iterative native
+# NGPC research. Keep the 8 Pocket checks individually visible and blocking
+# in this smaller workflow. Save-restart remains a separately labeled lab.
+concurrency:
+  group: neo-geo-pocket-native-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-ngp.yml'
+      - 'anything_plays/libretro_input.py'
+      - 'anything_plays/libretro_save.py'
+      - 'anything_plays/libretro_state.py'
+      - 'anything_plays/neopop_flash.py'
+      - 'anything_plays/libretro_video.py'
+      - 'anything_plays/libretro_audio.py'
+      - 'anything_plays/gba_emulator.py'
+      - 'anything_plays/core_locator.py'
+      - 'anything_plays/systems.py'
+      - 'fetch_mgba_core.py'
+      - 'tools/ngp_mit_fixtures.py'
+      - 'tools/probe_ngp_*.py'
+      - 'tests/test_v30_ngp_*.py'
+      - 'tests/test_v30_gamecube_save_locations.py'
+      - 'requirements.txt'
+      - 'config/v3.0-release-acceptance.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_V30_TEST_CORES: '1'
+  AP_RELEASE_BUILD: '0'
+
+jobs:
+  ngp-unit-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify NeoPop native input mappings, flash paths and restart contracts
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_ngp*.py' -v
+          python -m unittest discover -s tests -p 'test_v30_gamecube_save_locations.py' -v
+
+  ngp-original-native-av:
+    # Each job requires authentic changing game-owned video, native PCM,
+    # and actual Libretro manual A/camera B callback queries (not physical
+    # speaker or hardware cartridge operation).
+    # A failed job stays failed; do not use continue-on-error.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngp}
+          - {os: ubuntu-24.04, target: linux-x64, ext: so, system: ngpc}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ngp}
+          - {os: windows-2025, target: windows-x64, ext: dll, system: ngpc}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngp}
+          - {os: macos-15, target: macos-arm64, ext: dylib, system: ngpc}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngp}
+          - {os: macos-15-intel, target: macos-x64, ext: dylib, system: ngpc}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Acquire matching native NeoPop core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      # The original Tixul *filename* .ngp fixture is actually header 0x10
+      # COLOR; it cannot prove mono K1GE. Retain it only as provenance data.
+      # Color-mode NGPC uses the real pinned StarGunner MIT homebrew.
+      - name: Prove pinned MIT NGPC COLOR homebrew native LCD, PCM and input
+        if: matrix.system == 'ngpc'
+        run: |
+          python tools/probe_ngp_mit_homebrew.py --system ngpc --core "cores/mednafen_ngp_libretro.${{ matrix.ext }}" --seconds 12 --report "test-evidence/ngpc-${{ matrix.target }}-native-AV.json"
+      # Mono-mode NGP uses an ORIGINAL genuine header 0x00 K1GE sound+video
+      # cartridge. It generates temporary ROM bytes and never uploads them.
+      - name: Prove original AUTHENTIC NGP MONO video audio and input via native NeoPop
+        if: matrix.system == 'ngp'
+        run: |
+          python -m tools.probe_v30_ngp_mono_native_av --core "cores/mednafen_ngp_libretro.${{ matrix.ext }}" --output "test-evidence/ngp-${{ matrix.target }}-native" --seconds 12
+      - name: Fail closed unless true mono header and real native A/V/input all pass
+        if: matrix.system == 'ngp'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          output = Path('test-evidence') / ('ngp-' + os.environ['TARGET'] + '-native')
+          report = output / 'NGP_ORIGINAL_MONO_K1GE_NATIVE_AV_UNAPPROVED.json'
+          evidence = json.loads(report.read_text('utf-8'))
+          assert evidence['status'] == 'ORIGINAL-MONO-K1GE-PSG-NATIVE-AV-UNAPPROVED'
+          assert evidence['mono_cartridge_header_value'] == 0x00
+          assert evidence['full_native_audio_video_input_verified'] is True
+          assert evidence['audio_verified_in_native_test'] is True
+          assert evidence['changing_monochrome_video_verified_in_native_test'] is True
+          assert evidence['native_manual_and_camera_input_query_verified'] is True
+          assert evidence['actual_native_exit'] == 0
+          native = evidence['native_metrics']
+          assert native['sampled_nonblank_frames'] >= 3
+          assert native['distinct_nonblank_frames'] >= 2
+          assert native['native_nonzero_pcm_values'] > 100
+          assert native['native_audio_peak'] > 0
+          assert native['manual_a_native_positive_samples'] > 0
+          assert native['camera_b_native_positive_samples'] > 0
+          assert evidence['physical_speaker_or_retail_gameplay_verified'] is False
+          assert evidence['cartridge_flash_save_verified'] is False
+          assert evidence['public_distribution_approved'] is False
+          assert evidence['public_release_approved'] is False
+          # Platform-neutral checksum check: accept CRLF/LF in a research
+          # file, but require its exact SHA-256 to match actual report bytes.
+          parts = (output / 'SHA256SUMS.txt').read_text('utf-8').strip().split()
+          assert parts == [hashlib.sha256(report.read_bytes()).hexdigest(), report.name]
+          print('Genuine monochrome native color-free NGP A/V/input verified on',
+                os.environ['TARGET'], 'with real changing K1GE video and PCM')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NeoGeoPocket-${{ matrix.system }}-${{ matrix.target }}-native-AV
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  ngpc-real-flash-restart-lab:
+    # Exploratory: strictly reports real 3-process flash+pixels evidence.
+    # The full 3.0 release gate stays closed whether this job passes or not.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Acquire matching native NeoPop core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      - name: Prove StarGunner Options flash survives 3 cold starts
+        run: |
+          python tools/probe_ngp_flash_persistence.py --core cores/mednafen_ngp_libretro.so --seconds 12 --report test-evidence/ngpc-three-process-real-flash.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NeoGeoPocket-EXPERIMENTAL-three-cold-start-flash-save
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  ngpc-independent-native-state-resume:
+    # Strict test of the fallback layer, using the same immutable MIT
+    # StarGunner content and two cold core processes. Never flush cartridge
+    # flash; prove the recovered Options pixels came from native save-state.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Python requirements
+        run: python -m pip install -r requirements.txt
+      - name: Acquire matching native NeoPop core
+        run: python -c "from fetch_mgba_core import fetch_core; fetch_core('mednafen_ngp')"
+      - name: Require actual cold restart from verified native recovery checkpoint
+        run: |
+          python tools/probe_ngp_flash_persistence.py --core cores/mednafen_ngp_libretro.so --mode state --seconds 12 --report test-evidence/ngpc-two-cold-session-real-state-resume.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: NeoGeoPocket-REQUIRED-native-state-resume
+          path: test-evidence/
+          if-no-files-found: warn
+          retention-days: 14

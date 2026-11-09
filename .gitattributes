@@ -1,0 +1,14 @@
+# Avoid useless line diffs for pre-approved binary artwork and installers.
+*.png binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.deb binary
+*.dmg binary
+*.exe binary
+
+# Release compliance texts remain visible and reviewable in Git diffs.
+*.md text
+*.py text
+*.yml text
+*.yaml text

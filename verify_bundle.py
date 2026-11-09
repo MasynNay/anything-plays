@@ -12,10 +12,14 @@ import os
 from pathlib import Path
 import sys
 
-from fetch_mgba_core import inspect_core_identity
+from fetch_mgba_core import inspect_core_identity, core_names_for_build
 
 
 CORE_NAMES = ("mgba", "snes9x")
+OPTIONAL_V21_LICENSES = (
+    "FCEUmm-GPL-2.0.txt", "Genesis-Plus-GX-LICENSE.txt",
+    "Dolphin-GPL-2.0-or-later.txt",
+)
 REQUIRED_DOCUMENTS = (
     "AnythingPlays-MIT.txt",
     "CODE_OF_CONDUCT.md",
@@ -26,14 +30,95 @@ REQUIRED_DOCUMENTS = (
     "Snes9x-snes_ntsc-LGPL-2.1.txt",
 )
 EXTENSIONS = {"macos": ".dylib", "windows": ".dll", "linux": ".so"}
+# Reviewed v2.1 icon. This SHA belongs to its corrected 512px artwork,
+# not the stable 2.0 PNG or ICO, which are deliberately not replaced.
+V21_ICON_SHA256 = "a2ef1f7415ea9806c0bff5cec5b5b3d1ad0d1b0ca3a87b0cbf0a5b331bbeb380"
 
 # Distribution policy: Anything Plays never ships game images or BIOS ROMs.
 # This catches recognizable console/cart and firmware image filenames;
 # as with any extension-based check, manual artifact inspection remains needed.
 DISALLOWED_GAME_EXTENSIONS = frozenset({
     ".gb", ".gbc", ".gba", ".sfc", ".smc",
-    ".nes", ".n64", ".z64", ".v64", ".rom", ".bios",
+    ".nes", ".unf", ".unif", ".n64", ".z64", ".v64", ".rom", ".bios",
+    ".smd", ".gen", ".gcm", ".rvz", ".gcz", ".ciso", ".iso",
+    ".dol", ".elf", ".tgc", ".wia", ".m3u",
 })
+
+
+def verify_v21_artwork(bundle):
+    """Require the reviewed icon inside every test installer, unchanged."""
+    files = [
+        path for path in Path(bundle).rglob("anything_plays_v21.webp")
+        if path.is_file()
+    ]
+    if not files:
+        raise ValueError("Missing corrected 2.1 fish icon from app bundle")
+    if not any(
+        hashlib.sha256(path.read_bytes()).hexdigest() == V21_ICON_SHA256
+        for path in files
+    ):
+        raise ValueError("Corrected 2.1 fish icon has a checksum mismatch")
+
+
+def verify_dolphin_sys(cores, main_manifest):
+    """Validate every bundled Dolphin Sys file against the build inventory.
+
+    This catches missing/corrupted compatibility data in the actual installer,
+    including inside macOS DMGs and unpacked Windows/Linux distributions.
+    """
+    from tools.fetch_dolphin_sys import (
+        MANIFEST_NAME, MAX_FILES, MAX_EXTRACTED_BYTES, SYSTEM_ASSET_URL,
+    )
+
+    path = cores / MANIFEST_NAME
+    if not path.is_file() or path.stat().st_size > 1024 * 1024:
+        raise ValueError("Dolphin Sys provenance manifest is missing or oversized")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest != main_manifest.get("dolphin_system_assets"):
+        raise ValueError("Dolphin Sys provenance does not match the core manifest")
+    if manifest.get("source_url") != SYSTEM_ASSET_URL:
+        raise ValueError("Unexpected Dolphin Sys archive source")
+    records = manifest.get("files")
+    if not isinstance(records, dict) or not (5 <= len(records) <= MAX_FILES):
+        raise ValueError("Incomplete Dolphin Sys file inventory")
+
+    root = cores / "dolphin-emu" / "Sys"
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("Bundled Dolphin Sys directory is missing or symlinked")
+    if "codehandler.bin" not in records:
+        raise ValueError("Dolphin core requires codehandler.bin")
+
+    expected_paths = set()
+    cumulative = 0
+    for relative, identity in records.items():
+        components = Path(relative)
+        if (not relative or components.is_absolute() or
+                any(part in ("..", ".") for part in relative.split("/"))):
+            raise ValueError("Unsafe Dolphin Sys file name")
+        if not isinstance(identity, dict):
+            raise ValueError("Malformed Dolphin Sys file inventory")
+        expected_file = root / components
+        if expected_file.is_symlink() or not expected_file.is_file():
+            raise ValueError(f"Missing Dolphin Sys file: {relative}")
+        length = identity.get("size_bytes")
+        if not isinstance(length, int) or length < 0:
+            raise ValueError(f"Invalid Dolphin Sys length: {relative}")
+        cumulative += length
+        if cumulative > MAX_EXTRACTED_BYTES:
+            raise ValueError("Dolphin Sys exceeds memory safety budget")
+        if expected_file.stat().st_size != length:
+            raise ValueError(f"Dolphin Sys size mismatch: {relative}")
+        digest = hashlib.sha256(expected_file.read_bytes()).hexdigest()
+        if digest != identity.get("sha256"):
+            raise ValueError(f"Dolphin Sys checksum mismatch: {relative}")
+        expected_paths.add(expected_file.relative_to(root).as_posix())
+
+    observed = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*") if path.is_file()
+    }
+    if expected_paths != observed:
+        raise ValueError("Dolphin Sys files differ from the reviewed manifest")
 
 
 def verify_no_bundled_game_files(bundle):
@@ -84,11 +169,144 @@ def verify_bundle(bundle, platform_name, check_native=False):
         licenses = bundle / "licenses"
         cores = bundle / "cores"
 
-    missing = [str(licenses / filename) for filename in REQUIRED_DOCUMENTS
+    expected_cores = core_names_for_build()
+    if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+        # The production binary's installed paths MUST match the 44-asset
+        # independently reviewed native lock, not the original Snes9x /
+        # Genesis Plus GX paths or any test-only research marker.
+        from tools.v30_release_lock import (
+            ALTERNATIVE_CORE_NAMES, load_approved_lock, selected_core_set,
+        )
+        from tools.core_release_lock import release_target
+        approved_lock = load_approved_lock()
+        if selected_core_set(approved_lock) == ALTERNATIVE_CORE_NAMES:
+            from anything_plays.v30_approved_core_map import (
+                MARKER as PRODUCTION_MAP, validate_installed_map,
+            )
+            if (cores / "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json").exists():
+                raise ValueError("Production installer contains unapproved research marker")
+            selected = validate_installed_map(cores, EXTENSIONS[platform_name])
+            records = approved_lock["targets"][
+                release_target(sys.platform, __import__("platform").machine())]["cores"]
+            notices = {
+                "mednafen_supafaust": "Supafaust-COPYING.txt",
+                "blastem": "BlastEm-COPYING.txt",
+                "mednafen_pce_fast": "PCE-COPYING.txt",
+            }
+            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten"):
+                # A native same-name buildbot ZIP is NOT the verified
+                # original source-built NES/Atari/NGP/WonderSwan binary.
+                for name in ("fceumm","stella2014","prosystem",
+                             "mednafen_ngp","mednafen_wswan"):
+                    notices[name] = f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
+            for name, filename in notices.items():
+                row = selected["cores"][name]
+                if row["native_sha256"] != records[name]["native_sha256"]:
+                    raise ValueError(f"Approved 3.0 native mapping differs from core lock: {name}")
+                license_file = licenses / filename
+                if license_file.is_symlink() or not license_file.is_file():
+                    raise ValueError(f"Missing original source license notice: {filename}")
+                if (hashlib.sha256(license_file.read_bytes()).hexdigest()
+                        != row["license_notice_sha256"]):
+                    raise ValueError(f"Unreviewed GPL source notice bytes: {name}")
+            if selected["core_set_id"] == "gpl-source-built-ten":
+                # mGBA MPL original license plus 11 individually pinned
+                # ParaLLEl-N64 upstream GPL/LGPL/MIT notice files must be
+                # present. The aggregate SHA binds every filename and byte
+                # digest to the independently approved immutable native lock.
+                mpl = licenses / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt"
+                if (mpl.is_symlink() or not mpl.is_file()
+                        or hashlib.sha256(mpl.read_bytes()).hexdigest()
+                        != selected["cores"]["mgba"]["license_notice_sha256"]):
+                    raise ValueError("Production mGBA original MPL notice missing/changed")
+                notice_hashes = {}
+                for number in range(1, 12):
+                    filename = f"GPL-TRIAL-N64-NOTICE-{number:02}.txt"
+                    notice = licenses / filename
+                    if (notice.is_symlink() or not notice.is_file()
+                            or not 0 < notice.stat().st_size <= 1024 * 1024):
+                        raise ValueError(f"Missing source-built N64 original notice: {filename}")
+                    notice_hashes[filename] = hashlib.sha256(notice.read_bytes()).hexdigest()
+                combined_notice_sha = hashlib.sha256(json.dumps(
+                    notice_hashes, sort_keys=True,
+                    separators=(",", ":")).encode("utf-8")).hexdigest()
+                if combined_notice_sha != selected["cores"]["parallel_n64"]["license_notice_sha256"]:
+                    raise ValueError("Source-built N64 original notices do not match approved lock")
+                for name in ("mgba", "parallel_n64"):
+                    if (selected["cores"][name]["native_sha256"]
+                            != records[name]["native_sha256"]):
+                        raise ValueError(f"Production {name} compiled binary differs from lock")
+            if platform_name == "windows":
+                win_notice = licenses / "Winpthreads-COPYING.txt"
+                if win_notice.is_symlink() or not win_notice.is_file() or not win_notice.read_bytes().strip():
+                    raise ValueError("Original Winpthreads source notice is required")
+    if os.environ.get("AP_V30_GPL_TRIAL") == "1":
+        # Never mistake test-only noncommercial-core substitutions for an
+        # approved 3.0 production input. Validate the actual installed native
+        # images, unapproved marker and source identities before inspecting DLLs.
+        from anything_plays.v30_gpl_trial import validate_trial_core_directory
+        trial_marker = validate_trial_core_directory(cores, EXTENSIONS[platform_name])
+        notices = ["GPL-TRIAL-Supafaust-COPYING.txt",
+                   "GPL-TRIAL-BlastEm-COPYING.txt"]
+        pinned_pce = trial_marker.get("source_built_pce")
+        if pinned_pce is not None:
+            notices.append("GPL-TRIAL-PCE-COPYING.txt")
+        for name in notices:
+            notice = licenses / name
+            if notice.is_symlink() or not notice.is_file() or not notice.read_bytes().strip():
+                raise ValueError(f"GPL trial missing original license: {name}")
+        if pinned_pce is not None:
+            source_notice = licenses / "GPL-TRIAL-PCE-COPYING.txt"
+            expected_sha = pinned_pce["notice_sha256"]
+            if hashlib.sha256(source_notice.read_bytes()).hexdigest() != expected_sha:
+                raise ValueError("Wrong original pinned-source PCE GPL2 notice")
+        remaining = trial_marker.get("source_built_remaining_five")
+        if remaining is not None:
+            if set(remaining) != {
+                "fceumm", "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan",
+            }:
+                raise ValueError("Incomplete five original source-built GPL notices")
+            for name,row in remaining.items():
+                original = licenses / f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
+                if original.is_symlink() or not original.is_file():
+                    raise ValueError(f"Original source-built GPL notice missing: {name}")
+                if hashlib.sha256(original.read_bytes()).hexdigest()!=row["original_license_notice_sha256"]:
+                    raise ValueError(f"Wrong original 3.0 GPL license notice: {name}")
+        mgba = trial_marker.get("source_built_mgba")
+        if mgba is not None:
+            original = licenses / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt"
+            if original.is_symlink() or not original.is_file():
+                raise ValueError("Missing original MPL2 source license for the ninth core")
+            if hashlib.sha256(original.read_bytes()).hexdigest() != mgba["original_license_notice_sha256"]:
+                raise ValueError("Original ninth source-built mGBA MPL2 license was modified")
+        n64 = trial_marker.get("source_built_n64")
+        if n64 is not None:
+            notices = n64["original_notice_sha256"]
+            if len(notices) != 11:
+                raise ValueError("Missing original source-built N64 license set")
+            for filename, exact_sha in notices.items():
+                original = licenses / filename
+                if (original.is_symlink() or not original.is_file()
+                        or hashlib.sha256(original.read_bytes()).hexdigest() != exact_sha):
+                    raise ValueError(f"Original source-built N64 license changed: {filename}")
+        if "snes9x" in expected_cores or "genesis_plus_gx" in expected_cores:
+            raise ValueError("Noncommercial core entered the GPL alternative test lineup")
+        if platform_name == "windows":
+            win_notice = licenses / "Winpthreads-COPYING.txt"
+            if (win_notice.is_symlink() or not win_notice.is_file()
+                    or not win_notice.read_bytes().strip()):
+                raise ValueError("Bundled MinGW runtime requires original Winpthreads permission notice")
+    if len(expected_cores) > len(CORE_NAMES):
+        verify_v21_artwork(bundle)
+    required_notices = (
+        REQUIRED_DOCUMENTS + OPTIONAL_V21_LICENSES
+        if len(expected_cores) > len(CORE_NAMES) else REQUIRED_DOCUMENTS
+    )
+    missing = [str(licenses / filename) for filename in required_notices
                if not (licenses / filename).is_file()]
     if missing:
         raise ValueError("Missing bundled license documents:\n" + "\n".join(missing))
-    for filename in REQUIRED_DOCUMENTS:
+    for filename in required_notices:
         if not (licenses / filename).read_bytes().strip():
             raise ValueError(f"Empty bundled license document: {filename}")
 
@@ -127,14 +345,14 @@ def verify_bundle(bundle, platform_name, check_native=False):
         raise ValueError(f"Missing core manifest: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     records = manifest.get("cores")
-    if not isinstance(records, list) or len(records) != len(CORE_NAMES):
+    if not isinstance(records, list) or len(records) != len(expected_cores):
         raise ValueError("Manifest must identify all required cores")
     found = set()
     for record in records:
         if not isinstance(record, dict):
             raise ValueError("Invalid core manifest entry")
         name = record.get("name")
-        if name not in CORE_NAMES or name in found:
+        if name not in expected_cores or name in found:
             raise ValueError(f"Unexpected or duplicated core: {name}")
         found.add(name)
         expected_filename = f"{name}_libretro{EXTENSIONS[platform_name]}"
@@ -154,16 +372,24 @@ def verify_bundle(bundle, platform_name, check_native=False):
             raise ValueError(f"Missing recorded native version for {name}")
         if not isinstance(record.get("source_repository_url"), str) or not record["source_repository_url"].startswith("https://"):
             raise ValueError(f"Missing upstream source repository for {name}")
+    if "dolphin" in expected_cores:
+        verify_dolphin_sys(cores, manifest)
     # Verify the staged file hashes against the approved release lock BEFORE
     # any ctypes-based native-core inspection can load the libraries.
     release_mode = os.environ.get("AP_RELEASE_BUILD", "0")
     if release_mode not in ("0", "1"):
         raise ValueError("AP_RELEASE_BUILD must be 0 or 1")
     if release_mode == "1":
-        from tools.core_release_lock import LOCK_PATH, verify_release_lock
-
-        lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
-        verify_release_lock(manifest, lock)
+        if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
+            from tools.v30_release_lock import (
+                load_approved_lock, verify_native_bundle,
+            )
+            verify_native_bundle(load_approved_lock(), manifest)
+        else:
+            # Old published 2.0 checks must not be affected by 3.0.
+            from tools.core_release_lock import LOCK_PATH, verify_release_lock
+            lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+            verify_release_lock(manifest, lock)
 
     if check_native:
         _validate_mgba_core(cores / f"mgba_libretro{EXTENSIONS[platform_name]}")
@@ -176,7 +402,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                           "reported_source_commit_url"):
                 if record.get(field) != observed[field]:
                     raise ValueError(f"Recorded {field} mismatch for {name}: {path}")
-    print(f"Verified {platform_name} bundle: license files and {len(CORE_NAMES)} core checksums"
+    print(f"Verified {platform_name} bundle: license files and {len(expected_cores)} core checksums"
           + (" and native GB/GBC/GBA coverage" if check_native else ""))
 
 

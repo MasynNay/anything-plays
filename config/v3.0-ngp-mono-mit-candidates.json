@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "status": "NGP-EXTENSION-COLOR-HEADER-CALIBRATION-RESEARCH-ONLY",
+  "source_repository": "Tixul/Ngpcraft_emulator",
+  "source_commit": "93b1fd666ff375afcbb48079fbcf61dbb99b86b4",
+  "source_license": "MIT",
+  "source_license_url": "https://raw.githubusercontent.com/Tixul/Ngpcraft_emulator/93b1fd666ff375afcbb48079fbcf61dbb99b86b4/LICENSE",
+  "tree_sha1": "93b1fd666ff375afcbb48079fbcf61dbb99b86b4",
+  "original_fixture": "hw_calibration/a_align_calib_v12.ngp",
+  "candidate_native_audio_verified": false,
+  "public_release_approved": false,
+  "distribution_in_app": false,
+  "candidates": [
+    {
+      "path": "hw_calibration/a_align_calib_v12.ngp",
+      "git_blob_sha1": "8942344acbc23b80fa6f72c10e0fada5b58cdd7a",
+      "size_bytes": 10630,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_blocpath_calib_v21.ngp",
+      "git_blob_sha1": "339879ccf8e2f2218112240fb02832aaa1ee7a0b",
+      "size_bytes": 13357,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_dma_calib_v9.ngp",
+      "git_blob_sha1": "ff847e61db159db9f22f9e38bf6a13b1226ab647",
+      "size_bytes": 10648,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_droite_calib_v11.ngp",
+      "git_blob_sha1": "be437ea003b8d7518f7a4bb2dd37e2c082ba5fb1",
+      "size_bytes": 10778,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_flush_calib_v13.ngp",
+      "git_blob_sha1": "bdc04413eec68946d0f196943d251bc5adc752b0",
+      "size_bytes": 10844,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_gaps_calib_v20.ngp",
+      "git_blob_sha1": "bc6ab1e08980c02c996017341b74421c013f5557",
+      "size_bytes": 22703,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_irq_calib_v8.ngp",
+      "git_blob_sha1": "e5737965c79472e95633dabab4d6a4ab289a9433",
+      "size_bytes": 10601,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_irqdec_calib_v18.ngp",
+      "git_blob_sha1": "871263585ce48f1641f469f05aca6317c75fd612",
+      "size_bytes": 11596,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_multi_calib_v14.ngp",
+      "git_blob_sha1": "99e6ecfe997eba0e25540b853959c3cade270db0",
+      "size_bytes": 14553,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_pont_calib_v10.ngp",
+      "git_blob_sha1": "6cd4df872920ce32e2fd850a4cde6f4f5acae584",
+      "size_bytes": 10967,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_queue_calib_v15.ngp",
+      "git_blob_sha1": "ce96f8811e8b6cac35da258f1c6a30f0819f6e9b",
+      "size_bytes": 12543,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_retq_calib_v19.ngp",
+      "git_blob_sha1": "b054a1120c65456cb9b98950bcc479afd5b85af0",
+      "size_bytes": 11440,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_slack_calib_v16.ngp",
+      "git_blob_sha1": "a92cec7c0a96fdeba85843e54befd4b0cf698011",
+      "size_bytes": 11919,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    },
+    {
+      "path": "hw_calibration/a_word_calib_v17.ngp",
+      "git_blob_sha1": "12b89ea73636f1a2ae0510523d6591957d7c74a1",
+      "size_bytes": 11814,
+      "header_mode_byte": 16,
+      "genuine_monochrome_header": false
+    }
+  ],
+  "total_ngp_extension_candidates": 14,
+  "genuine_monochrome_header_candidates": 0,
+  "header_examination": "ALL-14-PINNED-UPSTREAM-GIT-BLOBS-HAVE-0x10-COLOR-COMPATIBILITY",
+  "warning": "These source files end in .ngp but header byte 0x23 is 0x10 for all 14. They are not valid evidence for genuine mono/K1GE acceptance; diagnostic PCM-only results also all zero."
+}

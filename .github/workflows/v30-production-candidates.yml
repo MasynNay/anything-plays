@@ -1,0 +1,322 @@
+name: Anything Plays 3.0 | Approved production candidates
+
+# A closed, manual production lane. This file cannot build test-only binaries
+# and never publishes a GitHub release. Publication uses a separate guarded job.
+on:
+  workflow_dispatch:
+    inputs:
+      native_input_run_id:
+        description: Successful original 12-archive offline lab (immutable Dolphin and Sys baseline; ten source-built replacements)
+        required: true
+        type: string
+      confirmation:
+        description: Type APPROVED-3.0-DISTRIBUTION after independent source, rights and QA review
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-v30-approved-production
+  cancel-in-progress: false
+
+jobs:
+  approved-four-platform-candidates:
+    environment: stable-v3-production-build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows-x64
+            lock_target: windows-x86_64
+            extension: dll
+            installer: AnythingPlaysSetup-3.0.0.exe
+            core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
+          - runner: macos-15
+            target: macos-arm64
+            lock_target: macos-arm64
+            extension: dylib
+            installer: AnythingPlays-3.0.0-macos-arm64.dmg
+            core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
+          - runner: macos-15-intel
+            target: macos-x64
+            lock_target: macos-x86_64
+            extension: dylib
+            installer: AnythingPlays-3.0.0-macos-x64.dmg
+            core_manifest: dist/AnythingPlays.app/Contents/Resources/cores/CORE_PROVENANCE.json
+          - runner: ubuntu-24.04
+            target: linux-x64
+            lock_target: linux-x86_64
+            extension: so
+            installer: anything-plays_3.0.0_amd64.deb
+            core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      SOURCE_RUN_ID: ${{ inputs.native_input_run_id }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+      AP_RELEASE_BUILD: '1'
+      AP_V30_APPROVED_RELEASE: '1'
+      AP_V30_APPROVED_EIGHT: '1'
+      AP_V30_APPROVED_TEN: '1'
+      AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/immutable-inputs
+      GH_TOKEN: ${{ github.token }}
+      GPL_SNES_RUN_ID: '42494297281'
+      GPL_SEGA_RUN_ID: '42496671418'
+      PINNED_PCE_RUN_ID: '42444367068'
+      FIVE_SOURCE_RUN_ID: '42515151314'
+      MGBA_SOURCE_RUN_ID: '42527449154'
+      N64_SOURCE_RUN_ID: '42534736496'
+      ORIGINAL_SOURCE_SYS_RUN_ID: '42553978214'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # An approval commit's SHA cannot equal its own lock-file value.
+          # Fetch the earlier source-reviewed commit to diff exact Git blobs.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require reviewed main commit and independent release approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/main || "$RELEASE_CONFIRMATION" != APPROVED-3.0-DISTRIBUTION ]]; then
+            echo "::error::Production is main-only with explicit reviewed rights confirmation"
+            exit 1
+          fi
+          if [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Exact original-native-input Actions run ID is required"
+            exit 1
+          fi
+          python tools/check_repository_hygiene.py
+          python tools/check_v30_release.py
+          python - <<'PY'
+          from tools.v30_release_lock import (
+              load_approved_lock, selected_core_set, selected_source_families,
+              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_TEN)
+          lock = load_approved_lock()
+          assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
+              "Production must use the FULL source-built GPL alternative core set; "
+              "original Snes9x/Genesis GX are not accepted for v3")
+          assert selected_source_families(lock) == SOURCE_BUILT_TEN, (
+              "Production must use ten independently source-built families; "
+              "only original Dolphin remains from the legacy archived binary")
+          PY
+          test -s config/v3.0-corresponding-source-inventory.json
+          test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
+          test -s docs/V3_RELEASE_NOTES_APPROVED.md
+          # Preflight the *contents*, not mere existence, of the 44-core
+          # matching source inventory and each core's redistribution review.
+          # This fails before expensive installer builders ever run.
+          python -m tools.check_v30_source_gate
+          # The reviewed app code may predate the final approval records.
+          # Confirm the actual production checkout changed ONLY six exact
+          # approval metadata files, never native/app/build/dependency inputs.
+          reviewed_source_commit="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('config/v3.0-core-lock.json').read_text('utf-8'))['source_commit'])
+          PY
+          )"
+          python -m tools.verify_v30_reviewed_runtime_code \
+            --reviewed-source-commit "$reviewed_source_commit" \
+            --actual-build-commit "$GITHUB_SHA"
+          run_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
+          run_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
+          if [[ "$run_name" != "Anything Plays 3.0 | Complete offline installer lab" || "$run_status" != success ]]; then
+            echo "::error::Original preserved ZIPs must come from a completed successful 3.0 full lab"
+            exit 1
+          fi
+          for pair in \
+            "$GPL_SNES_RUN_ID|Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate" \
+            "$GPL_SEGA_RUN_ID|Anything Plays 3.0 | Four-platform pinned GPL candidate research" \
+            "$PINNED_PCE_RUN_ID|Anything Plays 3.0 | PCE pinned-source replacement research" \
+            "$FIVE_SOURCE_RUN_ID|Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)" \
+            "$MGBA_SOURCE_RUN_ID|Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)" \
+            "$N64_SOURCE_RUN_ID|Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64" \
+            "$ORIGINAL_SOURCE_SYS_RUN_ID|Anything Plays 3.0 | Original pinned Dolphin Sys from exact Git source"; do
+            run_id="${pair%%|*}"
+            expected_name="${pair#*|}"
+            [[ "$(gh run view "$run_id" --json conclusion --jq .conclusion)" == success ]] || exit 1
+            [[ "$(gh run view "$run_id" --json name --jq .name)" == "$expected_name" ]] || exit 1
+          done
+      - name: Download original privately preserved core ZIPs and exact source-built upstream artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}" \
+            --dir original-native-inputs
+          # The original research archive's flag MUST remain false. Approval
+          # comes from the separately independently reviewed immutable lock,
+          # never by relabeling a previously unapproved buildbot native ZIP.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          row=json.loads(Path("original-native-inputs/PRESERVED_NATIVE_INPUTS.json").read_text("utf-8"))
+          assert row["public_distribution_approved"] is False
+          assert row["original_archive_count"] == 12
+          PY
+          gh run download "$GPL_SNES_RUN_ID" \
+            --name "AnythingPlays-3.0-SUPAFAUST-${{ matrix.target }}-SOURCE-UNAPPROVED" \
+            --dir source-built-snes
+          gh run download "$GPL_SEGA_RUN_ID" \
+            --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-${{ matrix.target }}-UNAPPROVED" \
+            --dir source-built-sega
+          gh run download "$PINNED_PCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-${{ matrix.target }}-UNAPPROVED" \
+            --dir source-built-pce
+          gh run download "$MGBA_SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PINNED-MGBA-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED" \
+            --dir source-built-mgba
+          gh run download "$N64_SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PARALLEL-N64-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED" \
+            --dir source-built-n64
+          gh run download "$ORIGINAL_SOURCE_SYS_RUN_ID" \
+            --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-${{ matrix.target }}-UNAPPROVED" \
+            --dir original-source-sys
+          (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
+          for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+            gh run download "$FIVE_SOURCE_RUN_ID" \
+              --name "AnythingPlays-3.0-PINNED-REMAINING-$name-${{ matrix.target }}-UNAPPROVED" \
+              --dir "original-five-source/$name"
+          done
+          # Original PCE CI includes exactly six immutable sources/notices.
+          # Build a deterministic ZIP locally and let inspect_artifact verify
+          # every original source/native/notice SHA before ANY build.
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_STORED
+          root = Path("source-built-pce")
+          files = sorted(root.iterdir())
+          assert len(files) == 6 and all(p.is_file() and not p.is_symlink() for p in files)
+          with ZipFile("original-source-built-pce.zip", "w", ZIP_STORED) as archive:
+              for item in files:
+                  archive.write(item, arcname=item.name)
+          PY
+      - name: Prepare Windows source-built runtime dependency without external user requirements
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+      - name: Capture exact candidate Winpthreads native bytes; immutable reviewed lock must approve this precise hash
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          test -s /mingw64/bin/libwinpthread-1.dll
+          cp /mingw64/bin/libwinpthread-1.dll original-native-winpthread.dll
+          test -s original-native-winpthread.dll
+      - name: Stage EXACT SOURCE-REVIEWED 11-core production offline inputs, or fail before build
+        shell: bash
+        env:
+          REVIEWED_TARGET: ${{ matrix.lock_target }}
+        run: |
+          set -euo pipefail
+          WIN_DLL=""
+          if [[ "$REVIEWED_TARGET" == windows-x86_64 ]]; then
+            WIN_DLL="--windows-runtime=original-native-winpthread.dll"
+          fi
+          python -m tools.stage_v30_approved_source_inputs \
+            --target "$REVIEWED_TARGET" \
+            --original-dir original-native-inputs \
+            --snes-dir source-built-snes \
+            --sega-dir source-built-sega \
+            --pce-artifact original-source-built-pce.zip \
+            --fceumm-dir original-five-source/fceumm \
+            --stella2014-dir original-five-source/stella2014 \
+            --prosystem-dir original-five-source/prosystem \
+            --mednafen-ngp-dir original-five-source/mednafen_ngp \
+            --mednafen-wswan-dir original-five-source/mednafen_wswan \
+            --mgba-dir source-built-mgba \
+            --n64-dir source-built-n64 \
+            --dolphin-sys-dir original-source-sys \
+            --output-dir "$AP_CORE_ARCHIVE_DIR" \
+            ${WIN_DLL:+$WIN_DLL}
+          # This receipt is strictly source/native provenance; it is NOT a
+          # generated grant of rights or a public binary release decision.
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from tools.v30_release_lock import load_approved_lock, selected_core_set
+          from tools.stage_v30_approved_source_inputs import RECEIPT
+          lock = load_approved_lock()
+          root = Path(os.environ["AP_CORE_ARCHIVE_DIR"])
+          manifest = json.loads((root/RECEIPT).read_text("utf-8"))
+          assert manifest["native_core_count"] == 11
+          assert manifest["system_profile_count"] == 18
+          assert manifest["unchanged_original_core_count"] == 1
+          assert manifest["native_approval_comes_from_separately_reviewed_lock"] is True
+          assert manifest["auto_granted_license_rights"] is False
+          assert manifest["source_exact_dolphin_sys_evidence"]["original_git_data_sys_tree_sha1"] == "6abd87498928d5362d83f698a562e956072b8700"
+          assert manifest["source_exact_dolphin_sys_evidence"]["public_distribution_approved"] is False
+          assert set(manifest["source_built_families"]) == {
+              "mednafen_supafaust","blastem","mednafen_pce_fast",
+              "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan",
+              "mgba","parallel_n64"}
+          assert selected_core_set(lock) == set(lock["targets"][manifest["target"]]["cores"])
+          PY
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Build exact stable Windows setup EXE
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Build exact stable macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Build exact stable Linux DEB
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Verify corresponding-source record and emit production provenance
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          INSTALLER_NAME: ${{ matrix.installer }}
+          NATIVE_MANIFEST: ${{ matrix.core_manifest }}
+        run: |
+          set -euo pipefail
+          python -m tools.emit_v30_production_provenance \
+            --target "$RELEASE_TARGET" \
+            --version 3.0.0 \
+            --source-commit "$GITHUB_SHA" \
+            --installer "release/$INSTALLER_NAME" \
+            --core-provenance "$NATIVE_MANIFEST" \
+            --output production-artifact
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path("production-artifact")
+          expected = {"PRODUCTION_PROVENANCE.json", os.environ["INSTALLER_NAME"]}
+          assert {x.name for x in root.iterdir()} == expected
+          record = json.loads((root/"PRODUCTION_PROVENANCE.json").read_text("utf-8"))
+          assert record["release_mode"] == "APPROVED-IMMUTABLE-PRODUCTION"
+          assert record["source_revision"] == os.environ["GITHUB_SHA"]
+          PY
+      - name: Preserve exact approved two-file production artifact for manual release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-PRODUCTION-${{ matrix.target }}
+          path: production-artifact/*
+          if-no-files-found: error
+          retention-days: 30

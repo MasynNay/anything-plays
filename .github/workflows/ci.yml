@@ -35,6 +35,8 @@ jobs:
         run: |
           pulseaudio --start --exit-idle-time=-1
           pactl info
+      - name: Check tracked repository layout and forbidden binaries
+        run: python tools/check_repository_hygiene.py
       - name: Run regression tests
         run: python -m unittest discover -s tests -v
       - name: Headless GUI smoke test
@@ -68,11 +70,13 @@ jobs:
   # Package checks use real host OSes and verify staged license/core files.
   # No build artifacts are uploaded or published until redistribution approval.
   package-windows:
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/v3')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
     # Independent package check: all jobs must still pass before merging.
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
+    env:
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -84,7 +88,7 @@ jobs:
         run: choco install innosetup --yes --no-progress
       - name: Build and verify the Windows installer locally on runner
         shell: cmd
-        run: call build_windows.bat
+        run: call packaging\build_windows.bat
       - name: Record staged Windows binary inventory
         run: python tools/binary_inventory.py windows-x86_64 dist/AnythingPlays release-evidence/windows-x86_64.json
       - uses: actions/upload-artifact@v4
@@ -94,7 +98,7 @@ jobs:
           if-no-files-found: error
 
   package-macos:
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/v3')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
     # Independent package check: all jobs must still pass before merging.
     strategy:
@@ -106,18 +110,20 @@ jobs:
           - runner: macos-15-intel
             arch: x86_64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 90
+    env:
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Build and verify a macOS DMG locally on runner
-        run: bash build_macos_dmg.sh
+        run: bash packaging/build_macos_dmg.sh
       - name: Record staged macOS binary inventory
-        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays.app release-evidence/macos-${{ matrix.arch }}.json
+        run: python tools/binary_inventory.py macos-${{ matrix.arch }} dist/AnythingPlays30Preview.app release-evidence/macos-${{ matrix.arch }}.json
       - name: Audit macOS FFmpeg and encoder Mach-O link dependencies
-        run: python tools/audit_codec_linkage.py dist/AnythingPlays.app release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
+        run: python tools/audit_codec_linkage.py dist/AnythingPlays30Preview.app release-evidence/codec-linkage-macos-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: evidence-macos-${{ matrix.arch }}
@@ -127,11 +133,13 @@ jobs:
           if-no-files-found: error
 
   package-linux:
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/v3')
     # Packaging needs regression tests, but may run alongside independent native gameplay checks.
     # Independent package check: all jobs must still pass before merging.
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
+    env:
+      AP_V30_TEST_CORES: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -140,9 +148,9 @@ jobs:
       - name: Install OS packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libglib2.0-0 libportaudio2
+          sudo apt-get install -y --no-install-recommends python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
       - name: Build and verify Debian package locally on runner
-        run: bash build_linux_deb.sh
+        run: bash packaging/build_linux_deb.sh
       - name: Record staged Linux binary inventory
         run: python tools/binary_inventory.py linux-x86_64 dist/AnythingPlays release-evidence/linux-x86_64.json
       - uses: actions/upload-artifact@v4

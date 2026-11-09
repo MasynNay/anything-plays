@@ -1,0 +1,111 @@
+name: Anything Plays 3.0 | Complete nested Dolphin source Gitlink candidate capture
+
+# Source-only UNAPPROVED research, never publish installers or native cores.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - 'config/v3.0-dolphin-nested-submodule-candidates.json'
+      - 'tools/capture_v30_dolphin_nested_sources.py'
+      - 'tests/test_v30_dolphin_nested_sources.py'
+      - '.github/workflows/v30-dolphin-nested-sources.yml'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-nested-sources.yml'
+      - 'config/v3.0-dolphin-nested-submodule-candidates.json'
+      - 'tools/capture_v30_dolphin_nested_sources.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-dolphin-nested-sources-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  three-nested-source-archives:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PARENT_SOURCE_REVIEW_RUN: '42447184893'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test immutable nested Gitlinks and prohibit forged source approval
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_dolphin_nested_sources.py' -v
+          python -m unittest discover -s tests -p 'test_v30_dolphin_source_review.py' -v
+      - name: Verify 34-source parent audit run was the correct successful source-only workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$PARENT_SOURCE_REVIEW_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$PARENT_SOURCE_REVIEW_RUN" --json name --jq .name)" = \
+            "Anything Plays 3.0 | Reconcile all 34 immutable Dolphin source snapshots"
+      - name: Retrieve original SHA-256-verified parent-source audit (two JSON/text files only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$PARENT_SOURCE_REVIEW_RUN" \
+            --name AnythingPlays-3.0.0-DOLPHIN-34-SOURCE-REVIEW-UNAPPROVED \
+            --dir verified-parent-review
+          test "$(find verified-parent-review -maxdepth 1 -type f | wc -l)" -eq 2
+          (cd verified-parent-review && sha256sum -c SHA256SUMS.txt)
+      - name: Verify both immutable parent Gitlink trees, recursively inspect children and archive 3 originals
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.capture_v30_dolphin_nested_sources \
+            --original-review verified-parent-review/DOLPHIN_34_SOURCE_ARCHIVE_REVIEW_UNAPPROVED.json \
+            --output original-nested-sources
+      - name: Inspect exact source graph coverage, original license candidates and archive hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd original-nested-sources && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('original-nested-sources')
+          manifest=root/'DOLPHIN_THREE_NESTED_SOURCE_CANDIDATES_UNAPPROVED.json'
+          evidence=json.loads(manifest.read_text('utf-8'))
+          assert evidence['status']=='UNAPPROVED-DOLPHIN-THREE-NESTED-SOURCE-ARCHIVES'
+          assert evidence['source_candidates_captured']==3
+          assert evidence['pinned_nested_gitlink_count']==3
+          assert evidence['pinned_nested_gitlink_tree_closure_verified'] is True
+          assert len(evidence['archives'])==3
+          assert len(list(root.iterdir()))==5
+          assert all(x is False for x in (
+              evidence['complete_corresponding_source_verified'],
+              evidence['source_to_dolphin_binary_verified'],
+              evidence['transitive_build_deps_and_notices_reviewed'],
+              evidence['independent_license_review_complete'],
+              evidence['public_binary_distribution_approved'],
+          ))
+          for name, row in evidence['archives'].items():
+              assert row['compiled_into_original_dolphin_binary_verified'] is False
+              assert row['source_rights_independently_reviewed'] is False
+              assert row['archive_size_bytes']>0
+              assert (root/row['archive_filename']).is_file()
+              print('PINNED NESTED SOURCE:', name,
+                    'original bytes=',row['archive_size_bytes'],
+                    'notice candidates=',len(row['root_license_notice_candidates']))
+          print('Verified 34 direct + 3 additional nested pinned Gitlink SOURCE CANDIDATES.')
+          print('Source-to-binary, licensing, full build inputs and public 3.0 approval remain FALSE.')
+          PY
+      - name: Retain ONLY original-source archive candidates and audit checksums (NO binaries or games)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-DOLPHIN-THREE-NESTED-SOURCES-UNAPPROVED
+          path: original-nested-sources/*
+          if-no-files-found: error
+          retention-days: 90

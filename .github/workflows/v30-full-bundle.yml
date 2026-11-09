@@ -1,0 +1,369 @@
+name: Anything Plays 3.0 | Complete offline installer lab
+
+# Test only: builds full 18-profile, 11-core installers and checks payloads.
+# Retains authenticated GitHub Actions artifacts for owner-directed evaluation,
+# NOT GitHub Releases or a public 3.0 release. Third-party source, licenses,
+# hardware/compatibility and signing must still be reviewed before distribution.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-full-bundle.yml'
+      - 'packaging/build_macos_dmg.sh'
+      - 'tests/test_v30_macos_dmg_mount_retry.py'
+      - 'tools/probe_v30_installed_offline_cores.py'
+      - 'tests/test_v30_offline_runtime_cores.py'
+      - 'anything_plays/core_locator.py'
+      - 'anything_plays/core_packs.py'
+      - 'anything_plays/systems.py'
+  push:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-full-bundle.yml'
+      - 'packaging/**'
+      - 'licenses/**'
+      - 'docs/THIRD_PARTY_NOTICES.md'
+      - 'docs/THIRD_PARTY_COMPONENTS.md'
+      - 'tests/test_v30_pinned_license_texts.py'
+      - 'fetch_mgba_core.py'
+      - 'verify_bundle.py'
+      - 'anything_plays/core_locator.py'
+      - 'anything_plays/systems.py'
+      # Changes to visible 3.0 gameplay controls must produce a NEW full
+      # preview, not silently leave the old packaged builds on GitHub.
+      - 'app.py'
+      - 'anything_plays/ui_volume.py'
+      - 'anything_plays/ui_tracking_panel.py'
+      - 'anything_plays/ui_theme.py'
+      - 'anything_plays/ui_external.py'
+      - 'anything_plays/gamecube_preview.py'
+      - 'anything_plays/gamecube_gpu.py'
+      - 'anything_plays/gamecube_sys.py'
+      - 'tools/smoke_installed_linux.py'
+      - 'tools/probe_v30_installed_offline_cores.py'
+      - 'tests/test_v30_offline_runtime_cores.py'
+      - 'anything_plays/gamecube_software.py'
+      - 'tests/test_v30_gamecube_linux_writable_sys.py'
+      - 'anything_plays/ui_layout.py'
+      - 'anything_plays/ui_view.py'
+      - 'anything_plays/ui_panels.py'
+      - 'anything_plays/ui_library.py'
+      - 'anything_plays/icon_cleanup.py'
+      - 'anything_plays/ui_icon.py'
+      - 'tools/render_v21_icon.py'
+      - 'assets/anything_plays_v21.webp'
+      - 'tests/test_v30_icon_matte.py'
+      - 'anything_plays/ui_zones.py'
+      - 'tests/test_zone_label_sizing.py'
+      - 'anything_plays/ui_profiles.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_gameplay.py'
+      - 'anything_plays/tracking.py'
+      - 'anything_plays/zone_rendering.py'
+      - 'anything_plays/libretro_input.py'
+      - 'anything_plays/libretro_audio.py'
+      - 'anything_plays/gba_emulator.py'
+      - 'anything_plays/system_profiles.py'
+      - 'anything_plays/settings_defaults.py'
+      - 'tests/test_v30_multi_fish_qol.py'
+      - 'tests/test_v30_gamecube_preview_optimization.py'
+      - 'tests/smoke_gui.py'
+      - 'tools/check_v30_release.py'
+      - 'tools/fetch_dolphin_sys.py'
+      - 'tests/test_v30_original_input_capture.py'
+      - 'config/v3.0-release-acceptance.json'
+      # Physical test evidence must bind to a CURRENT complete offline
+      # 18-profile/11-core installer, not stale alpha artifacts. When the
+      # private owner QA recorder/reconciler changes, produce fresh test-only
+      # owner-accessible installer artifacts at that exact merged commit.
+      - 'tools/v30_physical_qa.py'
+      - 'tools/v30_physical_qa_matrix.py'
+      - 'tests/test_v30_physical_qa.py'
+      - 'tests/test_v30_physical_qa_matrix.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AP_RELEASE_BUILD: '0'
+  AP_V30_TEST_CORES: '1'
+  # Persist the actual upstream ZIPs used by this build; they remain
+  # UNAPPROVED until full source/license verification is complete.
+  AP_CORE_ARCHIVE_CAPTURE_DIR: preserved-native-inputs
+
+jobs:
+  complete-installer-lab:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, target: windows-x64}
+          - {runner: macos-15, target: macos-arm64}
+          - {runner: macos-15-intel, target: macos-x64}
+          - {runner: ubuntu-24.04, target: linux-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk python3-venv dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Compile complete Windows installer (test only)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging/build_windows.bat
+      - name: Compile complete macOS DMG (test only)
+        if: runner.os == 'macOS'
+        run: bash packaging/build_macos_dmg.sh
+      - name: Compile complete Linux DEB (test only)
+        if: runner.os == 'Linux'
+        run: bash packaging/build_linux_deb.sh
+      - name: Verify original unchanged fish art and transparent black exterior
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_icon_matte.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_icon_matte.py' -v
+          fi
+      - name: Verify Linux Dolphin Sys is writable without changing /opt files
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_gamecube_linux_writable_sys.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_gamecube_linux_writable_sys.py' -v
+          fi
+      - name: Verify 3.0 audio, multi-target and local two-player contracts
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_multi_fish_qol.py' -v
+            .build-venv/Scripts/python.exe -m unittest discover -s tests -p 'test_v30_gamecube_preview_optimization.py' -v
+          else
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_multi_fish_qol.py' -v
+            .build-venv/bin/python -m unittest discover -s tests -p 'test_v30_gamecube_preview_optimization.py' -v
+          fi
+      - name: Smoke-test visible preview settings in a real Tk UI
+        if: runner.os == 'Linux'
+        # A directly executed tests/smoke_gui.py lives under tests/, so
+        # explicitly put the checked-out project root on Python's import path.
+        run: PYTHONPATH=. xvfb-run -a .build-venv/bin/python tests/smoke_gui.py
+      - name: Real installed Linux desktop launches as an unprivileged user
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends x11-utils
+          sudo DEBIAN_FRONTEND=noninteractive dpkg -i release/anything-plays-preview_3.0.0~alpha1_amd64.deb
+          smoke_home="$(mktemp -d)"
+          trap 'sudo rm -rf "$smoke_home"' EXIT
+          cp tools/smoke_installed_linux.py "$smoke_home/verify.py"
+          sudo chown -R nobody:nogroup "$smoke_home"
+          sudo chmod 0700 "$smoke_home"
+          sudo -u nobody env HOME="$smoke_home" XDG_STATE_HOME="$smoke_home/.local/state" \
+            xvfb-run -a python3 "$smoke_home/verify.py" \
+              --executable /usr/bin/anything-plays-30-preview \
+              --report "$smoke_home/installed-boot.json"
+          mkdir -p test-evidence
+          # The nonroot user's test HOME is deliberately 0700; copy its
+          # evidence with sudo, then hand ownership back to the CI runner.
+          sudo cp "$smoke_home/installed-boot.json" test-evidence/linux-installed-gui-boot.json
+          sudo chown "$(id -u):$(id -g)" test-evidence/linux-installed-gui-boot.json
+      - name: Real GameCube playback from a read-only extracted Linux DEB
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          readonly_install="$(mktemp -d)"
+          trap 'chmod -R u+w "$readonly_install" 2>/dev/null || true; rm -rf "$readonly_install"' EXIT
+          dpkg-deb -x release/anything-plays-preview_3.0.0~alpha1_amd64.deb "$readonly_install"
+          chmod -R a-w "$readonly_install/opt/anything-plays-30-preview"
+          mkdir -p test-evidence
+          xvfb-run -a .build-venv/bin/python tools/probe_gamecube_app.py \
+            --core "$readonly_install/opt/anything-plays-30-preview/cores/dolphin_libretro.so" \
+            --seconds 5 --report test-evidence/gamecube-linux-readonly-deb.json
+      - name: Verify every console has its native core in the installed payload
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from anything_plays.systems import SYSTEMS
+          from fetch_mgba_core import core_names_for_build
+          target = os.environ["TARGET"]
+          root = (Path("dist/AnythingPlays30Preview.app/Contents/Resources/cores")
+                  if target.startswith("macos") else Path("dist/AnythingPlays/cores"))
+          ext = ".dll" if target.startswith("windows") else ".dylib" if target.startswith("macos") else ".so"
+          expected = set(core_names_for_build())
+          missing = sorted(name for name in expected if not (root / f"{name}_libretro{ext}").is_file())
+          assert len(SYSTEMS) == 18, f"Unexpected system count: {len(SYSTEMS)}"
+          assert len(expected) == 11, f"Unexpected native core count: {len(expected)}"
+          assert not missing, f"Offline installer is missing native cores: {missing}"
+          assert (root / "dolphin-emu/Sys/codehandler.bin").is_file(), "Missing GameCube Sys data"
+          print(f"{target}: {len(SYSTEMS)} consoles, {len(expected)} native cores, GameCube Sys included")
+          PY
+      - name: Prove fresh-user 18-console runtime core selection works entirely offline
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v30_offline_runtime_cores.py' -v
+          if [[ "$TARGET" == macos-* ]]; then
+            core_dir="dist/AnythingPlays30Preview.app/Contents/Resources/cores"
+          else
+            core_dir="dist/AnythingPlays/cores"
+          fi
+          mkdir -p test-evidence
+          python -m tools.probe_v30_installed_offline_cores \
+            --core-dir "$core_dir" \
+            --target "$TARGET" \
+            --report "test-evidence/offline-runtime-$TARGET.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path('test-evidence') / ('offline-runtime-' + os.environ['TARGET'] + '.json')
+          data = json.loads(p.read_text('utf-8'))
+          assert data['systems_resolved_without_network'] == 18
+          assert data['native_cores_hash_verified'] == 11
+          assert data['clean_user_core_overlay'] is True
+          assert data['no_external_emulator_setup_required_in_staged_bundle'] is True
+          assert data['no_runtime_core_download_required_for_fresh_bundled_lookup'] is True
+          assert data['approved_for_public_release'] is False
+          assert data['real_gameplay_video_audio_input_verified'] is False
+          assert data['legal_distribution_review_complete'] is False
+          print('Fresh native profile offline selection proven without claiming game/license approval')
+          PY
+      - name: Record unmet public-release gates without approving binaries
+        run: python tools/check_v30_release.py --report-only
+      - name: Prepare test-only installer checksum and limitations manifest
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os
+          target = os.environ["TARGET"]
+          names = {
+              "windows-x64": "AnythingPlaysSetup-3.0.0-alpha.1.exe",
+              "macos-arm64": "AnythingPlays-3.0.0-alpha.1.dmg",
+              "macos-x64": "AnythingPlays-3.0.0-alpha.1.dmg",
+              "linux-x64": "anything-plays-preview_3.0.0~alpha1_amd64.deb",
+          }
+          file = Path("release") / names[target]
+          if not file.is_file() or file.stat().st_size < 1024 * 1024:
+              raise SystemExit(f"Missing expected full preview installer: {file}")
+          evidence = Path("test-evidence")
+          evidence.mkdir(exist_ok=True)
+          digest = hashlib.sha256()
+          with file.open("rb") as stream:
+              while chunk := stream.read(1024 * 1024):
+                  digest.update(chunk)
+          (evidence / "SHA256SUMS.txt").write_text(
+              f"{digest.hexdigest()}  {file.name}\n", encoding="utf-8")
+          info = {
+              "status": "UNRELEASED-DEVELOPER-TEST-ONLY",
+              "target": target,
+              "source_revision": os.environ["GITHUB_SHA"],
+              "artifact_name": file.name,
+              "sha256": digest.hexdigest(),
+              "size_bytes": file.stat().st_size,
+              "profiles_bundled": 18,
+              "emulator_cores_bundled": 11,
+              "standalone_emulator_download_needed": False,
+              "gamecube_sys_data_bundled": True,
+              "certified_gameplay_on_physical_hardware": False,
+              "public_release_approved": False,
+              "third_party_license_review_complete": False,
+              "notarized_or_platform_signed": False,
+              "roms_or_bios_included": False,
+          }
+          (evidence / "FULL_PREVIEW_INFO.json").write_text(
+              json.dumps(info, indent=2) + "\n", encoding="utf-8")
+          print(f"Verified installable preview payload: {target}, {file.stat().st_size} bytes")
+          print(f"SHA256: {digest.hexdigest()}")
+          PY
+      - name: Verify and fingerprint exact preserved native input archives
+        env:
+          TARGET: ${{ matrix.target }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from fetch_mgba_core import core_names_for_build
+          target = os.environ["TARGET"]
+          ext = ".dll" if target.startswith("windows") else ".dylib" if target.startswith("macos") else ".so"
+          original = Path("cores/CORE_PROVENANCE.json")
+          manifest = json.loads(original.read_text(encoding="utf-8"))
+          cores = {record["name"]: record for record in manifest["cores"]}
+          names = set(core_names_for_build())
+          assert len(names) == 11 and names == set(cores), "Unexpected core inventory"
+          archive_dir = Path("preserved-native-inputs")
+          files = []
+          for name in sorted(names):
+              record = cores[name]
+              assert record["file"] == f"{name}_libretro{ext}", (name, target)
+              path = archive_dir / (record["file"] + ".zip")
+              assert path.is_file() and not path.is_symlink(), f"Missing original core ZIP: {path}"
+              payload = path.read_bytes()
+              sha = hashlib.sha256(payload).hexdigest()
+              assert sha == record["archive_sha256"], f"Core ZIP changed: {name}"
+              assert len(payload) == record["archive_size_bytes"], f"Core ZIP size changed: {name}"
+              files.append({"name": path.name, "sha256": sha, "size_bytes": len(payload)})
+          dolphin = manifest["dolphin_system_assets"]
+          path = archive_dir / "Dolphin.zip"
+          assert path.is_file() and not path.is_symlink(), "Missing original Dolphin Sys ZIP"
+          payload = path.read_bytes()
+          sha = hashlib.sha256(payload).hexdigest()
+          assert sha == dolphin["archive_sha256"], "Dolphin Sys source archive changed"
+          assert len(payload) == dolphin["archive_size_bytes"], "Dolphin Sys archive size changed"
+          files.append({"name": path.name, "sha256": sha, "size_bytes": len(payload)})
+          result = {
+              "source_revision": os.environ["GITHUB_SHA"],
+              "target": target,
+              "status": "UNAPPROVED-TEST-INPUTS",
+              "public_distribution_approved": False,
+              "original_archive_count": len(files),
+              "files": files,
+              "source_core_provenance": manifest,
+          }
+          (archive_dir / "PRESERVED_NATIVE_INPUTS.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(f"{target}: preserved {len(files)} matching immutable native input archives")
+          PY
+      - name: Retain original upstream native ZIP inputs (test only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-${{ matrix.target }}
+          path: preserved-native-inputs/*
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload full offline 3.0 installer for authorized hands-on testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-FULL-TEST-ONLY-${{ matrix.target }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.deb
+            test-evidence/SHA256SUMS.txt
+            test-evidence/FULL_PREVIEW_INFO.json
+            test-evidence/offline-runtime-*.json
+          if-no-files-found: error
+          retention-days: 14
