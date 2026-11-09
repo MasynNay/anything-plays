@@ -46,7 +46,9 @@ permissions:
 
 concurrency:
   group: v30-eleven-original-offline-${{ github.ref }}
-  cancel-in-progress: true
+  # Original Dolphin native builds take many minutes. A later review commit
+  # must not kill all four already-verified source builds before aggregate CI.
+  cancel-in-progress: false
 
 jobs:
   complete-offline-18-profile-11-core-lab:
