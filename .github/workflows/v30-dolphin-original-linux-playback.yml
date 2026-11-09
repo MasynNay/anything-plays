@@ -46,7 +46,7 @@ jobs:
             libudev-dev libevdev-dev libasound2-dev libpulse-dev \
             libgl-dev libegl1-mesa-dev libx11-dev libxi-dev \
             libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev \
-            xvfb xauth libportaudio2
+            xvfb xauth libportaudio2 gdb
           python -m pip install -r requirements.txt
       - name: Check out the pinned unmodified Dolphin and all its original Gitlinks
         shell: bash
@@ -106,6 +106,7 @@ jobs:
             --seconds 25 \
             --exercise-controls \
             --cpu-core 5 \
+            --debugger \
             --report test-evidence/original-source-dolphin-gamecube-homebrew.json
           python - <<'PY'
           import json
