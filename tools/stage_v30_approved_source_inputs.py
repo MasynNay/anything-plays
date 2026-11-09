@@ -26,8 +26,8 @@ sys.path.insert(0, str(ROOT))
 
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
 from tools.v30_release_lock import (
-    ALTERNATIVE_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
-    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_FIVE,
+    ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
+    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA, SOURCE_BUILT_FIVE,
     verify_core_archive, verify_core_payload, verify_dolphin_archive,
 )
 from tools.emit_v30_production_provenance import SOURCE_FILE, validate_source_inventory
@@ -39,7 +39,8 @@ from tools.probe_v30_gpl_core_switch import validate_original_source_artifact
 from tools.v30_pce_candidate import inspect_artifact, load_index
 from anything_plays.v30_approved_core_map import (
     REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED,
-    TEN_REPOSITORIES, TEN_EXPECTED, ELEVEN_REPOSITORIES, ELEVEN_EXPECTED, WINDOWS_RUNTIME,
+    TEN_REPOSITORIES, TEN_EXPECTED, ELEVEN_REPOSITORIES, ELEVEN_EXPECTED,
+    ELEVEN_TIA_REPOSITORIES, ELEVEN_TIA_EXPECTED, WINDOWS_RUNTIME,
 )
 from tools.stage_v30_eight_source_inputs import check_original_five_artifact
 from tools.stage_v30_nine_source_inputs import inspect_original_mgba
@@ -50,6 +51,7 @@ from tools.verify_v30_dolphin_original_build import verify_original_source, veri
 from tools.verify_v30_dolphin_original_macos import verify_original_macos_native
 from tools.verify_v30_dolphin_original_windows import verify_original_windows_native
 from tools.package_v30_dolphin_source_bundle import validate_parent_archive
+from tools.verify_v30_tia_production_source import validate_production_tia
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
 FIVE_FAMILY_SOURCE_RUN = 42515151314
@@ -64,6 +66,8 @@ ORIGINAL_11 = frozenset((*CORE_NAMES, *OPTIONAL_V21_CORES))
 UNCHANGED_8 = ORIGINAL_11 - REPLACED_ORIGINAL
 assert len(ORIGINAL_11) == 11 and len(UNCHANGED_8) == 8
 assert len(ALTERNATIVE_CORE_NAMES) == 11
+SOURCE_BUILT_FIVE_TIA = (SOURCE_BUILT_FIVE - {'stella2014'}) | {'tia'}
+assert len(SOURCE_BUILT_FIVE_TIA) == 5
 NOTICES = {
     "mednafen_supafaust": ("SUPAFAUST_ORIGINAL_GPL2_LICENSE.txt",
                            "GPL-TRIAL-Supafaust-COPYING.txt"),
@@ -160,7 +164,8 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              windows_runtime=None, five_dirs=None,
                              mgba_dir=None, n64_dir=None, dolphin_sys_dir=None,
                              dolphin_source_dir=None, dolphin_native=None,
-                             dolphin_build_report=None, dolphin_parent_archive=None):
+                             dolphin_build_report=None, dolphin_parent_archive=None,
+                             tia_native=None, tia_source_tar=None, tia_playback_report=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -173,18 +178,26 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
             or os.environ.get("AP_RELEASE_BUILD") != "1"
             or os.environ.get("AP_V30_APPROVED_RELEASE") != "1"):
         raise ValueError("Only the independently reviewed production lane may stage approved inputs")
-    if target not in TARGETS or selected_core_set(lock) != ALTERNATIVE_CORE_NAMES:
+    selected_cores = selected_core_set(lock)
+    if target not in TARGETS or selected_cores not in (ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES):
         raise ValueError("Only the reviewed source-built alternative set is supported")
     validate_source_inventory(lock, inventory)
     reviewed_map = approved_core_map_from_lock(lock, target)
     families = selected_source_families(lock)
-    eleven = families == SOURCE_BUILT_ELEVEN
-    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
-    ten = families in (SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
+    eleven_tia = families == SOURCE_BUILT_ELEVEN_TIA
+    eleven = families in (SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA)
+    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA)
+    ten = families in (SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA)
     if eight != (five_dirs is not None):
-        raise ValueError("Eight/ten reviewed sources require EXACT original five-family artifact inputs")
-    if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=SOURCE_BUILT_FIVE):
-        raise ValueError("Exactly five additional pinned original source builds required")
+        raise ValueError("Eight/ten/eleven reviewed sources require EXACT five-family inputs")
+    chosen_five = SOURCE_BUILT_FIVE_TIA if eleven_tia else SOURCE_BUILT_FIVE
+    if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=chosen_five):
+        raise ValueError("Exactly five separately pinned original source builds are required")
+    tia_inputs = (tia_native, tia_source_tar, tia_playback_report)
+    if eleven_tia != all(item is not None for item in tia_inputs):
+        raise ValueError("Full reviewed Tia mode requires exact native, original source TAR and actual Atari AV")
+    if not eleven_tia and any(item is not None for item in tia_inputs):
+        raise ValueError("Unapproved original Tia source-native in legacy non-Tia mode")
     if ten != (mgba_dir is not None and n64_dir is not None):
         raise ValueError("Ten-source production requires BOTH separately captured original mGBA and N64 artifacts")
     if not ten and (mgba_dir is not None or n64_dir is not None):
@@ -197,8 +210,10 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
     if not eleven and any(item is not None for item in dolphin_inputs):
         raise ValueError("Unreviewed original Dolphin native inputs in ten-source release")
     retained = UNCHANGED_0 if eleven else UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
-    expected = ELEVEN_EXPECTED if eleven else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = ELEVEN_REPOSITORIES if eleven else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    expected = (ELEVEN_TIA_EXPECTED if eleven_tia else ELEVEN_EXPECTED if eleven
+                else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED)
+    repositories = (ELEVEN_TIA_REPOSITORIES if eleven_tia else ELEVEN_REPOSITORIES if eleven
+                    else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES)
     ext = EXT[target]
     original_target = {
         "windows-x86_64": "windows-x64",
