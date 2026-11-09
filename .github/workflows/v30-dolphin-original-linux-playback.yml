@@ -64,7 +64,18 @@ jobs:
           assert p["direct_gitlinks_verified"]==34 and p["nested_gitlinks_verified"]==3
           print("All 37 frozen original Dolphin gitlinks checked")
           PY
-      - name: Compile the real source-built Dolphin Libretro ELF without upstream code modification
+      - name: Apply and preserve the narrow auditable headless-Libretro source correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Original source identity and all 37 Gitlinks were verified before any edit.
+          python tools/patch_v30_dolphin_headless_source.py --source original-dolphin
+          git -C original-dolphin diff --check
+          git -C original-dolphin diff -- Source/Core/DolphinLibretro/Main.cpp Source/Core/VideoBackends/Software/SWOGLWindow.cpp Source/Core/VideoBackends/Software/SWGfx.cpp > ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
+          test -s ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
+          echo "Audited corresponding-source patch digest:"
+          sha256sum ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
+      - name: Compile patched pinned original-source Dolphin Libretro ELF with headless fix
         shell: bash
         run: |
           set -euo pipefail
@@ -77,10 +88,27 @@ jobs:
             -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
             -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="${GITHUB_WORKSPACE}/tools/v30_dolphin_original_link_order.cmake"
           cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
-          python -m tools.verify_v30_dolphin_original_build \
-            --source original-dolphin \
-            --native original-dolphin-build/dolphin_libretro.so \
-            --output ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_library, REV
+          import hashlib, json
+          native=verify_original_library(Path("original-dolphin-build/dolphin_libretro.so"))
+          patch=Path("ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff")
+          assert patch.is_file() and patch.stat().st_size > 100
+          result={
+              "status": "UNAPPROVED-ORIGINAL-PINNED-DOLPHIN-PLUS-REVIEWABLE-HEADLESS-PATCH",
+              "pinned_original_source_commit": REV,
+              "exact_pinned_parent_gitlinks_checked_before_patch": 37,
+              **native,
+              "source_patch_sha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
+              "old_buildbot_binary_equivalence_claimed": False,
+              "physical_gameplay_tested": False,
+              "combined_gpl_distribution_reviewed": False,
+              "public_binary_distribution_approved": False,
+          }
+          Path("ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json").write_text(json.dumps(result,sort_keys=True,indent=2)+"\\n","utf-8")
+          print("Pinned original plus reviewed source patch compiled:", native["native_sha256"])
+          PY
       - name: Stage ONLY ephemeral local-source Dolphin core plus exact original Sys into app layout
         shell: bash
         run: |
@@ -129,6 +157,7 @@ jobs:
           name: AnythingPlays-3.0-DOLPHIN-SOURCE-BUILT-LINUX-PLAYBACK-REPORT-UNAPPROVED
           path: |
             ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json
+            ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
             test-evidence/original-source-dolphin-gamecube-homebrew.json
             test-evidence/gamecube-homebrew-frame.png
           if-no-files-found: warn
