@@ -215,10 +215,20 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
             raise ValueError("Missing original local source archive folder")
     if output.exists() or output.is_symlink():
         raise ValueError("Production immutable input folder must be new")
-    if any(output.resolve() == Path(folder).resolve()
-           or Path(folder).resolve() in output.resolve().parents
-           for folder in (original_dir, snes_dir, sega_dir, pce_artifact)):
-        raise ValueError("Cannot overwrite original source-built proof/archive files")
+    # Resolve every source path before writing output. The old four-path
+    # guard omitted the five extra original builds, mGBA, N64, Dolphin Sys,
+    # and Windows runtime, allowing accidental staging into their directories.
+    evidence_paths = [original_dir, snes_dir, sega_dir, pce_artifact]
+    if five_dirs is not None:
+        evidence_paths.extend(five_dirs.values())
+    evidence_paths.extend(p for p in (mgba_dir, n64_dir, dolphin_sys_dir,
+                                      windows_runtime) if p is not None)
+    resolved_output = output.resolve()
+    for item in evidence_paths:
+        evidence = Path(item).resolve()
+        if (resolved_output == evidence or evidence in resolved_output.parents
+                or resolved_output in evidence.parents):
+            raise ValueError("Cannot overwrite original source-built proof/archive files")
     # All 12 old archived inputs MUST remain verified, but only the actual
     # 3 retained originals (8 source builds) or 8 retained originals
     # (3 source builds) and Dolphin Sys may enter approved production.
