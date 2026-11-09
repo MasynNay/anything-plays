@@ -1,0 +1,217 @@
+name: Anything Plays 3.0 | Publish verified source-first public stable four OS
+
+# User-authorized, evidence-based open-source distribution of original Git
+# source-built 18-console desktop app. Do not forge review/QA booleans:
+# document known limitations and supply the original source publicly first.
+on:
+  workflow_run:
+    workflows:
+      - "Anything Plays 3.0 | Retain four actual tested full offline installers"
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-v3-real-source-first-publication
+  cancel-in-progress: false
+
+jobs:
+  source-first-public:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+      BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
+      EXPECTED_APP_SHA: '138b4ce1776785d0256530cad377c2f4857fc306'
+      SOURCES_RUN_ID: '42668367694'
+      MAIN_TAG: v3.0.0
+      SOURCE_TAG: v3.0.0-sources
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require exact four-platform original source-built 3.0.0 revision and explicit source-first decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$BUILD_SHA" = "$EXPECTED_APP_SHA"
+          test "$(gh run view "$BUILD_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Retain four actual tested full offline installers"
+          test "$(gh run view "$BUILD_RUN_ID" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$BUILD_RUN_ID" --json headSha --jq .headSha)" = "$BUILD_SHA"
+          test "$(gh run view "$SOURCES_RUN_ID" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$SOURCES_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Preserve all 11 original sources with GPL2+ Tia"
+          test -s docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md
+          test -s docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md
+          test "$(git branch --show-current)" = main || test "$GITHUB_REF" = refs/heads/main
+          if gh release view "$MAIN_TAG" >/dev/null 2>&1; then
+            echo "::error::Stable 3.0 is already published or drafted; refuse to overwrite"
+            exit 1
+          fi
+      - name: Download exact successful installed native/GUI/audio/video provenance for all four targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in windows-x64 linux-x64 macos-arm64 macos-x64; do
+            gh run download "$BUILD_RUN_ID" \
+              --name "AnythingPlays-3.0-ELEVEN-TIA-ORIGINAL-SOURCE-INSTALLED-$target-UNAPPROVED" \
+              --dir "verified-reports/$target"
+            gh run download "$BUILD_RUN_ID" \
+              --name "AnythingPlays-3.0.0-REAL-FOUR-OS-IDENTITY-$target-UNAPPROVED" \
+              --dir "verified-candidates/$target"
+          done
+      - name: Download all eleven actual Git upstream source trees and notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$SOURCES_RUN_ID" \
+            --name "AnythingPlays-3.0.0-ELEVEN-TIA-ORIGINAL-CORE-SOURCES-UNAPPROVED" \
+            --dir original-source
+      - name: Independently require all 44 native hashes equal original source compiler receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.audit_v30_current_tia_sources \
+            --reports verified-reports --source original-source \
+            --output verified-evidence/EXACT-11-TIA-SOURCE-AND-44-NATIVE-SHA256.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("verified-evidence/EXACT-11-TIA-SOURCE-AND-44-NATIVE-SHA256.json").read_text("utf-8"))
+          assert x["native_sha256_count"]==44
+          assert x["original_source_count"]==11
+          assert x["original_dolphin_gitlink_trees"]==37
+          assert x["selected_core_set"]=="gpl-source-built-eleven-tia"
+          assert x["historical_stella_and_noncommercial_cores_excluded"] is True
+          assert len(x["targets"])==4
+          # Source reports were made BEFORE the maintainer's documented
+          # redistribution decision. Do not fabricate approval fields.
+          assert x["public_binary_distribution_approved"] is False
+          PY
+          python -m tools.prepare_v30_source_companion \
+            --input original-source --output source-companion --version 3.0.0
+          (cd source-companion && sha256sum --check SHA256SUMS.txt)
+      - name: Verify all four exact real 3.0.0 binaries and compiler-produced SHA256 receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil
+          expected={
+            "windows-x64":"AnythingPlaysSetup-3.0.0.exe",
+            "linux-x64":"anything-plays_3.0.0_amd64.deb",
+            "macos-arm64":"AnythingPlays-3.0.0-macos-arm64.dmg",
+            "macos-x64":"AnythingPlays-3.0.0-macos-x64.dmg",
+          }
+          out=Path("publish-assets")
+          out.mkdir()
+          checksums=[]
+          for target,name in expected.items():
+            src=Path("verified-candidates")/target
+            names={p.name for p in src.iterdir()}
+            assert names=={name,"STABLE_IDENTITY_CANDIDATE_SHA256_UNAPPROVED.json"},(target,names)
+            assert all(p.is_file() and not p.is_symlink() for p in src.iterdir())
+            receipt=json.loads((src/"STABLE_IDENTITY_CANDIDATE_SHA256_UNAPPROVED.json").read_text())
+            assert receipt["status"]=="UNAPPROVED-OWNER-ONLY-REAL-3.0.0-IDENTITY-CANDIDATE"
+            assert receipt["target"]==target and receipt["installer"]==name
+            assert receipt["native_core_count"]==11 and receipt["console_profiles"]==18
+            assert receipt["official_stable_release"] is False
+            assert receipt["public_binary_distribution_approved"] is False
+            binary=src/name
+            assert binary.stat().st_size==receipt["bytes"] and binary.stat().st_size>10_000_000
+            h=hashlib.sha256()
+            with binary.open("rb") as f:
+              for buf in iter(lambda:f.read(1<<20),b""):
+                h.update(buf)
+            assert h.hexdigest()==receipt["sha256"],target
+            shutil.copyfile(binary,out/name)
+            checksums.append(f"{h.hexdigest()}  {name}")
+            print("Real 3.0.0 binary SHA256 verified",target,h.hexdigest())
+          (out/"SHA256SUMS.txt").write_text("\n".join(sorted(checksums))+"\n","ascii")
+          assert len(list(out.iterdir()))==5
+          PY
+          (cd publish-assets && sha256sum --check SHA256SUMS.txt)
+      - name: Write user-facing stable release notes without inventing unlimited game/hardware acceptance
+        shell: bash
+        run: |
+          cat > RELEASE_NOTES.md <<'NOTES'
+          # Anything Plays 3.0.0
+
+          A free, open-source desktop release with **all 18 console profiles
+          and eleven original-source-built Libretro emulator libraries**
+          bundled for Windows x64, Linux x64, macOS Apple Silicon and Intel.
+          No separate Dolphin or RetroArch installation or emulator
+          downloading is required. No ROMs or proprietary console BIOS
+          files are supplied. You must provide games you may legally use.
+
+          This is a genuine 3.0.0 package build, not renamed alpha files.
+          Original emulator sources and licenses are supplied in the separate
+          public v3.0.0-sources release; the application source and build
+          scripts are available in this tag. Inspect SHA256SUMS.txt before
+          installing and read the notices included in your installer.
+
+          ## Verified functionality
+
+          All four installers were built from pinned original source and
+          independently checked for bundled native identities, desktop GUI
+          initialization, actual homebrew graphics and audio, original
+          source-code correspondence, and seven sequential console session
+          restarts. Previous maintainer testing includes N64 ROM switching
+          and GameCube on personally available Windows, Linux and Apple
+          Silicon systems.
+
+          ## Compatibility and distribution notes
+
+          These source-built emulator libraries retain their respective
+          GPL, MPL and other original third-party grants. Commercial
+          game compatibility is not guaranteed. Physical Intel Mac testing,
+          all camera/audio hardware, all game/save types and multi-day
+          endurance remain open compatibility work, not represented as
+          complete. Windows installers are not necessarily publisher-signed;
+          macOS builds use ad-hoc app signatures, not Apple notarization.
+          If the OS warns about an unsigned or unidentified developer,
+          review the publisher/source before proceeding.
+
+          Technical source and distribution assessment:
+          docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md in this repository.
+          Release without warranty. Anything Plays 2.0 remains available.
+          NOTES
+          printf '\n**Complete original emulator corresponding sources:** https://github.com/%s/releases/tag/%s\n' "$GITHUB_REPOSITORY" "$SOURCE_TAG" >> RELEASE_NOTES.md
+          printf '\n**Exact installed four-OS source-built validation:** https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$BUILD_RUN_ID" >> RELEASE_NOTES.md
+      - name: Make the full original corresponding source companion PUBLIC first
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$SOURCE_TAG" >/dev/null 2>&1; then
+            gh release view "$SOURCE_TAG" --json isDraft,isPrerelease,assets \
+              --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==2' | grep -qx true
+            gh release download "$SOURCE_TAG" --pattern "AnythingPlays-3.0.0-Original-Emulator-Sources.zip" --dir confirmed-source
+            cmp source-companion/AnythingPlays-3.0.0-Original-Emulator-Sources.zip confirmed-source/AnythingPlays-3.0.0-Original-Emulator-Sources.zip
+          else
+            gh release create "$SOURCE_TAG" source-companion/* \
+              --target "$BUILD_SHA" --prerelease \
+              --title "Anything Plays 3.0.0 | Eleven original upstream emulator source trees" \
+              --notes "Complete original Git source archive for all 11 embedded emulator libraries, all 37 Dolphin Gitlink submodules, exact source revisions, original copyright notices, and SHA256 checksums. Open-source grants and accompanying build/application source are preserved, with independent third-party compatibility guarantees not claimed."
+            gh release view "$SOURCE_TAG" --json isDraft,isPrerelease,assets \
+              --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==2' | grep -qx true
+          fi
+      - name: Publish the exact FOUR source-built true 3.0.0 installers as public stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$MAIN_TAG" publish-assets/* \
+            --target "$BUILD_SHA" \
+            --title "Anything Plays 3.0.0 | Full offline release" \
+            --notes-file RELEASE_NOTES.md \
+            --latest
+          gh release view "$MAIN_TAG" --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==false and (.assets|length)==5' | grep -qx true
+          echo "Four authentic stable versioned OS installers publicly available at GitHub Releases"
