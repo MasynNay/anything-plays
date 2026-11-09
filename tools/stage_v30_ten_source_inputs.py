@@ -25,6 +25,7 @@ from tools.capture_v30_n64_original_source_build import (
 )
 from tools.stage_v30_nine_source_inputs import FAMILIES, stage_nine
 from tools.stage_v30_gpl_trial_inputs import TARGET_EXT, package_native_zip
+from tools.stage_v30_original_dolphin_sys import exact_original_sys_artifact
 
 N64_SOURCE_RUN_ID = 42534736496
 SOURCE_MARKER = "ORIGINAL_N64_SOURCE_NATIVE_UNAPPROVED.json"
@@ -166,7 +167,8 @@ def check_original_n64_artifact(folder, target):
 
 
 def stage_ten(*, original_dir, snes_dir, sega_dir, pce_artifact, five_dirs,
-              mgba_dir, n64_dir, target, output, evidence, windows_runtime=None):
+              mgba_dir, n64_dir, target, output, evidence, windows_runtime=None,
+              dolphin_sys_dir=None):
     if (any(os.environ.get(flag) != "1" for flag in (
             "AP_V30_GPL_TRIAL","AP_V30_PINNED_PCE","AP_V30_PINNED_FIVE",
             "AP_V30_PINNED_MGBA","AP_V30_PINNED_N64"))
@@ -179,6 +181,13 @@ def stage_ten(*, original_dir, snes_dir, sega_dir, pce_artifact, five_dirs,
             or output.resolve() == evidence.resolve()):
         raise ValueError("Original ten-family output and report must be newly created")
     native, notices, original = check_original_n64_artifact(n64_dir, target)
+    # The first ten-source research lab used an older mutable buildbot Sys ZIP.
+    # An optional *independently Git-tree-reverified* original-source ZIP is
+    # now supported; this is test-only and never grants distribution rights.
+    replacement_sys = None
+    source_sys_proof = None
+    if dolphin_sys_dir is not None:
+        replacement_sys, source_sys_proof = exact_original_sys_artifact(dolphin_sys_dir)
     extension = TARGET_EXT[target]
     with tempfile.TemporaryDirectory(prefix="anything-plays-ten-source-n64-") as temporary:
         tmp = Path(temporary)
@@ -196,6 +205,8 @@ def stage_ten(*, original_dir, snes_dir, sega_dir, pce_artifact, five_dirs,
                 or marker.get("source_built_n64") is not None):
             raise ValueError("Full original nine-family candidate was not authenticated")
         marker["source_built_n64"] = original
+        if source_sys_proof is not None:
+            marker["source_exact_original_dolphin_sys"] = source_sys_proof
         marker["original_unchanged_core_archives"] = 1
         marker["total_source_built_core_families"] = 10
         for approval in ("public_binary_distribution_approved",
@@ -211,7 +222,9 @@ def stage_ten(*, original_dir, snes_dir, sega_dir, pce_artifact, five_dirs,
             if file.is_symlink() or not file.is_file():
                 raise ValueError("Unsafe original nine-source file")
             data = (json.dumps(marker,indent=2,sort_keys=True)+"\n").encode() if file.name==MARKER else (
-                replacement if file.name==archive_name else file.read_bytes())
+                replacement if file.name==archive_name else
+                replacement_sys if file.name == 'Dolphin.zip' and replacement_sys is not None
+                else file.read_bytes())
             (output/file.name).write_bytes(data)
         for name,data in sorted(notices.items()):
             (output/name).write_bytes(data)
@@ -226,6 +239,7 @@ def main(argv=None):
                  "target","output","evidence","mgba-dir","n64-dir"):
         p.add_argument("--"+name,required=True)
     p.add_argument("--windows-runtime")
+    p.add_argument("--dolphin-sys-dir", help="Original Git-tree-verified Sys ZIP research artifact, test-only")
     for name in sorted(FAMILIES):
         p.add_argument("--"+name.replace("_","-")+"-dir",required=True)
     args=vars(p.parse_args(argv))
@@ -237,6 +251,7 @@ def main(argv=None):
             mgba_dir=args["mgba_dir"],n64_dir=args["n64_dir"],
             target=args["target"],output=args["output"],evidence=args["evidence"],
             windows_runtime=args["windows_runtime"],
+            dolphin_sys_dir=args["dolphin_sys_dir"],
         )
     except (ValueError,OSError,KeyError,TypeError,json.JSONDecodeError) as exc:
         p.exit(1,f"Ten source-family N64 full offline research REFUSED: {exc}\n")
