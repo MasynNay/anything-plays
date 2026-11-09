@@ -75,6 +75,7 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
   if "%AP_RELEASE_BUILD%"=="1" exit /b 1
   if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
   set "CORE_LIST=mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin stella2014 prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
+  if "%AP_V30_TIA_TRIAL%"=="1" set "CORE_LIST=mgba mednafen_supafaust fceumm blastem parallel_n64 dolphin tia prosystem mednafen_pce_fast mednafen_ngp mednafen_wswan"
 )
 REM An ACTUALLY APPROVED production build must take its names from the
 REM independently reviewed 11-core lock, not the original NC hardcoded list.
@@ -152,9 +153,18 @@ if "%AP_V30_GPL_TRIAL%"=="1" (
     if errorlevel 1 exit /b 1
   )
   if "%AP_V30_PINNED_FIVE%"=="1" (
+    if "%AP_V30_TIA_TRIAL%"=="1" (
+      for %%C in (fceumm tia prosystem mednafen_ngp mednafen_wswan) do (
+        copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-%%C-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+        if errorlevel 1 exit /b 1
+      )
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-tia-ORIGINAL-SPDX.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    ) else (
     for %%C in (fceumm stella2014 prosystem mednafen_ngp mednafen_wswan) do (
       copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-%%C-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
       if errorlevel 1 exit /b 1
+    )
     )
   )
 )
