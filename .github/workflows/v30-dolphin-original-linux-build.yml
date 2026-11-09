@@ -81,7 +81,7 @@ jobs:
             -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
             -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
             -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
-            -DUSE_MGBA=OFF -DENABLE_AUTOUPDATE=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF \
             -DENABLE_CLI_TOOL=OFF
           cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
           test -s original-dolphin-build/dolphin_libretro.so
