@@ -123,6 +123,12 @@ if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" && -f cores/V30_SOURCE_BUILT_PRODUC
       cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-${name}-ORIGINAL-COPYING.txt" dist/AnythingPlays/licenses/
     done
   fi
+  if [[ "${AP_V30_APPROVED_TEN:-0}" == "1" ]]; then
+    cp "${AP_CORE_ARCHIVE_DIR}/MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt" dist/AnythingPlays/licenses/
+    for number in 01 02 03 04 05 06 07 08 09 10 11; do
+      cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-N64-NOTICE-$number.txt" dist/AnythingPlays/licenses/
+    done
+  fi
 fi
 .build-venv/bin/python tools/collect_python_notices.py dist/AnythingPlays/licenses
 
