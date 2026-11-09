@@ -57,6 +57,9 @@ target_link_libraries(dolphin_libretro PRIVATE
                     self.assertIn("Original Dolphin source preserved",
                                   config.stdout)
                     self.assertTrue((target/"libdolphin_libretro.so").is_file())
+                    link_command = (target/"build.ninja").read_text("utf-8")
+                    self.assertIn("--start-group", link_command)
+                    self.assertIn("--end-group", link_command)
                 else:
                     self.assertIn("undefined reference",built.stdout+built.stderr)
 
