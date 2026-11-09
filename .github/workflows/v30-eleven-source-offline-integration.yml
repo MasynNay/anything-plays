@@ -696,3 +696,52 @@ jobs:
             test-evidence/*.json
           if-no-files-found: warn
           retention-days: 30
+
+  consolidate-44-platform-native-source-evidence:
+    # Runs ONLY if all four real original-source installed emulator checks pass.
+    # This is a complete machine-readable source-review packet, NOT a license
+    # clearance or a downloadable public installer.
+    needs: complete-offline-18-profile-11-core-lab
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify fail-closed four-platform source-evidence assembler
+        run: python -m unittest discover -s tests -p 'test_v30_four_platform_source_evidence.py' -v
+      - name: Retrieve only this run's four real installed 11-source evidence sets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: AnythingPlays-3.0-ELEVEN-SOURCE-CORE-INSTALLED-*-UNAPPROVED
+          path: four-platform-evidence
+          merge-multiple: false
+      - name: Consolidate exact 44 installed native digests with original source commits
+        env:
+          VERIFIED_RUN_ID: ${{ github.run_id }}
+        run: |
+          python -m tools.compile_v30_four_platform_source_evidence \
+            --artifacts-dir four-platform-evidence \
+            --run-id "$VERIFIED_RUN_ID" \
+            --output test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json")
+          r=json.loads(p.read_text("utf-8"))
+          assert r["total_platform_native_sha256"]==44
+          assert r["corresponding_source_inventory_verified"] is False
+          assert r["license_compatibility_reviewed"] is False
+          assert r["public_binary_distribution_approved"] is False
+          print("4 OS, 44 original-source native SHA identities; no rights claimed.")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-FOUR-PLATFORM-44-ORIGINAL-SOURCE-REVIEW-UNAPPROVED
+          path: test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          if-no-files-found: error
+          retention-days: 90
