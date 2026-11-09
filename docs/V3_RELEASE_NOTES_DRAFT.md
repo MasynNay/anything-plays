@@ -6,8 +6,8 @@
 
 ## What's new in 3.0
 
-- **Expanded built-in console library:** 18 console profiles powered by 11 native emulator cores; the full offline test installers contain the cores and Dolphin support files rather than requiring separately installed RetroArch or Dolphin.
-- **Nintendo 64 and GameCube:** Embedded gameplay paths with improved restart handling and GameCube display pacing settings. Actual performance varies by GPU and game.
+- **Expanded built-in console library:** 18 console profiles powered by 11 native emulator core families. The four-platform complete offline trial installers include each console's emulator and bundled Dolphin Sys files; no separately installed RetroArch or Dolphin is required. The latest verified full native trial uses **ten pinned original source-built core families** and one archived Dolphin core, with custom noncommercial Snes9x and Genesis Plus GX replaced by experimental source-built alternatives. This is a technical result, **not a GPL/license approval**.
+- **Nintendo 64 and GameCube:** Embedded gameplay with improved N64 repeated-ROM switching and GameCube display pacing. The maintainer has already confirmed working N64 and GameCube gameplay, with Dolphin functioning on Windows, Apple Silicon macOS and Linux after the Dolphin Sys permissions correction. This should not be confused with yet-to-be-documented final production-installer source, audio/save/endurance and rights evidence. Performance varies by GPU and game.
 - **Camera controls:** Object-neutral color tracking, optional secondary color, optional multiple objects per color and local player assignments for compatible games.
 - **Visible label-size control:** Resize the labels on the camera control zones with a slider on the left. Long labels now shrink to fit rather than overlap neighboring zones. Per-console size settings persist.
 - **Audio and display:** Game-volume slider and mute, windowed, borderless and fullscreen modes.
@@ -34,8 +34,8 @@ Full application installers are planned to contain the complete supported emulat
 
 ## Evidence and release approval
 
-- [Four-platform offline installer test workflow](https://github.com/MasynNay/anything-plays/actions/runs/42426209611) passed, including an unprivileged Linux installed-app startup and read-only GameCube playback.
-- Developer-branch source checks passed. User-reported Linux Dolphin playability is recorded in [Linux QA issue #25](https://github.com/MasynNay/anything-plays/issues/25).
+- [Ten-original-source complete four-platform installer integration run](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed genuine Windows x64, Linux x64 and both macOS architectures, including installed Tk GUI and original source-built N64 homebrew video. The older full installer baseline [also passed all four platforms](https://github.com/MasynNay/anything-plays/actions/runs/42535823317).
+- The maintainer has personally reported N64 gameplay with working ROM switching and Dolphin/GameCube gameplay across Windows, Apple Silicon macOS and Linux. These observations are recorded in the project roadmap and release acceptance notes; no repeat gameplay demonstration is being requested.
 - **Final approval is pending**: exact third-party license/source review, immutable production binaries, release acceptance and checksum publication.
 
 Do not make this release public until `python tools/check_v30_release.py` passes with the documented evidence, and the final downloaded installers and required source assets are verified.
