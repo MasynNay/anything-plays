@@ -1,0 +1,119 @@
+name: Anything Plays 3.0 | Pinned GPL2+ Atari 2600 replacement proof
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-tia-gpl2plus-candidate.yml'
+      - 'tests/test_v30_tia_gpl2plus_candidate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-atari-2600-candidate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, ext: so, platform: unix}
+          - {runner: windows-2025, target: windows-x64, ext: dll, platform: win}
+          - {runner: macos-15, target: macos-arm64, ext: dylib, platform: osx}
+          - {runner: macos-15-intel, target: macos-x64, ext: dylib, platform: osx}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      TARGET: ${{ matrix.target }}
+      EXT: ${{ matrix.ext }}
+      PLATFORM: ${{ matrix.platform }}
+      TIA_SHA: 6ae5bf998fe7a7842294089db17fc86fd73db1f0
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate fail-closed experimental identity and four OS coverage
+        run: python -m unittest discover -s tests -p 'test_v30_tia_gpl2plus_candidate.py' -v
+      - name: Fetch precise original Tia GPL2+ source, never a buildbot binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q original-tia
+          git -C original-tia remote add origin https://github.com/warmenhoven/tia
+          for attempt in 1 2 3 4; do
+            if git -C original-tia fetch --depth=1 --no-tags origin "$TIA_SHA"; then break; fi
+            if [[ "$attempt" == 4 ]]; then exit 1; fi
+            sleep "$((3*attempt))"
+          done
+          git -C original-tia checkout -q --detach FETCH_HEAD
+          test "$(git -C original-tia rev-parse HEAD)" = "$TIA_SHA"
+          grep -Fq 'GPL-2.0-or-later' original-tia/README.md
+          grep -Fq 'SPDX-License-Identifier: GPL-2.0-or-later' original-tia/src/libretro.c
+          grep -Fq 'GNU GENERAL PUBLIC LICENSE' original-tia/COPYING
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+      - name: Compile original native Linux and macOS Libretro core
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          make -C original-tia platform="$PLATFORM" -j2
+          test -s "original-tia/tia_libretro.$EXT"
+      - name: Compile original native Windows x64 Libretro core
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          make -C original-tia platform=win CC=gcc -j2
+          test -s original-tia/tia_libretro.dll
+      - name: Prepare existing real 2600 gameplay, RGB, input and PCM probe
+        run: python -m pip install -r requirements.txt
+      - name: Run original Atari 2600 homebrew inside actual app Libretro frontend
+        shell: bash
+        run: |
+          python tools/probe_atari_homebrew.py \
+            --core "original-tia/tia_libretro.$EXT" --seconds 8 \
+            --report tia-evidence/TIA_ATARI2600_NATIVE_PLAYBACK_UNAPPROVED.json
+      - name: Verify real frame/audio proof and record pinned source identity
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os,json,hashlib
+          from pathlib import Path
+          core=Path(f"original-tia/tia_libretro.{os.environ['EXT']}")
+          probe=json.loads(Path("tia-evidence/TIA_ATARI2600_NATIVE_PLAYBACK_UNAPPROVED.json").read_text())
+          detail=probe.get("details") or {}
+          assert probe.get("passed") is True and probe.get("native_exit_code")==0
+          assert detail.get("video_frames",0)>=30 and detail.get("unique_frame_hashes",0)>=2
+          assert detail.get("pcm_nonzero_samples",0)>=100
+          assert core.is_file() and not core.is_symlink() and core.stat().st_size>10000
+          evidence={
+            "status":"UNAPPROVED-GPL2PLUS-ATARI2600-SAME-PROFILE-SOURCE-REPLACEMENT",
+            "original_git_commit":os.environ["TIA_SHA"],
+            "source_repository":"https://github.com/warmenhoven/tia",
+            "source_license":"GPL-2.0-or-later",
+            "native_sha256":hashlib.sha256(core.read_bytes()).hexdigest(),
+            "target":os.environ["TARGET"],
+            "original_homebrew_playback_passed":True,
+            "atari2600_profile_preserved":True,
+            "additional_console_profiles":0,
+            "stella2014_replaced_in_main":False,
+            "all_game_compatibility_verified":False,
+            "combined_license_compliance_approved":False,
+            "public_binary_distribution_approved":False,
+          }
+          Path("tia-evidence/TIA_GPL2PLUS_SOURCE_AND_NATIVE_SHA_UNAPPROVED.json").write_text(
+            json.dumps(evidence,indent=2,sort_keys=True)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TIA-ATARI2600-GPL2PLUS-ORIGINAL-${{ matrix.target }}_UNAPPROVED
+          path: |
+            tia-evidence/TIA_ATARI2600_NATIVE_PLAYBACK_UNAPPROVED.json
+            tia-evidence/TIA_GPL2PLUS_SOURCE_AND_NATIVE_SHA_UNAPPROVED.json
+          if-no-files-found: error
+          retention-days: 90
