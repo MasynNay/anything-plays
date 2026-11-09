@@ -1,107 +1,62 @@
-# Anything Plays — Development Roadmap
+# Anything Plays — Roadmap
 
-**If it moves, it plays.** Anything Plays turns camera-detected motion into local video-game controls. This roadmap describes shipped work, the **active 3.0 development preview**, and the evidence required before the next public release.
+**If it moves, it plays.** This roadmap tracks what has shipped, what has been verified in development, and where the project is going. It deliberately separates completed engineering work from public release availability.
 
-**Last reviewed:** November 8, 2026  
-**Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
-**Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
-**Current focus:** Final 3.0 binary redistribution/source compliance and packaging publication; owner has already manually tested Windows, Linux and macOS. Do not ask for repeat N64/GameCube gameplay tests.  
-**Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
+[Website](https://anythingplays.masynnay.com/) · [Latest public release](https://github.com/MasynNay/anything-plays/releases/latest) · [Issues](https://github.com/MasynNay/anything-plays/issues) · [Architecture](docs/ARCHITECTURE.md)
 
-> **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
+## Progress at a glance
 
-## At a glance
-
-| Area | Status | Evidence / next step |
+| Milestone | Status | Result |
 | --- | --- | --- |
-| 2.0 supported consoles (GB, GBC, GBA, SNES) | **Released** | [Stable v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) |
-| Modular desktop UI, themes, ROM shelf, object-based controls | **Implemented in 3.0 preview** | [3.0 source branch](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) |
-| 18 console profiles, 11 native cores, four installer targets | **Built, native-tested and frozen desktop launched on four CI hosts** | [Actual installed desktop launches](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
-| Simultaneous object/color tracking, local P1/P2 inputs | **Automated simulation passed** | [Camera-to-controller simulation](https://github.com/MasynNay/anything-plays/actions/runs/42402602944) |
-| N64 ROM unload/reload without quitting the app | **Fixed and owner-verified on Apple Silicon** | [Four-platform 3× native restart CI](https://github.com/MasynNay/anything-plays/actions/runs/42415242942) |
-| Windows real-device clean install and regression | **Owner tested Windows and confirmed app/emulator behavior; exhaustive acceptance not claimed** | [#26](https://github.com/MasynNay/anything-plays/issues/26) |
-| Linux real-device clean install and regression | **Owner tested Linux; historical GameCube permission failure fixed; frozen Linux app starts in CI** | [Real GUI launch CI](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
-| GameCube GPU smoothness and long-session behavior | **In progress** | [#27](https://github.com/MasynNay/anything-plays/issues/27) |
-| Third-party licenses, signing, clean-install release gates | **Blocking stable 3.0** | [#28](https://github.com/MasynNay/anything-plays/issues/28) |
+| **1.5** — Original desktop application | Released | Camera-driven controls and local emulation |
+| **2.0** — Expanded studio | Released | Game Boy, Game Boy Color, GBA, SNES; ROM libraries, themes and configurable zones |
+| **3.0** — Unified offline console library | **Built and validated; publication in progress** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
+| **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
-## Latest verified activity — November 8, 2026
+**Download status:** The [GitHub Releases page](https://github.com/MasynNay/anything-plays/releases/latest) is authoritative. A successful build, internal release candidate, or private draft is not automatically a publicly downloadable release.
 
-- **Maintainer cross-platform acceptance:** the author has already personally tested the application on **Windows, Linux and macOS**, and reported working **N64 and GameCube** emulation. **Do not request those same OS/core retests again.** This is truthful owner-observed gameplay, not a claim that all 18 profiles or peripheral combinations were exhaustively accepted.
-- **Real installed app startup, not just emulator DLLs:** the actual frozen desktop window, App initialization and Tk event loop passed on **Windows x64, Linux x64, Apple Silicon and Intel Mac**. [Original CI proof](https://github.com/MasynNay/anything-plays/actions/runs/42529022383).
-- **Native source provenance:** the full 18-profile/11-core engineering installer has **eight independently source-built integrated core families** across the four CI architectures, with nine source-built families demonstrated when separately tested mGBA is counted. [Source-integrated four-OS installer](https://github.com/MasynNay/anything-plays/actions/runs/42519987017) · [Original mGBA source checks](https://github.com/MasynNay/anything-plays/actions/runs/42527449154).
-- **Public release reality:** GitHub v2.0.0 is still the latest published stable download. The *full offline 3.0 binary* is **not yet public**, because the original third-party emulator license/source-bundle requirements and controlled production approval have not been completed. This is **not** waiting for the owner to repeat successful gameplay tests.
+## Version 3.0 — Implementation
 
-- **Apple Silicon:** Maintainer confirmed repeated Nintendo 64 ROM switching without relaunching Anything Plays after the per-game native lifecycle fix.
-- **Windows:** Maintainer reported that the real application worked without issues in the features tested. This is **partial QA**, not certification of every core, game, camera or save workflow.
-- **Linux:** A genuine `/opt/.../dolphin-emu/Sys/codehandler.bin` permission failure was reproduced from a root-owned DEB. The updated build now passes a **non-root installed-app launch** (fresh and saved-GameCube profiles), bundled Sys visibility checks, and real native GameCube homebrew playback from a read-only installation. [Full installer evidence](https://github.com/MasynNay/anything-plays/actions/runs/42421756448). **Physical user re-test remains open.**
-- **Portfolio:** The [public project showcase](https://anythingplays.masynnay.com/) is deployed by GitHub Pages from `main`, with real desktop artwork, a clearly labelled interactive concept, tech stack and this transparent roadmap.
+The 3.0 application expands from four supported console profiles to 18, with integrated Nintendo 64 and GameCube alongside handhelds and classic systems.
 
-These are engineering milestones, **not an announcement of a stable 3.0 release**. Roadmap statuses update when real evidence changes, not just to make the project appear active.
+**Implemented**
 
-## Delivered milestones
+- Eleven native emulator cores from pinned original upstream sources, including Dolphin and GPL-2.0-or-later Tia.
+- Offline desktop packages for Windows x64, Linux x64, macOS Apple Silicon and macOS Intel.
+- ROM-library browsing, per-console settings and flexible input-zone layouts.
+- Local camera and keyboard controls, a control-label sizing slider and volume controls.
+- Improved N64 game unload/reload behavior and GameCube initialization.
+- Packaged original emulator notices and corresponding-source provenance.
 
-### 1.0–2.0 — Desktop foundation
+**Verified**
 
-- [x] Camera color detection mapped to configurable gamepad zones.
-- [x] Embedded GB, GBC, GBA and SNES, with separate ROM shelves and profile persistence.
-- [x] Theme and layout customization, local keyboard input, and controlled game audio.
-- [x] Cross-platform 2.0 installer release.
+- The original four-platform source-built [integration run](https://github.com/MasynNay/anything-plays/actions/runs/42686588072) passed native emulator, frozen UI, graphics/audio, and seven-session switching checks.
+- The [source correspondence audit](https://github.com/MasynNay/anything-plays/actions/runs/42717944132) matched 44 compiled emulator libraries to eleven pinned upstream source trees, including 37 Dolphin Git-linked source dependencies.
+- The maintainer has personally tested N64 game switching and GameCube, including testing on Windows, Linux and Apple Silicon. These reports count as valuable real-world testing.
+- Genuine versioned 3.0.0 installer builds are tracked in the [release workflow](https://github.com/MasynNay/anything-plays/actions/runs/42718569352).
 
-### 3.0 preview — Wider compatibility and reliable recovery
+**Known limitations**
 
-- [x] Implemented 18 console profiles with 11 emulator cores in **full offline developer-test** installers; no separate emulator installation required.
-- [x] Added an object-neutral tracking interface, optional second tracked color, opt-in multiple objects per color, and independent local Player 1/Player 2 input.
-- [x] Added an in-game volume slider and mute button, with persistent listening level.
-- [x] Added synthetic moving-object integration tests that exercise the actual Tk camera/UI path and Libretro input callbacks.
-- [x] Reproduced a persistent N64 second-ROM failure across four operating-system runners, implemented per-game Mac process isolation and safe N64 lifecycle cleanup on other platforms, then passed three consecutive native restarts per platform.
-- [x] Preserved the original fish artwork; removed only the exterior black icon matte via an alpha-only transformation, protected by regression tests.
-- [x] Added adjustable GameCube display preview pacing. **Actual emulation-FPS improvement on physical GPUs is still unverified.**
+Individual game compatibility, graphics performance, physical cameras, save types, and extended-session stability vary by computer and are not exhaustively certified. Unsigned Windows installers and macOS applications without Apple notarization may display operating-system warnings. No commercial ROMs or console firmware are included.
 
-### Currently validating
+The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
-- [ ] **Windows real-device acceptance** — first real-device smoke was reported successful for features tested; complete the full installer, game audio, save/reload, N64 switching, and local-control checklist before marking acceptance complete. [Track #26](https://github.com/MasynNay/anything-plays/issues/26).
-- [ ] **Linux real-device acceptance** — physical testing exposed a root-owned Dolphin Sys directory that prevented GameCube launch and later app startup. The corrected 3.0 DEB passes non-root installed-GUI tests with fresh and GameCube-saved settings, plus native GameCube playback from read-only DEB. The owner has **not yet confirmed the replacement on the physical Linux machine**. [Track #25](https://github.com/MasynNay/anything-plays/issues/25).
-- [ ] **GameCube reliability and smoothness** — actual emulation FPS, frame pacing, controller latency, 30+ minute sessions, and compatibility evidence across GPUs. [Track #27](https://github.com/MasynNay/anything-plays/issues/27).
-- [ ] **Evidence-backed native-core readiness** — complete mono Neo Geo Pocket audio acceptance and per-console save/input checks; do not substitute silently passing fixtures for audible gameplay. [Track #24](https://github.com/MasynNay/anything-plays/issues/24).
+## Next priorities
 
-### Stable 3.0 release criteria
-
-- [ ] Every declared supported console meets the release checklist with actual playback evidence, not just packaged core presence.
-- [ ] Fresh-install QA covers available Windows, Linux and Apple Silicon hardware. Intel macOS is covered by CI; **physical Intel hardware testing is not yet available** and should be documented honestly or supplied by contributors.
-- [ ] Verify game audio, manual and object controls, save persistence, repeated ROM switching and clean shutdown.
-- [ ] Complete redistribution-license / source-provenance review and OS signing/notarization decisions.
-- [ ] Meet all [fail-closed 3.0 acceptance criteria](https://github.com/MasynNay/anything-plays/blob/feature/v3.0-unified-test/config/v3.0-release-acceptance.json) and publish understandable release notes and SHA-256 checksums.
-
-The explicit release-readiness work is in [#28](https://github.com/MasynNay/anything-plays/issues/28). **Stable 2.0 stays available throughout this work.**
-
-## Ideas for after 3.0 — proposals, not commitments
-
-These are opportunities to investigate **after stability and compliance**, not features promised for 3.0.
-
-| Candidate | Why it matters | What would make it worthwhile |
+| Priority | Focus | Success criteria |
 | --- | --- | --- |
-| [Camera calibration and preview diagnostics](https://github.com/MasynNay/anything-plays/issues/29) | Less trial-and-error with lighting, reflections and similarly colored objects | Local diagnostic feedback, measured false activations and accessible opt-in calibration |
-| [Portable user-profile export/import](https://github.com/MasynNay/anything-plays/issues/30) | Preserve layouts and color mappings between machines | Versioned settings-only JSON, validation and cross-platform import tests |
-| Easier accessibility presets | Lower the setup barrier for nonstandard controls | One-action templates, clear keyboard navigation and user testing |
-| Performance telemetry panel | Help distinguish GPU emulation bottlenecks from UI preview bottlenecks | Local-only measurements, no collection by default, low overhead |
-| In-app health report | Make bug reports actionable without sharing ROMs or personal camera footage | Sanitized diagnostics, core/version hashes, opt-in export and documented privacy |
+| **P1** | 3.0 publication and distribution | Four genuine public 3.0 installers with checksums, source archive and clear notes |
+| **P1** | Reliability and saved games | Repeatable save/reload, core switching and graceful recovery from failed ROM loads |
+| **P2** | GameCube performance | Measure actual emulation FPS and rendered preview FPS separately; improve frame pacing without damaging correctness |
+| **P2** | Camera usability | Faster color calibration, clearer multi-object indicators and accessible diagnostics |
+| **P2** | Installation and updates | Better package verification, user-friendly update checks and straightforward offline usage |
+| **P3** | Profiles and customization | Portable settings, easier controller layouts, cleaner multi-player mapping and theme consistency |
+| **P3** | Long-session quality | Track memory growth, background worker cleanup, repeated game transitions and crash recovery |
 
-**Candidate initiatives currently tracked:** [#29 Local camera calibration](https://github.com/MasynNay/anything-plays/issues/29) and [#30 Portable profile export/import](https://github.com/MasynNay/anything-plays/issues/30). These have concrete proposed acceptance criteria but **no committed dates or implementation claims**.
+Priorities are engineering directions, **not promises of a release date**. Changes should ship with focused regression tests and useful documentation rather than cosmetic churn.
 
-Proposals should begin as [GitHub issues](https://github.com/MasynNay/anything-plays/issues) with a user problem, scope, acceptance criteria, and ideally a small reproducible test.
+## Contributing and tracking
 
-## How progress is tracked
+Use [GitHub Issues](https://github.com/MasynNay/anything-plays/issues) to report reproducible problems or suggest features. Include the affected operating system and console when relevant. The [contribution guide](CONTRIBUTING.md) explains testing and code expectations.
 
-1. **An issue is the unit of work.** Open work states the problem, scope and verifiable completion criteria. Existing 3.0 tasks: [#24](https://github.com/MasynNay/anything-plays/issues/24), [#25](https://github.com/MasynNay/anything-plays/issues/25), [#26](https://github.com/MasynNay/anything-plays/issues/26), [#27](https://github.com/MasynNay/anything-plays/issues/27), [#28](https://github.com/MasynNay/anything-plays/issues/28).
-2. **Development is separated from stable releases.** Work is performed on [the 3.0 branch](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test), not directly in public stable 2.0.
-3. **Tests produce evidence.** Source tests, virtual-camera simulations, per-console native tests, multi-platform installers and sustained runs are available in [GitHub Actions](https://github.com/MasynNay/anything-plays/actions).
-4. **User reports inform priorities.** For example, the N64 repeat-launch defect was reproduced before its fix was considered complete; Apple Silicon was then tested by the maintainer.
-5. **Reviews change statuses, not just dates.** Update the issue and this roadmap when an acceptance criterion changes, a regression is fixed, or a real device is tested. Automated CI success and physical device coverage remain separate.
-
-### Feedback and contributions
-
-Found a reproducible issue or have a useful idea? [Open an issue](https://github.com/MasynNay/anything-plays/issues) with the affected platform, steps, expected behavior and safe logs, or read [CONTRIBUTING.md](CONTRIBUTING.md). Please do not upload commercial ROMs, BIOS files, private camera footage or secrets.
-
----
-
-*Roadmap status is maintained manually and is subject to change based on user testing, compatibility, security and third-party license requirements. There is no public 3.0 release date until these gates are satisfied.*
+For anyone who wants the original CI logs, source hashes, dependency notices or build procedure, start with the [technical documentation index](docs/README.md). The detailed append-only [engineering checkpoint](CONTINUE_HERE.md) is retained for development recovery and is **not** the public product roadmap.
