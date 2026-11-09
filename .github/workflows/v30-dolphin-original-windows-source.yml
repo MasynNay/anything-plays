@@ -50,7 +50,9 @@ jobs:
             throw "Original Dolphin's pinned pch.h requires Visual Studio 2026"
           }
           $available = cmake --help
-          if ($available -notmatch 'Visual Studio 18 2026') {
+          # PowerShell -notmatch applied to a line ARRAY returns every nonmatching
+          # line (truthy), so inspect the joined help text as ONE scalar.
+          if (-not (($available -join [Environment]::NewLine) -match 'Visual Studio 18 2026')) {
             throw "CMake is missing the Visual Studio 2026 generator"
           }
       - name: Retrieve exact original Dolphin upstream source and all pinned Gitlinks
