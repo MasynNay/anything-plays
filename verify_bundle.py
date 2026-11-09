@@ -175,11 +175,11 @@ def verify_bundle(bundle, platform_name, check_native=False):
         # independently reviewed native lock, not the original Snes9x /
         # Genesis Plus GX paths or any test-only research marker.
         from tools.v30_release_lock import (
-            ALTERNATIVE_CORE_NAMES, load_approved_lock, selected_core_set,
+            ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES, load_approved_lock, selected_core_set,
         )
         from tools.core_release_lock import release_target
         approved_lock = load_approved_lock()
-        if selected_core_set(approved_lock) == ALTERNATIVE_CORE_NAMES:
+        if selected_core_set(approved_lock) in (ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES):
             from anything_plays.v30_approved_core_map import (
                 MARKER as PRODUCTION_MAP, validate_installed_map,
             )
@@ -193,11 +193,12 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 "blastem": "BlastEm-COPYING.txt",
                 "mednafen_pce_fast": "PCE-COPYING.txt",
             }
-            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten", "gpl-source-built-eleven"):
+            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten", "gpl-source-built-eleven", "gpl-source-built-eleven-tia"):
                 # A native same-name buildbot ZIP is NOT the verified
                 # original source-built NES/Atari/NGP/WonderSwan binary.
-                for name in ("fceumm","stella2014","prosystem",
-                             "mednafen_ngp","mednafen_wswan"):
+                remaining = ("fceumm", "tia" if selected["core_set_id"] == "gpl-source-built-eleven-tia"
+                             else "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan")
+                for name in remaining:
                     notices[name] = f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
             for name, filename in notices.items():
                 row = selected["cores"][name]
@@ -209,7 +210,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 if (hashlib.sha256(license_file.read_bytes()).hexdigest()
                         != row["license_notice_sha256"]):
                     raise ValueError(f"Unreviewed GPL source notice bytes: {name}")
-            if selected["core_set_id"] in ("gpl-source-built-ten", "gpl-source-built-eleven"):
+            if selected["core_set_id"] in ("gpl-source-built-ten", "gpl-source-built-eleven", "gpl-source-built-eleven-tia"):
                 # mGBA MPL original license plus 11 individually pinned
                 # ParaLLEl-N64 upstream GPL/LGPL/MIT notice files must be
                 # present. The aggregate SHA binds every filename and byte
@@ -236,7 +237,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                     if (selected["cores"][name]["native_sha256"]
                             != records[name]["native_sha256"]):
                         raise ValueError(f"Production {name} compiled binary differs from lock")
-            if selected["core_set_id"] == "gpl-source-built-eleven":
+            if selected["core_set_id"] in ("gpl-source-built-eleven", "gpl-source-built-eleven-tia"):
                 # Source-built Dolphin original upstream license notices are
                 # preserved individually; one sorted digest protects all five.
                 dolphin_notices = {
@@ -259,6 +260,14 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 if (original_notice_sha != selected["cores"]["dolphin"]["license_notice_sha256"]
                         or selected["cores"]["dolphin"]["native_sha256"] != records["dolphin"]["native_sha256"]):
                     raise ValueError("New source-built Dolphin native or original notices differ from approved lock")
+            if selected["core_set_id"] == "gpl-source-built-eleven-tia":
+                if (cores / f"stella2014_libretro{EXTENSIONS[platform_name]}").exists():
+                    raise ValueError("GPL2-only Stella core must not enter source-reviewed Tia production")
+                # Retain exact original source-file-level GPL2-or-later grant
+                # as distinct proof from the upstream project's COPYING.
+                tia_spdx = licenses / "GPL-TRIAL-tia-ORIGINAL-SPDX.txt"
+                if tia_spdx.is_symlink() or not tia_spdx.is_file() or b"GPL-2.0-or-later" not in tia_spdx.read_bytes():
+                    raise ValueError("Original GPL2-or-later Tia file-level copyright header is missing")
             if platform_name == "windows":
                 win_notice = licenses / "Winpthreads-COPYING.txt"
                 if win_notice.is_symlink() or not win_notice.is_file() or not win_notice.read_bytes().strip():

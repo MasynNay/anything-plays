@@ -108,18 +108,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Select the exact source composition from the *fully reviewed*
+          # native lock, NEVER from an untrusted artifact name or user input.
+          # Tia occupies the existing Atari 2600 core slot; its original Git
+          # sources must accompany the release in place of Stella2014.
+          source_selection="$(python - <<'PY'
+          from tools.v30_release_lock import load_approved_lock, selected_core_set, ALTERNATIVE_TIA_CORE_NAMES
+          lock=load_approved_lock()
+          if selected_core_set(lock) == ALTERNATIVE_TIA_CORE_NAMES:
+              print("tia")
+          elif lock.get("core_set_id") == "gpl-source-built-eleven":
+              print("stella")
+          else:
+              raise SystemExit("Release source companion requires a reviewed eleven-original-native lock")
+          PY
+          )"
+          if [[ "$source_selection" == tia ]]; then
+            expected_source_run_name="Anything Plays 3.0 | Preserve all 11 original sources with GPL2+ Tia"
+            expected_source_artifact="AnythingPlays-3.0.0-ELEVEN-TIA-ORIGINAL-CORE-SOURCES-UNAPPROVED"
+          else
+            expected_source_run_name="Anything Plays 3.0 | Preserve all 11 pinned original corresponding sources"
+            expected_source_artifact="AnythingPlays-3.0.0-ELEVEN-ORIGINAL-CORE-SOURCES-UNAPPROVED"
+          fi
           source_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
           source_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
-          if [[ "$source_status" != success ||
-                "$source_name" != "Anything Plays 3.0 | Preserve all 11 pinned original corresponding sources" ]]; then
-            echo "::error::Only a successful original eleven-source preservation run is accepted"
+          if [[ "$source_status" != success || "$source_name" != "$expected_source_run_name" ]]; then
+            echo "::error::Original source workflow does not match the exact reviewed native composition"
             exit 1
           fi
           # Bounded network retries use clean directories. Never reuse partial evidence.
           for attempt in 1 2 3 4; do
             scratch="source-artifacts.try-$attempt"
             if gh run download "$SOURCE_RUN_ID" \
-              --name AnythingPlays-3.0.0-ELEVEN-ORIGINAL-CORE-SOURCES-UNAPPROVED \
+              --name "$expected_source_artifact" \
               --dir "$scratch"; then
               mv "$scratch" source-artifacts
               break
@@ -132,6 +153,17 @@ jobs:
             sleep "$((attempt * 3))"
           done
           python -m unittest discover -s tests -p 'test_v30_source_companion.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          from tools.prepare_v30_source_companion import validate_captured_sources
+          from tools.v30_release_lock import load_approved_lock
+          manifest=validate_captured_sources(Path("source-artifacts"))
+          lock=load_approved_lock()
+          expected_id=("original-eleven-gpl2plus-tia"
+                       if lock.get("core_set_id") == "gpl-source-built-eleven-tia" else None)
+          if manifest.get("source_set_id") != expected_id:
+              raise SystemExit("Public 3.0 source archive cannot differ from reviewed 11-native Tia/Stella lineup")
+          PY
           python -m tools.prepare_v30_source_companion \
             --input source-artifacts --output source-release-package --version "$VERSION"
           (cd source-release-package && sha256sum --check SHA256SUMS.txt)

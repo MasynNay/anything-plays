@@ -176,8 +176,18 @@ if "%AP_V30_APPROVED_RELEASE%"=="1" if exist "cores\V30_SOURCE_BUILT_PRODUCTION_
   copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-PCE-COPYING.txt" "dist\AnythingPlays\licenses\PCE-COPYING.txt" >nul
   if errorlevel 1 exit /b 1
   if "%AP_V30_APPROVED_EIGHT%"=="1" (
-    for %%C in (fceumm stella2014 prosystem mednafen_ngp mednafen_wswan) do (
+    for %%C in (fceumm prosystem mednafen_ngp mednafen_wswan) do (
       copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-%%C-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    )
+    REM The immutable approved core map selects Tia in the one Atari2600 slot.
+    if exist "cores\tia_libretro.dll" (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-tia-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-tia-ORIGINAL-SPDX.txt" "dist\AnythingPlays\licenses\" >nul
+      if errorlevel 1 exit /b 1
+    ) else (
+      copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-stella2014-ORIGINAL-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
       if errorlevel 1 exit /b 1
     )
   )
