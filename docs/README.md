@@ -1,51 +1,35 @@
-# Anything Plays documentation
+# Anything Plays — Technical documentation
 
-This directory is the index for technical and release evidence. The [repository README](../README.md) is the public product overview.
+This directory holds the engineering, packaging, source, and test details behind [Anything Plays](../README.md). The root README is the public project introduction; the [roadmap](../ROADMAP.md) describes milestones and priorities.
 
 ## Start here
 
-| Purpose | Document |
+| Topic | Document |
 | --- | --- |
-| Source code architecture | [Architecture](ARCHITECTURE.md) |
-| CI and operating-system test workflows | [Workflow guide](V3_CI_WORKFLOWS.md) |
-| Real-device and emulator QA | [QA checklist](QA_CHECKLIST.md) |
-| Exact 3.0 physical installer QA evidence and private offline recorder | [3.0 physical QA runbook](V3_PHYSICAL_QA_RUNBOOK.md) |
-| Packaging policy | [Release structure](V3_RELEASE_STRUCTURE.md) |
-| Third-party component attribution | [Notices](THIRD_PARTY_NOTICES.md) |
-| Release dependencies | [Third-party components](THIRD_PARTY_COMPONENTS.md) |
+| How the application works | [Architecture](ARCHITECTURE.md) |
+| Building and validating releases | [CI workflows](V3_CI_WORKFLOWS.md) |
+| Contributing and local tests | [Contributing](../CONTRIBUTING.md) |
+| Security and responsible reporting | [Security policy](../SECURITY.md) |
+| Current 3.0 original-source and binary audit | [Exact 11-core source assessment](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) |
+| Source-first distribution assessment | [3.0 source and release notes](V3_0_SOURCE_FIRST_RELEASE_DECISION.md) |
+| Licensing and attribution | [Third-party notices](THIRD_PARTY_NOTICES.md) |
 
-## Version 3.0 release records
+## Release and quality records
 
-| Purpose | Document |
+| Topic | Document |
 | --- | --- |
-| Fully tested 18-console/11-core four-platform offline installer with 8 source-built families (UNAPPROVED) | [Eight source-family exact evidence](V3_EIGHT_SOURCE_CORE_FULL_OFFLINE_EVIDENCE.md) |
-| Outstanding native source/rights checks | [Distribution review](V3_DISTRIBUTION_READINESS.md) |
-| GPL and noncommercial license question | [Compatibility assessment](V3_LICENSE_COMPATIBILITY_GATE.md) |
-| Evidence-based four-Sega-console core license choices | [Sega legal/engineering review options](V3_SEGA_LICENSE_OPTIONS.md) |
-| Free educational portfolio 3.0 license decisions and specific release requirements | [Portfolio license clearance checklist](V3_PORTFOLIO_LICENSE_CLEARANCE.md) |
-| Draft messages seeking clarification from noncommercial rights holders (not sent) | [Portfolio permission requests](V3_PORTFOLIO_PERMISSION_REQUESTS.md) |
-| Experimental disposable 2D Libretro worker technical feasibility (not release-approved) | [Isolated core research](V3_ISOLATED_CORE_RESEARCH.md) |
-| Source-built GPL-alternative SNES + four Sega consoles, real four-platform repeated switching (unapproved) | [28-cycle native switching research](V3_GPL_ALTERNATIVE_SWITCH_RESEARCH.md) |
-| Full 18-profile/11-core, source-built GPL-alternative offline installer research (never published) | [Offline installer trial](V3_GPL_OFFLINE_INSTALLER_TRIAL.md) |
-| Draft release text (not published) | [3.0 release notes](V3_RELEASE_NOTES_DRAFT.md) |
-| Neo Geo Pocket test ROM license evidence | [NGP test license](V3_NGP_TEST_LICENSE.md) |
-| Exact recovery checkpoint | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |
-| Release acceptance flags and evidence | [Acceptance data](../config/v3.0-release-acceptance.json) |
-| Controlled stable-release publication and production artifact assembly | [3.0 publication runbook](V3_PUBLICATION_RUNBOOK.md) |
-| Distinct 3.0 immutable native release lock | [Native production lock](V3_NATIVE_PRODUCTION_LOCK.md) |
-| Reviewer-ready cross-platform source evidence generator | [Native production lock: source review matrix](V3_NATIVE_PRODUCTION_LOCK.md#automated-draft-corresponding-source-review-matrix) |
-| Verified N64 empty submodules and eleven embedded source notices | [ParaLLEl-N64 pinned source review](V3_PARALLEL_N64_SOURCE_NOTICE_REVIEW.md) |
+| Release structure | [Versioned packages](V3_RELEASE_STRUCTURE.md) |
+| Production preparation | [Publication runbook](V3_PUBLICATION_RUNBOOK.md) |
+| Hardware and gameplay testing | [QA checklist](QA_CHECKLIST.md) |
+| Physical-device test procedures | [3.0 QA runbook](V3_PHYSICAL_QA_RUNBOOK.md) |
+| Known distribution constraints | [Distribution readiness](V3_DISTRIBUTION_READINESS.md) |
+| Native source and licensing investigations | [Compatibility research](V3_LICENSE_COMPATIBILITY_GATE.md) |
+| Full development recovery record | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |
 
-The original 3.0 GUI **itself** now launches from the frozen Windows EXE, Linux executable and both macOS .app binaries: [actual four-platform desktop cold-launch report](V3_FROZEN_DESKTOP_LAUNCH_EVIDENCE.md). This is separate from emulator-only native tests and is not a public release or physical camera acceptance.
+The old Stella2014, Snes9x, Genesis Plus GX, and early ten-source experiments are retained as **historical research**, not the selected 3.0 native lineup. The current build selects eleven pinned original-source cores, including Tia and Dolphin. Consult [the current audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) rather than inferring present-day release status from an old experiment.
 
-The complete offline **3.0 preview** has passed four-platform packaging checks. It is not yet an approved public binary release. The [current stable release is 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0).
+## Development references
 
-## Archives and continuity
+The complete [workflow catalog](../.github/README.md), [requirements](../requirements.txt), [packaging scripts](../packaging), [source-oriented tools](../tools), and [tests](../tests) are in the repository. Generated build output, commercial ROMs and proprietary console firmware must not be committed.
 
-Historical 2.0 release evidence includes [RC6 verification](RC6_VERIFICATION.md), the [distribution review](RELEASE_DISTRIBUTION_REVIEW.md) and [source access](RELEASE_SOURCE_ACCESS.md). Older superseded notes live in [history](history/README.md). Preserve development and audit records rather than deleting them to reduce file counts.
-
-The original source is organized under [anything_plays](../anything_plays/), with narrowly scoped root entry points for application boot, native core downloads and installer verification. [packaging](../packaging/) contains platform installers; [tools](../tools/) contains diagnostics; [tests](../tests/) holds regression coverage.
-
-Run **python tools/check_repository_hygiene.py** to verify that the Git index does not contain builds, downloaded emulators, proprietary ROMs or unexpected loose root files. Pull-request CI runs the same check.
-
-The future versioned roadmap will be published only after public 3.0, not before.
+For the latest publicly downloadable version, use [GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest). A workflow's green checks and a private release draft are not equivalent to a published release.
