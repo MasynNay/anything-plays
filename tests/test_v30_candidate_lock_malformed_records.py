@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 import unittest
 import zipfile
 
-from tools.create_v30_candidate_lock import PLATFORMS, build_candidate
+from tools.create_v30_candidate_lock import CORES, PLATFORMS, build_candidate
 
 
 class MalformedPreservedProvenanceTests(unittest.TestCase):
@@ -24,9 +24,9 @@ class MalformedPreservedProvenanceTests(unittest.TestCase):
                     "public_distribution_approved": False,
                     "original_archive_count": 12,
                     "source_core_provenance": {
-                        "cores": [{"name": "synthetic"}] * 11,
+                        "cores": [{"name": name} for name in sorted(CORES)],
                     },
-                    "files": [{"name": "synthetic"}] * 12,
+                    "files": [{"name": f"synthetic-{index}"} for index in range(12)],
                 }
                 if platform == "linux-x64":
                     if broken_field == "cores":
