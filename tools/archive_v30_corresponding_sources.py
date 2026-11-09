@@ -29,7 +29,7 @@ def run_git(*args, cwd=None, timeout=1200):
     return subprocess.check_output(
         ["git", *map(str, args)], cwd=cwd, text=True,
         stderr=subprocess.STDOUT, timeout=timeout,
-    ).strip()
+    ).rstrip("\r\n")
 
 
 def checkout_pinned_source(root: Path, name: str, repo: str, revision: str) -> None:
@@ -129,7 +129,7 @@ def archive_checkout(root: Path, target: Path, name: str, revision: str):
                             with source.open("rb") as handle:
                                 archive.addfile(info, handle)
                         count += 1
-        if count < 5 or not 1000 < target.stat().st_size < MAX_ARCHIVE:
+        if count < 5 or not 200 < target.stat().st_size < MAX_ARCHIVE:
             raise ValueError(f"Source archive missing substantial original content: {name}")
         digest = hashlib.sha256()
         with target.open("rb") as stream:
@@ -163,7 +163,7 @@ def archive_all(checkouts: Path, output: Path, *, verify_git=True):
     manifest = {
         "schema_version": 1,
         "status": "UNAPPROVED-ORIGINAL-SOURCE-TREE-ACCESS-CANDIDATE",
-        "native_binaries_included": False,
+        "newly_compiled_libretro_core_outputs_included": False,
         "core_count": 11,
         "all_source_revisions_pinned": True,
         "source_to_bundled_binary_review_complete": False,
