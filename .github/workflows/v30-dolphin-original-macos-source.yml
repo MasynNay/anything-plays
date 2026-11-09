@@ -1,0 +1,130 @@
+name: Anything Plays 3.0 | Original pinned Dolphin source-built macOS research
+
+# Build original upstream source on both Apple CPU targets, no ROM or Dolphin binary uploads.
+# This is source-to-compiled-binary research; not an approved 3.0 distribution.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-original-macos-source.yml'
+      - 'tools/verify_v30_dolphin_original_macos.py'
+      - 'tests/test_v30_dolphin_original_macos.py'
+      - 'tools/verify_v30_dolphin_original_build.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-original-dolphin-mac-${{ github.ref }}
+  # Original full Dolphin source builds take many minutes. Preserve active
+  # compiled-source evidence across harmless PR documentation/merge updates.
+  cancel-in-progress: false
+
+jobs:
+  original-dolphin-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: macos-arm64
+            cpu: arm64
+          - runner: macos-15-intel
+            target: macos-x86_64
+            cpu: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 115
+    env:
+      DOLPHIN_SOURCE_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate immutable parent+37 source evidence and Mac native audit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p test_v30_dolphin_original_macos.py -v
+          python -m unittest discover -s tests -p test_v30_dolphin_original_build.py -v
+      - name: Install original upstream macOS build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ninja cmake pkg-config
+          cmake --version
+          xcodebuild -version
+          clang --version
+      - name: Fetch pinned pristine original Dolphin parent and 37 immutable child source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin "$DOLPHIN_SOURCE_SHA"
+          git -C original-dolphin checkout --detach "$DOLPHIN_SOURCE_SHA"
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update \
+            --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          result=verify_original_source(Path("original-dolphin"))
+          assert result["direct_gitlinks_verified"] == 34
+          assert result["nested_gitlinks_verified"] == 3
+          print("Original source verified. No upstream code modifications.")
+          PY
+      - name: Compile real unmodified original source-built Dolphin Libretro Mach-O library
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="${{ matrix.cpu }}" \
+            -DLIBRETRO=ON -DENABLE_QT=OFF -DENABLE_TESTS=OFF \
+            -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF \
+            -DENABLE_CLI_TOOL=OFF
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 3
+          test -s original-dolphin-build/dolphin_libretro.dylib
+      - name: Check source, native Mach-O architecture, 6 Libretro exports and linked libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v30_dolphin_original_macos \
+            --source original-dolphin \
+            --native original-dolphin-build/dolphin_libretro.dylib \
+            --target "$TARGET" \
+            --output ORIGINAL_DOLPHIN_${{ matrix.cpu }}_SOURCE_PROOF_UNAPPROVED.json
+          python - <<'PY'
+          from pathlib import Path
+          import json, os
+          p=Path(f"ORIGINAL_DOLPHIN_{'arm64' if os.environ['TARGET']=='macos-arm64' else 'x86_64'}_SOURCE_PROOF_UNAPPROVED.json")
+          r=json.loads(p.read_text("utf-8"))
+          assert r["original_unmodified_dolphin_source_compiled"] is True
+          assert r["direct_gitlinks_verified"] == 34
+          assert r["nested_gitlinks_verified"] == 3
+          assert len(r["verified_exports"]) == 6
+          assert r["source_build_target"] == os.environ["TARGET"]
+          assert r["public_binary_distribution_approved"] is False
+          assert r["old_buildbot_binary_equivalence_claimed"] is False
+          assert r["physical_gameplay_tested"] is False
+          print("Native original pinned source-proof passed. NOT a public binary release.")
+          PY
+          shasum -a 256 ORIGINAL_DOLPHIN_${{ matrix.cpu }}_SOURCE_PROOF_UNAPPROVED.json \
+            > ORIGINAL_DOLPHIN_${{ matrix.cpu }}_SOURCE_PROOF_SHA256SUMS.txt
+      - name: Preserve only source-built inspection report, never native unapproved library
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-DOLPHIN-ORIGINAL-${{ matrix.target }}-SOURCE-BUILD-REPORT-UNAPPROVED
+          path: |
+            ORIGINAL_DOLPHIN_${{ matrix.cpu }}_SOURCE_PROOF_UNAPPROVED.json
+            ORIGINAL_DOLPHIN_${{ matrix.cpu }}_SOURCE_PROOF_SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
