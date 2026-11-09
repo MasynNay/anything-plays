@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from anything_plays import core_locator
 from anything_plays.v30_approved_core_map import (
-    MARKER, EXPECTED, REPOSITORIES, WINDOWS_RUNTIME,
+    MARKER, EXPECTED, REPOSITORIES, TEN_EXPECTED, TEN_REPOSITORIES, WINDOWS_RUNTIME,
     find_approved_core, validate_installed_map,
 )
 from tools.stage_v30_approved_native_mapping import (
@@ -79,6 +79,53 @@ def supply_synthetic_installed_cores(folder, info, ext):
 
 
 class ApprovedNativeMapContracts(unittest.TestCase):
+
+    def test_ten_source_core_map_preserves_direct_mgba_and_n64_routing(self):
+        for target in ("linux-x86_64", "windows-x86_64", "macos-arm64", "macos-x86_64"):
+            with self.subTest(target=target), TemporaryDirectory() as temp:
+                root = Path(temp)
+                cores, archives = root / "cores", root / "archives"
+                cores.mkdir(); archives.mkdir()
+                lock, runtime, ext = synthetic_reviewed_lock(target)
+                lock["core_set_id"] = "gpl-source-built-ten"
+                lock["ten_source_built_families_reviewed"] = True
+                lock["one_unchanged_dolphin_family_reviewed"] = True
+                for name in TEN_EXPECTED:
+                    row = lock["targets"][target]["cores"][name]
+                    row["source_commit_sha"] = TEN_EXPECTED[name]
+                    row["upstream_source_repository"] = TEN_REPOSITORIES[name]
+                    row["original_license_notice_sha256"] = sha(
+                        f"TEST ONLY {name} upstream source notice".encode())
+                if runtime:
+                    (archives / WINDOWS_RUNTIME).write_bytes(runtime)
+                staged = stage_approved_map(lock, target, cores, archives)
+                self.assertEqual(staged["core_set_id"], "gpl-source-built-ten")
+                self.assertEqual(set(staged["cores"]), set(TEN_EXPECTED))
+                self.assertTrue(staged["ten_source_built_families_reviewed"])
+                self.assertTrue(staged["one_unchanged_dolphin_family_reviewed"])
+                for name in TEN_EXPECTED:
+                    payload = ("synthetic " + name).encode() * 1600
+                    (cores / f"{name}_libretro{ext}").write_bytes(payload)
+                self.assertTrue(validate_installed_map(cores, ext))
+                for system, name in (
+                    ("gb", "mgba"), ("gbc", "mgba"), ("gba", "mgba"),
+                    ("n64", "parallel_n64"), ("nes", "fceumm"),
+                    ("snes", "mednafen_supafaust")):
+                    found, native = find_approved_core([cores], system, ext)
+                    self.assertTrue(found, system)
+                    self.assertEqual(Path(native).name, f"{name}_libretro{ext}")
+                (cores / f"parallel_n64_libretro{ext}").write_bytes(b"tampered")
+                with self.assertRaises(ValueError):
+                    find_approved_core([cores], "n64", ext)
+                (cores / f"parallel_n64_libretro{ext}").write_bytes(
+                    ("synthetic parallel_n64").encode() * 1600)
+                marker = cores / MARKER
+                forged = json.loads(marker.read_text("utf-8"))
+                forged["one_unchanged_dolphin_family_reviewed"] = False
+                marker.write_text(json.dumps(forged), "utf-8")
+                with self.assertRaises(ValueError):
+                    validate_installed_map(cores, ext)
+
     def test_existing_real_repository_rights_do_not_allow_prod_staging(self):
         with TemporaryDirectory() as root:
             with self.assertRaises(ValueError):
