@@ -102,7 +102,7 @@ jobs:
           assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
               "Production must use the FULL source-built GPL alternative core set; "
               "original Snes9x/Genesis GX are not accepted for v3")
-          assert selected_source_families(lock) == SOURCE_BUILT_EIGHT, (
+          assert selected_source_families(lock) == SOURCE_BUILT_TEN, (
               "Production must use ten independently source-built families; "
               "only original Dolphin remains from the legacy archived binary")
           PY
