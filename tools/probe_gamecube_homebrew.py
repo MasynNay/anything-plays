@@ -299,7 +299,10 @@ def _child(rom, core, seconds, report_path, cpu_core=None,
         **evidence,
         "audio_tested": False,
         "camera_actuation_tested": False,
-        "playback_probe_passed": evidence["fps_target_met"],
+        # A fast stream of blank or unchanging frames is not interactive
+        # gameplay. Keep the probe verdict aligned with the workflow's
+        # controller + changing-video acceptance, not FPS alone.
+        "playback_probe_passed": evidence["fps_target_met"] and interactive_valid,
         "error": error,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
