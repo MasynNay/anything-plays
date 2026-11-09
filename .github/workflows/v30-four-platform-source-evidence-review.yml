@@ -1,0 +1,85 @@
+name: Anything Plays 3.0 | Fast 44-native source evidence review
+
+# Re-audit four immutable, previously successful original-source full desktop
+# installer reports; no recompilation, release approval, binary or ROM upload.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-four-platform-source-evidence-review.yml'
+      - 'tools/compile_v30_four_platform_source_evidence.py'
+      - 'tests/test_v30_four_platform_source_evidence.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  review-exact-original-44-native-inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERIFIED_RUN: '42568420431'
+      VERIFIED_SHA: '2cb2e6b6cb4a63dbcfac56f08c15fb6bfbd23f7c'
+      VERIFIED_WORKFLOW: 'Anything Plays 3.0 | Eleven source-built cores in full 18-console offline installer test'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test verifier refuses missing, static and fake original native proofs
+        run: python -m unittest discover -s tests -p 'test_v30_four_platform_source_evidence.py' -v
+      - name: Pin immutable ORIGINAL successful four OS source compilation result
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$VERIFIED_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$VERIFIED_RUN" --json headSha --jq .headSha)" = "$VERIFIED_SHA"
+          test "$(gh run view "$VERIFIED_RUN" --json name --jq .name)" = "$VERIFIED_WORKFLOW"
+      - name: Retrieve and hash-check all four exact original installed native identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            artifact="AnythingPlays-3.0-ELEVEN-SOURCE-CORE-INSTALLED-$target-UNAPPROVED"
+            dest="frozen-source-evidence/$artifact"
+            mkdir -p frozen-source-evidence
+            for attempt in 1 2 3 4; do
+              scratch="$dest.retry-$attempt"
+              if gh run download "$VERIFIED_RUN" --name "$artifact" --dir "$scratch"; then
+                mv "$scratch" "$dest"
+                break
+              fi
+              rm -rf -- "$scratch"
+              if [[ "$attempt" == 4 ]]; then
+                echo "::error::Cannot retrieve exact original native provenance $artifact"
+                exit 1
+              fi
+              sleep "$((attempt * 3))"
+            done
+          done
+          python -m tools.compile_v30_four_platform_source_evidence \
+            --artifacts-dir frozen-source-evidence \
+            --run-id "$VERIFIED_RUN" \
+            --output frozen-source-review/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          record=json.loads(Path("frozen-source-review/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json").read_text("utf-8"))
+          assert record["source_actions_run_id"] == 42568420431
+          assert record["total_platform_native_sha256"] == 44
+          assert len(record["targets"]) == 4
+          assert record["public_binary_distribution_approved"] is False
+          assert record["corresponding_source_inventory_verified"] is False
+          assert record["license_compatibility_reviewed"] is False
+          print("Four-OS, 44-native original-source audit passed; no rights claimed.")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-PINNED-FOUR-OS-44-ORIGINAL-SOURCE-REVIEW-UNAPPROVED
+          path: frozen-source-review/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          if-no-files-found: error
+          retention-days: 90
