@@ -60,7 +60,8 @@ class MacOSDMGAttachRetryTests(unittest.TestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertNotIn("VERIFICATION_ALLOWED=1", proc.stdout)
         self.assertEqual(proc.stderr.count("mount refused"), 10)
-        self.assertIn("DMG validation BLOCKED", proc.stderr)\n        self.assertIn("ten attempts", proc.stderr)
+        self.assertIn("DMG validation BLOCKED", proc.stderr)
+        self.assertIn("ten attempts", proc.stderr)
 
     def test_original_verifier_and_cleanup_are_still_mandatory(self):
         source = SCRIPT.read_text("utf-8")
