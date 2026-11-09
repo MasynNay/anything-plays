@@ -106,7 +106,7 @@ jobs:
               "combined_gpl_distribution_reviewed": False,
               "public_binary_distribution_approved": False,
           }
-          Path("ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json").write_text(json.dumps(result,sort_keys=True,indent=2)+"\\n","utf-8")
+          Path("ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json").write_text(json.dumps(result,sort_keys=True,indent=2)+"\n","utf-8")
           print("Pinned original plus reviewed source patch compiled:", native["native_sha256"])
           PY
       - name: Stage ONLY ephemeral local-source Dolphin core plus exact original Sys into app layout
