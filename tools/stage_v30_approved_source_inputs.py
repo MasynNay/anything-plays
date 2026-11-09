@@ -502,6 +502,10 @@ def main(argv=None):
     parser.add_argument("--mgba-dir", type=Path)
     parser.add_argument("--n64-dir", type=Path)
     parser.add_argument("--dolphin-sys-dir", type=Path)
+    parser.add_argument("--dolphin-source-dir", type=Path)
+    parser.add_argument("--dolphin-native", type=Path)
+    parser.add_argument("--dolphin-build-report", type=Path)
+    parser.add_argument("--dolphin-parent-archive", type=Path)
     for name in sorted(SOURCE_BUILT_FIVE):
         parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
@@ -511,7 +515,7 @@ def main(argv=None):
         if not (ROOT / "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md").is_file():
             raise ValueError("Independent reviewed copyright decision is missing")
         families = selected_source_families(lock)
-        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
+        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
         five={name: getattr(args,name+"_dir") for name in SOURCE_BUILT_FIVE}
         if wants_eight and any(path is None for path in five.values()):
             raise ValueError("Independent 8-family source lock requires all 5 original artifacts")
@@ -525,6 +529,10 @@ def main(argv=None):
             five_dirs=five if wants_eight else None,
             mgba_dir=args.mgba_dir, n64_dir=args.n64_dir,
             dolphin_sys_dir=args.dolphin_sys_dir,
+            dolphin_source_dir=args.dolphin_source_dir,
+            dolphin_native=args.dolphin_native,
+            dolphin_build_report=args.dolphin_build_report,
+            dolphin_parent_archive=args.dolphin_parent_archive,
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")
