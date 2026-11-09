@@ -170,7 +170,7 @@ def write_candidate_atomic(output: Path, candidate: dict) -> None:
                                          delete=False) as handle:
             temporary = Path(handle.name)
             json.dump(candidate, handle, indent=2, sort_keys=True)
-            handle.write("\\n")
+            handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
         if output.is_symlink():
@@ -191,11 +191,7 @@ def main(argv=None):
     artifacts = {name: getattr(args, name.replace("-", "_")) for name in PLATFORMS}
     try:
         candidate = build_candidate(artifacts)
-        output = args.output
-        if output.is_symlink():
-            raise ValueError("Refusing symlinked lock output")
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_candidate_atomic(args.output, candidate)
     except (OSError, ValueError, zipfile.BadZipFile) as error:
         p.exit(1, f"Candidate lock generation failed: {error}\n")
     print(f"Locked {len(candidate['targets'])} targets with 11 original native archives and Dolphin Sys each (UNAPPROVED)")
