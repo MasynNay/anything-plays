@@ -3,6 +3,11 @@ name: Anything Plays 3.0 | Original Dolphin runtime playback (Linux)
 # True native gameplay acceptance research for the newly SOURCE-built Dolphin
 # library. Never uploads the Libretro binary or a public release asset.
 on:
+  push:
+    branches: [test/v30-original-dolphin-linux-playback]
+    paths:
+      - '.github/workflows/v30-dolphin-original-linux-playback.yml'
+      - 'tools/patch_v30_dolphin_headless_source.py'
   pull_request:
     branches: [feature/v3.0-unified-test]
     paths:
