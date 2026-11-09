@@ -69,7 +69,14 @@ def verify_installed_payload(cores, target):
     if not isinstance(rows, list) or len(rows) != 11:
         raise ValueError("Packaged native manifest not exactly 11 cores")
     indexed = {r.get("name"): r for r in rows if isinstance(r, dict)}
-    if set(indexed) != set(V30_GPL_TRIAL_CORES):
+    # The source-reviewed Tia variant takes the SAME one Atari 2600 native
+    # slot. Require the marker + actual installed core identities to agree;
+    # do not silently accept extra cores or a remaining GPL2-only Stella.
+    expected_names = set(V30_GPL_TRIAL_CORES)
+    if os.environ.get("AP_V30_TIA_TRIAL") == "1":
+        expected_names.remove("stella2014")
+        expected_names.add("tia")
+    if set(indexed) != expected_names or len(indexed) != 11:
         raise ValueError("Packaged native inventory changed, missing or duplicated")
     if len(SYSTEMS) != 18 or len(PROFILE_TO_CORE) != 5:
         raise ValueError("Full 18-console 5-profile alternative scope changed")
@@ -84,7 +91,7 @@ def verify_installed_payload(cores, target):
                 or row.get("file") != path.name
                 or entry["source_commit"] != revision):
             raise ValueError("Installed alternate native identity is not source verified")
-    for name in V30_GPL_TRIAL_CORES:
+    for name in sorted(expected_names):
         row = indexed[name]
         path = cores / f"{name}_libretro{SUFFIX[target]}"
         if (path.is_symlink() or not path.is_file()
@@ -98,7 +105,7 @@ def verify_installed_payload(cores, target):
         "snes": cores / marker["alternatives"]["mednafen_supafaust"]["native_filename"],
         "sega": cores / marker["alternatives"]["blastem"]["native_filename"],
         "source": marker,
-        "core_hashes": {n: indexed[n]["sha256"] for n in V30_GPL_TRIAL_CORES},
+        "core_hashes": {n: indexed[n]["sha256"] for n in sorted(expected_names)},
     }
 
 
