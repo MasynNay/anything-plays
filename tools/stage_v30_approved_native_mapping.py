@@ -14,11 +14,12 @@ from pathlib import Path
 from anything_plays.v30_approved_core_map import (
     EXPECTED, REPOSITORIES, EIGHT_EXPECTED, EIGHT_REPOSITORIES,
     TEN_EXPECTED, TEN_REPOSITORIES, ELEVEN_EXPECTED, ELEVEN_REPOSITORIES,
+    ELEVEN_TIA_EXPECTED, ELEVEN_TIA_REPOSITORIES,
     MARKER, STATUS, WINDOWS_RUNTIME, _require_hash, validate_installed_map,
 )
 from tools.v30_release_lock import (
-    ALTERNATIVE_CORE_NAMES, selected_core_set, selected_source_families,
-    SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, TARGETS, load_approved_lock,
+    ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES, selected_core_set, selected_source_families,
+    SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA, TARGETS, load_approved_lock,
 )
 
 EXT = {
@@ -31,7 +32,8 @@ EXT = {
 
 def approved_core_map_from_lock(lock, target):
     """Strict pure production metadata builder, called only AFTER approval."""
-    if target not in TARGETS or selected_core_set(lock) != ALTERNATIVE_CORE_NAMES:
+    selected = selected_core_set(lock)
+    if target not in TARGETS or selected not in (ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES):
         raise ValueError("Only the EXACT reviewed GPL-alternative 11-core build is accepted")
     for flag in ("approved_for_binary_distribution", "license_compatibility_reviewed",
                  "corresponding_source_inventory_verified",
@@ -43,14 +45,17 @@ def approved_core_map_from_lock(lock, target):
     if row.get("approved_for_distribution") is not True:
         raise ValueError("Platform's core distribution is not reviewed")
     cores = row.get("cores")
-    if not isinstance(cores, dict) or set(cores) != ALTERNATIVE_CORE_NAMES:
+    if not isinstance(cores, dict) or set(cores) != selected:
         raise ValueError("Source-reviewed production core inventory does not have 11 names")
     families = selected_source_families(lock)
     eight = families == SOURCE_BUILT_EIGHT
     ten = families == SOURCE_BUILT_TEN
     eleven = families == SOURCE_BUILT_ELEVEN
-    expected = ELEVEN_EXPECTED if eleven else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = ELEVEN_REPOSITORIES if eleven else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    eleven_tia = families == SOURCE_BUILT_ELEVEN_TIA
+    expected = (ELEVEN_TIA_EXPECTED if eleven_tia else ELEVEN_EXPECTED if eleven
+                else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED)
+    repositories = (ELEVEN_TIA_REPOSITORIES if eleven_tia else ELEVEN_REPOSITORIES if eleven
+                    else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES)
     result = {
         "schema_version": 1, "status": STATUS,
         "core_set_id": lock.get("core_set_id"),
@@ -64,9 +69,14 @@ def approved_core_map_from_lock(lock, target):
     if ten:
         result["ten_source_built_families_reviewed"] = True
         result["one_unchanged_dolphin_family_reviewed"] = True
-    if eleven:
+    if eleven or eleven_tia:
         result["eleven_source_built_families_reviewed"] = True
         result["zero_unchanged_native_families_reviewed"] = True
+    if eleven_tia:
+        # Only forward already reviewed release-lock decisions; do not
+        # synthesize approval from a license label or native fingerprint.
+        result["gpl2plus_atari_source_replacement_reviewed"] = True
+        result["original_gpl2_only_stella_excluded"] = True
     ext = EXT[target]
     for name, source in expected.items():
         core = cores[name]
