@@ -358,6 +358,92 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                 "original_license_sha256": original_notice_sha,
                 "original_owned_actions_run_id": proof["source_build_run_id"],
             }
+    if eleven:
+        # Production Dolphin may ONLY come from the newly compiled pristine
+        # original source tree, not the historically unverified buildbot ZIP.
+        # GPL source/rights approval is separate from this native identity proof.
+        original_source = Path(dolphin_source_dir)
+        compiled_dolphin = Path(dolphin_native)
+        compiler_record = Path(dolphin_build_report)
+        original_parent_tar = Path(dolphin_parent_archive)
+        if any(x.is_symlink() for x in (
+                original_source, compiled_dolphin, compiler_record, original_parent_tar)):
+            raise ValueError("Source/native Dolphin input symlink forbidden")
+        provenance = verify_original_source(original_source)
+        if (provenance["parent_commit"] != DOLPHIN_REV or
+                provenance["direct_gitlinks_verified"] != 34 or
+                provenance["nested_gitlinks_verified"] != 3):
+            raise ValueError("Pristine Dolphin source parent or 37 source Gitlinks differ")
+        if target == "windows-x86_64":
+            native_dolphin = verify_original_windows_native(compiled_dolphin)
+        elif target.startswith("macos"):
+            native_dolphin = verify_original_macos_native(compiled_dolphin, target)
+        else:
+            native_dolphin = verify_original_library(compiled_dolphin)
+        if (not compiler_record.is_file() or compiler_record.stat().st_size > 100000):
+            raise ValueError("Missing original Dolphin compiler-emitted proof")
+        compiled = json.loads(compiler_record.read_text("utf-8"))
+        approved_target = {
+            "windows-x86_64": "windows-x64", "linux-x86_64": "linux-x64",
+            "macos-arm64": "macos-arm64", "macos-x86_64": "macos-x86_64",
+        }[target]
+        if (compiled.get("parent_commit") != DOLPHIN_REV
+                or compiled.get("source_build_target") != approved_target
+                or compiled.get("direct_gitlinks_verified") != 34
+                or compiled.get("nested_gitlinks_verified") != 3
+                or compiled.get("original_unmodified_dolphin_source_compiled") is not True
+                or compiled.get("built_from_original_pinned_git_tree") is not True
+                or compiled.get("old_buildbot_binary_equivalence_claimed") is not False
+                or compiled.get("public_binary_distribution_approved") is not False
+                or compiled.get("native_sha256") != native_dolphin["native_sha256"]
+                or compiled.get("native_size_bytes") != native_dolphin["native_size_bytes"]):
+            raise ValueError("Actual Dolphin native/source/CI proof does not match pinned original compiler")
+        parent_sha, parent_size = validate_parent_archive(original_parent_tar)
+        original_licenses = {
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt": "COPYING",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-GPL2-OR-LATER.txt": "LICENSES/GPL-2.0-or-later.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-BSD3.txt": "LICENSES/BSD-3-Clause.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-CC0.txt": "LICENSES/CC0-1.0.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-MIT.txt": "LICENSES/MIT.txt",
+        }
+        license_payload = {}
+        for dest, location in original_licenses.items():
+            src = original_source / location
+            if (src.is_symlink() or not src.is_file()
+                    or not 50 < src.stat().st_size <= 1024 * 1024):
+                raise ValueError(f"Original Dolphin source copyright/notice missing: {location}")
+            license_payload[dest] = src.read_bytes()
+        notice_sha = sha(json.dumps(
+            {name: sha(data) for name, data in sorted(license_payload.items())},
+            sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        from tools.stage_v30_gpl_trial_inputs import package_native_zip
+        compiled_bytes = compiled_dolphin.read_bytes()
+        zipped = package_native_zip("dolphin", ext, compiled_bytes)
+        verify_core_archive(lock, _sys_platform(target), _architecture(target), "dolphin", zipped)
+        verify_core_payload(lock, _sys_platform(target), _architecture(target),
+                            "dolphin", f"dolphin_libretro{ext}", compiled_bytes)
+        reviewed = inventory["targets"][target]["cores"]["dolphin"]
+        if (reviewed.get("source_archive_sha256") != parent_sha
+                or reviewed.get("source_archive_size_bytes") != parent_size
+                or reviewed.get("source_commit_sha") != DOLPHIN_REV
+                or reviewed.get("source_repository") != "https://github.com/libretro/dolphin"
+                or reviewed.get("native_sha256") != sha(compiled_bytes)
+                or notice_sha != reviewed_map["cores"]["dolphin"]["license_notice_sha256"]):
+            raise ValueError("Original Dolphin source/native/parent TAR or licenses differ from reviewed inventory")
+        payload[f"dolphin_libretro{ext}.zip"] = zipped
+        payload.update(license_payload)
+        sources["dolphin"] = {
+            "source_revision": DOLPHIN_REV,
+            "source_archive_sha256": parent_sha,
+            "native_sha256": sha(compiled_bytes),
+            "original_native_archive_sha256": sha(zipped),
+            "original_license_sha256": notice_sha,
+            "original_source_gitlinks_verified": 37,
+            "source_build_report_sha256": sha(compiler_record.read_bytes()),
+            "old_unverified_buildbot_native_replaced": True,
+            "full_corresponding_source_and_license_decision_independently_approved":
+                reviewed.get("redistribution_license_reviewed") is True,
+        }
     if target == "windows-x86_64":
         binary = _file_bytes(Path(windows_runtime).parent, Path(windows_runtime).name,
                              max_size=8 * 1024 * 1024)
