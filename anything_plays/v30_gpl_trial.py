@@ -178,8 +178,14 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
     if remaining is not None:
         if (not isinstance(remaining, dict)
                 or set(remaining) != set(FIVE_ORIGINAL_SOURCE_COMMITS)
-                or info.get("total_source_built_core_families") != (10 if info.get("source_built_n64") is not None else 9 if info.get("source_built_mgba") is not None else 8)
-                or info.get("original_unchanged_core_archives") != (1 if info.get("source_built_n64") is not None else 2 if info.get("source_built_mgba") is not None else 3)
+                or info.get("total_source_built_core_families") != (
+                    11 if info.get("source_built_dolphin") is not None else
+                    10 if info.get("source_built_n64") is not None else
+                    9 if info.get("source_built_mgba") is not None else 8)
+                or info.get("original_unchanged_core_archives") != (
+                    0 if info.get("source_built_dolphin") is not None else
+                    1 if info.get("source_built_n64") is not None else
+                    2 if info.get("source_built_mgba") is not None else 3)
                 or info.get("five_source_family_run_id") != 42515151314
                 or pce is None):
             raise ValueError("Eight source-built families are not complete and exact")
@@ -272,6 +278,58 @@ def validate_trial_core_directory(folder, extension, *, verify_native=True):
                     or not 100000<native.stat().st_size<120*1024*1024
                     or hashlib.sha256(native.read_bytes()).hexdigest()!=n64["native_sha256"]):
                 raise ValueError("Modified tenth original source-built N64 core")
+    # Eleventh source-built native: the NEW pristine original Dolphin,
+    # never a historical buildbot DLL renamed to claim matching source.
+    dolphin = info.get("source_built_dolphin")
+    if dolphin is not None:
+        notice_paths = {
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt": "COPYING",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-GPL2-OR-LATER.txt": "LICENSES/GPL-2.0-or-later.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-BSD3.txt": "LICENSES/BSD-3-Clause.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-CC0.txt": "LICENSES/CC0-1.0.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-MIT.txt": "LICENSES/MIT.txt",
+        }
+        if (n64 is None or remaining is None or mgba is None or pce is None
+                or not isinstance(dolphin, dict)
+                or dolphin.get("source_repository") != "https://github.com/libretro/dolphin"
+                or dolphin.get("source_commit") != "32c61f9d0e933331bb7087ba57e96883241b4960"
+                or dolphin.get("native_filename") != f"dolphin_libretro{extension}"
+                or dolphin.get("direct_original_gitlinks") != 34
+                or dolphin.get("nested_original_gitlinks") != 3
+                or dolphin.get("old_unverified_buildbot_replaced") is not True
+                or dolphin.get("pristine_unmodified_original_source_compiled") is not True
+                or dolphin.get("production_hardware_gameplay_reviewed") is not False
+                or dolphin.get("full_corresponding_source_and_transitive_rights_reviewed") is not False
+                or dolphin.get("public_binary_distribution_approved") is not False):
+            raise ValueError("Missing genuine eleventh original source-built Dolphin native")
+        if (type(dolphin.get("native_size_bytes")) is not int
+                or not 200000 < dolphin["native_size_bytes"] < 512 * 1024 * 1024):
+            raise ValueError("Invalid original Dolphin native length")
+        for key in ("native_sha256", "native_archive_sha256"):
+            value = dolphin.get(key)
+            if (not isinstance(value, str) or len(value) != 64
+                    or any(k not in "0123456789abcdef" for k in value)):
+                raise ValueError(f"Missing source-native Dolphin {key}")
+        notices = dolphin.get("original_source_notices")
+        if not isinstance(notices, dict) or set(notices) != set(notice_paths):
+            raise ValueError("Missing original upstream Dolphin GPL/MIT/BSD/CC0 notices")
+        for name, path in notice_paths.items():
+            notice = notices[name]
+            if (not isinstance(notice, dict) or notice.get("source_path") != path
+                    or not isinstance(notice.get("sha256"), str)
+                    or len(notice["sha256"]) != 64
+                    or any(k not in "0123456789abcdef" for k in notice["sha256"])):
+                raise ValueError(f"Forged original Dolphin source license record: {name}")
+        sys_origin = info.get("source_exact_original_dolphin_sys")
+        if (not isinstance(sys_origin, dict)
+                or sys_origin.get("public_distribution_approved") is not False):
+            raise ValueError("The eleventh source-built Dolphin requires the exact source-pinned Sys files")
+        if verify_native:
+            native = root / dolphin["native_filename"]
+            if (native.is_symlink() or not native.is_file()
+                    or native.stat().st_size != dolphin["native_size_bytes"]
+                    or hashlib.sha256(native.read_bytes()).hexdigest() != dolphin["native_sha256"]):
+                raise ValueError("Installed newly source-built Dolphin native differs from reviewed SHA")
     _verify_runtime_dependency(root, info, extension)
     # The research installer must NOT distribute the two replaced noncommercial cores.
     for forbidden in ("snes9x", "genesis_plus_gx"):
