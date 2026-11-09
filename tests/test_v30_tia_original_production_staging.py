@@ -86,7 +86,7 @@ class OriginalTiaProduction(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             paths = make_inputs(tmp)
             (paths["source_checkout"]/"README.md").write_text("tampered")
-            with self.assertRaisesRegex(ValueError, "source differs|differs from TAR"):
+            with self.assertRaisesRegex(ValueError, "Malformed Tia source TAR member|source differs|differs from TAR"):
                 self.verify(paths)
 
     def test_original_gameplay_must_render_video_and_emit_real_pcm(self):
