@@ -33,6 +33,16 @@ ALTERNATIVE_CORE_ORDER = (
     "mednafen_ngp", "mednafen_wswan",
 )
 ALTERNATIVE_CORE_NAMES = frozenset(ALTERNATIVE_CORE_ORDER)
+# Original upstream GPLv2-or-later Tia takes exactly the existing 2600 slot
+# in the separately vetted 11-core all-source lineup. These constants do
+# NOT approve public redistribution of any native library.
+ALTERNATIVE_TIA_CORE_ORDER = tuple(
+    "tia" if name == "stella2014" else name for name in ALTERNATIVE_CORE_ORDER
+)
+ALTERNATIVE_TIA_CORE_NAMES = frozenset(ALTERNATIVE_TIA_CORE_ORDER)
+assert len(ALTERNATIVE_TIA_CORE_ORDER) == len(ALTERNATIVE_TIA_CORE_NAMES) == 11
+assert "stella2014" not in ALTERNATIVE_TIA_CORE_NAMES
+
 # No original noncommercial core can be part of the source-built 3.0
 # lineup. The full 8-family release *additionally* requires source-reviewed
 # builds for original NES/Atari/NGP/WonderSwan, not old buildbot DLLs.
@@ -41,6 +51,11 @@ SOURCE_BUILT_FIVE = frozenset(("fceumm", "stella2014", "prosystem", "mednafen_ng
 SOURCE_BUILT_EIGHT = SOURCE_BUILT_THREE | SOURCE_BUILT_FIVE
 SOURCE_BUILT_TEN = SOURCE_BUILT_EIGHT | frozenset(("mgba", "parallel_n64"))
 SOURCE_BUILT_ELEVEN = SOURCE_BUILT_TEN | frozenset(("dolphin",))
+SOURCE_BUILT_ELEVEN_TIA = frozenset(
+    "tia" if name == "stella2014" else name for name in SOURCE_BUILT_ELEVEN
+)
+assert len(SOURCE_BUILT_ELEVEN_TIA) == 11
+assert SOURCE_BUILT_ELEVEN_TIA == ALTERNATIVE_TIA_CORE_NAMES
 assert len(SOURCE_BUILT_EIGHT) == 8 and SOURCE_BUILT_EIGHT.issubset(ALTERNATIVE_CORE_NAMES)
 assert len(SOURCE_BUILT_TEN) == 10 and SOURCE_BUILT_TEN == ALTERNATIVE_CORE_NAMES - {"dolphin"}
 assert len(SOURCE_BUILT_ELEVEN) == 11 and SOURCE_BUILT_ELEVEN == ALTERNATIVE_CORE_NAMES
@@ -72,7 +87,9 @@ def selected_core_set(lock):
     mode = lock.get("core_set_id", "legacy-noncommercial")
     if mode == "legacy-noncommercial":
         return CORE_NAMES
-    if mode not in ("gpl-source-built-alternative", "gpl-source-built-eight", "gpl-source-built-ten", "gpl-source-built-eleven"):
+    if mode not in ("gpl-source-built-alternative", "gpl-source-built-eight",
+                     "gpl-source-built-ten", "gpl-source-built-eleven",
+                     "gpl-source-built-eleven-tia"):
         raise ValueError("Unknown 3.0 release core set")
     if (lock.get("legacy_noncommercial_native_binaries_excluded") is not True
             or lock.get("source_built_alternative_binary_rights_reviewed") is not True):
@@ -85,10 +102,15 @@ def selected_core_set(lock):
         if (lock.get("ten_source_built_families_reviewed") is not True
                 or lock.get("one_unchanged_dolphin_family_reviewed") is not True):
             raise ValueError("Ten original native source families and retained Dolphin require independent review")
-    if mode == "gpl-source-built-eleven":
+    if mode in ("gpl-source-built-eleven", "gpl-source-built-eleven-tia"):
         if (lock.get("eleven_source_built_families_reviewed") is not True
                 or lock.get("zero_unchanged_native_families_reviewed") is not True):
             raise ValueError("Eleven original source-built natives require independent review")
+    if mode == "gpl-source-built-eleven-tia":
+        if (lock.get("gpl2plus_atari_source_replacement_reviewed") is not True
+                or lock.get("original_gpl2_only_stella_excluded") is not True):
+            raise ValueError("Pinned GPL2+ Atari native and absent GPL2-only Stella require review")
+        return ALTERNATIVE_TIA_CORE_NAMES
     return ALTERNATIVE_CORE_NAMES
 
 
@@ -99,6 +121,8 @@ def selected_source_families(lock):
     unrelated, unknown-source nightly with the very same Libretro filename.
     """
     names = selected_core_set(lock)
+    if names == ALTERNATIVE_TIA_CORE_NAMES:
+        return SOURCE_BUILT_ELEVEN_TIA
     if names != ALTERNATIVE_CORE_NAMES:
         return frozenset()
     mode = lock.get("core_set_id")
@@ -111,6 +135,8 @@ def selected_source_families(lock):
 
 def ordered_core_names_for_lock(lock):
     names = selected_core_set(lock)
+    if names == ALTERNATIVE_TIA_CORE_NAMES:
+        return ALTERNATIVE_TIA_CORE_ORDER
     if names == ALTERNATIVE_CORE_NAMES:
         return ALTERNATIVE_CORE_ORDER
     return ORIGINAL_CORE_ORDER
@@ -179,7 +205,7 @@ def load_approved_lock(path=LOCK_PATH):
             raise ValueError(f"{target}: Dolphin Sys archive hash missing")
         if type(sys.get("original_archive_size_bytes")) is not int or sys["original_archive_size_bytes"] <= 0:
             raise ValueError(f"{target}: Dolphin Sys archive size missing")
-        if lock.get("core_set_id") in ("gpl-source-built-ten", "gpl-source-built-eleven"):
+        if lock.get("core_set_id") in ("gpl-source-built-ten", "gpl-source-built-eleven", "gpl-source-built-eleven-tia"):
             # No legacy mutable Dolphin Sys may be shipped in the intended
             # ten-source production mode, even if other approvals are true.
             if (sys.get("original_upstream_source_commit") != DOLPHIN_REV
