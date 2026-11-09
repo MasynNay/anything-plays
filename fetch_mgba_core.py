@@ -385,10 +385,11 @@ def fetch_all(destination=CORE_FOLDER):
         # core metadata and pinned offline native runtime BEFORE ctypes opens
         # any source-built Windows library. This is NOT the trial marker.
         from tools.v30_release_lock import (
-            ALTERNATIVE_CORE_NAMES, load_approved_lock, selected_core_set,
+            ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES,
+            load_approved_lock, selected_core_set,
         )
         reviewed = load_approved_lock()
-        if selected_core_set(reviewed) == ALTERNATIVE_CORE_NAMES:
+        if selected_core_set(reviewed) in (ALTERNATIVE_CORE_NAMES, ALTERNATIVE_TIA_CORE_NAMES):
             from tools.core_release_lock import release_target
             from tools.stage_v30_approved_native_mapping import stage_approved_map
             destination.mkdir(parents=True, exist_ok=True)
