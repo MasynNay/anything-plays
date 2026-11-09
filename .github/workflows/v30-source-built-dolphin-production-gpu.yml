@@ -1,0 +1,153 @@
+name: Anything Plays 3.0 | Source-built Dolphin real production GPU gameplay
+
+# Prove NEW pristine source-built native Dolphin works in the SAME accelerated
+# GameCubeHardwareSession, GPU host and PortAudio input/output path the user
+# actually plays. Software-renderer diagnosis alone cannot authorize the
+# production GameCube backend. No old buildbot binary is used here.
+on:
+  push:
+    branches: [test/v30-original-dolphin-linux-playback]
+    paths:
+      - '.github/workflows/v30-source-built-dolphin-production-gpu.yml'
+      - 'tools/probe_gamecube_app.py'
+      - 'anything_plays/gamecube_gpu.py'
+      - 'anything_plays/libretro_gpu_egl.py'
+      - 'tools/verify_v30_dolphin_original_build.py'
+      - 'tools/v30_dolphin_original_link_order.cmake'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-source-built-dolphin-production-gpu.yml'
+      - 'tools/probe_gamecube_app.py'
+      - 'anything_plays/gamecube_gpu.py'
+      - 'anything_plays/libretro_gpu_egl.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v30-pristine-dolphin-real-gamecube-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  new-source-native-production-gpu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      PINNED_DOLPHIN_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install compiler and actual desktop app accelerated-video/audio runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config \
+            libudev-dev libevdev-dev libasound2-dev libpulse-dev \
+            libgl-dev libegl1-mesa-dev libgl1-mesa-dri libx11-dev libxi-dev \
+            libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev \
+            xvfb xauth python3-tk libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Fetch pinned original upstream Dolphin parent and 37 source Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin checkout --detach "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          result=verify_original_source(Path('original-dolphin'))
+          assert result['direct_gitlinks_verified']==34
+          assert result['nested_gitlinks_verified']==3
+          print('Pristine Dolphin source tree and 37 immutable child Gitlinks verified')
+          PY
+      - name: Compile real original Dolphin native WITHOUT software-renderer patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
+            -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="$GITHUB_WORKSPACE/tools/v30_dolphin_original_link_order.cmake"
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+          python -m tools.verify_v30_dolphin_original_build \
+            --source original-dolphin \
+            --native original-dolphin-build/dolphin_libretro.so \
+            --output ORIGINAL_DOLPHIN_GPU_NATIVE_SOURCE_PROOF_UNAPPROVED.json
+      - name: Compile OWNED original 3D GameCube GX and audio homebrew via devkitPro
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/tools/gamecube-3d-homebrew:/project" \
+            -w /project -e TARGET_CONSOLE=gamecube -u "$(id -u):$(id -g)" \
+            devkitpro/devkitppc make
+          test -s tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+          sha256sum tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol
+      - name: Stage only newly source-compiled native and matching pinned original Dolphin Sys
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cores/dolphin-emu/Sys test-evidence
+          cp original-dolphin-build/dolphin_libretro.so cores/dolphin_libretro.so
+          cp -a original-dolphin/Data/Sys/. cores/dolphin-emu/Sys/
+          test -s cores/dolphin-emu/Sys/codehandler.bin
+          python - <<'PY'
+          from pathlib import Path
+          from anything_plays.gamecube_software import packaged_dolphin_system_directory
+          core=Path('cores/dolphin_libretro.so')
+          assert packaged_dolphin_system_directory(core).resolve()==core.resolve().parent
+          print('In-app Dolphin Sys and native share exact original upstream source revision')
+          PY
+      - name: Play owned 3D GX homebrew through REAL production accelerated GameCube class
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. PYTHONUNBUFFERED=1 xvfb-run -a \
+            python -X faulthandler tools/probe_gamecube_app.py \
+            --core cores/dolphin_libretro.so \
+            --rom tools/gamecube-3d-homebrew/anythingplays-gc-gx-gamecube.dol \
+            --seconds 55 --require-animated --require-audio \
+            --require-controller-effect \
+            --report test-evidence/new-original-source-real-gamecube-hardware.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('test-evidence/new-original-source-real-gamecube-hardware.json').read_text('utf-8'))
+          d=report.get('details') or {}
+          assert report['passed'] is True and report['native_exit_code']==0
+          assert d.get('backend')=='production GameCubeHardwareSession + platform GPU host'
+          assert d.get('uses_external_dolphin') is False
+          assert d.get('gamecube_button_a_visual_effect_verified') is True
+          assert d.get('continuous_video_20fps_requirement_met') is True
+          assert d.get('native_nonzero_pcm_requirement_met') is True
+          assert d.get('native_gpu_requests')
+          print('SOURCE-BUILT REAL production GPU/GameCube video, controller and PCM passed')
+          PY
+      - name: Retain source/native proof and actual original-homebrew frames, not GPL core binaries
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.0-ORIGINAL-SOURCE-DOLPHIN-REAL-HW-GAMEPLAY-REPORT
+          path: |
+            ORIGINAL_DOLPHIN_GPU_NATIVE_SOURCE_PROOF_UNAPPROVED.json
+            test-evidence/new-original-source-real-gamecube-hardware.json
+            test-evidence/gamecube-app-accelerated-frame.png
+          if-no-files-found: warn
+          retention-days: 45
