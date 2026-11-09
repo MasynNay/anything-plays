@@ -19,7 +19,8 @@ import subprocess
 import tarfile
 import time
 
-from anything_plays.v30_approved_core_map import ELEVEN_EXPECTED, ELEVEN_REPOSITORIES
+from anything_plays.v30_approved_core_map import (ELEVEN_EXPECTED, ELEVEN_REPOSITORIES,
+    ELEVEN_TIA_EXPECTED, ELEVEN_TIA_REPOSITORIES)
 
 SOURCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
 MAX_ARCHIVE = 1024 * 1024 * 1024
@@ -32,7 +33,7 @@ def run_git(*args, cwd=None, timeout=1200):
     ).rstrip("\r\n")
 
 
-def checkout_pinned_source(root: Path, name: str, repo: str, revision: str) -> None:
+def checkout_pinned_source(root: Path, name: str, repo: str, revision: str, *, tia=False) -> None:
     if root.exists() or root.is_symlink():
         raise ValueError("Original source checkout destination must not exist")
     root.parent.mkdir(parents=True, exist_ok=True)
@@ -59,12 +60,14 @@ def checkout_pinned_source(root: Path, name: str, repo: str, revision: str) -> N
             if attempt == 4:
                 raise
             time.sleep(5 * attempt)
-    verify_checkout(root, name, repo, revision)
+    verify_checkout(root, name, repo, revision, tia=tia)
 
 
-def verify_checkout(root: Path, name: str, repo: str, revision: str) -> int:
-    if (name not in ELEVEN_EXPECTED or repo != ELEVEN_REPOSITORIES[name]
-            or revision != ELEVEN_EXPECTED[name]
+def verify_checkout(root: Path, name: str, repo: str, revision: str, *, tia=False) -> int:
+    expected = ELEVEN_TIA_EXPECTED if tia else ELEVEN_EXPECTED
+    repositories = ELEVEN_TIA_REPOSITORIES if tia else ELEVEN_REPOSITORIES
+    if (name not in expected or repo != repositories[name]
+            or revision != expected[name]
             or not SOURCE_SHA.fullmatch(revision)):
         raise ValueError("Unrecognized original source repository or Git revision")
     if (run_git("rev-parse", "HEAD", cwd=root) != revision
@@ -142,18 +145,20 @@ def archive_checkout(root: Path, target: Path, name: str, revision: str):
         raise
 
 
-def archive_all(checkouts: Path, output: Path, *, verify_git=True):
+def archive_all(checkouts: Path, output: Path, *, verify_git=True, tia=False):
     if output.exists() or output.is_symlink():
         raise ValueError("Original source archive output must be new")
     if checkouts.resolve() == output.resolve() or checkouts.resolve() in output.resolve().parents:
         raise ValueError("Cannot overwrite source checkouts")
     output.mkdir(parents=True)
     entries = {}
-    for name in sorted(ELEVEN_EXPECTED):
-        revision = ELEVEN_EXPECTED[name]
-        repository = ELEVEN_REPOSITORIES[name]
+    expected = ELEVEN_TIA_EXPECTED if tia else ELEVEN_EXPECTED
+    repositories = ELEVEN_TIA_REPOSITORIES if tia else ELEVEN_REPOSITORIES
+    for name in sorted(expected):
+        revision = expected[name]
+        repository = repositories[name]
         root = checkouts / name
-        count = verify_checkout(root, name, repository, revision) if verify_git else None
+        count = verify_checkout(root, name, repository, revision, tia=tia) if verify_git else None
         archive = archive_checkout(
             root, output / f"source-{name}-{revision}.tar.gz", name, revision)
         entries[name] = {
@@ -165,6 +170,7 @@ def archive_all(checkouts: Path, output: Path, *, verify_git=True):
         "status": "UNAPPROVED-ORIGINAL-SOURCE-TREE-ACCESS-CANDIDATE",
         "newly_compiled_libretro_core_outputs_included": False,
         "core_count": 11,
+        **({"source_set_id": "original-eleven-gpl2plus-tia"} if tia else {}),
         "all_source_revisions_pinned": True,
         "source_to_bundled_binary_review_complete": False,
         "transitive_build_dependencies_review_complete": False,
@@ -185,13 +191,16 @@ def main():
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--fetch", action="store_true")
+    parser.add_argument("--tia", action="store_true", help="Preserve 11 sources with GPL2+ Tia instead of Stella2014")
     args = parser.parse_args()
     if args.fetch:
         args.workspace.mkdir(parents=True, exist_ok=True)
-        for name in sorted(ELEVEN_EXPECTED):
+        expected = ELEVEN_TIA_EXPECTED if args.tia else ELEVEN_EXPECTED
+        repositories = ELEVEN_TIA_REPOSITORIES if args.tia else ELEVEN_REPOSITORIES
+        for name in sorted(expected):
             checkout_pinned_source(args.workspace / name, name,
-                                   ELEVEN_REPOSITORIES[name], ELEVEN_EXPECTED[name])
-    result = archive_all(args.workspace, args.output)
+                                   repositories[name], expected[name], tia=args.tia)
+    result = archive_all(args.workspace, args.output, tia=args.tia)
     print(f"Archived {len(result['sources'])} original source trees, source-only, rights NOT auto-approved.")
 
 
