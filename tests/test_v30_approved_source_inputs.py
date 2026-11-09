@@ -353,6 +353,52 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
             self.assertEqual(kwargs["dolphin_sys_dir"], base / "sys")
             self.assertEqual(set(kwargs["five_dirs"]), staging.SOURCE_BUILT_FIVE)
 
+    def test_ten_source_staging_never_overwrites_any_evidence_directory(self):
+        """All original source proofs must survive invalid output locations."""
+        with TemporaryDirectory() as temp:
+            lock, source, fixtures = synthetic_four_platform_review(temp)
+            lock["core_set_id"] = "gpl-source-built-ten"
+            lock["ten_source_built_families_reviewed"] = True
+            lock["one_unchanged_dolphin_family_reviewed"] = True
+            folder, _, _, _ = fixtures["linux-x86_64"]
+            snes = folder / "snes"; snes.mkdir()
+            sega = folder / "sega"; sega.mkdir()
+            pce = folder / "pce.zip"; pce.write_bytes(b"test source")
+            five = {}
+            for name in ("fceumm", "stella2014", "prosystem",
+                         "mednafen_ngp", "mednafen_wswan"):
+                five[name] = folder / name
+                five[name].mkdir()
+            mgba = folder / "mgba"; mgba.mkdir()
+            n64 = folder / "n64"; n64.mkdir()
+            dolphin = folder / "dolphin_sys"; dolphin.mkdir()
+            evidence = [folder / "original", snes, sega, *five.values(),
+                        mgba, n64, dolphin]
+            # This regression isolates the pre-write filesystem guard.
+            # The full source/rights contract is independently exercised by
+            # the synthetic four-platform staging tests below.
+            with patch.object(staging, "validate_source_inventory", return_value=True), \
+                 patch.object(staging, "approved_core_map_from_lock", return_value={}), \
+                 patch.dict(os.environ, {
+                     "AP_RELEASE_BUILD": "1", "AP_V30_APPROVED_RELEASE": "1",
+                     "AP_V30_GPL_TRIAL": "0", "AP_V30_TEST_CORES": "0",
+                 }, clear=True):
+                for protected in evidence:
+                    marker = protected / "immutable-source-proof.txt"
+                    marker.write_text("original", encoding="utf-8")
+                    output = protected / "staged"
+                    with self.subTest(protected=protected.name):
+                        with self.assertRaisesRegex(ValueError, "overwrite original"):
+                            staging.assemble_approved_inputs(
+                                lock=lock, inventory=source, target="linux-x86_64",
+                                original_dir=folder / "original",
+                                snes_dir=snes, sega_dir=sega, pce_artifact=pce,
+                                output_dir=output, five_dirs=five,
+                                mgba_dir=mgba, n64_dir=n64, dolphin_sys_dir=dolphin,
+                            )
+                        self.assertFalse(output.exists())
+                        self.assertEqual(marker.read_text("utf-8"), "original")
+
     def test_ten_source_lock_alone_never_satisfies_actual_license_approval(self):
         with TemporaryDirectory() as temp:
             lock, source, fixtures = synthetic_four_platform_review(temp)
