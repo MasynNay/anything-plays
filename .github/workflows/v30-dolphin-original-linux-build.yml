@@ -35,6 +35,7 @@ jobs:
         shell: bash
         run: |
           python -m unittest discover -s tests -p test_v30_dolphin_original_build.py -v
+          python -m unittest discover -s tests -p test_v30_dolphin_original_link_order.py -v
           python -m unittest discover -s tests -p test_v30_dolphin_source_review.py -v
           python -m unittest discover -s tests -p test_v30_dolphin_nested_sources.py -v
       - name: Install original source build system packages, no game/emulator installation
@@ -104,6 +105,7 @@ jobs:
           assert row["direct_gitlinks_verified"] == 34
           assert row["nested_gitlinks_verified"] == 3
           assert len(row["native_sha256"]) == 64
+          assert len(row["build_only_original_source_link_order_cmake_sha256"]) == 64
           for flag in ("old_buildbot_binary_equivalence_claimed",
                        "physical_gameplay_tested",
                        "complete_corresponding_source_and_runtime_dependencies_reviewed",
