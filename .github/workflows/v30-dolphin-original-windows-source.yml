@@ -49,7 +49,7 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !$vsroot -or $vsroot -notmatch '\\18\\') {
             throw "Original Dolphin's pinned pch.h requires Visual Studio 2026"
           }
-          $available = cmake -G
+          $available = cmake --help
           if ($available -notmatch 'Visual Studio 18 2026') {
             throw "CMake is missing the Visual Studio 2026 generator"
           }
