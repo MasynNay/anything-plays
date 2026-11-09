@@ -20,8 +20,9 @@ concurrency:
 
 jobs:
   original-dolphin-windows:
-    # VS2022 is a required original Dolphin x64 CMake generator here.
-    runs-on: windows-2022
+    # Pinned upstream Dolphin pch.h requires MSVC >= 19.51.36252 (VS2026).
+    # GitHub's 2025 image includes VS 18/2026 with CMake 4.2+.
+    runs-on: windows-2025
     timeout-minutes: 125
     env:
       DOLPHIN_SOURCE_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
@@ -39,6 +40,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Original source verifier tests failed" }
           python -m unittest discover -s tests -p test_v30_dolphin_original_windows.py -v
           if ($LASTEXITCODE -ne 0) { throw "Windows PE verifier tests failed" }
+      - name: Verify VS2026 and CMake versions match original Dolphin PCH requirements
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cmake --version
+          $vsroot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -property installationPath
+          if ($LASTEXITCODE -ne 0 -or !$vsroot -or $vsroot -notmatch '\\18\\') {
+            throw "Original Dolphin's pinned pch.h requires Visual Studio 2026"
+          }
+          $available = cmake -G
+          if ($available -notmatch 'Visual Studio 18 2026') {
+            throw "CMake is missing the Visual Studio 2026 generator"
+          }
       - name: Retrieve exact original Dolphin upstream source and all pinned Gitlinks
         shell: pwsh
         run: |
@@ -61,7 +75,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $configure = @(
             "-S", "original-dolphin", "-B", "original-dolphin-build",
-            "-G", "Visual Studio 17 2022", "-A", "x64",
+            "-G", "Visual Studio 18 2026", "-A", "x64",
             "-DCMAKE_BUILD_TYPE=Release",
             "-DLIBRETRO=ON", "-DENABLE_QT=OFF", "-DENABLE_TESTS=OFF",
             "-DENABLE_LTO=OFF", "-DENABLE_VULKAN=OFF",
