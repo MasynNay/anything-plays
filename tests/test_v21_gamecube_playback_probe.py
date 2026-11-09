@@ -219,7 +219,8 @@ class GameCubePlaybackProbeTests(unittest.TestCase):
 
             def fake_gdb(args, **kwargs):
                 self.assertEqual(args[0], "/usr/bin/gdb")
-                self.assertIn("thread apply all bt 24", args)
+                self.assertIn("bt 10", args)
+                self.assertIn("p g_vertex_manager", args)
                 return CompletedProcess(args, 0, stdout="#0 fatal_native_frame()")
 
             with patch("tools.probe_gamecube_homebrew.verified_homebrew",
