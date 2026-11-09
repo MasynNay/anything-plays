@@ -4,18 +4,25 @@
 
 ## Why a green installer is not yet a distributable installer
 
-The 3.0 test bundle contains **11** native Libretro cores and the Python desktop
-frontend, and **18** console profiles. All four installer builds passed automated
-packaging tests. That establishes neither license compatibility nor compliance
-for the *exact binaries* shipped.
+The selected 3.0 **ten-original-source-built** test bundle contains 11 native
+Libretro core families and 18 profiles, with the Python desktop frontend;
+the retained Dolphin native family is the original archived buildbot binary.
+Four-platform installer and native integration jobs passed. This establishes
+technical function, not the license compatibility of the **exact binaries**
+or complete corresponding-source rights.
 
 The [Libretro upstream license index](https://docs.libretro.com/development/licenses/)
 lists, among others:
 
-- **Snes9x** and **Genesis Plus GX:** noncommercial use restrictions. The exact
-  upstream copies are preserved in `licenses/Snes9x-LICENSE.txt` and
-  `licenses/Genesis-Plus-GX-LICENSE.txt`.
-- **ParaLLEl-N64:** GPLv3, including components with their own notices.
+- **Snes9x** and **Genesis Plus GX:** noncommercial restrictions apply to
+  **historical unapproved preview variants**, but those binaries have been
+  **replaced** by original source-built Supafaust and BlastEm in the selected
+  3.0 production candidate. The final release must exclude both old libraries.
+- **ParaLLEl-N64:** the upstream index and individual source components
+  require a **revision-accurate GPL/LGPL/MIT notice and version review**;
+  its pinned source-built 3.0 candidate retains eleven original notices.
+- **BlastEm:** GPLv3-or-later; Supafaust and other Mednafen-derived cores
+  need file-level review of GPLv2-only versus GPLv2-or-later grants.
 - **FCEUmm, Dolphin, Stella, ProSystem, Beetle PCE Fast, NeoPop and WonderSwan:**
   GPL-family licenses, with the version and dependency terms to be checked at
   each exact source revision.
@@ -33,21 +40,30 @@ distinguishes that from distributing genuinely separate programs together.
 This is **not** a conclusion that Anything Plays' exact packaging is unlawful:
 the answer depends on how the host and cores are actually combined, how they
 interact and the precise upstream permissions. It is a **material release
-question**, because a noncommercial restriction is not automatically
-compatible with GPL permissions if both licenses apply to one combined work.
+question**, because GPLv2-only and GPLv3-only components may be incompatible **if
+they actually combine into one work**. The selected ten-source build removes
+the earlier Snes9x/Genesis Plus GX noncommercial restriction question by
+excluding those libraries entirely. Do not imply such excluded permissions
+are still mandatory for the selected stable installer.
 
 ### Clarification for a free educational hiring portfolio
 
-The project's author confirms that the intended 3.0 showcase is free, educational and **not a revenue-generating product**. The fact that the source is shown to prospective employers should be disclosed as a use case; it should not be automatically classified as commercial, nor assumed to satisfy all custom noncommercial grants without checking the relevant wording. Snes9x's custom text refers to both noncommercial permission and personal/promotional examples; Genesis Plus GX's original text restricts commercial products/activities. For a per-core 11-family action matrix, required source/notices and the **real remaining decisions**, see [portfolio license clearance](V3_PORTFOLIO_LICENSE_CLEARANCE.md). The [Snes9x/Genesis Plus GX requests](V3_PORTFOLIO_PERMISSION_REQUESTS.md) are **drafts, not sent letters or received permissions**.
+The project's author confirms that the intended 3.0 showcase is free, educational and **not a revenue-generating product**. The fact that the source is shown to prospective employers should be disclosed as a use case; it should not be automatically classified as commercial, nor assumed to satisfy all custom noncommercial grants without checking the relevant wording. The original Snes9x/Genesis Plus GX license texts still matter **only to
+historical preview archives or future different variants that actually ship
+them**, not to the chosen Supafaust/BlastEm release composition. See the
+[updated exact eleven-core review](V3_PORTFOLIO_LICENSE_CLEARANCE.md).
+Older [Snes9x/Genesis Plus GX permission drafts](V3_PORTFOLIO_PERMISSION_REQUESTS.md)
+are retained as historical research; **do not send them** to unrelated
+upstream authors for components excluded from this release.
 
 Do not claim that the recent shared-memory 2D isolated worker prototype fixes copyleft linking by itself. GNU's GPL FAQ explicitly warns shared memory with complex interoperation may amount to a combined program. Independent, qualified license/architecture review still decides whether an approved 3.0 offline installer can be shipped in its current form.
 
 ### Required decision and evidence before public 3.0 binary publication
 
-1. Review the exact Snes9x and Genesis Plus GX permissions and any artwork
-   restrictions against the intended portfolio distribution (free vs promotional
-   or commercial use). No payment does not necessarily decide the meaning of
-   every noncommercial clause.
+1. Verify that the final source-built installer actually **excludes**
+   Snes9x and Genesis Plus GX binaries. These absent noncommercial cores are
+   **not** a reason to contact upstream authors or block the selected build.
+   Review the permissions of the *actual* eleven selected native families.
 2. Review the actual core-host linking/invocation design and GPL/other
    copyleft obligations. Resolve whether a separate process/IPC architecture,
    a documented legally permissible aggregation, or specific rights-holder
@@ -65,10 +81,10 @@ Do not claim that the recent shared-memory 2D isolated worker prototype fixes co
    fail-closed `config/v3.0-release-acceptance.json` record be completed and
    the `tools/check_v30_release.py` gate run **without** `--report-only`.
 
-The candidate-specific [four-Sega-console source/license decision record](V3_SEGA_LICENSE_OPTIONS.md)
-compares current Genesis Plus GX, source-built GPLv3 BlastEm, noncommercial
-PicoDrive, GPLv3 Gearsystem, GPLv2 SMS Plus GX and AGPLv3 ClownMDEmu
-without claiming any component resolves legal rights on its own. The
+The [four-Sega-console source/license history](V3_SEGA_LICENSE_OPTIONS.md)
+records why source-built GPLv3 BlastEm replaced Genesis Plus GX in the
+selected ten-source installer; other trial substitutions are **not** the
+current release lineup. The
 reviewer must not substitute cores or approve a separate-process design
 solely because CI demonstrated original homebrew video/audio.
 
@@ -79,9 +95,9 @@ functionality integrated without first-run external downloads. If the
 license compatibility review requires a change, an *offline bundled*
 separate-process core worker with narrow IPC could be evaluated instead of
 dropping support; however, that is engineering work and **not** itself a
-legal safe harbor. Alternatively, acquire specific upstream redistribution
-permission where needed. Do not silently replace one of the supported
-cores or require users to download separate emulators.
+legal safe harbor. Alternatively, obtain compatible permissions only if an **actually selected**
+component requires them. Do not reintroduce excluded noncommercial cores,
+silently drop console profiles, or require users to install separate emulators.
 
 ### Progress already established
 
