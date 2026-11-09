@@ -309,6 +309,50 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
                         for forbidden in ("snes9x", "genesis_plus_gx"):
                             self.assertFalse((built / f"{forbidden}_libretro{ext}.zip").exists())
 
+    def test_approved_production_cli_uses_namespace_native_and_dolphin_sys_paths(self):
+        """Regression: release CLI must not subscript an argparse.Namespace."""
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            (base / "docs").mkdir()
+            (base / "docs" / "V3_LICENSE_COMPATIBILITY_APPROVED.md").write_text(
+                "SYNTHETIC TEST only", "utf-8")
+            source = base / "source.json"
+            source.write_text("{}", "utf-8")
+            lock = {
+                "core_set_id": "gpl-source-built-ten",
+                "legacy_noncommercial_native_binaries_excluded": True,
+                "source_built_alternative_binary_rights_reviewed": True,
+                "ten_source_built_families_reviewed": True,
+                "one_unchanged_dolphin_family_reviewed": True,
+            }
+            command = [
+                "--target", "linux-x86_64",
+                "--original-dir", str(base / "old"),
+                "--snes-dir", str(base / "snes"),
+                "--sega-dir", str(base / "sega"),
+                "--pce-artifact", str(base / "pce.zip"),
+                "--output-dir", str(base / "out"),
+                "--mgba-dir", str(base / "mgba"),
+                "--n64-dir", str(base / "n64"),
+                "--dolphin-sys-dir", str(base / "sys"),
+            ]
+            for name in sorted(staging.SOURCE_BUILT_FIVE):
+                command.extend([
+                    "--" + name.replace("_", "-") + "-dir",
+                    str(base / name),
+                ])
+            with patch.object(staging, "ROOT", base), \
+                 patch.object(staging, "SOURCE_FILE", source), \
+                 patch.object(staging, "load_approved_lock", return_value=lock), \
+                 patch.object(staging, "assemble_approved_inputs",
+                              return_value={"target": "linux-x86_64"}) as staged:
+                self.assertEqual(staging.main(command), 0)
+            kwargs = staged.call_args.kwargs
+            self.assertEqual(kwargs["mgba_dir"], base / "mgba")
+            self.assertEqual(kwargs["n64_dir"], base / "n64")
+            self.assertEqual(kwargs["dolphin_sys_dir"], base / "sys")
+            self.assertEqual(set(kwargs["five_dirs"]), staging.SOURCE_BUILT_FIVE)
+
     def test_ten_source_lock_alone_never_satisfies_actual_license_approval(self):
         with TemporaryDirectory() as temp:
             lock, source, fixtures = synthetic_four_platform_review(temp)
