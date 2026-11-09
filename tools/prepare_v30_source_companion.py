@@ -15,7 +15,8 @@ import re
 import shutil
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
-from anything_plays.v30_approved_core_map import ELEVEN_EXPECTED, ELEVEN_REPOSITORIES
+from anything_plays.v30_approved_core_map import (ELEVEN_EXPECTED, ELEVEN_REPOSITORIES,
+    ELEVEN_TIA_EXPECTED, ELEVEN_TIA_REPOSITORIES)
 
 VERSION = re.compile(r"3\.0\.\d+\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -58,14 +59,20 @@ def validate_captured_sources(folder: Path):
         manifest.get(k) != v for k, v in expected_status.items()
     ):
         raise ValueError("Original source package has a fabricated approval or incomplete identity")
+    variant = manifest.get("source_set_id")
+    if variant not in (None, "original-eleven-gpl2plus-tia"):
+        raise ValueError("Unrecognized original emulator source composition")
+    tia = variant == "original-eleven-gpl2plus-tia"
+    revisions = ELEVEN_TIA_EXPECTED if tia else ELEVEN_EXPECTED
+    repos = ELEVEN_TIA_REPOSITORIES if tia else ELEVEN_REPOSITORIES
     sources = manifest.get("sources")
-    if not isinstance(sources, dict) or set(sources) != set(ELEVEN_EXPECTED):
-        raise ValueError("Expected all 11 original upstream emulator sources")
+    if not isinstance(sources, dict) or set(sources) != set(revisions):
+        raise ValueError("Expected all 11 exact originally pinned emulator sources")
     source_names = set()
     digest_lines = set()
-    for name in sorted(ELEVEN_EXPECTED):
+    for name in sorted(revisions):
         row = sources[name]
-        revision, repository = ELEVEN_EXPECTED[name], ELEVEN_REPOSITORIES[name]
+        revision, repository = revisions[name], repos[name]
         expected_filename = f"source-{name}-{revision}.tar.gz"
         if (not isinstance(row, dict)
                 or row.get("source_commit") != revision
@@ -111,6 +118,8 @@ def prepare_source_companion(source_dir: Path, output_dir: Path, version: str):
     names = sorted(p.name for p in src.iterdir())
     readme = (
         f"Anything Plays {version} — pinned original emulator sources\n"
+        + ("Atari2600 uses original GPL2-or-later Tia in place of old Stella2014.\n"
+           if captured.get("source_set_id") == "original-eleven-gpl2plus-tia" else "")
         "Eleven upstream Git source trees with recursive submodule checkout.\n"
         "The corresponding application source, packaging scripts, patches and\n"
         f"build workflows are available at the Anything Plays v{version} tag.\n"
