@@ -1,0 +1,92 @@
+name: Anything Plays 3.0 | Verify actual Tia 11 core corresponding source and native evidence
+
+# Replaces the historical Stella/Snes9x candidate matrix for current 3.0.
+# Uses the ORIGINAL completed 4OS installed-app native evidence and all 11
+# exact pinned Git source archives (including 37 Dolphin submodule Gitlinks).
+# Neither public release nor permission granted by automated tests.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-current-tia-source-proof.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-current-tia-source-proof.yml'
+      - 'tools/audit_v30_current_tia_sources.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  current-original-source-and-44-native-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INSTALLED_PROOF_RUN: '42686588072'
+      ORIGINAL_SOURCE_RUN: '42668367694'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify the exact original 11 Tia multi-platform source builds succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$INSTALLED_PROOF_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$INSTALLED_PROOF_RUN" --json name --jq .name)" = "Anything Plays 3.0 | Retain four actual tested full offline installers"
+          test "$(gh run view "$ORIGINAL_SOURCE_RUN" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$ORIGINAL_SOURCE_RUN" --json name --jq .name)" = "Anything Plays 3.0 | Preserve all 11 original sources with GPL2+ Tia"
+      - name: Download 44 real installed core SHA records, 4 frozen GUI and native A/V receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in windows-x64 linux-x64 macos-arm64 macos-x64; do
+            gh run download "$INSTALLED_PROOF_RUN" \
+              --name "AnythingPlays-3.0-ELEVEN-TIA-ORIGINAL-SOURCE-INSTALLED-$target-UNAPPROVED" \
+              --dir "actual-reports/$target"
+          done
+      - name: Retrieve all eleven matching pinned Git source trees with original SPDX/license notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$ORIGINAL_SOURCE_RUN" \
+            --name "AnythingPlays-3.0.0-ELEVEN-TIA-ORIGINAL-CORE-SOURCES-UNAPPROVED" \
+            --dir original-source
+      - name: Verify pinned source, 37 Dolphin Gitlinks, 44 installed native SHA256s, and all OS GUI sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.audit_v30_current_tia_sources \
+            --reports actual-reports \
+            --source original-source \
+            --output review-results/AnythingPlays-3.0.0-EXACT-TIA-11-CORE-SOURCE-AND-NATIVE-EVIDENCE.json
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root = Path("review-results")
+          report = json.loads(next(root.glob("*.json")).read_text(encoding="utf-8"))
+          assert report["original_source_count"] == 11
+          assert report["native_sha256_count"] == 44
+          assert report["original_dolphin_gitlink_trees"] == 37
+          assert report["selected_core_set"] == "gpl-source-built-eleven-tia"
+          assert report["public_binary_distribution_approved"] is False
+          assert report["independent_license_compatibility_review_complete"] is False
+          assert set(report["targets"]) == {
+            "windows-x64", "linux-x64", "macos-arm64", "macos-x64"
+          }
+          assert "stella2014" not in report["original_sources"]
+          print("Real installed-native/source correspondence verified on four OSes")
+          PY
+          (cd review-results && sha256sum *.json > SHA256SUMS.txt)
+      - name: Preserve verified CURRENT 3.0 corresponding-source evidence, never outdated Stella matrix
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-44-ACTUAL-TIA-11-ORIGINAL-SOURCE-REVIEW-UNAPPROVED
+          path: review-results/*
+          if-no-files-found: error
+          retention-days: 90
