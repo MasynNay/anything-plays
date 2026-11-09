@@ -60,7 +60,11 @@ class PinnedOwnerPreviewHashesTests(unittest.TestCase):
         docs = (root/"docs/V3_PHYSICAL_QA_RUNBOOK.md").read_text("utf-8")
         self.assertIn("config/v3.0-owner-qa-preview-hashes-unapproved.json", docs)
         self.assertIn("42455076101", docs)
-        self.assertIn("42455076101", readme)
+        # The historical preview run belongs in the technical QA document,
+        # not as stale release clutter on the public project landing page.
+        self.assertNotIn("42455076101", readme)
+        self.assertIn("docs/README.md", readme)
+        self.assertIn("releases/latest", readme)
         self.assertIn("NOT approved", docs)
         self.assertNotIn("gh release create", docs)
 
