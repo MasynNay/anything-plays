@@ -80,7 +80,7 @@ def build(root):
         "schema_version": 1,
         "status": NESTED_STATUS,
         "original_34_source_review_run": "42447184893",
-        "original_34_review_manifest_sha256": old_digest,
+        "original_34_source_review_manifest_sha256": old_digest,
         "dolphin_parent_commit": PARENT_COMMIT,
         "source_candidates_captured": 3,
         "pinned_nested_gitlink_tree_closure_verified": True,
