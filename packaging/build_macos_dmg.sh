@@ -21,6 +21,24 @@ if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
     *) echo "Unsupported 3.0 production macOS architecture"; exit 1 ;;
   esac
 fi
+# Produce true 3.0.0 Info.plist, app bundle and DMG identifiers for a
+# PRIVATE source-built candidate only. License/QA approved-release flags
+# are never set automatically by candidate builds.
+if [[ "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" != "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_GPL_TRIAL:-0}" == "1" &&
+     "${AP_V30_TIA_TRIAL:-0}" == "1" ]] || {
+    echo "Stable-identity macOS candidate requires original Tia source trial"; exit 1;
+  }
+  AP_V30_PRODUCTION="1"
+  BUNDLE_FILE="AnythingPlays.app"
+  DMG_VOLUME="Anything Plays"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.0.0-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.0.0-macos-x64.dmg" ;;
+    *) echo "Unsupported macOS source-built candidate architecture"; exit 1 ;;
+  esac
+fi
 APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
@@ -117,6 +135,10 @@ PLIST="${APP_BUNDLE}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Anything Plays uses the camera to track moving objects for game controls." "$PLIST"
 if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.release30" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.0.0" "$PLIST" ||
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.0.0" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.0.0" "$PLIST" ||
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.0.0" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
 else
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
