@@ -367,6 +367,10 @@ def _parent(core, seconds, report, debugger=False, cpu_core=None,
                     "-ex", "set print thread-events off",
                     "-ex", "run",
                     "-ex", "thread apply all bt 24",
+                    "-ex", "thread 1",
+                    "-ex", "frame 0",
+                    "-ex", "info registers",
+                    "-ex", "x/16i $pc",
                     "--args", *command,
                 ]
             try:
