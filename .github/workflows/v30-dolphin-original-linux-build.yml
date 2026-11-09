@@ -1,0 +1,124 @@
+name: Anything Plays 3.0 | Original pinned Dolphin source build (Linux research)
+
+# Unmodified real source-built Dolphin, not an approved/public 3.0 emulator.
+# Only JSON/SHA evidence is retained, never source-unapproved native binaries.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-original-linux-build.yml'
+      - 'tools/verify_v30_dolphin_original_build.py'
+      - 'tests/test_v30_dolphin_original_build.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-original-dolphin-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-dolphin-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      PINNED_DOLPHIN_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check fail-closed original-source build verifier
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -p test_v30_dolphin_original_build.py -v
+          python -m unittest discover -s tests -p test_v30_dolphin_source_review.py -v
+          python -m unittest discover -s tests -p test_v30_dolphin_nested_sources.py -v
+      - name: Install original source build system packages, no game/emulator installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config \
+            libudev-dev libevdev-dev libasound2-dev libpulse-dev \
+            libgl-dev libegl1-mesa-dev libx11-dev libxi-dev \
+            libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev
+      - name: Checkout exact pristine original Dolphin Libretro Git revision and all Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin checkout --detach "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update \
+            --init --recursive --jobs 4
+          git -C original-dolphin status --porcelain --untracked-files=no
+      - name: Verify original 34 direct and 3 nested source Gitlinks against frozen committed records
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          result=verify_original_source(Path("original-dolphin"))
+          assert result["direct_gitlinks_verified"] == 34
+          assert result["nested_gitlinks_verified"] == 3
+          print("37 ORIGINAL pinned Dolphin Gitlinks checked; NO source modification.")
+          PY
+      - name: Configure and compile actual original Dolphin Libretro native ELF (NO code patches)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLIBRETRO=ON -DENABLE_QT=OFF -DENABLE_TESTS=OFF \
+            -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=OFF -DENABLE_AUTOUPDATE=OFF \
+            -DENABLE_CLI_TOOL=OFF
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+          test -s original-dolphin-build/dolphin_libretro.so
+      - name: Capture SHA and source provenance of actual original source-compiled Dolphin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v30_dolphin_original_build \
+            --source original-dolphin \
+            --native original-dolphin-build/dolphin_libretro.so \
+            --output ORIGINAL_DOLPHIN_LINUX_NATIVE_SOURCE_BUILD_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("ORIGINAL_DOLPHIN_LINUX_NATIVE_SOURCE_BUILD_UNAPPROVED.json")
+          row=json.loads(p.read_text("utf-8"))
+          assert row["original_unmodified_dolphin_source_compiled"] is True
+          assert row["parent_commit"] == "32c61f9d0e933331bb7087ba57e96883241b4960"
+          assert row["direct_gitlinks_verified"] == 34
+          assert row["nested_gitlinks_verified"] == 3
+          assert len(row["native_sha256"]) == 64
+          for flag in ("old_buildbot_binary_equivalence_claimed",
+                       "physical_gameplay_tested",
+                       "complete_corresponding_source_and_runtime_dependencies_reviewed",
+                       "combined_gpl_distribution_reviewed",
+                       "public_binary_distribution_approved"):
+              assert row[flag] is False,flag
+          print("Original pinned Dolphin native compiled; no public binary/QA approval.")
+          PY
+          sha256sum ORIGINAL_DOLPHIN_LINUX_NATIVE_SOURCE_BUILD_UNAPPROVED.json \
+            > ORIGINAL_DOLPHIN_LINUX_SHA256SUMS.txt
+      - name: Preserve review JSON only, no GPL-unapproved Dolphin native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-DOLPHIN-ORIGINAL-LINUX-COMPILE-REPORT-UNAPPROVED
+          path: |
+            ORIGINAL_DOLPHIN_LINUX_NATIVE_SOURCE_BUILD_UNAPPROVED.json
+            ORIGINAL_DOLPHIN_LINUX_SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
