@@ -9,6 +9,8 @@ on:
       - '.github/workflows/v30-dolphin-original-linux-build.yml'
       - 'tools/verify_v30_dolphin_original_build.py'
       - 'tests/test_v30_dolphin_original_build.py'
+      - 'tools/v30_dolphin_original_link_order.cmake'
+      - 'tests/test_v30_dolphin_original_link_order.py'
   workflow_dispatch:
 
 permissions:
