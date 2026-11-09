@@ -175,3 +175,7 @@ The corrected [four-platform complete offline installer lab](https://github.com/
 ### November 9, 2026 — candidate-lock malformed source evidence
 
 Following the merged and CI-passing PR #130, a focused follow-up adds controlled rejection of non-object top-level source provenance and unhashable core/archive names, with synthetic regression tests. **CI pending; not yet merged into the 3.0 development branch.** This improves rejection of malformed review artifacts only. It does not approve third-party redistribution, complete Dolphin corresponding-source obligations, or authorize a public 3.0 release. Stable v2.0 remains unchanged.
+
+### November 9, 2026 — atomic unapproved candidate lock output
+
+A focused pending- CI change replaces direct JSON lock writes with same-directory atomic staging and cleanup, with four regression tests for failed replacement, failed serialization, success and symlink refusal. This protects previously generated source evidence against partial writes. It does not authorize public distribution; exact production rights, source correspondence and full acceptance remain open. Public v2.0 stays unchanged.
