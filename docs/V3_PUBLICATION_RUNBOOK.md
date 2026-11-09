@@ -50,13 +50,38 @@ must remain clearly linked and provided separately as the applicable licenses
 require. Keeping a clean release page does **not** excuse source-distribution
 obligations.
 
-## Current technical release-input mismatch (November 8, 2026)
+## Ten-source production path implemented — November 8, 2026
 
-The full [ten-source desktop integration](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed all four OS targets and preserved every one of the 18 profiles/11 native core families. It replaces historical buildbot mGBA and ParaLLEl-N64 binaries with new pinned original-source builds. **Dolphin remains an original archived binary**. This is engineering evidence, not redistribution approval.
+[PR #103](https://github.com/MasynNay/anything-plays/pull/103)
+merged as `791116e773f2f1441382cb4740bfad5395ff0969`.
+The production-candidate workflow now selects the same **ten pinned original
+source-built core families** as the [verified complete four-OS native
+integration](https://github.com/MasynNay/anything-plays/actions/runs/42535823260),
+plus the original archived Dolphin core and Sys data. The release-mode native
+stager validates exact independent original mGBA and ParaLLEl-N64 source
+TAR/native hashes, mGBA MPL text and all eleven individual N64 upstream
+notices, and the frozen production app checks installed native digests.
+The full older twelve-archive input bundle is still cryptographically
+verified, but **only the Dolphin native archive and its Sys assets are
+preserved unchanged** in the ten-source final candidate.
 
-**Do not release using the old eight-source production composition by accident.** The current `.github/workflows/v30-production-candidates.yml` and `tools/stage_v30_approved_source_inputs.py` still select eight original source-built families and preserve original buildbot `mgba`, `parallel_n64` and `dolphin` as the three unchanged families. Before selecting final production inputs, the engineering team must either (a) update the approved production path to validate the already demonstrated original-source mGBA and N64 artifacts as well, plus every notice/source hash in the 44-core lock, or (b) independently document why the *different* old binaries qualify as completely corresponding-source/rights-reviewed. Never treat a passing **ten-source trial** as proof that a different eight-source production binary was reviewed.
+[Python 3.12, 3.13 and native mGBA source CI](https://github.com/MasynNay/anything-plays/actions/runs/42540053797)
+all passed. The [complete four-platform installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42540053912)
+passed Windows x64, Linux x64, Mac ARM and Mac Intel. This lab is an
+**engineering test**, not a release-mode build performed with an approved
+license/source lock. The separate ten-source original-homebrew integration
+job must also be checked individually and must not be declared green before
+it completes.
 
-Existing owner reports of working N64 games and Dolphin/GameCube on Windows, macOS and Linux are preserved in the roadmap and acceptance notes. They are not an outstanding request to repeat gameplay; final production hash/release-mode identity and physical checks not observed before remain separately tracked.
+**This removes the technical eight-versus-ten original-source production
+mismatch.** It does **not** approve any actual binary for distribution.
+Exact Dolphin binary-to-source correspondence and its dependencies,
+GPLv2-only/GPLv3 in-process combination, complete source and component
+rights, final per-platform production records, install/QA requirements and
+an explicitly approved immutable 11-core lock remain mandatory. The tracked
+approval fields stay **false**. The maintainer already confirmed working
+N64 and GameCube gameplay; do not request repetitive tests of that same
+functionality.
 
 ## Blocking checklist
 
