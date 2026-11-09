@@ -13,6 +13,7 @@ import io
 import json
 import os
 import tempfile
+import stat
 from pathlib import Path
 import re
 import sys
@@ -28,6 +29,7 @@ PLATFORMS = {
     "linux-x64": ("linux-x86_64", ".so"),
 }
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+MAX_PROVENANCE_BYTES = 1024 * 1024  # metadata only; native binaries are verified separately
 
 
 def hash_bytes(data: bytes) -> str:
@@ -46,6 +48,14 @@ def build_candidate(artifact_paths):
         target_id, suffix = PLATFORMS[platform]
         with zipfile.ZipFile(source) as outer:
             files = outer.namelist()
+            # ZIP metadata is untrusted until exact input hashes are checked.
+            # Refuse Unix symlink entries and oversized provenance before extraction.
+            if any((entry.create_system == 3 and
+                    stat.S_ISLNK(entry.external_attr >> 16)) for entry in outer.infolist()):
+                raise ValueError(f"{platform}: symlinked preserved ZIP member")
+            provenance_entry = outer.getinfo("PRESERVED_NATIVE_INPUTS.json") if "PRESERVED_NATIVE_INPUTS.json" in files else None
+            if provenance_entry is not None and provenance_entry.file_size > MAX_PROVENANCE_BYTES:
+                raise ValueError(f"{platform}: oversized preserved provenance")
             if len(files) != len(set(files)):
                 raise ValueError(f"{platform}: duplicate ZIP member")
             if "PRESERVED_NATIVE_INPUTS.json" not in files:
