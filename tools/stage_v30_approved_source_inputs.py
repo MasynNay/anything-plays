@@ -416,7 +416,6 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         notice_sha = sha(json.dumps(
             {name: sha(data) for name, data in sorted(license_payload.items())},
             sort_keys=True, separators=(",", ":")).encode("utf-8"))
-        from tools.stage_v30_gpl_trial_inputs import package_native_zip
         compiled_bytes = compiled_dolphin.read_bytes()
         zipped = package_native_zip("dolphin", ext, compiled_bytes)
         verify_core_archive(lock, _sys_platform(target), _architecture(target), "dolphin", zipped)
