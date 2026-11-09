@@ -16,6 +16,7 @@ from tools.check_v30_dolphin_submodules import PINNED, validate_index
 from tools.capture_v30_dolphin_nested_sources import NESTED, INDEX_STATUS
 
 REV = "32c61f9d0e933331bb7087ba57e96883241b4960"
+BUILD_ONLY_LINK_SHIM = Path(__file__).resolve().parents[1] / "tools" / "v30_dolphin_original_link_order.cmake"
 MANDATORY_LIBRETRO_SYMBOLS = (
     "retro_init", "retro_deinit", "retro_load_game",
     "retro_run", "retro_unload_game", "retro_get_system_info",
@@ -103,6 +104,11 @@ def verify_original_library(path):
 def audit(source, native, output, *, direct_index=PINNED, nested_index=NESTED):
     proof = verify_original_source(source, direct_index=direct_index, nested_index=nested_index)
     compiled = verify_original_library(native)
+    if (BUILD_ONLY_LINK_SHIM.is_symlink()
+            or not BUILD_ONLY_LINK_SHIM.is_file()
+            or not BUILD_ONLY_LINK_SHIM.read_bytes()):
+        raise ValueError("Missing original-source-preserving Dolphin CMake link repair")
+    link_shim_sha = hashlib.sha256(BUILD_ONLY_LINK_SHIM.read_bytes()).hexdigest()
     output = Path(output)
     if output.is_symlink() or output.exists():
         raise ValueError("Refusing to overwrite a previous Dolphin source-build report")
@@ -114,6 +120,7 @@ def audit(source, native, output, *, direct_index=PINNED, nested_index=NESTED):
         "original_unmodified_dolphin_source_compiled": True,
         "built_from_original_pinned_git_tree": True,
         "source_build_target": "linux-x64",
+        "build_only_original_source_link_order_cmake_sha256": link_shim_sha,
         "old_buildbot_binary_equivalence_claimed": False,
         "physical_gameplay_tested": False,
         "complete_corresponding_source_and_runtime_dependencies_reviewed": False,
