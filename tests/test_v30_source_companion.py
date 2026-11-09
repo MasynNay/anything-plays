@@ -101,5 +101,33 @@ class SourceCompanionTests(unittest.TestCase):
                 validate_captured_sources(src)
 
 
+    def test_publisher_creates_source_draft_before_binary_release(self):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github/workflows/v30-publish-approved.yml").read_text("utf-8")
+        self.assertIn("source_run_id:", workflow)
+        self.assertIn("python -m tools.prepare_v30_source_companion", workflow)
+        self.assertIn("SOURCE_RUN_ID", workflow)
+        self.assertIn('gh release create "v$VERSION-sources"', workflow)
+        self.assertIn('gh release create "v$VERSION" public-release/*', workflow)
+        self.assertLess(
+            workflow.index('gh release create "v$VERSION-sources"'),
+            workflow.index('gh release create "v$VERSION" public-release/*'),
+        )
+        self.assertLess(
+            workflow.index('gh release edit "v$VERSION-sources" --draft=false'),
+            workflow.index('gh release edit "v$VERSION" --draft=false'),
+        )
+        self.assertIn("test \"$(find . -maxdepth 1 -type f | wc -l)\" -eq 5", workflow)
+        self.assertNotIn("\n  push:", workflow)
+
+    def test_companion_zip_byte_identical_across_distinct_output_directories(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            src = prepare_fixture(root)
+            first = prepare_source_companion(src, root / "first", "3.0.0")
+            second = prepare_source_companion(src, root / "second", "3.0.0")
+            self.assertEqual(first["sha256"], second["sha256"])
+
+
 if __name__ == "__main__":
     unittest.main()
