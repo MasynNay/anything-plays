@@ -1,0 +1,75 @@
+name: Anything Plays 3.0 | Audit verified private preview Release checksums
+
+# GitHub release uploads normalize a Debian version "~" to "." in asset
+# filenames. Update only the SHA256SUMS.txt of an existing PRIVATE draft;
+# leave every installer, source archive and older public release untouched.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/v30-audit-preview-draft-checksums.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  audit-private-draft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v3.0.0-rc.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Audit exact existing draft identity, never public or stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets|length')" = 6
+          gh release download "$RELEASE_TAG" --pattern "SHA256SUMS.txt" --dir checksum-before
+          test -s checksum-before/SHA256SUMS.txt
+          gh release download "$RELEASE_TAG" --pattern "*.deb" --dir linux-asset
+          test -s linux-asset/anything-plays-preview_3.0.0.alpha1_amd64.deb
+      - name: Normalize just GitHub's Debian asset name, verify original bytes, preserve all four hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path=Path("checksum-before/SHA256SUMS.txt")
+          original=path.read_text("ascii")
+          old="anything-plays-preview_3.0.0~alpha1_amd64.deb"
+          new="anything-plays-preview_3.0.0.alpha1_amd64.deb"
+          assert original.count(old)==1
+          assert original.count(new)==0
+          updated=original.replace(old,new)
+          rows=updated.splitlines()
+          assert len(rows)==4
+          expected={
+            "AnythingPlaysSetup-3.0.0-alpha.1.exe",
+            new,
+            "AnythingPlays-3.0.0-alpha.1-macos-arm64.dmg",
+            "AnythingPlays-3.0.0-alpha.1-macos-x64.dmg",
+          }
+          assert set(row.split("  ",1)[1] for row in rows)==expected
+          for row in rows:
+            digest,name=row.split("  ",1)
+            assert len(digest)==64 and all(c in "0123456789abcdef" for c in digest)
+          linux=Path("linux-asset")/new
+          sha=hashlib.sha256(linux.read_bytes()).hexdigest()
+          assert sha==dict((n,h) for h,n in (r.split("  ",1) for r in rows))[new]
+          Path("SHA256SUMS.txt").write_text(updated,"ascii")
+          print("Debian installer and all 4 receipt hashes are consistent with exact release filenames")
+          PY
+      - name: Correct only checksum attachment in private 3.0 Release draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber
+          gh release download "$RELEASE_TAG" --pattern "SHA256SUMS.txt" --dir verified-after
+          cmp SHA256SUMS.txt verified-after/SHA256SUMS.txt
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets|length')" = 6
