@@ -67,8 +67,8 @@ target_link_libraries(dolphin_libretro PRIVATE
                     import re
                     self.assertRegex(
                         link_command,
-                        r"-Wl,--start-group\\s+libcommon\\.a\\s+"
-                        r"libdolphin_libretro_videocontexts\\.a\\s+-Wl,--end-group",
+                        r"-Wl,--start-group\s+libcommon\.a\s+"
+                        r"libdolphin_libretro_videocontexts\.a\s+-Wl,--end-group",
                     )
                 else:
                     self.assertIn("undefined reference",built.stdout+built.stderr)
