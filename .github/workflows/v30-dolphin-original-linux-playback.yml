@@ -73,7 +73,7 @@ jobs:
           # Original source identity and all 37 Gitlinks were verified before any edit.
           python tools/patch_v30_dolphin_headless_source.py --source original-dolphin
           git -C original-dolphin diff --check
-          git -C original-dolphin diff -- Source/Core/DolphinLibretro/Main.cpp Source/Core/VideoBackends/Software/SWOGLWindow.cpp Source/Core/VideoBackends/Software/SWGfx.cpp > ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
+          git -C original-dolphin diff -- Source/Core/DolphinLibretro/Video.h Source/Core/DolphinLibretro/Main.cpp Source/Core/VideoBackends/Software/SWOGLWindow.cpp Source/Core/VideoBackends/Software/SWGfx.cpp > ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
           test -s ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff
           echo "Audited corresponding-source patch digest:"
           sha256sum ORIGINAL_DOLPHIN_HEADLESS_SOURCE_PATCH.diff

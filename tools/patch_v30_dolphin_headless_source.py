@@ -18,6 +18,22 @@ import argparse
 from pathlib import Path
 
 _FILES = {
+    "Source/Core/DolphinLibretro/Video.h": [
+        (
+            '  void ShowImage(const AbstractTexture* source_texture,\n'
+            '                 const MathUtil::Rectangle<int>& source_rc) override\n'
+            '  {\n'
+            '    SW::SWGfx::ShowImage(source_texture, source_rc);\n',
+            '  // CPU-only Libretro supplies a display surface; if this is headless,\n'
+            '  // Presenter::Present silently discards every generated GameCube frame.\n'
+            '  bool IsHeadless() const override { return false; }\n'
+            '  void ShowImage(const AbstractTexture* source_texture,\n'
+            '                 const MathUtil::Rectangle<int>& source_rc) override\n'
+            '  {\n'
+            '    // Base SW::SWGfx::ShowImage calls a nonexistent OpenGL context;\n'
+            '    // the Libretro frontend consumes these pixels through video_cb.\n',
+        ),
+    ],
     "Source/Core/DolphinLibretro/Main.cpp": [
         (
             '#include "VideoCommon/VideoConfig.h"\n',

@@ -1,7 +1,7 @@
 """Fail-closed tests for the exact pinned original Dolphin headless patch.
 
 No emulator binaries, ROMs, or source downloads are used. These tests check
-that a three-file original-source edit cannot silently become partial or
+that a four-file original-source edit cannot silently become partial or
 be applied twice to a different upstream revision.
 """
 from __future__ import annotations
@@ -41,6 +41,15 @@ class OriginalDolphinHeadlessPatchTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "anchor count=0"):
                 patch_source(root)
             self.assertEqual(snapshot, {p: (root / p).read_bytes() for p in _FILES})
+
+    def test_source_cpu_video_is_presentable_without_a_native_gl_window(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.prepare(root)
+            patch_source(root)
+            video = (root / 'Source/Core/DolphinLibretro/Video.h').read_text('utf-8')
+            self.assertIn('bool IsHeadless() const override { return false; }', video)
+            self.assertNotIn('SW::SWGfx::ShowImage(source_texture, source_rc);', video)
 
     def test_modified_upstream_anchor_fails_before_any_file_is_written(self):
         with TemporaryDirectory() as temp:

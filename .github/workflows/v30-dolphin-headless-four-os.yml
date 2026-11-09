@@ -118,6 +118,7 @@ jobs:
           python tools/patch_v30_dolphin_headless_source.py --source original-dolphin
           git -C original-dolphin diff --check
           git -C original-dolphin diff -- \
+            Source/Core/DolphinLibretro/Video.h \
             Source/Core/DolphinLibretro/Main.cpp \
             Source/Core/VideoBackends/Software/SWOGLWindow.cpp \
             Source/Core/VideoBackends/Software/SWGfx.cpp \
