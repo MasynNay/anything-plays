@@ -193,7 +193,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 "blastem": "BlastEm-COPYING.txt",
                 "mednafen_pce_fast": "PCE-COPYING.txt",
             }
-            if selected["core_set_id"] == "gpl-source-built-eight":
+            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten"):
                 # A native same-name buildbot ZIP is NOT the verified
                 # original source-built NES/Atari/NGP/WonderSwan binary.
                 for name in ("fceumm","stella2014","prosystem",
@@ -209,6 +209,33 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 if (hashlib.sha256(license_file.read_bytes()).hexdigest()
                         != row["license_notice_sha256"]):
                     raise ValueError(f"Unreviewed GPL source notice bytes: {name}")
+            if selected["core_set_id"] == "gpl-source-built-ten":
+                # mGBA MPL original license plus 11 individually pinned
+                # ParaLLEl-N64 upstream GPL/LGPL/MIT notice files must be
+                # present. The aggregate SHA binds every filename and byte
+                # digest to the independently approved immutable native lock.
+                mpl = licenses / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt"
+                if (mpl.is_symlink() or not mpl.is_file()
+                        or hashlib.sha256(mpl.read_bytes()).hexdigest()
+                        != selected["cores"]["mgba"]["license_notice_sha256"]):
+                    raise ValueError("Production mGBA original MPL notice missing/changed")
+                notice_hashes = {}
+                for number in range(1, 12):
+                    filename = f"GPL-TRIAL-N64-NOTICE-{number:02}.txt"
+                    notice = licenses / filename
+                    if (notice.is_symlink() or not notice.is_file()
+                            or not 0 < notice.stat().st_size <= 1024 * 1024):
+                        raise ValueError(f"Missing source-built N64 original notice: {filename}")
+                    notice_hashes[filename] = hashlib.sha256(notice.read_bytes()).hexdigest()
+                combined_notice_sha = hashlib.sha256(json.dumps(
+                    notice_hashes, sort_keys=True,
+                    separators=(",", ":")).encode("utf-8")).hexdigest()
+                if combined_notice_sha != selected["cores"]["parallel_n64"]["license_notice_sha256"]:
+                    raise ValueError("Source-built N64 original notices do not match approved lock")
+                for name in ("mgba", "parallel_n64"):
+                    if (selected["cores"][name]["native_sha256"]
+                            != records[name]["native_sha256"]):
+                        raise ValueError(f"Production {name} compiled binary differs from lock")
             if platform_name == "windows":
                 win_notice = licenses / "Winpthreads-COPYING.txt"
                 if win_notice.is_symlink() or not win_notice.is_file() or not win_notice.read_bytes().strip():

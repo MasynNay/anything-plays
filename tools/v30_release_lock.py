@@ -38,7 +38,9 @@ ALTERNATIVE_CORE_NAMES = frozenset(ALTERNATIVE_CORE_ORDER)
 SOURCE_BUILT_THREE = frozenset(("mednafen_supafaust", "blastem", "mednafen_pce_fast"))
 SOURCE_BUILT_FIVE = frozenset(("fceumm", "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan"))
 SOURCE_BUILT_EIGHT = SOURCE_BUILT_THREE | SOURCE_BUILT_FIVE
+SOURCE_BUILT_TEN = SOURCE_BUILT_EIGHT | frozenset(("mgba", "parallel_n64"))
 assert len(SOURCE_BUILT_EIGHT) == 8 and SOURCE_BUILT_EIGHT.issubset(ALTERNATIVE_CORE_NAMES)
+assert len(SOURCE_BUILT_TEN) == 10 and SOURCE_BUILT_TEN == ALTERNATIVE_CORE_NAMES - {"dolphin"}
 ORIGINAL_CORE_ORDER = (
     "mgba", "snes9x", "fceumm", "genesis_plus_gx", "parallel_n64",
     "dolphin", "stella2014", "prosystem", "mednafen_pce_fast",
@@ -67,7 +69,7 @@ def selected_core_set(lock):
     mode = lock.get("core_set_id", "legacy-noncommercial")
     if mode == "legacy-noncommercial":
         return CORE_NAMES
-    if mode not in ("gpl-source-built-alternative", "gpl-source-built-eight"):
+    if mode not in ("gpl-source-built-alternative", "gpl-source-built-eight", "gpl-source-built-ten"):
         raise ValueError("Unknown 3.0 release core set")
     if (lock.get("legacy_noncommercial_native_binaries_excluded") is not True
             or lock.get("source_built_alternative_binary_rights_reviewed") is not True):
@@ -76,6 +78,10 @@ def selected_core_set(lock):
         if (lock.get("eight_source_built_families_reviewed") is not True
                 or lock.get("three_unchanged_native_families_reviewed") is not True):
             raise ValueError("Eight reviewed source-built and three retained native families require real signoffs")
+    if mode == "gpl-source-built-ten":
+        if (lock.get("ten_source_built_families_reviewed") is not True
+                or lock.get("one_unchanged_dolphin_family_reviewed") is not True):
+            raise ValueError("Ten original native source families and retained Dolphin require independent review")
     return ALTERNATIVE_CORE_NAMES
 
 
@@ -88,7 +94,10 @@ def selected_source_families(lock):
     names = selected_core_set(lock)
     if names != ALTERNATIVE_CORE_NAMES:
         return frozenset()
-    return SOURCE_BUILT_EIGHT if lock.get("core_set_id")=="gpl-source-built-eight" else SOURCE_BUILT_THREE
+    mode = lock.get("core_set_id")
+    if mode == "gpl-source-built-ten":
+        return SOURCE_BUILT_TEN
+    return SOURCE_BUILT_EIGHT if mode == "gpl-source-built-eight" else SOURCE_BUILT_THREE
 
 
 def ordered_core_names_for_lock(lock):

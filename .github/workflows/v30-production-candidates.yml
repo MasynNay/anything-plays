@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       native_input_run_id:
-        description: Successful original 12-archive full offline lab (the other 8 cores and Dolphin Sys remain exact)
+        description: Successful original 12-archive offline lab (immutable Dolphin and Sys baseline; ten source-built replacements)
         required: true
         type: string
       confirmation:
@@ -61,12 +61,15 @@ jobs:
       AP_RELEASE_BUILD: '1'
       AP_V30_APPROVED_RELEASE: '1'
       AP_V30_APPROVED_EIGHT: '1'
+      AP_V30_APPROVED_TEN: '1'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/immutable-inputs
       GH_TOKEN: ${{ github.token }}
       GPL_SNES_RUN_ID: '42494297281'
       GPL_SEGA_RUN_ID: '42496671418'
       PINNED_PCE_RUN_ID: '42444367068'
       FIVE_SOURCE_RUN_ID: '42515151314'
+      MGBA_SOURCE_RUN_ID: '42527449154'
+      N64_SOURCE_RUN_ID: '42534736496'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,14 +97,14 @@ jobs:
           python - <<'PY'
           from tools.v30_release_lock import (
               load_approved_lock, selected_core_set, selected_source_families,
-              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_EIGHT)
+              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_TEN)
           lock = load_approved_lock()
           assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
               "Production must use the FULL source-built GPL alternative core set; "
               "original Snes9x/Genesis GX are not accepted for v3")
-          assert selected_source_families(lock) == SOURCE_BUILT_EIGHT, (
-              "Original NES/Atari/NGPC/WonderSwan buildbot archives cannot replace "
-              "the separately reviewed EIGHT original source-built families")
+          assert selected_source_families(lock) == SOURCE_BUILT_TEN, (
+              "Production must use ten independently source-built families; "
+              "only original Dolphin remains from the legacy archived binary")
           PY
           test -s config/v3.0-corresponding-source-inventory.json
           test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
@@ -132,7 +135,9 @@ jobs:
             "$GPL_SNES_RUN_ID|Anything Plays 3.0 | Four-platform source-built GPLv2+ SNES candidate" \
             "$GPL_SEGA_RUN_ID|Anything Plays 3.0 | Four-platform pinned GPL candidate research" \
             "$PINNED_PCE_RUN_ID|Anything Plays 3.0 | PCE pinned-source replacement research" \
-            "$FIVE_SOURCE_RUN_ID|Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)"; do
+            "$FIVE_SOURCE_RUN_ID|Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)" \
+            "$MGBA_SOURCE_RUN_ID|Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)" \
+            "$N64_SOURCE_RUN_ID|Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64"; do
             run_id="${pair%%|*}"
             expected_name="${pair#*|}"
             [[ "$(gh run view "$run_id" --json conclusion --jq .conclusion)" == success ]] || exit 1
@@ -164,6 +169,12 @@ jobs:
           gh run download "$PINNED_PCE_RUN_ID" \
             --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-${{ matrix.target }}-UNAPPROVED" \
             --dir source-built-pce
+          gh run download "$MGBA_SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PINNED-MGBA-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED" \
+            --dir source-built-mgba
+          gh run download "$N64_SOURCE_RUN_ID" \
+            --name "AnythingPlays-3.0-PARALLEL-N64-${{ matrix.target }}-SOURCE-NATIVE-UNAPPROVED" \
+            --dir source-built-n64
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
               --name "AnythingPlays-3.0-PINNED-REMAINING-$name-${{ matrix.target }}-UNAPPROVED" \
@@ -220,6 +231,8 @@ jobs:
             --prosystem-dir original-five-source/prosystem \
             --mednafen-ngp-dir original-five-source/mednafen_ngp \
             --mednafen-wswan-dir original-five-source/mednafen_wswan \
+            --mgba-dir source-built-mgba \
+            --n64-dir source-built-n64 \
             --output-dir "$AP_CORE_ARCHIVE_DIR" \
             ${WIN_DLL:+$WIN_DLL}
           # This receipt is strictly source/native provenance; it is NOT a
@@ -234,12 +247,13 @@ jobs:
           manifest = json.loads((root/RECEIPT).read_text("utf-8"))
           assert manifest["native_core_count"] == 11
           assert manifest["system_profile_count"] == 18
-          assert manifest["unchanged_original_core_count"] == 3
+          assert manifest["unchanged_original_core_count"] == 1
           assert manifest["native_approval_comes_from_separately_reviewed_lock"] is True
           assert manifest["auto_granted_license_rights"] is False
           assert set(manifest["source_built_families"]) == {
               "mednafen_supafaust","blastem","mednafen_pce_fast",
-              "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan"}
+              "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan",
+              "mgba","parallel_n64"}
           assert selected_core_set(lock) == set(lock["targets"][manifest["target"]]["cores"])
           PY
       - name: Install Windows installer compiler

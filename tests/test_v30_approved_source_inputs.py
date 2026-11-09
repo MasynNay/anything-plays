@@ -15,10 +15,14 @@ import unittest
 from unittest.mock import patch
 
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
-from tools.v30_release_lock import ALTERNATIVE_CORE_ORDER, TARGETS
+from tools.v30_release_lock import (
+    ALTERNATIVE_CORE_ORDER, TARGETS, SOURCE_BUILT_TEN, selected_source_families,
+)
 from tools.stage_v30_gpl_trial_inputs import package_native_zip
 from tools import stage_v30_approved_source_inputs as staging
-from anything_plays.v30_approved_core_map import EXPECTED, REPOSITORIES, WINDOWS_RUNTIME
+from anything_plays.v30_approved_core_map import (
+    EXPECTED, REPOSITORIES, TEN_EXPECTED, TEN_REPOSITORIES, WINDOWS_RUNTIME,
+)
 
 
 def sha(data):
@@ -164,6 +168,135 @@ def original_stub(compiled):
 
 
 class CompleteReviewedSourceInputContracts(unittest.TestCase):
+
+    def test_ten_original_source_approved_path_stages_only_dolphin_from_old_archive(self):
+        """Synthetic-only: exact ten source/library hashes, plus a true fail-closed lock."""
+        with TemporaryDirectory() as temp:
+            lock, source, fixtures = synthetic_four_platform_review(temp)
+            lock["core_set_id"] = "gpl-source-built-ten"
+            lock["ten_source_built_families_reviewed"] = True
+            lock["one_unchanged_dolphin_family_reviewed"] = True
+            self.assertEqual(selected_source_families(lock), SOURCE_BUILT_TEN)
+            with patch.dict(os.environ, {
+                "AP_RELEASE_BUILD": "1", "AP_V30_APPROVED_RELEASE": "1",
+                "AP_V30_GPL_TRIAL": "0", "AP_V30_TEST_CORES": "0",
+            }, clear=True):
+                for target, (folder, original_compiled, originals, runtime) in fixtures.items():
+                    with self.subTest(target=target):
+                        ext = staging.EXT[target]
+                        source_inputs = dict(original_compiled)
+                        for name in TEN_EXPECTED:
+                            native, notice, archive_sha = fake_source(name, target)
+                            source_inputs[name] = (native, notice, archive_sha)
+                            row = lock["targets"][target]["cores"][name]
+                            row["source_commit_sha"] = TEN_EXPECTED[name]
+                            row["upstream_source_repository"] = TEN_REPOSITORIES[name]
+                            row["native_sha256"] = sha(native)
+                            row["native_size_bytes"] = len(native)
+                            archive = package_native_zip(name, ext, native)
+                            row["original_archive_sha256"] = sha(archive)
+                            row["original_archive_size_bytes"] = len(archive)
+                            row["original_license_notice_sha256"] = sha(notice)
+                            reviewed = source["targets"][target]["cores"][name]
+                            reviewed.update(
+                                source_commit_sha=TEN_EXPECTED[name],
+                                source_repository=TEN_REPOSITORIES[name],
+                                native_sha256=sha(native),
+                                original_native_archive_sha256=sha(archive),
+                                source_archive_sha256=archive_sha,
+                            )
+                        mgba_native, _, mgba_source_sha = source_inputs["mgba"]
+                        mgba_notice = b"TEST ONLY Mozilla Public License Version 2.0"
+                        lock["targets"][target]["cores"]["mgba"]["original_license_notice_sha256"] = sha(mgba_notice)
+                        n64_native, _, n64_source_sha = source_inputs["parallel_n64"]
+                        n64_notices = {
+                            f"GPL-TRIAL-N64-NOTICE-{i:02}.txt": f"TEST ONLY source notice {i}".encode()
+                            for i in range(1, 12)
+                        }
+                        n64_notices_sha = sha(json.dumps(
+                            {name: sha(data) for name, data in sorted(n64_notices.items())},
+                            sort_keys=True, separators=(",", ":")).encode())
+                        lock["targets"][target]["cores"]["parallel_n64"]["original_license_notice_sha256"] = n64_notices_sha
+                        snes = folder / "snes"; sega = folder / "sega"
+                        snes.mkdir(); sega.mkdir()
+                        pce = folder / "pce.zip"; pce.write_bytes(b"synthetic test only")
+                        five = {}
+                        for name in ("fceumm", "stella2014", "prosystem",
+                                     "mednafen_ngp", "mednafen_wswan"):
+                            loc = folder / name
+                            loc.mkdir()
+                            five[name] = loc
+                        mgba = folder / "mgba"; mgba.mkdir()
+                        n64 = folder / "n64"; n64.mkdir()
+                        def five_stub(location, name, original_target, original_ext):
+                            binary, notice, archive_sha = source_inputs[name]
+                            return binary, notice, {
+                                "source_archive_sha256": archive_sha,
+                                "original_license_notice_copied": True,
+                            }
+                        def mgba_stub(location, original_target):
+                            return mgba_native, mgba_notice, {
+                                "source_commit": TEN_EXPECTED["mgba"],
+                                "source_repository": TEN_REPOSITORIES["mgba"],
+                                "source_archive_sha256": mgba_source_sha,
+                                "native_sha256": sha(mgba_native),
+                                "source_build_run_id": 42527449154,
+                            }
+                        def n64_stub(location, original_target):
+                            return n64_native, n64_notices, {
+                                "source_commit": TEN_EXPECTED["parallel_n64"],
+                                "source_repository": TEN_REPOSITORIES["parallel_n64"],
+                                "original_source_sha256": n64_source_sha,
+                                "native_sha256": sha(n64_native),
+                                "source_build_run_id": 42534736496,
+                            }
+                        with patch.object(staging, "_source_original_family",
+                                          side_effect=original_stub(source_inputs)), \
+                             patch.object(staging, "check_original_five_artifact",
+                                          side_effect=five_stub), \
+                             patch.object(staging, "inspect_original_mgba",
+                                          side_effect=mgba_stub), \
+                             patch.object(staging, "check_original_n64_artifact",
+                                          side_effect=n64_stub):
+                            result = staging.assemble_approved_inputs(
+                                lock=lock, inventory=source, target=target,
+                                original_dir=folder / "original",
+                                snes_dir=snes, sega_dir=sega, pce_artifact=pce,
+                                output_dir=folder / "output", five_dirs=five,
+                                mgba_dir=mgba, n64_dir=n64,
+                                windows_runtime=folder / "runtime.dll" if runtime else None,
+                            )
+                        self.assertEqual(result["unchanged_original_core_count"], 1)
+                        self.assertEqual(set(result["source_built_families"]), SOURCE_BUILT_TEN)
+                        self.assertFalse(result["auto_granted_license_rights"])
+                        built = folder / "output"
+                        self.assertEqual((built / "Dolphin.zip").read_bytes(), originals["Dolphin.zip"])
+                        for name in TEN_EXPECTED:
+                            package = built / f"{name}_libretro{ext}.zip"
+                            self.assertTrue(package.is_file())
+                            self.assertNotEqual(package.read_bytes(), originals.get(package.name))
+                        self.assertEqual(
+                            (built / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt").read_bytes(), mgba_notice)
+                        for notice_name, bytes_ in n64_notices.items():
+                            self.assertEqual((built / notice_name).read_bytes(), bytes_)
+                        for forbidden in ("snes9x", "genesis_plus_gx"):
+                            self.assertFalse((built / f"{forbidden}_libretro{ext}.zip").exists())
+
+    def test_ten_source_lock_alone_never_satisfies_actual_license_approval(self):
+        with TemporaryDirectory() as temp:
+            lock, source, fixtures = synthetic_four_platform_review(temp)
+            lock["core_set_id"] = "gpl-source-built-ten"
+            with self.assertRaises(ValueError):
+                selected_source_families(lock)
+            lock["ten_source_built_families_reviewed"] = True
+            with self.assertRaises(ValueError):
+                selected_source_families(lock)
+            lock["one_unchanged_dolphin_family_reviewed"] = True
+            self.assertEqual(selected_source_families(lock), SOURCE_BUILT_TEN)
+            # Current checked-in, real production source/license review is still false.
+            with self.assertRaises(ValueError):
+                staging.load_approved_lock()
+
     def test_current_3_0_staging_cli_will_not_claim_approval(self):
         with TemporaryDirectory() as folder:
             root = Path(folder)

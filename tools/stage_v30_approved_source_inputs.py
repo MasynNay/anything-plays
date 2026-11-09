@@ -3,9 +3,9 @@
 Unlike the developer-only GPL trial stager, this module accepts ONLY a
 separately approved, exact 44-core/four-platform source/license lock and its
 corresponding-source inventory. It will not approve anything. It independently
-verifies the original eight unchanged cores and Dolphin Sys against their
-original complete-offline research artifact, then replaces THREE core families
-with validated original source-built Supafaust, BlastEm and Beetle PCE Fast.
+verifies all original inputs and Dolphin Sys against the exact original
+full-offline archive, then replaces the reviewed core families with original
+pinned native builds. The ten-source variant retains ONLY original Dolphin.
 
 Never publish the new ZIPs or call them license-cleared based on this script
 alone: all third-party rights, source correspondence, and physical QA must be
@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
 from tools.v30_release_lock import (
     ALTERNATIVE_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
-    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_FIVE,
+    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_FIVE,
     verify_core_archive, verify_core_payload, verify_dolphin_archive,
 )
 from tools.emit_v30_production_provenance import SOURCE_FILE, validate_source_inventory
@@ -38,14 +38,18 @@ from tools.stage_v30_gpl_trial_inputs import package_native_zip
 from tools.probe_v30_gpl_core_switch import validate_original_source_artifact
 from tools.v30_pce_candidate import inspect_artifact, load_index
 from anything_plays.v30_approved_core_map import (
-    REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED, WINDOWS_RUNTIME,
+    REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED,
+    TEN_REPOSITORIES, TEN_EXPECTED, WINDOWS_RUNTIME,
 )
 from tools.stage_v30_eight_source_inputs import check_original_five_artifact
+from tools.stage_v30_nine_source_inputs import inspect_original_mgba
+from tools.stage_v30_ten_source_inputs import check_original_n64_artifact
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
 FIVE_FAMILY_SOURCE_RUN = 42515151314
 UNCHANGED_3 = frozenset(("mgba", "parallel_n64", "dolphin"))
-assert len(UNCHANGED_3) == 3
+UNCHANGED_1 = frozenset(("dolphin",))
+assert len(UNCHANGED_3) == 3 and len(UNCHANGED_1) == 1
 RECEIPT = "V30_SOURCE_BUILT_INPUTS_MATCH_REVIEWED_LOCK.json"
 # The old Snes9x / Genesis Plus GX must NOT be copied into production.
 REPLACED_ORIGINAL = frozenset(("snes9x", "genesis_plus_gx", "mednafen_pce_fast"))
@@ -146,7 +150,8 @@ def _source_original_family(root, name, target, extension):
 
 def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              snes_dir, sega_dir, pce_artifact, output_dir,
-                             windows_runtime=None, five_dirs=None):
+                             windows_runtime=None, five_dirs=None,
+                             mgba_dir=None, n64_dir=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -163,14 +168,20 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         raise ValueError("Only the reviewed source-built alternative set is supported")
     validate_source_inventory(lock, inventory)
     reviewed_map = approved_core_map_from_lock(lock, target)
-    eight = selected_source_families(lock) == SOURCE_BUILT_EIGHT
+    families = selected_source_families(lock)
+    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
+    ten = families == SOURCE_BUILT_TEN
     if eight != (five_dirs is not None):
-        raise ValueError("Eight reviewed sources require EXACT original five-family artifact inputs")
+        raise ValueError("Eight/ten reviewed sources require EXACT original five-family artifact inputs")
     if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=SOURCE_BUILT_FIVE):
         raise ValueError("Exactly five additional pinned original source builds required")
-    retained = UNCHANGED_3 if eight else UNCHANGED_8
-    expected = EIGHT_EXPECTED if eight else EXPECTED
-    repositories = EIGHT_REPOSITORIES if eight else REPOSITORIES
+    if ten != (mgba_dir is not None and n64_dir is not None):
+        raise ValueError("Ten-source production requires BOTH separately captured original mGBA and N64 artifacts")
+    if not ten and (mgba_dir is not None or n64_dir is not None):
+        raise ValueError("Unreviewed mGBA or N64 research artifacts in older production variant")
+    retained = UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
+    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
+    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
     ext = EXT[target]
     original_target = {
         "windows-x86_64": "windows-x64",
@@ -269,6 +280,55 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                 "original_license_sha256": sha(original_notice),
                 "original_owned_actions_run_id": FIVE_FAMILY_SOURCE_RUN,
             }
+    if ten:
+        # Source-native identity is authenticated by the ORIGINAL four-platform
+        # capture validators, including real original mGBA video/audio, the
+        # exact immutable Git source TAR, and N64's eleven source-tree notices.
+        for name, folder in (("mgba", mgba_dir), ("parallel_n64", n64_dir)):
+            original_target = {
+                "windows-x86_64": "windows-x64", "linux-x86_64": "linux-x64",
+                "macos-arm64": "macos-arm64", "macos-x86_64": "macos-x64",
+            }[target]
+            if name == "mgba":
+                native, notice, proof = inspect_original_mgba(folder, original_target)
+                notice_map = {"MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt": notice}
+                source_archive_sha = proof["source_archive_sha256"]
+                original_notice_sha = sha(notice)
+            else:
+                native, notice_map, proof = check_original_n64_artifact(folder, original_target)
+                source_archive_sha = proof["original_source_sha256"]
+                # Deterministic named/hashed eleven-notice aggregate; one
+                # digest in the immutable lock cannot omit a required notice.
+                original_notice_sha = sha(json.dumps(
+                    {file: sha(data) for file,data in sorted(notice_map.items())},
+                    sort_keys=True, separators=(",", ":")).encode("utf-8"))
+                if len(notice_map) != 11:
+                    raise ValueError("N64 production missing original source notices")
+            archive = package_native_zip(name, ext, native)
+            verify_core_archive(lock, _sys_platform(target), _architecture(target), name, archive)
+            verify_core_payload(lock, _sys_platform(target), _architecture(target),
+                                name, f"{name}_libretro{ext}", native)
+            if original_notice_sha != reviewed_map["cores"][name]["license_notice_sha256"]:
+                raise ValueError(f"Ten-source core {name} original notice identity differs from reviewed lock")
+            reviewed = inventory["targets"][target]["cores"][name]
+            if (reviewed.get("source_archive_sha256") != source_archive_sha
+                    or reviewed.get("source_commit_sha") != expected[name]
+                    or reviewed.get("source_repository") != repositories[name]
+                    or reviewed.get("native_sha256") != sha(native)
+                    or proof.get("source_commit") != expected[name]
+                    or proof.get("native_sha256") != sha(native)
+                    or proof.get("source_repository") != repositories[name]):
+                raise ValueError(f"Ten-source original {name} binary/source does not match independent review")
+            payload[f"{name}_libretro{ext}.zip"] = archive
+            payload.update(notice_map)
+            sources[name] = {
+                "source_revision": expected[name],
+                "source_archive_sha256": source_archive_sha,
+                "native_sha256": sha(native),
+                "original_native_archive_sha256": sha(archive),
+                "original_license_sha256": original_notice_sha,
+                "original_owned_actions_run_id": proof["source_build_run_id"],
+            }
     if target == "windows-x86_64":
         binary = _file_bytes(Path(windows_runtime).parent, Path(windows_runtime).name,
                              max_size=8 * 1024 * 1024)
@@ -323,6 +383,8 @@ def main(argv=None):
     parser.add_argument("--pce-artifact", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--windows-runtime", type=Path)
+    parser.add_argument("--mgba-dir", type=Path)
+    parser.add_argument("--n64-dir", type=Path)
     for name in sorted(SOURCE_BUILT_FIVE):
         parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
@@ -331,7 +393,8 @@ def main(argv=None):
         inventory = json.loads(SOURCE_FILE.read_text("utf-8"))
         if not (ROOT / "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md").is_file():
             raise ValueError("Independent reviewed copyright decision is missing")
-        wants_eight = selected_source_families(lock) == SOURCE_BUILT_EIGHT
+        families = selected_source_families(lock)
+        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
         five={name: getattr(args,name+"_dir") for name in SOURCE_BUILT_FIVE}
         if wants_eight and any(path is None for path in five.values()):
             raise ValueError("Independent 8-family source lock requires all 5 original artifacts")
@@ -343,6 +406,7 @@ def main(argv=None):
             sega_dir=args.sega_dir, pce_artifact=args.pce_artifact,
             output_dir=args.output_dir, windows_runtime=args.windows_runtime,
             five_dirs=five if wants_eight else None,
+            mgba_dir=args["mgba_dir"], n64_dir=args["n64_dir"],
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")
