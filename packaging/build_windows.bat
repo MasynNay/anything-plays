@@ -126,6 +126,12 @@ copy /Y docs\THIRD_PARTY_COMPONENTS.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 copy /Y licenses\*.txt dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
+if defined AP_CORE_ARCHIVE_DIR if exist "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt" (
+  for %%N in (COPYING GPL2-OR-LATER BSD3 CC0 MIT) do (
+    copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-DOLPHIN-ORIGINAL-%%N.txt" "dist\AnythingPlays\licenses\" >nul
+    if errorlevel 1 exit /b 1
+  )
+)
 if "%AP_V30_GPL_TRIAL%"=="1" (
   copy /Y "%AP_CORE_ARCHIVE_DIR%\GPL-TRIAL-Supafaust-COPYING.txt" "dist\AnythingPlays\licenses\" >nul
   if errorlevel 1 exit /b 1

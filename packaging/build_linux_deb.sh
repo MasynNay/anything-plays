@@ -92,6 +92,14 @@ cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
+# Genuine original-source Dolphin's 5 notices are required for the 11th
+# family, never inferred from the earlier retained buildbot core.
+if [[ -n "${AP_CORE_ARCHIVE_DIR:-}" && -f "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt" ]]; then
+  for notice in COPYING GPL2-OR-LATER BSD3 CC0 MIT; do
+    test -s "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-DOLPHIN-ORIGINAL-${notice}.txt"
+    cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-DOLPHIN-ORIGINAL-${notice}.txt" dist/AnythingPlays/licenses/
+  done
+fi
 if [[ "${AP_V30_GPL_TRIAL:-0}" == "1" ]]; then
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-Supafaust-COPYING.txt" dist/AnythingPlays/licenses/
   cp "${AP_CORE_ARCHIVE_DIR}/GPL-TRIAL-BlastEm-COPYING.txt" dist/AnythingPlays/licenses/
