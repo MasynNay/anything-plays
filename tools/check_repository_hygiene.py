@@ -21,7 +21,7 @@ ROOT_FILES = frozenset({
 })
 ROOT_DIRECTORIES = frozenset({
     ".github", "anything_plays", "assets", "config", "cores",
-    "docs", "licenses", "packaging", "tests", "tools",
+    "docs", "licenses", "packaging", "site", "tests", "tools",
 })
 FORBIDDEN_SUFFIXES = frozenset({
     ".deb", ".dmg", ".exe", ".msi", ".pkg", ".whl", ".zip", ".7z",
