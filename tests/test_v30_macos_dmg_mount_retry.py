@@ -48,7 +48,7 @@ class MacOSDMGAttachRetryTests(unittest.TestCase):
         return subprocess.run(["bash", "-c", harness], capture_output=True, text=True)
 
     def test_healthy_and_transient_busy_attach_both_allow_real_check(self):
-        for attempt in (1, 2, 4, 6):
+        for attempt in (1, 2, 4, 6, 7, 10):
             with self.subTest(success_at=attempt):
                 proc = self.run_fake(attempt)
                 self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -56,11 +56,11 @@ class MacOSDMGAttachRetryTests(unittest.TestCase):
                 self.assertEqual(proc.stderr.count("mount refused"), attempt - 1)
 
     def test_permanent_attach_failure_does_not_pass_verification(self):
-        proc = self.run_fake(7)
+        proc = self.run_fake(11)
         self.assertNotEqual(proc.returncode, 0)
         self.assertNotIn("VERIFICATION_ALLOWED=1", proc.stdout)
-        self.assertEqual(proc.stderr.count("mount refused"), 6)
-        self.assertIn("DMG validation BLOCKED", proc.stderr)
+        self.assertEqual(proc.stderr.count("mount refused"), 10)
+        self.assertIn("DMG validation BLOCKED", proc.stderr)\n        self.assertIn("ten attempts", proc.stderr)
 
     def test_original_verifier_and_cleanup_are_still_mandatory(self):
         source = SCRIPT.read_text("utf-8")
