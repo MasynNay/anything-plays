@@ -14,6 +14,18 @@ if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
   PACKAGE_NAME="anything-plays"
   INSTALL_ID="anything-plays"
 fi
+# A version-correct nonpublic source-built candidate for technical review.
+# This does NOT enable AP_V30_APPROVED_RELEASE or public redistribution.
+if [[ "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" != "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_TEST_CORES:-0}" == "1" && "${AP_V30_GPL_TRIAL:-0}" == "1" &&
+     "${AP_V30_TIA_TRIAL:-0}" == "1" ]] || {
+    echo "Stable-identity candidate requires exact original Tia source trial, not approved release"; exit 1;
+  }
+  VERSION="3.0.0"
+  PACKAGE_NAME="anything-plays"
+  INSTALL_ID="anything-plays"
+fi
 OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -227,7 +239,7 @@ Categories=Game;Emulator;
 DESKTOP
 # Preview installs side by side with 2.0. The stable Linux package identity
 # is selected only after exact 3.0 source/rights/real-device checks pass.
-if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" ]]; then
+if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" || "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
   mv "$PKG/opt/anything-plays-30-preview" "$PKG/opt/anything-plays"
   sed -i \
     -e 's@anything-plays-30-preview@anything-plays@g' \

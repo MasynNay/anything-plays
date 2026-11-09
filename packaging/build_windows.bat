@@ -19,6 +19,16 @@ if "%AP_V30_APPROVED_RELEASE%"=="1" (
   if errorlevel 1 exit /b 1
   set "VERSION=3.0.0"
 )
+REM Build source-verified private 3.0.0 installer IDENTITIES, not an approved
+REM release. No build can turn the source/redistribution review flags true.
+if "%AP_V30_STABLE_CANDIDATE%"=="1" (
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  if not "%AP_V30_TEST_CORES%"=="1" exit /b 1
+  if not "%AP_V30_GPL_TRIAL%"=="1" exit /b 1
+  if not "%AP_V30_TIA_TRIAL%"=="1" exit /b 1
+  set "VERSION=3.0.0"
+)
 REM Both CI preview and fully approved 3.0 builds include all 11 cores.
 REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
 set "AP_FULL_CORE_BUILD=0"
@@ -225,6 +235,8 @@ if not defined ISCC (
   exit /b 2
 )
 if "%AP_V30_APPROVED_RELEASE%"=="1" (
+  "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else if "%AP_V30_STABLE_CANDIDATE%"=="1" (
   "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
 ) else (
   "%ISCC%" /DAppVersion=%VERSION% packaging\installer.iss

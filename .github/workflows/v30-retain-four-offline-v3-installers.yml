@@ -8,6 +8,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/v30-retain-four-offline-v3-installers.yml'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
   workflow_dispatch:
 
 permissions:
@@ -791,6 +794,75 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AnythingPlays-3.0-FULL-18-CONSOLES-${{ matrix.target }}-OWNER-DOWNLOAD-UNAPPROVED
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
+      - name: Clear previous preview package files before separate real 3.0.0 build
+        shell: bash
+        run: rm -rf release
+      - name: Build authentic 3.0.0 Windows installer metadata (owner-only candidate)
+        if: matrix.target == 'windows-x64'
+        shell: cmd
+        env:
+          AP_V30_STABLE_CANDIDATE: '1'
+        run: call packaging/build_windows.bat
+      - name: Build authentic 3.0.0 Linux DEB package identity (owner-only candidate)
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        env:
+          AP_V30_STABLE_CANDIDATE: '1'
+        run: bash packaging/build_linux_deb.sh
+      - name: Build authentic 3.0.0 Mac app version and DMG (owner-only candidate)
+        if: startsWith(matrix.target, 'macos-')
+        shell: bash
+        env:
+          AP_V30_STABLE_CANDIDATE: '1'
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify real 3.0.0 installer identity, exact native cores and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            windows-x64) filename="AnythingPlaysSetup-3.0.0.exe" ;;
+            linux-x64) filename="anything-plays_3.0.0_amd64.deb" ;;
+            macos-arm64) filename="AnythingPlays-3.0.0-macos-arm64.dmg" ;;
+            macos-x64) filename="AnythingPlays-3.0.0-macos-x64.dmg" ;;
+            *) exit 1 ;;
+          esac
+          test -f "release/$filename" && test ! -L "release/$filename"
+          if [[ "$TARGET" == linux-x64 ]]; then
+            test "$(dpkg-deb -f "release/$filename" Version)" = 3.0.0
+            test "$(dpkg-deb -f "release/$filename" Package)" = anything-plays
+          elif [[ "$TARGET" == macos-* ]]; then
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' dist/AnythingPlays.app/Contents/Info.plist)" = 3.0.0
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/AnythingPlays.app/Contents/Info.plist)" = 3.0.0
+          fi
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          files=list(Path("release").iterdir())
+          assert len(files)==1 and files[0].is_file() and not files[0].is_symlink()
+          core=json.loads(Path("test-evidence/INSTALLED_GPL_ALTERNATIVE_PROVENANCE_UNAPPROVED.json").read_text("utf-8"))
+          assert core["installed_core_count"]==11 and core["console_profiles"]==18
+          assert core["all_eleven_original_source_families_verified"] is True
+          assert set(core["actual_core_sha256"])=={"mgba","mednafen_supafaust","fceumm","blastem","parallel_n64","dolphin","tia","prosystem","mednafen_pce_fast","mednafen_ngp","mednafen_wswan"}
+          binary=files[0];assert binary.stat().st_size>10_000_000
+          h=hashlib.sha256()
+          with binary.open("rb") as reader:
+            for part in iter(lambda:reader.read(1<<20),b""):
+              h.update(part)
+          receipt={"status":"UNAPPROVED-OWNER-ONLY-REAL-3.0.0-IDENTITY-CANDIDATE",
+                   "target":os.environ["TARGET"],"installer":binary.name,
+                   "sha256":h.hexdigest(),"bytes":binary.stat().st_size,
+                   "native_core_count":11,"console_profiles":18,
+                   "public_binary_distribution_approved":False,
+                   "official_stable_release":False}
+          (Path("release")/"STABLE_IDENTITY_CANDIDATE_SHA256_UNAPPROVED.json").write_text(json.dumps(receipt,indent=2)+"\n","utf-8")
+          PY
+      - name: Keep real 3.0.0 identity candidates for private final audit, never automatic publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-REAL-FOUR-OS-IDENTITY-${{ matrix.target }}-UNAPPROVED
           path: release/*
           if-no-files-found: error
           retention-days: 90
