@@ -1,4 +1,4 @@
-# 3.0 licensing compatibility — distribution decision required
+> **November 9, 2026 superseding correction:** This document's older ten-core/Stella snapshot is historical and must not be treated as the actual 3.0 release blocker. The current selected binary lineup uses all ELEVEN original source-built families, including GPL-2.0-or-later Tia (not Stella2014), and excludes Snes9x/Genesis Plus GX. See [the exact runtime/source/ELF linkage audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md), which verifies no direct ELF-to-ELF core dependency and checks real N64 build flags. Mixed GPL versions across **separately built and selected** emulator libraries do not automatically prove illegal combination; similarly, a source ZIP alone does not establish complete third-party compliance. Do not repeat historical claims as current facts.\n\n# 3.0 licensing compatibility — distribution decision required
 
 **Status:** REQUIRES REVIEW — not a clearance or legal opinion.
 
