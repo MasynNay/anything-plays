@@ -60,6 +60,16 @@ target_link_libraries(dolphin_libretro PRIVATE
                     link_command = (target/"build.ninja").read_text("utf-8")
                     self.assertIn("--start-group", link_command)
                     self.assertIn("--end-group", link_command)
+                    # A start marker in LINK_OPTIONS and an end marker before
+                    # transitive common.a is NOT sufficient (real CI failure).
+                    # Require BOTH original source archives INSIDE THE SAME
+                    # late CMake RESCAN group, in their exact cyclic order.
+                    import re
+                    self.assertRegex(
+                        link_command,
+                        r"-Wl,--start-group\\s+libcommon\\.a\\s+"
+                        r"libdolphin_libretro_videocontexts\\.a\\s+-Wl,--end-group",
+                    )
                 else:
                     self.assertIn("undefined reference",built.stdout+built.stderr)
 
