@@ -285,9 +285,12 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 raise ValueError("Wrong original pinned-source PCE GPL2 notice")
         remaining = trial_marker.get("source_built_remaining_five")
         if remaining is not None:
-            if set(remaining) != {
-                "fceumm", "stella2014", "prosystem", "mednafen_ngp", "mednafen_wswan",
-            }:
+            five = {"fceumm", "stella2014", "prosystem",
+                    "mednafen_ngp", "mednafen_wswan"}
+            if trial_marker.get("source_built_tia") is not None:
+                five.remove("stella2014")
+                five.add("tia")
+            if set(remaining) != five:
                 raise ValueError("Incomplete five original source-built GPL notices")
             for name,row in remaining.items():
                 original = licenses / f"GPL-TRIAL-{name}-ORIGINAL-COPYING.txt"
@@ -295,6 +298,15 @@ def verify_bundle(bundle, platform_name, check_native=False):
                     raise ValueError(f"Original source-built GPL notice missing: {name}")
                 if hashlib.sha256(original.read_bytes()).hexdigest()!=row["original_license_notice_sha256"]:
                     raise ValueError(f"Wrong original 3.0 GPL license notice: {name}")
+            tia = trial_marker.get("source_built_tia")
+            if tia is not None:
+                original = licenses / "GPL-TRIAL-tia-ORIGINAL-SPDX.txt"
+                if (original.is_symlink() or not original.is_file()
+                        or hashlib.sha256(original.read_bytes()).hexdigest()
+                        != tia["original_source_spdx_sha256"]):
+                    raise ValueError("Exact GPL2-or-later Tia source copyright header missing")
+                if (cores / f"stella2014_libretro{EXTENSIONS[platform_name]}").exists():
+                    raise ValueError("GPL2-only Stella binary is still inside the original Tia installer")
         mgba = trial_marker.get("source_built_mgba")
         if mgba is not None:
             original = licenses / "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt"
