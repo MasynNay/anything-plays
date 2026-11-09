@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
 from tools.v30_release_lock import (
     ALTERNATIVE_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
-    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_FIVE,
+    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_FIVE,
     verify_core_archive, verify_core_payload, verify_dolphin_archive,
 )
 from tools.emit_v30_production_provenance import SOURCE_FILE, validate_source_inventory
@@ -39,18 +39,23 @@ from tools.probe_v30_gpl_core_switch import validate_original_source_artifact
 from tools.v30_pce_candidate import inspect_artifact, load_index
 from anything_plays.v30_approved_core_map import (
     REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED,
-    TEN_REPOSITORIES, TEN_EXPECTED, WINDOWS_RUNTIME,
+    TEN_REPOSITORIES, TEN_EXPECTED, ELEVEN_REPOSITORIES, ELEVEN_EXPECTED, WINDOWS_RUNTIME,
 )
 from tools.stage_v30_eight_source_inputs import check_original_five_artifact
 from tools.stage_v30_nine_source_inputs import inspect_original_mgba
 from tools.stage_v30_ten_source_inputs import check_original_n64_artifact
 from tools.stage_v30_original_dolphin_sys import exact_original_sys_artifact
 from tools.prepare_v30_dolphin_source_sys import DOLPHIN_REV, PINNED_SYS_TREE_SHA1
+from tools.verify_v30_dolphin_original_build import verify_original_source, verify_original_library
+from tools.verify_v30_dolphin_original_macos import verify_original_macos_native
+from tools.verify_v30_dolphin_original_windows import verify_original_windows_native
+from tools.package_v30_dolphin_source_bundle import validate_parent_archive
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
 FIVE_FAMILY_SOURCE_RUN = 42515151314
 UNCHANGED_3 = frozenset(("mgba", "parallel_n64", "dolphin"))
 UNCHANGED_1 = frozenset(("dolphin",))
+UNCHANGED_0 = frozenset()
 assert len(UNCHANGED_3) == 3 and len(UNCHANGED_1) == 1
 RECEIPT = "V30_SOURCE_BUILT_INPUTS_MATCH_REVIEWED_LOCK.json"
 # The old Snes9x / Genesis Plus GX must NOT be copied into production.
@@ -153,7 +158,9 @@ def _source_original_family(root, name, target, extension):
 def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              snes_dir, sega_dir, pce_artifact, output_dir,
                              windows_runtime=None, five_dirs=None,
-                             mgba_dir=None, n64_dir=None, dolphin_sys_dir=None):
+                             mgba_dir=None, n64_dir=None, dolphin_sys_dir=None,
+                             dolphin_source_dir=None, dolphin_native=None,
+                             dolphin_build_report=None, dolphin_parent_archive=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -171,8 +178,9 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
     validate_source_inventory(lock, inventory)
     reviewed_map = approved_core_map_from_lock(lock, target)
     families = selected_source_families(lock)
-    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
-    ten = families == SOURCE_BUILT_TEN
+    eleven = families == SOURCE_BUILT_ELEVEN
+    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
+    ten = families in (SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
     if eight != (five_dirs is not None):
         raise ValueError("Eight/ten reviewed sources require EXACT original five-family artifact inputs")
     if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=SOURCE_BUILT_FIVE):
@@ -183,9 +191,14 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         raise ValueError("Unreviewed mGBA or N64 research artifacts in older production variant")
     if ten != (dolphin_sys_dir is not None):
         raise ValueError("Ten-source production must use exact original-source Dolphin Sys artifact")
-    retained = UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
-    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    dolphin_inputs = (dolphin_source_dir, dolphin_native, dolphin_build_report, dolphin_parent_archive)
+    if eleven != all(item is not None for item in dolphin_inputs):
+        raise ValueError("Eleven-source production requires ALL exact pinned Dolphin source/native/build/parent archive inputs")
+    if not eleven and any(item is not None for item in dolphin_inputs):
+        raise ValueError("Unreviewed original Dolphin native inputs in ten-source release")
+    retained = UNCHANGED_0 if eleven else UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
+    expected = ELEVEN_EXPECTED if eleven else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
+    repositories = ELEVEN_REPOSITORIES if eleven else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
     ext = EXT[target]
     original_target = {
         "windows-x86_64": "windows-x64",
