@@ -46,7 +46,9 @@ permissions:
 
 concurrency:
   group: v30-eleven-original-offline-${{ github.ref }}
-  cancel-in-progress: true
+  # Original Dolphin native builds take many minutes. A later review commit
+  # must not kill all four already-verified source builds before aggregate CI.
+  cancel-in-progress: false
 
 jobs:
   complete-offline-18-profile-11-core-lab:
@@ -124,21 +126,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run download "$OLD_INPUT_RUN_ID" --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" --dir original-native-inputs
-          gh run download "$GPL_SNES_RUN_ID" --name "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" --dir source-built-snes
-          gh run download "$GPL_SEGA_RUN_ID" --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" --dir source-built-sega
-          gh run download "$PINNED_PCE_RUN_ID" --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" --dir source-built-pce
-          gh run download "$MGBA_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-mgba
-          gh run download "$N64_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-n64
-          gh run download "$SOURCE_SYS_RUN_ID" --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" --dir original-source-sys
+          # A failed artifact request must never leave partial files for validation.
+          verified_download() {
+            local run="$1" artifact="$2" destination="$3" attempt scratch
+            if [[ -e "$destination" || -L "$destination" ]]; then
+              echo "::error::Artifact destination already exists: $destination"
+              return 1
+            fi
+            mkdir -p "$(dirname "$destination")"
+            for attempt in 1 2 3 4; do
+              scratch="$destination.try-$attempt"
+              if [[ -e "$scratch" || -L "$scratch" ]]; then
+                echo "::error::Unexpected temporary artifact path: $scratch"
+                return 1
+              fi
+              if gh run download "$run" --name "$artifact" --dir "$scratch"; then
+                mv "$scratch" "$destination"
+                return 0
+              fi
+              rm -rf -- "$scratch"
+              if [[ "$attempt" -lt 4 ]]; then
+                echo "::warning::Artifact API failure: $artifact attempt $attempt/4; retrying"
+                sleep "$((attempt * 3))"
+              fi
+            done
+            echo "::error::Unable to fetch immutable native input: $artifact"
+            return 1
+          }
+          verified_download "$OLD_INPUT_RUN_ID" "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" "original-native-inputs"
+          verified_download "$GPL_SNES_RUN_ID" "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" "source-built-snes"
+          verified_download "$GPL_SEGA_RUN_ID" "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" "source-built-sega"
+          verified_download "$PINNED_PCE_RUN_ID" "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" "source-built-pce"
+          verified_download "$MGBA_SOURCE_RUN_ID" "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" "source-built-mgba"
+          verified_download "$N64_SOURCE_RUN_ID" "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" "source-built-n64"
+          verified_download "$SOURCE_SYS_RUN_ID" "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" "original-source-sys"
           # Windows Python normalizes artifact checksum lines to CRLF; GNU sha256sum
           # otherwise mistakes the carriage return for part of each filename.
           # Normalize line endings for the checker, never the archived file hashes.
           (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
-            gh run download "$FIVE_SOURCE_RUN_ID" \
-              --name "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
-              --dir "source-built-five/$name"
+            verified_download "$FIVE_SOURCE_RUN_ID" \
+              "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
+              "source-built-five/$name"
           done
           python - <<'PY'
           from pathlib import Path
@@ -696,3 +725,52 @@ jobs:
             test-evidence/*.json
           if-no-files-found: warn
           retention-days: 30
+
+  consolidate-44-platform-native-source-evidence:
+    # Runs ONLY if all four real original-source installed emulator checks pass.
+    # This is a complete machine-readable source-review packet, NOT a license
+    # clearance or a downloadable public installer.
+    needs: complete-offline-18-profile-11-core-lab
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify fail-closed four-platform source-evidence assembler
+        run: python -m unittest discover -s tests -p 'test_v30_four_platform_source_evidence.py' -v
+      - name: Retrieve only this run's four real installed 11-source evidence sets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: AnythingPlays-3.0-ELEVEN-SOURCE-CORE-INSTALLED-*-UNAPPROVED
+          path: four-platform-evidence
+          merge-multiple: false
+      - name: Consolidate exact 44 installed native digests with original source commits
+        env:
+          VERIFIED_RUN_ID: ${{ github.run_id }}
+        run: |
+          python -m tools.compile_v30_four_platform_source_evidence \
+            --artifacts-dir four-platform-evidence \
+            --run-id "$VERIFIED_RUN_ID" \
+            --output test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json")
+          r=json.loads(p.read_text("utf-8"))
+          assert r["total_platform_native_sha256"]==44
+          assert r["corresponding_source_inventory_verified"] is False
+          assert r["license_compatibility_reviewed"] is False
+          assert r["public_binary_distribution_approved"] is False
+          print("4 OS, 44 original-source native SHA identities; no rights claimed.")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-FOUR-PLATFORM-44-ORIGINAL-SOURCE-REVIEW-UNAPPROVED
+          path: test-evidence/FOUR_PLATFORM_44_NATIVE_SOURCE_CANDIDATE_UNAPPROVED.json
+          if-no-files-found: error
+          retention-days: 90
