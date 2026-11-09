@@ -93,7 +93,7 @@ Repository hygiene is a **release deliverable**, not an invitation to delete his
 - [ ] Perform a final editorial pass on `README.md`, `ROADMAP.md`, screenshots, support and install instructions, release notes, changelog and GitHub Pages showcase.
 - [ ] Confirm stable 3.0 is the actual public release with four valid installer links and matching published checksums; clean up stale drafts without deleting old releases.
 
-Current pre-release inventory (November 8, 2026): **111 branches, seven open issues and no open pull requests following PR #102**. This is an audit baseline, **not** a claim that stable 3.0 has shipped or that cleanup has been carried out.
+Historical pre-release inventory (November 8, 2026, immediately after PR #102): **111 branches, seven open issues and no open pull requests at that checkpoint**. This is a dated audit baseline, **not a current live count**. As of November 9, original-source Dolphin Linux research [PR #105](https://github.com/MasynNay/anything-plays/pull/105) and production Sys lock regression [PR #111](https://github.com/MasynNay/anything-plays/pull/111) are open; four-platform original-source-backed Sys installer [run 42555031999](https://github.com/MasynNay/anything-plays/actions/runs/42555031999) passed, but public stable 3.0 remains blocked on full native source/rights acceptance. Stable 2.0 remains preserved.
 
 ## Ideas for after 3.0 — proposals, not commitments
 
