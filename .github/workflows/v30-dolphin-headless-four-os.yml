@@ -5,6 +5,11 @@ name: Anything Plays 3.0 | Corrected source-built Dolphin on four operating syst
 # on every requested desktop target. It deliberately does not distribute the
 # source-unapproved native libraries or publish a GitHub release.
 on:
+  push:
+    branches: [test/v30-original-dolphin-linux-playback]
+    paths:
+      - '.github/workflows/v30-dolphin-headless-four-os.yml'
+      - 'tools/patch_v30_dolphin_headless_source.py'
   pull_request:
     branches: [feature/v3.0-unified-test]
     paths:
