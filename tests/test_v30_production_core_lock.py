@@ -142,6 +142,69 @@ class V30ProductionCoreLockTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "incomplete source/license"):
                 load_approved_lock(file)
 
+    def test_ten_source_release_rejects_unpinned_dolphin_sys_on_each_platform(self):
+        """A synthetic rights approval cannot authorize an unrelated Sys tree.
+
+        This tests the production lock's original Git source identity check,
+        not a real-world license approval. The checked-in lock stays false.
+        """
+        from tools.prepare_v30_dolphin_source_sys import (
+            DOLPHIN_REV, PINNED_SYS_TREE_SHA1,
+        )
+        from tools.v30_release_lock import ALTERNATIVE_CORE_ORDER
+        fixture = eligible_synthetic_lock()
+        fixture.update(
+            core_set_id="gpl-source-built-ten",
+            legacy_noncommercial_native_binaries_excluded=True,
+            source_built_alternative_binary_rights_reviewed=True,
+            ten_source_built_families_reviewed=True,
+            one_unchanged_dolphin_family_reviewed=True,
+        )
+        for target, row in fixture["targets"].items():
+            old = row["cores"]
+            row["cores"] = {
+                name: old.get(name, {
+                    **old["mgba"],
+                    "file": name + "_libretro" +
+                    (".dll" if target.startswith("windows") else
+                     ".so" if target.startswith("linux") else ".dylib"),
+                })
+                for name in ALTERNATIVE_CORE_ORDER
+            }
+            row["dolphin_sys"].update(
+                original_upstream_source_commit=DOLPHIN_REV,
+                original_git_data_sys_tree_sha1=PINNED_SYS_TREE_SHA1,
+            )
+
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / "synthetic-lock.json"
+
+            def verify():
+                path.write_text(json.dumps(fixture), encoding="utf-8")
+                return load_approved_lock(path)
+
+            self.assertEqual(len(verify()["targets"]), 4)
+            for target in sorted(TARGETS):
+                row = fixture["targets"][target]["dolphin_sys"]
+                for field, bad in (
+                    ("original_upstream_source_commit", "a" * 40),
+                    ("original_git_data_sys_tree_sha1", "b" * 40),
+                    ("original_upstream_source_commit", None),
+                    ("original_git_data_sys_tree_sha1", None),
+                ):
+                    with self.subTest(target=target, field=field, bad=bad):
+                        saved = row.get(field)
+                        if bad is None:
+                            row.pop(field, None)
+                        else:
+                            row[field] = bad
+                        with self.assertRaisesRegex(
+                            ValueError, "original Dolphin Git Sys source identity"
+                        ):
+                            verify()
+                        row[field] = saved
+                self.assertEqual(len(verify()["targets"]), 4)
+
     def test_bundle_manifest_must_match_all_native_bytes(self):
         lock = eligible_synthetic_lock()
         root = lock["targets"]["linux-x86_64"]
