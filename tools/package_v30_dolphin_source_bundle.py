@@ -145,7 +145,7 @@ def collect(*, shards, nested, review, parent, output,
             or recent.get("source_candidates_captured") != 3
             or recent.get("pinned_nested_gitlink_count") != 3
             or recent.get("pinned_nested_gitlink_tree_closure_verified") is not True
-            or recent.get("original_34_source_review_manifest_sha256") != old_digest
+            or recent.get("original_34_review_manifest_sha256") != old_digest
             or not isinstance(recent.get("archives"), dict)
             or len(recent["archives"]) != 3):
         raise ValueError("Nested archive evidence does not match original source review")
