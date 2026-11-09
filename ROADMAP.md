@@ -2,10 +2,10 @@
 
 **If it moves, it plays.** Anything Plays turns camera-detected motion into local video-game controls. This roadmap describes shipped work, the **active 3.0 development preview**, and the evidence required before the next public release.
 
-**Last reviewed:** November 7, 2026  
+**Last reviewed:** November 9, 2026  
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
-**Current focus:** Finish adjustable preview-label polish, Windows/Linux acceptance, third-party licensing, and GameCube long-session performance  
+**Current focus:** Complete exact 44-native source review evidence, third-party GPL compatibility and source obligations, and final four-platform release acceptance  
 **Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
 
 > **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
@@ -39,6 +39,14 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 - **Ten genuinely original source-built core families:** [the full offline desktop installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed on all four targets: Windows x64, Linux x64, macOS Apple Silicon and Intel. [PR #102](https://github.com/MasynNay/anything-plays/pull/102) is merged. All 18 profiles and 11 native core slots remain present. The original Dolphin buildbot binary is now the only native family in this experimental lineup not independently rebuilt from the exact pinned source.
 - **Release-mode engineering caught up with the tested app:** [PR #103](https://github.com/MasynNay/anything-plays/pull/103) merged the ten-original-source native production package path, rather than continuing to use eight source-built cores plus old unverified mGBA/N64 buildbot files. Original mGBA MPL and all 11 pinned N64 source notices are required and independently checked by installed-package verification. The [source, Python 3.12/3.13, native compatibility gate](https://github.com/MasynNay/anything-plays/actions/runs/42540053797) passed; the [four-platform installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42540053912) passed **4/4**; and the [full ten-original-source installed desktop integration](https://github.com/MasynNay/anything-plays/actions/runs/42540053758) passed **4/4** (Windows, Linux, Mac ARM and Mac Intel). This is a **verified technical milestone**, not yet a public binary redistribution approval.
 - **The remaining 3.0 publication blocker is not an N64 or Dolphin gameplay defect:** exact combined GPL license compatibility, independently verified corresponding sources for the *distributed* native libraries and their dependencies (including Dolphin), immutable approved production artifacts and final production-identity acceptance are still unresolved. Successful real gameplay is recorded, not ignored. No stable 3.0 installer has been published yet.
+
+## November 9, 2026 — exact source-built Dolphin and evidence integrity
+
+- **All eleven original native families have been compiled from pinned upstream source in the experimental offline 3.0 candidate**, replacing the last historical Dolphin buildbot binary. The original Dolphin source includes its parent and 37 pinned submodule Gitlinks. The earlier ten-family milestone remains part of the history, not the final state of the active test candidate.
+- **Source-built Dolphin GPU playback passed on Linux** with real homebrew video, audio samples and controller polling in [run 42566459865](https://github.com/MasynNay/anything-plays/actions/runs/42566459865). The older CPU-only zero-frame probe did not exercise the production accelerated renderer. This does not establish retail-game compatibility or physical-device QA on every OS.
+- **Eleven-family full offline installer test:** [run 42577510631](https://github.com/MasynNay/anything-plays/actions/runs/42577510631) had Windows x64, Linux x64 and Mac ARM **passed** while Mac Intel was still compiling at this checkpoint. The earlier complete four-platform ten-family candidate had already passed; do not conflate the two test sets.
+- **Source evidence improvement:** [PR #122](https://github.com/MasynNay/anything-plays/pull/122) adds a post-matrix reviewer artifact for 44 installed native hashes and exact upstream source identities. Additional regression tests now reject fabricated Dolphin license-notice dictionaries, invalid source paths or digests and falsely asserted approval. The PR is **pending new CI**; the review artifact is not a legal determination or a distributable binary.
+- **Public release remains v2.0.0.** Third-party GPL compatibility, exact corresponding-source distribution obligations, immutable release-mode native inputs and final production acceptance remain unresolved. No permissions or legal QA booleans are inferred from compilation or installed homebrew playback.
 
 ## Delivered milestones
 
