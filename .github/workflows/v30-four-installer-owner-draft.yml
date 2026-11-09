@@ -1,0 +1,142 @@
+name: Anything Plays 3.0 | Stage four verified installers in private Release draft
+
+# Automatically stages the ACTUAL previously successful 4OS source-built
+# installers into a private GitHub release draft visible to repo maintainers.
+# Draft only: neither stable 3.0.0 nor third-party rights are approved here.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/v30-four-installer-owner-draft.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-3.0-owner-release-draft
+  cancel-in-progress: false
+
+jobs:
+  verified-private-release-draft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_RUN_ID: '42686588072'
+      PREVIEW_SHA: c78c0b3805557af909707d53819fa7f261347077
+      SOURCE_RUN_ID: '42668367694'
+      DRAFT_TAG: v3.0.0-rc.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require genuine passed four-platform original-source installer run
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$PREVIEW_RUN_ID" --json conclusion --jq '.conclusion')" = success
+          test "$(gh run view "$PREVIEW_RUN_ID" --json headSha --jq '.headSha')" = "$PREVIEW_SHA"
+          test "$(gh run view "$PREVIEW_RUN_ID" --json name --jq '.name')" = "Anything Plays 3.0 | Retain four actual tested full offline installers"
+          test "$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')" = success
+          test "$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')" = "Anything Plays 3.0 | Preserve all 11 original sources with GPL2+ Tia"
+          if gh release view "$DRAFT_TAG" >/dev/null 2>&1; then
+            echo "::notice::Existing draft or release found; do not overwrite"
+            exit 1
+          fi
+      - name: Download actual Windows Linux Apple Silicon and Intel installer files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in windows-x64 linux-x64 macos-arm64 macos-x64; do
+            name="AnythingPlays-3.0-FULL-18-CONSOLES-$target-OWNER-DOWNLOAD-UNAPPROVED"
+            for n in 1 2 3 4; do
+              if gh run download "$PREVIEW_RUN_ID" --name "$name" --dir "downloaded/$target"; then break; fi
+              rm -rf -- "downloaded/$target"
+              if [[ "$n" == 4 ]]; then exit 1; fi
+              sleep "$((n * 3))"
+            done
+          done
+      - name: Audit four original SHA256 receipts and isolate exact preview assets
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib,shutil
+          rows={
+            "windows-x64":("AnythingPlaysSetup-3.0.0-alpha.1.exe","AnythingPlaysSetup-3.0.0-alpha.1.exe"),
+            "linux-x64":("anything-plays-preview_3.0.0~alpha1_amd64.deb","anything-plays-preview_3.0.0~alpha1_amd64.deb"),
+            "macos-arm64":("AnythingPlays-3.0.0-alpha.1.dmg","AnythingPlays-3.0.0-alpha.1-macos-arm64.dmg"),
+            "macos-x64":("AnythingPlays-3.0.0-alpha.1.dmg","AnythingPlays-3.0.0-alpha.1-macos-x64.dmg"),
+          }
+          out=Path("verified-release-draft");out.mkdir()
+          sums=[]
+          for target,(original,publish) in rows.items():
+            root=Path("downloaded")/target
+            files=list(root.iterdir())
+            assert sorted(x.name for x in files)==sorted((original,"ORIGINAL_3_0_PREVIEW_INSTALLER_RECEIPT.json"))
+            assert all(x.is_file() and not x.is_symlink() for x in files)
+            receipt=json.loads((root/"ORIGINAL_3_0_PREVIEW_INSTALLER_RECEIPT.json").read_text())
+            assert receipt["status"]=="OWNER-DOWNLOAD-ONLY-UNAPPROVED-3.0-SOURCE-BUILT-PREVIEW"
+            assert receipt["target"]==target
+            assert receipt["original_emulator_core_count"]==11
+            assert receipt["offline_console_profiles"]==18
+            assert receipt["public_binary_distribution_approved"] is False
+            assert receipt["official_stable_release"] is False
+            item=root/original
+            assert item.stat().st_size==receipt["installer_bytes"] and item.stat().st_size>10*1024*1024
+            h=hashlib.sha256()
+            with item.open("rb") as f:
+              for buf in iter(lambda:f.read(1024*1024),b""):h.update(buf)
+            assert h.hexdigest()==receipt["installer_sha256"]
+            shutil.copyfile(item,out/publish)
+            sums.append(f"{h.hexdigest()}  {publish}")
+          (out/"SHA256SUMS.txt").write_text("\n".join(sorted(sums))+"\n","ascii")
+          assert len(list(out.iterdir()))==5
+          PY
+          (cd verified-release-draft && sha256sum --check SHA256SUMS.txt)
+      - name: Download original corresponding source before any private executable staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$SOURCE_RUN_ID" --name "AnythingPlays-3.0.0-ELEVEN-TIA-ORIGINAL-CORE-SOURCES-UNAPPROVED" --dir original-emulator-sources
+          python -m tools.prepare_v30_source_companion \
+            --input original-emulator-sources --output original-source-package --version 3.0.0
+          (cd original-source-package && sha256sum --check SHA256SUMS.txt)
+      - name: Prepare unambiguous private draft notes and preserved source references
+        shell: bash
+        run: |
+          cat > private-draft-notes.md <<'NOTES'
+          ## Anything Plays 3.0.0 full offline preview — private review draft
+
+          **Not the public or approved stable v3.0.0 release.**
+          All four original-source-built 18-console offline preview installers
+          passed GitHub Actions native video/audio, frozen Tk window startup,
+          11 bundled native SHA256 core identity and seven sequential
+          emulator restart checks. Files retain their original preview names.
+
+          This Release is intentionally a DRAFT visible to repository maintainers
+          while third-party license/corresponding-source and real-device
+          retail-game, camera/save/long-run acceptance remain incomplete.
+          Public redistribution is not approved by this draft process.
+          Eleven upstream original source trees, including all 37 Dolphin
+          Gitlinks and GPL2-or-later Tia, are bundled as a source companion.
+          No ROMs or proprietary BIOS content included. Retain the stable
+          2.0.0 release unchanged.
+          NOTES
+      - name: Create private GitHub Release draft with four actual installers and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find verified-release-draft -maxdepth 1 -type f | wc -l)" -eq 5
+          test -s original-source-package/AnythingPlays-3.0.0-Original-Emulator-Sources.zip
+          gh release create "$DRAFT_TAG" \
+            verified-release-draft/* \
+            original-source-package/AnythingPlays-3.0.0-Original-Emulator-Sources.zip \
+            --target "$PREVIEW_SHA" \
+            --title "Anything Plays 3.0 RC1 | Four offline installers (review draft)" \
+            --notes-file private-draft-notes.md \
+            --draft --prerelease
+          gh release view "$DRAFT_TAG" --json isDraft,assets \
+            --jq '.isDraft==true and (.assets|length)==6' | grep -qx true
