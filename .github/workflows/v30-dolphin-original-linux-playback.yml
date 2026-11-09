@@ -1,0 +1,133 @@
+name: Anything Plays 3.0 | Original Dolphin runtime playback (Linux)
+
+# True native gameplay acceptance research for the newly SOURCE-built Dolphin
+# library. Never uploads the Libretro binary or a public release asset.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-original-linux-playback.yml'
+      - 'tools/probe_gamecube_homebrew.py'
+      - 'tools/gamecube_homebrew_fixture.py'
+      - 'anything_plays/gamecube_sys.py'
+      - 'anything_plays/gamecube_software.py'
+      - 'tools/v30_dolphin_original_link_order.cmake'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: original-dolphin-linux-playback-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-built-dolphin-homebrew:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    env:
+      PINNED_DOLPHIN_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install original-source compiler and headless app test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config \
+            libudev-dev libevdev-dev libasound2-dev libpulse-dev \
+            libgl-dev libegl1-mesa-dev libx11-dev libxi-dev \
+            libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev \
+            xvfb xauth libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Check out the pinned unmodified Dolphin and all its original Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin checkout --detach "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          p=verify_original_source(Path("original-dolphin"))
+          assert p["direct_gitlinks_verified"]==34 and p["nested_gitlinks_verified"]==3
+          print("All 37 frozen original Dolphin gitlinks checked")
+          PY
+      - name: Compile the real source-built Dolphin Libretro ELF without upstream code modification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
+            -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="${GITHUB_WORKSPACE}/tools/v30_dolphin_original_link_order.cmake"
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+          python -m tools.verify_v30_dolphin_original_build \
+            --source original-dolphin \
+            --native original-dolphin-build/dolphin_libretro.so \
+            --output ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json
+      - name: Stage ONLY ephemeral local-source Dolphin core plus exact original Sys into app layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cores/dolphin-emu/Sys test-evidence
+          cp original-dolphin-build/dolphin_libretro.so cores/dolphin_libretro.so
+          cp -a original-dolphin/Data/Sys/. cores/dolphin-emu/Sys/
+          test -s cores/dolphin-emu/Sys/codehandler.bin
+          python - <<'PY'
+          from pathlib import Path
+          from anything_plays.gamecube_software import packaged_dolphin_system_directory
+          c=Path("cores/dolphin_libretro.so")
+          assert packaged_dolphin_system_directory(c).resolve()==c.resolve().parent
+          print("In-app Dolphin Sys is taken from same pinned original compiled source; no external Dolphin")
+          PY
+      - name: Boot genuine licensed GameCube homebrew with NEW original-source native
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. PYTHONUNBUFFERED=1 xvfb-run -a \
+            python -X faulthandler tools/probe_gamecube_homebrew.py \
+            --core cores/dolphin_libretro.so \
+            --seconds 25 \
+            --exercise-controls \
+            --cpu-core 5 \
+            --report test-evidence/original-source-dolphin-gamecube-homebrew.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("test-evidence/original-source-dolphin-gamecube-homebrew.json").read_text("utf-8"))
+          details=report.get("details") or {}
+          assert report["probe_passed"] is True
+          assert details.get("playback_probe_passed") is True
+          assert details.get("real_game_loaded") is True
+          assert details.get("video_callback_frames",0)>=3
+          assert details.get("nonblank_sampled_frames",0)>=1
+          assert details.get("static_homebrew_interactive_passed") is True, "GameCube input and changing real frames not independently proven"
+          print("REAL source-built Dolphin homebrew video, controller and minimum FPS passed")
+          PY
+      - name: Preserve only native SHA source and playable-homebrew QA JSON, not emulator binary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-DOLPHIN-SOURCE-BUILT-LINUX-PLAYBACK-REPORT-UNAPPROVED
+          path: |
+            ORIGINAL_DOLPHIN_SOURCE_BUILD_PLAYBACK_CANDIDATE_UNAPPROVED.json
+            test-evidence/original-source-dolphin-gamecube-homebrew.json
+            test-evidence/gamecube-homebrew-frame.png
+          if-no-files-found: warn
+          retention-days: 30
