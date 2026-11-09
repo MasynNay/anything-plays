@@ -1,0 +1,223 @@
+name: Anything Plays 3.0 | Corrected source-built Dolphin on four operating systems
+
+# This verifies that the SAME reviewed CPU-Libretro source correction builds
+# from the SAME original pinned Dolphin and all 37 immutable source Gitlinks
+# on every requested desktop target. It deliberately does not distribute the
+# source-unapproved native libraries or publish a GitHub release.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-headless-four-os.yml'
+      - 'tools/patch_v30_dolphin_headless_source.py'
+      - 'tools/v30_dolphin_original_link_order.cmake'
+      - 'tools/verify_v30_dolphin_original_build.py'
+      - 'tools/verify_v30_dolphin_original_windows.py'
+      - 'tools/verify_v30_dolphin_original_macos.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-original-dolphin-four-os-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  source-built-headless-dolphin:
+    name: Corrected Dolphin native | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: linux-x86_64
+            cpu: x86_64
+            extension: so
+          - runner: windows-2025
+            target: windows-x86_64
+            cpu: x86_64
+            extension: dll
+          - runner: macos-15
+            target: macos-arm64
+            cpu: arm64
+            extension: dylib
+          - runner: macos-15-intel
+            target: macos-x86_64
+            cpu: x86_64
+            extension: dylib
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 130
+    env:
+      AP_TARGET: ${{ matrix.target }}
+      AP_CPU: ${{ matrix.cpu }}
+      AP_CORE_EXTENSION: ${{ matrix.extension }}
+      PINNED_DOLPHIN_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+      AP_RELEASE_BUILD: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native Linux source compilation dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config \
+            libudev-dev libevdev-dev libasound2-dev libpulse-dev \
+            libgl-dev libegl1-mesa-dev libx11-dev libxi-dev \
+            libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev
+      - name: Install native macOS source compilation dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ninja cmake pkg-config
+      - name: Verify exact Visual Studio 2026 native toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vsroot = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -property installationPath
+          if ($LASTEXITCODE -ne 0 -or !$vsroot -or $vsroot -notmatch '\\18\\') {
+            throw 'Pinned Dolphin needs Visual Studio 18 / 2026'
+          }
+          if (-not ((cmake --help) -join [Environment]::NewLine -match 'Visual Studio 18 2026')) {
+            throw 'CMake 2026 VS generator not installed'
+          }
+      - name: Checkout exact original Dolphin parent plus all 37 Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin checkout --detach "$PINNED_DOLPHIN_SHA"
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          p=verify_original_source(Path('original-dolphin'))
+          assert p['direct_gitlinks_verified']==34 and p['nested_gitlinks_verified']==3
+          print('Reviewed exact source graph: 34 direct and 3 nested child Gitlinks')
+          PY
+      - name: Apply exact anchored software renderer patch and retain GNU diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/patch_v30_dolphin_headless_source.py --source original-dolphin
+          git -C original-dolphin diff --check
+          git -C original-dolphin diff -- \
+            Source/Core/DolphinLibretro/Main.cpp \
+            Source/Core/VideoBackends/Software/SWOGLWindow.cpp \
+            Source/Core/VideoBackends/Software/SWGfx.cpp \
+            > REVIEWED_DOLPHIN_HEADLESS_CORRESPONDING_SOURCE.patch
+          test -s REVIEWED_DOLPHIN_HEADLESS_CORRESPONDING_SOURCE.patch
+          sha256sum REVIEWED_DOLPHIN_HEADLESS_CORRESPONDING_SOURCE.patch
+      - name: Compile original pinned plus fixed software renderer ELF
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DCMAKE_CXX_FLAGS="-g1 -DDEBUGFAST" \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
+            -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="$GITHUB_WORKSPACE/tools/v30_dolphin_original_link_order.cmake"
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+      - name: Compile original pinned plus fixed software renderer Mach-O
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$AP_CPU" \
+            -DLIBRETRO=ON -DENABLE_QT=OFF -DCMAKE_CXX_FLAGS="-g1 -DDEBUGFAST" \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 3
+      - name: Compile original pinned plus fixed software renderer Windows DLL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $configure=@(
+            '-S', 'original-dolphin', '-B', 'original-dolphin-build',
+            '-G', 'Visual Studio 18 2026', '-A', 'x64',
+            '-DCMAKE_BUILD_TYPE=Release', '-DLIBRETRO=ON', '-DENABLE_QT=OFF',
+            '-DCMAKE_CXX_FLAGS=/DDEBUGFAST',
+            '-DENABLE_TESTS=OFF', '-DENABLE_LTO=OFF', '-DENABLE_VULKAN=OFF',
+            '-DENABLE_CCACHE=OFF', '-DENABLE_ANALYTICS=OFF',
+            '-DUSE_RETRO_ACHIEVEMENTS=OFF', '-DUSE_SYSTEM_LIBS=OFF',
+            '-DUSE_MGBA=ON', '-DENABLE_AUTOUPDATE=OFF', '-DENABLE_CLI_TOOL=OFF'
+          )
+          & cmake @configure
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Dolphin CMake configuration failed' }
+          cmake --build original-dolphin-build --target dolphin_libretro --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Dolphin native compile failed' }
+      - name: Inspect authentic platform-native image and write unapproved source record
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,shutil
+          from tools.verify_v30_dolphin_original_build import REV,verify_original_library
+          from tools.verify_v30_dolphin_original_macos import verify_original_macos_native
+          from tools.verify_v30_dolphin_original_windows import verify_original_windows_native
+          target=os.environ['AP_TARGET']
+          ext=os.environ['AP_CORE_EXTENSION']
+          files=list(Path('original-dolphin-build').rglob('dolphin_libretro.'+ext))
+          if len(files)!=1:
+              raise RuntimeError(f'Expected exactly one Dolphin {target} native; got {files}')
+          Path('native-check').mkdir()
+          native=Path('native-check')/files[0].name
+          shutil.copyfile(files[0],native)
+          if target.startswith('macos-'):
+              proof=verify_original_macos_native(native,target)
+          elif target.startswith('windows-'):
+              proof=verify_original_windows_native(native)
+          else:
+              proof=verify_original_library(native)
+          patch=Path('REVIEWED_DOLPHIN_HEADLESS_CORRESPONDING_SOURCE.patch')
+          assert patch.stat().st_size>100
+          source_sha=hashlib.sha256(patch.read_bytes()).hexdigest()
+          report={
+              'schema_version':1,
+              'status':'UNAPPROVED-REVIEWABLE-SOURCE-BUILT-DOLPHIN-HEADLESS',
+              'target':target,
+              'pinned_original_commit':REV,
+              'direct_gitlinks_verified_before_patch':34,
+              'nested_gitlinks_verified_before_patch':3,
+              'source_patch_sha256':source_sha,
+              **proof,
+              'original_unmodified_source_compiled':False,
+              'original_upstream_plus_tracked_correction':True,
+              'physical_gameplay_tested':False,
+              'license_compatibility_reviewed':False,
+              'public_binary_distribution_approved':False,
+          }
+          Path('CORRECTED_DOLPHIN_FOUR_OS_SOURCE_REPORT_UNAPPROVED.json').write_text(
+              json.dumps(report,indent=2,sort_keys=True)+'\n','utf-8')
+          print('Verified genuine source-built candidate:',target,proof['native_sha256'])
+          PY
+      - name: Preserve exact patch, source/native checksums and metadata only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-PATCHED-SOURCE-DOLPHIN-${{ matrix.target }}-REPORT-UNAPPROVED
+          path: |
+            REVIEWED_DOLPHIN_HEADLESS_CORRESPONDING_SOURCE.patch
+            CORRECTED_DOLPHIN_FOUR_OS_SOURCE_REPORT_UNAPPROVED.json
+          if-no-files-found: warn
+          retention-days: 45
