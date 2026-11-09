@@ -15,6 +15,10 @@ on:
         description: GitHub run ID with all four APPROVED production artifacts
         required: true
         type: string
+      source_run_id:
+        description: Successful 11-core original source-only archive run
+        required: true
+        type: string
       publish_publicly:
         description: Publish a real public release (false makes draft only)
         required: true
@@ -41,6 +45,7 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       PUBLISH_PUBLICLY: ${{ inputs.publish_publicly }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
       GH_TOKEN: ${{ github.token }}
@@ -59,7 +64,7 @@ jobs:
             echo "::error::Stable publication must be dispatched from main"
             exit 1
           fi
-          if [[ ! "$VERSION" =~ ^3\.0\.[0-9]+$ ]] || [[ ! "$CANDIDATE_RUN_ID" =~ ^[0-9]+$ ]]; then
+          if [[ ! "$VERSION" =~ ^3\.0\.[0-9]+$ ]] || [[ ! "$CANDIDATE_RUN_ID" =~ ^[0-9]+$ ]] || [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::Invalid stable version or source run ID"
             exit 1
           fi
@@ -71,10 +76,12 @@ jobs:
             echo "::error::Approved final release notes are missing"
             exit 1
           fi
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "::error::Tag/release already exists. Refusing overwrite"
-            exit 1
-          fi
+          for tag in "v$VERSION" "v$VERSION-sources"; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "::error::Release already exists: $tag. Refusing overwrite."
+              exit 1
+            fi
+          done
       - name: Enforce strict real-device and redistribution acceptance
         shell: bash
         run: |
@@ -97,6 +104,37 @@ jobs:
             echo "::error::Developer preview and unrelated workflows are not production candidates"
             exit 1
           fi
+      - name: Verify 11 original source archive run and stage separate source companion
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_status="$(gh run view "$SOURCE_RUN_ID" --json conclusion --jq '.conclusion')"
+          source_name="$(gh run view "$SOURCE_RUN_ID" --json name --jq '.name')"
+          if [[ "$source_status" != success ||
+                "$source_name" != "Anything Plays 3.0 | Preserve all 11 pinned original corresponding sources" ]]; then
+            echo "::error::Only a successful original eleven-source preservation run is accepted"
+            exit 1
+          fi
+          # Bounded network retries use clean directories. Never reuse partial evidence.
+          for attempt in 1 2 3 4; do
+            scratch="source-artifacts.try-$attempt"
+            if gh run download "$SOURCE_RUN_ID" \
+              --name AnythingPlays-3.0.0-ELEVEN-ORIGINAL-CORE-SOURCES-UNAPPROVED \
+              --dir "$scratch"; then
+              mv "$scratch" source-artifacts
+              break
+            fi
+            rm -rf -- "$scratch"
+            if [[ "$attempt" == 4 ]]; then
+              echo "::error::Original corresponding source archive unavailable"
+              exit 1
+            fi
+            sleep "$((attempt * 3))"
+          done
+          python -m unittest discover -s tests -p 'test_v30_source_companion.py' -v
+          python -m tools.prepare_v30_source_companion \
+            --input source-artifacts --output source-release-package --version "$VERSION"
+          (cd source-release-package && sha256sum --check SHA256SUMS.txt)
       - name: Download only four production-approved platform artifacts
         shell: bash
         run: |
@@ -120,19 +158,33 @@ jobs:
           cd public-release
           sha256sum --check SHA256SUMS.txt
           test "$(find . -maxdepth 1 -type f | wc -l)" -eq 5
-      - name: Create a non-public draft first
+      - name: Draft separate source-only companion BEFORE binary publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION-sources" source-release-package/* \
+            --title "Anything Plays $VERSION | Original emulator sources" \
+            --notes "All eleven pinned upstream emulator source trees, SHA256SUMS and original license notices. The matching Anything Plays application source and build workflows are available at tag v$VERSION. No game ROMs or newly compiled emulator cores are included." \
+            --target "$GITHUB_SHA" \
+            --draft --prerelease
+          cp docs/V3_RELEASE_NOTES_APPROVED.md final-release-notes.md
+          printf '\n**Full pinned emulator source archive:** https://github.com/%s/releases/tag/v%s-sources\n' \
+            "$GITHUB_REPOSITORY" "$VERSION" >> final-release-notes.md
+      - name: Create a non-public app draft linking the separate source archive
         shell: bash
         run: |
           set -euo pipefail
           gh release create "v$VERSION" public-release/* \
             --title "Anything Plays $VERSION" \
-            --notes-file docs/V3_RELEASE_NOTES_APPROVED.md \
+            --notes-file final-release-notes.md \
             --target "$GITHUB_SHA" \
             --draft
-      - name: Publish only after explicit public approval
+      - name: Publish source access first, then the four-installer stable release
         if: ${{ inputs.publish_publicly }}
         shell: bash
         run: |
           set -euo pipefail
+          gh release edit "v$VERSION-sources" --draft=false
+          gh release view "v$VERSION-sources" --json isDraft --jq '.isDraft' | grep -qx false
           gh release edit "v$VERSION" --draft=false
           gh release view "v$VERSION" --json isDraft --jq '.isDraft' | grep -qx false
