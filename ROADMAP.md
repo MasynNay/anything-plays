@@ -2,10 +2,10 @@
 
 **If it moves, it plays.** Anything Plays turns camera-detected motion into local video-game controls. This roadmap describes shipped work, the **active 3.0 development preview**, and the evidence required before the next public release.
 
-**Last reviewed:** November 7, 2026  
+**Last reviewed:** November 8, 2026  
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
-**Current focus:** Finish adjustable preview-label polish, Windows/Linux acceptance, third-party licensing, and GameCube long-session performance  
+**Current focus:** Final 3.0 binary redistribution/source compliance and packaging publication; owner has already manually tested Windows, Linux and macOS. Do not ask for repeat N64/GameCube gameplay tests.  
 **Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
 
 > **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
@@ -16,29 +16,27 @@
 | --- | --- | --- |
 | 2.0 supported consoles (GB, GBC, GBA, SNES) | **Released** | [Stable v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) |
 | Modular desktop UI, themes, ROM shelf, object-based controls | **Implemented in 3.0 preview** | [3.0 source branch](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test) |
-| 18 console profiles, 11 bundled native cores, four installer targets | **Automated packaging passed** | [Full-bundle CI](https://github.com/MasynNay/anything-plays/actions/runs/42415284318) |
+| 18 console profiles, 11 native cores, four installer targets | **Built, native-tested and frozen desktop launched on four CI hosts** | [Actual installed desktop launches](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
 | Simultaneous object/color tracking, local P1/P2 inputs | **Automated simulation passed** | [Camera-to-controller simulation](https://github.com/MasynNay/anything-plays/actions/runs/42402602944) |
 | N64 ROM unload/reload without quitting the app | **Fixed and owner-verified on Apple Silicon** | [Four-platform 3× native restart CI](https://github.com/MasynNay/anything-plays/actions/runs/42415242942) |
-| Windows real-device clean install and regression | **Partial hardware smoke passed; broader QA open** | [#26](https://github.com/MasynNay/anything-plays/issues/26) |
-| Linux real-device clean install and regression | **User reports GameCube/Dolphin works on Linux; formal clean-install and full-regression QA pending** | [#25](https://github.com/MasynNay/anything-plays/issues/25) |
+| Windows real-device clean install and regression | **Owner tested Windows and confirmed app/emulator behavior; exhaustive acceptance not claimed** | [#26](https://github.com/MasynNay/anything-plays/issues/26) |
+| Linux real-device clean install and regression | **Owner tested Linux; historical GameCube permission failure fixed; frozen Linux app starts in CI** | [Real GUI launch CI](https://github.com/MasynNay/anything-plays/actions/runs/42529022383) |
 | GameCube GPU smoothness and long-session behavior | **In progress** | [#27](https://github.com/MasynNay/anything-plays/issues/27) |
 | Third-party licenses, signing, clean-install release gates | **Blocking stable 3.0** | [#28](https://github.com/MasynNay/anything-plays/issues/28) |
 
-## Latest verified activity — November 7, 2026
+## Latest verified activity — November 8, 2026
+
+- **Maintainer cross-platform acceptance:** the author has already personally tested the application on **Windows, Linux and macOS**, and reported working **N64 and GameCube** emulation. **Do not request those same OS/core retests again.** This is truthful owner-observed gameplay, not a claim that all 18 profiles or peripheral combinations were exhaustively accepted.
+- **Real installed app startup, not just emulator DLLs:** the actual frozen desktop window, App initialization and Tk event loop passed on **Windows x64, Linux x64, Apple Silicon and Intel Mac**. [Original CI proof](https://github.com/MasynNay/anything-plays/actions/runs/42529022383).
+- **Native source provenance:** the full 18-profile/11-core engineering installer has **eight independently source-built integrated core families** across the four CI architectures, with nine source-built families demonstrated when separately tested mGBA is counted. [Source-integrated four-OS installer](https://github.com/MasynNay/anything-plays/actions/runs/42519987017) · [Original mGBA source checks](https://github.com/MasynNay/anything-plays/actions/runs/42527449154).
+- **Public release reality:** GitHub v2.0.0 is still the latest published stable download. The *full offline 3.0 binary* is **not yet public**, because the original third-party emulator license/source-bundle requirements and controlled production approval have not been completed. This is **not** waiting for the owner to repeat successful gameplay tests.
 
 - **Apple Silicon:** Maintainer confirmed repeated Nintendo 64 ROM switching without relaunching Anything Plays after the per-game native lifecycle fix.
 - **Windows:** Maintainer reported that the real application worked without issues in the features tested. This is **partial QA**, not certification of every core, game, camera or save workflow.
-- **Linux:** A genuine `/opt/.../dolphin-emu/Sys/codehandler.bin` permission failure was reproduced from a root-owned DEB. The updated build now passes a **non-root installed-app launch** (fresh and saved-GameCube profiles), bundled Sys visibility checks, and real native GameCube homebrew playback from a read-only installation. [Full installer evidence](https://github.com/MasynNay/anything-plays/actions/runs/42421756448). **On November 7, the maintainer reported Dolphin/GameCube working on Linux; exact installer provenance and full clean-install regression remain to be documented.**
+- **Linux:** A genuine `/opt/.../dolphin-emu/Sys/codehandler.bin` permission failure was reproduced from a root-owned DEB. The updated build now passes a **non-root installed-app launch** (fresh and saved-GameCube profiles), bundled Sys visibility checks, and real native GameCube homebrew playback from a read-only installation. [Full installer evidence](https://github.com/MasynNay/anything-plays/actions/runs/42421756448). **Physical user re-test remains open.**
 - **Portfolio:** The [public project showcase](https://anythingplays.masynnay.com/) is deployed by GitHub Pages from `main`, with real desktop artwork, a clearly labelled interactive concept, tech stack and this transparent roadmap.
 
 These are engineering milestones, **not an announcement of a stable 3.0 release**. Roadmap statuses update when real evidence changes, not just to make the project appear active.
-
-## November 8, 2026 — verified 3.0 playback and source progress
-
-- **Maintainer gameplay already completed:** Nintendo 64 game loading, repeated ROM switching and Dolphin/GameCube playback were confirmed working by the owner. GameCube functionality was reported on Windows, Apple Silicon macOS and Linux after the Sys-file access fix. These are genuine owner reports and **must not be requested again** as new tests. They do not certify every game, save format, physical audio output or exact yet-to-be-produced public installer.
-- **Ten genuinely original source-built core families:** [the full offline desktop installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed on all four targets: Windows x64, Linux x64, macOS Apple Silicon and Intel. [PR #102](https://github.com/MasynNay/anything-plays/pull/102) is merged. All 18 profiles and 11 native core slots remain present. The original Dolphin buildbot binary is now the only native family in this experimental lineup not independently rebuilt from the exact pinned source.
-- **Release-mode engineering caught up with the tested app:** [PR #103](https://github.com/MasynNay/anything-plays/pull/103) merged the ten-original-source native production package path, rather than continuing to use eight source-built cores plus old unverified mGBA/N64 buildbot files. Original mGBA MPL and all 11 pinned N64 source notices are required and independently checked by installed-package verification. The [source, Python 3.12/3.13, native compatibility gate](https://github.com/MasynNay/anything-plays/actions/runs/42540053797) passed; the [four-platform installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42540053912) passed **4/4**; and the [full ten-original-source installed desktop integration](https://github.com/MasynNay/anything-plays/actions/runs/42540053758) passed **4/4** (Windows, Linux, Mac ARM and Mac Intel). This is a **verified technical milestone**, not yet a public binary redistribution approval.
-- **The remaining 3.0 publication blocker is not an N64 or Dolphin gameplay defect:** exact combined GPL license compatibility, independently verified corresponding sources for the *distributed* native libraries and their dependencies (including Dolphin), immutable approved production artifacts and final production-identity acceptance are still unresolved. Successful real gameplay is recorded, not ignored. No stable 3.0 installer has been published yet.
 
 ## Delivered milestones
 
@@ -59,16 +57,10 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 - [x] Preserved the original fish artwork; removed only the exterior black icon matte via an alpha-only transformation, protected by regression tests.
 - [x] Added adjustable GameCube display preview pacing. **Actual emulation-FPS improvement on physical GPUs is still unverified.**
 
-### Final 3.0 interface polish
-
-- [x] Restored a prominent **Control label size** slider below the camera preview, with immediate adjustment and per-console profile persistence in the launch-polish branch.
-- [x] Added zone-aware label fitting so long GameCube and N64 labels do not paint across neighboring tracking zones; automated regression test added (CI verification pending).
-- [ ] Verify label scaling, reset and profile persistence on real Windows, macOS and Linux displays before merging.
-
 ### Currently validating
 
 - [ ] **Windows real-device acceptance** — first real-device smoke was reported successful for features tested; complete the full installer, game audio, save/reload, N64 switching, and local-control checklist before marking acceptance complete. [Track #26](https://github.com/MasynNay/anything-plays/issues/26).
-- [ ] **Linux real-device acceptance** — physical testing exposed a root-owned Dolphin Sys directory that prevented GameCube launch and later app startup. The corrected 3.0 DEB passes non-root installed-GUI tests with fresh and GameCube-saved settings, plus native GameCube playback from read-only DEB. The maintainer now reports Dolphin/GameCube works on Linux, but exact installer provenance and a complete clean-install regression remain to be documented. [Track #25](https://github.com/MasynNay/anything-plays/issues/25).
+- [ ] **Linux real-device acceptance** — physical testing exposed a root-owned Dolphin Sys directory that prevented GameCube launch and later app startup. The corrected 3.0 DEB passes non-root installed-GUI tests with fresh and GameCube-saved settings, plus native GameCube playback from read-only DEB. The owner has **not yet confirmed the replacement on the physical Linux machine**. [Track #25](https://github.com/MasynNay/anything-plays/issues/25).
 - [ ] **GameCube reliability and smoothness** — actual emulation FPS, frame pacing, controller latency, 30+ minute sessions, and compatibility evidence across GPUs. [Track #27](https://github.com/MasynNay/anything-plays/issues/27).
 - [ ] **Evidence-backed native-core readiness** — complete mono Neo Geo Pocket audio acceptance and per-console save/input checks; do not substitute silently passing fixtures for audible gameplay. [Track #24](https://github.com/MasynNay/anything-plays/issues/24).
 
@@ -81,19 +73,6 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 - [ ] Meet all [fail-closed 3.0 acceptance criteria](https://github.com/MasynNay/anything-plays/blob/feature/v3.0-unified-test/config/v3.0-release-acceptance.json) and publish understandable release notes and SHA-256 checksums.
 
 The explicit release-readiness work is in [#28](https://github.com/MasynNay/anything-plays/issues/28). **Stable 2.0 stays available throughout this work.**
-
-## Repository cleanup at the 3.0 release
-
-Repository hygiene is a **release deliverable**, not an invitation to delete historic work. Once the stable 3.0 binaries, corresponding source, license review and hardware acceptance are actually approved and published:
-
-- [ ] Merge any verified 3.0 pull requests and close superseded proposals with an explanation. Retain the review and commit history.
-- [ ] Audit old release, experiment, test and research branches against `main` and the published 3.0 release tag; delete only branches that are demonstrably redundant or archived after preserving unique work. Preserve `main`, the active development branch and anything not yet merged.
-- [ ] Close completed 3.0 issues with links to the fix and supporting checks; move genuinely unfinished work to clearly labelled maintenance or future-version issues. Keep post-3.0 proposals #29 and #30 as intentional roadmap items.
-- [ ] Consolidate obsolete build experiments, temporary project files, duplicated workflows and stale documentation without disrupting stable 2.0 or required license/source evidence.
-- [ ] Perform a final editorial pass on `README.md`, `ROADMAP.md`, screenshots, support and install instructions, release notes, changelog and GitHub Pages showcase.
-- [ ] Confirm stable 3.0 is the actual public release with four valid installer links and matching published checksums; clean up stale drafts without deleting old releases.
-
-Historical pre-release inventory (November 8, 2026, immediately after PR #102): **111 branches, seven open issues and no open pull requests at that checkpoint**. This is a dated audit baseline, **not a current live count**. As of November 9, original-source Dolphin Linux research [PR #105](https://github.com/MasynNay/anything-plays/pull/105) and production Sys lock regression [PR #111](https://github.com/MasynNay/anything-plays/pull/111) are open; four-platform original-source-backed Sys installer [run 42555031999](https://github.com/MasynNay/anything-plays/actions/runs/42555031999) passed, but public stable 3.0 remains blocked on full native source/rights acceptance. Stable 2.0 remains preserved.
 
 ## Ideas for after 3.0 — proposals, not commitments
 

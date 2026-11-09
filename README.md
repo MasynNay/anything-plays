@@ -8,7 +8,7 @@
 
 Camera-powered games · Local, private controls · Windows, macOS and Linux
 
-[Stable 2.0 download](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [3.0 engineering status](ROADMAP.md) · [Code architecture](docs/ARCHITECTURE.md) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
+[Website](https://anythingplays.masynnay.com/) · [Stable 2.0 download](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [3.0 engineering status](ROADMAP.md) · [Code architecture](docs/ARCHITECTURE.md) · [Report an issue](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 

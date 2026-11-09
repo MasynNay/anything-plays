@@ -1,0 +1,102 @@
+name: Publish Anything Plays portfolio
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the website
+        uses: actions/checkout@v4
+      - name: Verify static files and original fish artwork
+        shell: bash
+        run: |
+          test -f site/index.html
+          test -f site/styles.css
+          test -f site/main.js
+          test -f site/CNAME
+          test -f site/.nojekyll
+          test -f site/assets/anything-plays-original.webp
+          test -s site/assets/anything-plays-desktop-preview.webp
+          python3 - <<'PY'
+          from pathlib import Path
+          image = Path('site/assets/anything-plays-desktop-preview.webp').read_bytes()
+          assert image[:4] == b'RIFF' and image[8:12] == b'WEBP'
+          assert len(image) > 20000, 'Real application screenshot missing'
+          print('Verified authentic desktop preview image asset')
+          PY
+          test -f site/assets/anything-plays-desktop-preview.webp
+          grep -qx 'anythingplays.masynnay.com' site/CNAME
+          grep -q 'id="studio"' site/index.html
+          grep -q 'id="roadmap"' site/index.html
+          grep -q 'INTERACTIVE CONCEPT' site/index.html
+          node --check site/main.js
+          python3 - <<'PY'
+          import hashlib
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          root=Path("site")
+          class Check(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.ids=set()
+                  self.links=[]
+                  self.local_assets=[]
+                  self.duplicate=[]
+              def handle_starttag(self, tag, attributes):
+                  a=dict(attributes)
+                  if 'id' in a:
+                      if a['id'] in self.ids:
+                          self.duplicate.append(a['id'])
+                      self.ids.add(a['id'])
+                  if tag=='a' and a.get('href'):
+                      self.links.append(a['href'])
+                  if tag=='img' and a.get('src'):
+                      self.local_assets.append(a['src'])
+                  if tag=='script' and a.get('src'):
+                      self.local_assets.append(a['src'])
+                  if tag=='link' and a.get('href') and a.get('rel') in ('stylesheet','icon'):
+                      self.local_assets.append(a['href'])
+          parser=Check()
+          parser.feed((root/'index.html').read_text(encoding='utf-8'))
+          assert not parser.duplicate, parser.duplicate
+          assert all(x[1:] in parser.ids or x=='#top' for x in parser.links if x.startswith('#'))
+          assert all((root/x).is_file() for x in parser.local_assets), parser.local_assets
+          assert any(x.startswith('https://github.com/') for x in parser.links)
+          assert len(parser.ids)>=14, parser.ids
+          # Exact, approved original logo: never generate or modify the fish.
+          data=(root/'assets/anything-plays-original.webp').read_bytes()
+          blob=hashlib.sha1(b'blob '+str(len(data)).encode()+bytes([0])+data).hexdigest()
+          assert blob=='c620c4154e80768687dfde4c0541f544779af2ff', 'Original fish artwork was replaced'
+          print("Portfolio validated: original artwork, all assets, navigation and interactive script")
+          PY
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static portfolio
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Deploy Anything Plays website
+        id: deployment
+        uses: actions/deploy-pages@v4

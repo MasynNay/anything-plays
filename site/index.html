@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#061923">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Anything Plays turns everyday motion into controls for classic games. Explore a cross-platform camera-powered gaming desktop app, the technology behind it, and its development roadmap.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Anything Plays — If it moves, it plays.">
+  <meta property="og:description" content="A toy, a hand, a fish: anything your camera can track can become a controller. Discover the desktop software and the engineering behind it.">
+  <meta property="og:url" content="https://anythingplays.masynnay.com/">
+  <meta property="og:image" content="https://anythingplays.masynnay.com/assets/anything-plays-original.webp">
+  <title>Anything Plays — If it moves, it plays.</title>
+  <link rel="canonical" href="https://anythingplays.masynnay.com/">
+  <link rel="icon" href="assets/anything-plays-original.webp" type="image/webp">
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body id="top">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="site-header shell">
+    <a class="brand" href="#top" aria-label="Anything Plays — home">
+      <img src="assets/anything-plays-original.webp" width="58" height="58" alt="" fetchpriority="high">
+      <span class="brand-wordmark">ANYTHING<span>PLAYS</span><small>IF IT MOVES, IT PLAYS.</small></span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="#experience">Experience</a><a href="#technology">Engineering</a><a href="#roadmap">Roadmap</a>
+      <a class="nav-download" href="#download">Get the app <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero shell" aria-labelledby="hero-heading">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="live-dot"></span> ORIGINAL DESKTOP SOFTWARE <span class="eyebrow-note">BUILT FOR REAL-WORLD PLAY</span></div>
+        <h1 id="hero-heading">IF IT <em>MOVES,</em><br>IT <span>PLAYS.</span></h1>
+        <p class="hero-description">What if a toy, a hand, or even a fish could play a video game? <strong>Anything Plays</strong> transforms real-world movement into game controls using a webcam, a customizable control grid, and embedded emulators.</p>
+        <div class="hero-actions">
+          <a class="action action-primary" href="#experience">Explore the experience <span aria-hidden="true">↘</span></a>
+          <a class="action action-secondary" href="https://github.com/MasynNay/anything-plays" target="_blank" rel="noopener noreferrer">View the source <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="hero-facts" aria-label="Project at a glance">
+          <div><strong>3</strong><span>Desktop platforms</span></div>
+          <div><strong>4</strong><span>Stable console profiles</span></div>
+          <div><strong>18</strong><span>3.0 preview profiles</span></div>
+        </div>
+      </div>
+      <div class="hero-art" aria-label="Anything Plays original fish logo and controller studio concept">
+        <div class="art-top"><span>ANYTHING PLAYS / LAB 01</span><span class="art-indicator"><i></i> INPUT READY</span></div>
+        <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
+        <div class="art-glow" aria-hidden="true"></div>
+        <img class="hero-fish" src="assets/anything-plays-original.webp" alt="The original Anything Plays fish artwork holding a handheld gaming console" width="660" height="660" loading="eager">
+        <div class="art-bottom"><span>REAL-WORLD INPUT <b>→</b> DIGITAL ADVENTURE</span><span>001 / ∞</span></div>
+      </div>
+    </section>
+
+    <div class="signal-strip" aria-hidden="true"><div class="signal-content">CAMERA TRACKING <b>✳</b> CUSTOM CONTROLS <b>✳</b> EMBEDDED EMULATION <b>✳</b> YOUR OBJECT. YOUR GAME. <b>✳</b> CAMERA TRACKING <b>✳</b></div></div>
+
+    <section class="section shell" id="experience" aria-labelledby="experience-heading">
+      <div class="section-head"><div><p class="eyebrow">01 / THE EXPERIENCE</p><h2 id="experience-heading">PLAY OUTSIDE<br><em>THE BOX.</em></h2></div><p>Traditional controllers are optional. Anything Plays lets a camera recognize movement and translates it to precise, configurable game inputs.</p></div>
+      <div class="experience-grid">
+        <article class="feature featured"><div class="feature-meta"><span>CAMERA-POWERED</span><span>01</span></div><div class="feature-graphic camera-graphic" aria-hidden="true"><div class="lens-ring lens-ring-one"></div><div class="lens-ring lens-ring-two"></div><span class="camera-target">✳</span><div class="view-corner top-left"></div><div class="view-corner top-right"></div><div class="view-corner bottom-left"></div><div class="view-corner bottom-right"></div></div><h3>Turn movement into input.</h3><p>Select a color and let a real-world object move through control zones. Tracking stays inside the app, without system-wide keyboard injection.</p></article>
+        <article class="feature"><div class="feature-meta"><span>YOUR RULES</span><span>02</span></div><div class="feature-symbol" aria-hidden="true">▦</div><h3>Build your own controller.</h3><p>Arrange, resize, shuffle, and remap button zones. Save independent profiles for each console.</p></article>
+        <article class="feature"><div class="feature-meta"><span>NO CAMERA REQUIRED</span><span>03</span></div><div class="feature-symbol" aria-hidden="true">⌨</div><h3>Play the usual way, too.</h3><p>Use keyboard controls in the embedded game window. Pause object tracking whenever you want.</p></article>
+      </div>
+    </section>
+
+    <section class="studio-section shell" id="studio" aria-labelledby="studio-heading">
+      <div class="studio-copy"><p class="eyebrow">02 / INTERACTIVE CONCEPT</p><h2 id="studio-heading">MOVE IT.<br><em>WATCH IT RESPOND.</em></h2><p>Here’s the basic idea behind camera zones. Move the sample tracker across this interactive grid or tap a zone to see which game button would activate.</p><p class="studio-disclaimer">This is an illustrative browser interaction, <strong>not</strong> the desktop application or a live emulator. The actual app uses your webcam, configurable detection, and native game cores.</p><div class="studio-result" aria-live="polite"><span>LAST INPUT</span><strong id="selected-input">READY</strong><small id="selected-description">Move the tracker across the grid.</small></div></div>
+      <div class="studio-demo"><div class="demo-toolbar"><span><i class="live-dot"></i> TRACKING LAB / INTERACTIVE</span><span>LOCAL DEMO</span></div><div class="demo-grid" id="demo-grid" role="group" aria-label="Try the Anything Plays movement control zones"><button class="zone" type="button" data-zone="LEFT">LEFT</button><button class="zone" type="button" data-zone="UP">UP</button><button class="zone" type="button" data-zone="RIGHT">RIGHT</button><button class="zone" type="button" data-zone="A">A</button><button class="zone" type="button" data-zone="START">START</button><button class="zone" type="button" data-zone="B">B</button><button class="zone" type="button" data-zone="DOWN">DOWN</button><button class="zone" type="button" data-zone="SELECT">SELECT</button><button class="zone" type="button" data-zone="SHUFFLE">SHUFFLE</button><div class="demo-tracker" id="demo-tracker" aria-hidden="true"><span>✳</span></div></div><div class="demo-footer"><span>MOVE / TAP TO EXPLORE</span><button type="button" class="demo-reset" id="reset-demo">Reset grid ↺</button></div></div>
+    </section>
+
+    <section class="section shell desktop-section" id="desktop" aria-labelledby="desktop-heading">
+      <div class="section-head"><div><p class="eyebrow">03 / REAL DESKTOP APPLICATION</p><h2 id="desktop-heading">THE SOFTWARE.<br><em>NOT A MOCKUP.</em></h2></div><p>A capture of the actual Anything Plays 3.0 Linux developer-preview interface. The frozen desktop application now passes real-window startup checks on Windows, Linux and both Mac architectures; the author also tested Windows, Linux and macOS.</p></div>
+      <div class="desktop-shot"><div class="shot-toolbar"><span>ANYTHING PLAYS / REAL APPLICATION CAPTURE</span><span>LINUX · 3.0 DEV PREVIEW</span></div><img src="assets/anything-plays-desktop-preview.webp" width="1342" height="846" alt="Actual Anything Plays desktop window showing a camera tracking preview on the left and Game Boy Advance ROM browsing, display settings and volume controls on the right" loading="lazy"><div class="shot-caption"><span>CAPTURED FROM THE ACTUAL PACKAGED APP</span><span>NO ROM OR CAMERA CONNECTED IN THIS CAPTURE</span></div></div>
+    </section>
+
+    <section class="section shell consoles-section" id="consoles" aria-labelledby="consoles-heading"><div class="section-head"><div><p class="eyebrow">03 / THE GAME LIBRARY</p><h2 id="consoles-heading">A LITTLE NOSTALGIA.<br><em>A LOT OF POSSIBILITY.</em></h2></div><p>Four console profiles are supported in the stable 2.0 release. The active 3.0 developer preview expands the library to 18 profiles using 11 native cores; compatibility and redistribution review are still underway.</p></div>
+      <div class="console-grid"><article><span>01</span><h3>Game Boy</h3><small>STABLE 2.0</small></article><article><span>02</span><h3>Game Boy Color</h3><small>STABLE 2.0</small></article><article><span>03</span><h3>Game Boy Advance</h3><small>STABLE 2.0</small></article><article><span>04</span><h3>Super Nintendo</h3><small>STABLE 2.0</small></article><article class="console-preview"><span>05—18</span><h3>More worlds in 3.0</h3><small>DEVELOPER PREVIEW · INCLUDING N64 + GAMECUBE</small></article></div>
+      <p class="license-note">You supply your own legally usable games. Anything Plays does not distribute commercial ROMs or BIOS files. Not every preview core or game has passed release acceptance.</p>
+    </section>
+
+    <section class="section shell engineering-section" id="technology" aria-labelledby="technology-heading"><div class="section-head"><div><p class="eyebrow">04 / UNDER THE HOOD</p><h2 id="technology-heading">BUILT TO WORK.<br><em>BUILT TO LAST.</em></h2></div><p>Anything Plays is more than a concept. It is a real, modular desktop application with native emulation, performance tuning, safety boundaries, and cross-platform build automation.</p></div>
+      <div class="engineering-grid"><article><span>01 / APPLICATION</span><h3>Python + Tkinter</h3><p>Desktop user interface, themes, ROM libraries, input configuration, persistent console profiles and application lifecycle.</p></article><article><span>02 / COMPUTER VISION</span><h3>OpenCV + NumPy</h3><p>Camera capture, target-color detection, configurable control zones, and optional multi-object tracking.</p></article><article><span>03 / EMULATION</span><h3>Libretro + native cores</h3><p>Embedded game rendering, local gamepad signals, audio, and platform-specific lifecycle isolation. GameCube uses Dolphin Libretro.</p></article><article><span>04 / 3D PERFORMANCE</span><h3>OpenGL + GPU preview</h3><p>Experimental accelerated GameCube display path with preview readback pacing. Real-world GPU performance remains under review.</p></article><article><span>05 / DELIVERY</span><h3>PyInstaller + GitHub Actions</h3><p>Automated builds, packaged Windows/macOS/Linux previews, platform probes, regression tests and installer verification.</p></article><article><span>06 / MAINTENANCE</span><h3>Tests + issue-driven releases</h3><p>Verified fixes, reproducible bugs, a public roadmap, and clear separation between stable releases and development builds.</p></article></div>
+    </section>
+
+    <section class="section shell roadmap-section" id="roadmap" aria-labelledby="roadmap-heading">
+      <div class="section-head"><div><p class="eyebrow">05 / THE DEVELOPMENT ROADMAP</p><h2 id="roadmap-heading">SHIPPED. FIXED.<br><em>STILL BUILDING.</em></h2></div><p>3.0 is built and tested, including owner testing on Windows, Linux and macOS and verified frozen desktop launches on four CI architectures. Its full offline installer is not yet publicly released while bundled emulator licensing and corresponding source are reviewed.</p></div>
+      <ol class="roadmap-track" aria-label="Anything Plays development phases">
+        <li class="phase-released"><span class="phase-serial">01 / RELEASED</span><strong>2.0 · Four consoles</strong><small>Public stable release</small></li>
+        <li class="phase-verified"><span class="phase-serial">02 / IMPLEMENTED</span><strong>3.0 · 18 profiles</strong><small>Four-platform frozen app launches verified</small></li>
+        <li class="phase-current"><span class="phase-serial">03 / IN PROGRESS</span><strong>3.0 release compliance</strong><small>Bundled core licenses + source</small></li>
+        <li class="phase-planned"><span class="phase-serial">04 / RELEASE GATE</span><strong>Stable 3.0 review</strong><small>Licenses, saves and signing</small></li>
+      </ol>
+      <div class="milestone"><div><small>ROOT-CAUSE FIX · VERIFIED BY NATIVE REGRESSION</small><h3>N64 games can change without restarting.</h3><p>A genuine second-ROM failure was reproduced on all four build platforms, fixed with safe native-core lifecycle handling, and re-tested over three consecutive launches per platform. Manual Apple Silicon ROM switching was confirmed.</p></div><a href="https://github.com/MasynNay/anything-plays/actions/runs/42415242942" target="_blank" rel="noopener noreferrer">VIEW TEST EVIDENCE ↗</a></div>
+      <div class="roadmap-cards">
+        <article><div><span>NOW / REAL DEVICES</span><small>ACTIVE QA</small></div><h3>Cross-platform reliability</h3><p>Windows physical smoke tests were positive. Linux testing exposed a real Dolphin file-permission and startup bug; the replacement installer now passes non-root launch and native GameCube tests. Owner confirmation of the corrected Linux installer is still pending.</p><a href="https://github.com/MasynNay/anything-plays/issues/25" target="_blank" rel="noopener noreferrer">LINUX ISSUE #25 ↗</a><a href="https://github.com/MasynNay/anything-plays/issues/26" target="_blank" rel="noopener noreferrer">WINDOWS ISSUE #26 ↗</a></article>
+        <article><div><span>NEXT / PERFORMANCE</span><small>INVESTIGATING</small></div><h3>Make GameCube smoother.</h3><p>Measure actual emulation FPS versus display preview FPS, improve input and frame pacing where safe, and test long running sessions on real GPUs without weakening native correctness.</p><a href="https://github.com/MasynNay/anything-plays/issues/27" target="_blank" rel="noopener noreferrer">GAMECUBE ISSUE #27 ↗</a></article>
+        <article><div><span>RELEASE / QUALITY GATE</span><small>REVIEW REQUIRED</small></div><h3>Ship 3.0 responsibly.</h3><p>Complete core-redistribution and source audits, sign where practical, prove save and control reliability, and document platform limitations before publishing stable binaries.</p><a href="https://github.com/MasynNay/anything-plays/issues/28" target="_blank" rel="noopener noreferrer">RELEASE ISSUE #28 ↗</a></article>
+      </div>
+      <div class="future-ideas">
+        <div class="future-intro"><span>BEYOND 3.0 / RESEARCH CONCEPTS</span><h3>Useful ideas, not empty promises.</h3><p>Proposed improvements are filed with problems to solve, validation criteria, and clear scope. They are not part of the current release commitment.</p></div>
+        <div class="future-links"><a href="https://github.com/MasynNay/anything-plays/issues/29" target="_blank" rel="noopener noreferrer"><span>CAMERA / #29</span><strong>Faster calibration and clearer tracking diagnostics</strong><span aria-hidden="true">↗</span></a><a href="https://github.com/MasynNay/anything-plays/issues/30" target="_blank" rel="noopener noreferrer"><span>PROFILES / #30</span><strong>Portable, privacy-conscious control layouts</strong><span aria-hidden="true">↗</span></a></div>
+      </div>
+      <div class="roadmap-bottom"><span>Released work, passing CI and physical user testing are documented separately. Future proposals have no shipping date.</span><a href="https://github.com/MasynNay/anything-plays/blob/main/ROADMAP.md" target="_blank" rel="noopener noreferrer">READ THE FULL ROADMAP ↗</a></div>
+    </section>
+
+        <section class="download-section shell" id="download" aria-labelledby="download-heading"><div><p class="eyebrow">06 / GET HANDS ON</p><h2 id="download-heading">READY TO TRY<br><em>ANYTHING?</em></h2><p>Download stable 2.0 now, or explore the tested 3.0 source and verified four-platform desktop launch evidence. The full bundled 3.0 installers are not public yet because their third-party emulator distribution and source obligations are still under review.</p><div class="download-actions"><a class="action action-primary" href="https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0" target="_blank" rel="noopener noreferrer">Download stable 2.0 <span aria-hidden="true">↗</span></a><a class="action action-secondary" href="https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test" target="_blank" rel="noopener noreferrer">Explore 3.0 development ↗</a></div><p><a href="https://github.com/MasynNay/anything-plays/blob/feature/v3.0-unified-test/docs/V3_FROZEN_DESKTOP_LAUNCH_EVIDENCE.md" target="_blank" rel="noopener noreferrer">Read the verified Windows, Linux, and Mac 3.0 desktop startup results ↗</a></p></div><div class="download-details"><div class="detail-top"><span>ANYTHING PLAYS / DESKTOP</span><span class="availability"><i></i> STABLE 2.0 AVAILABLE</span></div><div class="platform-list"><span>WINDOWS</span><span>macOS · APPLE SILICON &amp; INTEL</span><span>LINUX</span></div><p>Local by design. A camera is optional for manual play. No commercial ROMs or BIOS files are included.</p><a href="https://github.com/MasynNay/anything-plays/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer">EXPLORE THE SYSTEM ARCHITECTURE ↗</a></div></section>
+  </main>
+  <footer class="footer shell"><a class="footer-brand" href="#top"><img src="assets/anything-plays-original.webp" alt="" width="42" height="42">ANYTHING<span>PLAYS</span></a><span>AN ORIGINAL CROSS-PLATFORM PROJECT · 2026</span><div><a href="https://masynnay.com/" target="_blank" rel="noopener noreferrer">PORTFOLIO ↗</a><a href="https://github.com/MasynNay/anything-plays" target="_blank" rel="noopener noreferrer">GITHUB ↗</a><a href="#top">BACK TO TOP ↑</a></div></footer>
+</body>
+</html>
