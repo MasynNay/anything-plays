@@ -19,13 +19,19 @@ Camera-powered games · Local, private controls · Windows, macOS and Linux
 | **2.0.0** | Published, stable | Original supported consoles; existing user installations are unchanged |
 | **3.0.0 Preview** | **In development, not a public release** | 18 console profiles, 11 native cores in complete test installers; manual compatibility and compliance QA still required |
 
-**3.0 is release-candidate engineering, not yet a public stable binary release.**
-The [latest complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42455076101)
-passed on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. All
-four developer installers contain **18 console profiles**, **11 Libretro cores**
-and Dolphin system assets. The maintainer reports successful Linux GameCube
-playback. The **Control label size** slider sits beneath the camera preview,
-retains per-console settings and fits long names inside their own zones.
+**3.0 is working development software, not yet a licensed public stable binary release.**
+The most recent **ten-original-source-core** [complete offline installer lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260)
+passed on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. These
+four test-only developer installers contain **18 console profiles**, **11 native
+Libretro core families**, and bundled Dolphin Sys assets, with no separate
+emulator installation. Ten core families are compiled from pinned original
+sources; **Dolphin is the remaining family using an archived native binary**.
+The developer also personally confirmed working N64 games and repeated ROM
+switching, plus working Dolphin/GameCube gameplay on Windows, macOS and Linux
+following the Linux installation fix. These confirmed observations do not
+establish the right to redistribute the combined binaries.
+The **Control label size** slider sits beneath the camera preview, retains
+per-console settings and fits long names inside their own zones.
 
 The remaining launch requirements are exact native source/license
 compatibility, selected real-device/audio/endurance acceptance, and a
@@ -61,7 +67,7 @@ camera processing happens locally.
 
 ## How version 3.0 distributes emulators
 
-**Full offline developer preview:** [Latest four-platform full test installers](https://github.com/MasynNay/anything-plays/actions/runs/42455076101) contain all **11 bundled native cores** for **18 console profiles** and the matched Dolphin system files. These are GitHub Actions artifacts for testing, **not approved public releases**; they are time-limited and may require a GitHub login. Neither RetroArch nor a separate Dolphin installation is required, and the packages include **no ROMs or BIOS**.
+**Full offline developer previews:** The [original full four-platform test build](https://github.com/MasynNay/anything-plays/actions/runs/42455076101) contained all 11 native core families and bundled Dolphin Sys for 18 profiles. A subsequent [ten-original-source-core full native lab](https://github.com/MasynNay/anything-plays/actions/runs/42535823260) passed on all four platforms with the noncommercial SNES/Sega libraries replaced by original source-built alternatives, and original source-built N64 and mGBA cores. These are **different development candidates**, not approved public releases or interchangeable production downloads. The ten-core research run retains diagnostic evidence; do not assume its installation files are offered as a public release. Neither approach requires end users to separately install RetroArch or Dolphin. No ROMs or BIOS are bundled.
 
 **Build variants:** Lightweight, mGBA-only application artifacts are for development diagnostics, not the planned stable 3.0 distribution. The intended stable 3.0 installer is the complete offline package with the already-selected emulator lineup. No separate RetroArch or Dolphin download is expected. Future in-app core updates remain optional and must use reviewed, verifiable packages.
 
@@ -69,21 +75,21 @@ The [3.0 distribution audit](docs/V3_DISTRIBUTION_READINESS.md), [draft notes](d
 
 ## Console library plan
 
-All eleven cores below are included in the **full offline 3.0 developer preview** on the four build targets. This inventory does **not** certify compatibility with every game or authorize public redistribution.
+The table below describes the **most recently tested ten-original-source-core full 3.0 experimental installer** (18 profiles, 11 native families). Older full previews instead used Snes9x and Genesis Plus GX for SNES and Sega. Both variants are **test-only**. This inventory does not certify every game or authorize redistribution.
 
 | Core | Console libraries | Readiness note |
 | --- | --- | --- |
 | mGBA | Game Boy, Game Boy Color, Game Boy Advance | Native gameplay tested; continue physical QA |
-| Snes9x | Super Nintendo | Native gameplay tested; continue physical QA |
+| Mednafen Supafaust | Super Nintendo | Original pinned source-built replacement for Snes9x; real original homebrew audio/video CI on four OS |
 | FCEUmm | NES | Native audio/video verified with homebrew; continue real-device QA |
-| Genesis Plus GX | Genesis, Master System, Game Gear, SG-1000 | Native homebrew acceptance implemented; real-device coverage pending |
+| BlastEm | Genesis, Master System, Game Gear, SG-1000 | Original pinned source-built replacement for Genesis Plus GX; four Sega paths checked in native CI |
 | Stella 2014 | Atari 2600 | Native audio/video tests; real-game coverage pending |
 | ProSystem | Atari 7800 | Native homebrew tests; real-device coverage pending |
 | Beetle PCE Fast | TurboGrafx-16 / PC Engine HuCard | Native homebrew tests; real-device coverage pending |
 | Beetle NeoPop | Neo Geo Pocket and Color | Authentic monochrome and color native audio/video/input CI passed all four OSes; physical game/saves still need validation |
 | Beetle WonderSwan | WonderSwan and Color | Native homebrew AV checks; real-device coverage pending |
-| ParaLLEl-N64 | Nintendo 64 | **Repeat-launch fix** passed 3 cycles on four OS builds; owner tested switching on Apple Silicon |
-| Dolphin Libretro | GameCube | Bundled in experimental preview; **GPU performance/real-game acceptance incomplete** |
+| ParaLLEl-N64 | Nintendo 64 | Source-built original N64 native video passed four OS; maintainer confirmed gameplay and repeated ROM switching |
+| Dolphin Libretro | GameCube | Owner confirmed working on Windows, macOS and Linux; original source-to-distributed-binary correspondence and license review remain pending |
 
 See [3.0 engineering status](ROADMAP.md) and [#24](https://github.com/MasynNay/anything-plays/issues/24) for the distinction between implemented code, native homebrew diagnostics and release approval.
 
