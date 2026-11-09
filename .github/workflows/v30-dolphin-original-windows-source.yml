@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   original-dolphin-windows:
-    runs-on: windows-2025
+    # VS2022 is a required original Dolphin x64 CMake generator here.
+    runs-on: windows-2022
     timeout-minutes: 125
     env:
       DOLPHIN_SOURCE_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
