@@ -70,6 +70,7 @@ jobs:
           set -euo pipefail
           cmake -S original-dolphin -B original-dolphin-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DCMAKE_CXX_FLAGS="-g1 -DDEBUGFAST" \
             -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
             -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
             -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
