@@ -126,3 +126,38 @@ build tool dependencies, Dolphin Sys rights and mixed GPL/noncommercial
 permission remain independently unapproved. Do not promote this source
 audit to `corresponding_source_inventory_verified=true` or publish stable
 v3.0 on its strength.
+
+## Original Dolphin parent plus all 37 Gitlinks, one verified archive — November 8, 2026
+
+[PR #104](https://github.com/MasynNay/anything-plays/pull/104) is **merged**
+as commit `59d7424554bf87377bcc8d25f3dbf2a412687188`.
+The [original-source packaging Actions run 42542696226](https://github.com/MasynNay/anything-plays/actions/runs/42542696226)
+completed successfully after checking all six original 34-source CI shards
+against the independent original audit, rehashing all three nested Gitlink
+source snapshots, and capturing the **exact pinned Dolphin parent commit**
+`32c61f9d0e933331bb7087ba57e96883241b4960`. It produced one
+**210,214,598-byte compressed GitHub Actions source-review artifact**,
+`AnythingPlays-3.0.0-DOLPHIN-38-SOURCE-CANDIDATES-UNAPPROVED`
+(artifact ID `13641868463`).
+
+Inside the artifact are **38 original source TAR.GZ candidates** (one
+Dolphin parent, **34 direct** Gitlink sources and **3 nested**), one JSON
+manifest with every pinned original revision, repository and byte SHA-256,
+and one `SHA256SUMS.txt` covering all 38 source TARs plus the manifest.
+The source archive itself is NOT a public application release and must not be
+misidentified as complete corresponding source for the archived buildbot
+Dolphin binary. The [source CI 42542696238](https://github.com/MasynNay/anything-plays/actions/runs/42542696238)
+passed Python 3.12/3.13 and native mGBA compatibility. No commercial ROM,
+game firmware or native Dolphin binary was uploaded in this artifact.
+
+**Next direct engineering gate:** determine whether a **new, original pinned
+Dolphin Libretro binary** can be compiled directly from these source Git
+revisions, then establish native gameplay in the full desktop app and
+license/source correspondence to the exact production binary. A Linux
+original-source research lane was opened as
+[PR #105](https://github.com/MasynNay/anything-plays/pull/105).
+This is not permission to substitute an untested core for the owner-verified
+working Dolphin. Mixed GPLv2/GPLv3 plugin rights, runtime dependencies,
+compilation provenance on all four OSes and complete Dolphin Sys rights
+are **still not approved**. All production rights flags remain false.
+
