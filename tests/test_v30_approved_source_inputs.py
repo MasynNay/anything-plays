@@ -19,6 +19,7 @@ from tools.v30_release_lock import (
     ALTERNATIVE_CORE_ORDER, TARGETS, SOURCE_BUILT_TEN, selected_source_families,
 )
 from tools.stage_v30_gpl_trial_inputs import package_native_zip
+from tools.prepare_v30_dolphin_source_sys import DOLPHIN_REV, PINNED_SYS_TREE_SHA1
 from tools import stage_v30_approved_source_inputs as staging
 from anything_plays.v30_approved_core_map import (
     EXPECTED, REPOSITORIES, TEN_EXPECTED, TEN_REPOSITORIES, WINDOWS_RUNTIME,
@@ -169,8 +170,8 @@ def original_stub(compiled):
 
 class CompleteReviewedSourceInputContracts(unittest.TestCase):
 
-    def test_ten_original_source_approved_path_stages_only_dolphin_from_old_archive(self):
-        """Synthetic-only: exact ten source/library hashes, plus a true fail-closed lock."""
+    def test_ten_original_source_approved_path_requires_original_git_source_sys(self):
+        """Synthetic-only: ten native source family SHA + pinned source Sys, zero real rights."""
         with TemporaryDirectory() as temp:
             lock, source, fixtures = synthetic_four_platform_review(temp)
             lock["core_set_id"] = "gpl-source-built-ten"
@@ -228,6 +229,25 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
                             five[name] = loc
                         mgba = folder / "mgba"; mgba.mkdir()
                         n64 = folder / "n64"; n64.mkdir()
+                        sys_dir = folder / "source-sys"; sys_dir.mkdir()
+                        exact_sys_data = b"TEST ONLY original source Git Dolphin Sys ZIP " * 130
+                        exact_sys_receipt = {
+                            "original_git_data_sys_tree_sha1": PINNED_SYS_TREE_SHA1,
+                            "public_distribution_approved": False,
+                            "source_asset_rights_independently_approved": False,
+                        }
+                        locked_sys = lock["targets"][target]["dolphin_sys"]
+                        locked_sys.update(
+                            original_archive_sha256=sha(exact_sys_data),
+                            original_archive_size_bytes=len(exact_sys_data),
+                            original_upstream_source_commit=DOLPHIN_REV,
+                            original_git_data_sys_tree_sha1=PINNED_SYS_TREE_SHA1,
+                        )
+                        source_sys = source["targets"][target]["dolphin_sys"]
+                        source_sys.update(
+                            original_archive_sha256=sha(exact_sys_data),
+                            original_archive_size_bytes=len(exact_sys_data),
+                        )
                         def five_stub(location, name, original_target, original_ext):
                             binary, notice, archive_sha = source_inputs[name]
                             return binary, notice, {
@@ -257,20 +277,27 @@ class CompleteReviewedSourceInputContracts(unittest.TestCase):
                              patch.object(staging, "inspect_original_mgba",
                                           side_effect=mgba_stub), \
                              patch.object(staging, "check_original_n64_artifact",
-                                          side_effect=n64_stub):
+                                          side_effect=n64_stub), \
+                             patch.object(staging, "exact_original_sys_artifact",
+                                          return_value=(exact_sys_data, exact_sys_receipt)):
                             result = staging.assemble_approved_inputs(
                                 lock=lock, inventory=source, target=target,
                                 original_dir=folder / "original",
                                 snes_dir=snes, sega_dir=sega, pce_artifact=pce,
                                 output_dir=folder / "output", five_dirs=five,
-                                mgba_dir=mgba, n64_dir=n64,
+                                mgba_dir=mgba, n64_dir=n64, dolphin_sys_dir=sys_dir,
                                 windows_runtime=folder / "runtime.dll" if runtime else None,
                             )
                         self.assertEqual(result["unchanged_original_core_count"], 1)
                         self.assertEqual(set(result["source_built_families"]), SOURCE_BUILT_TEN)
                         self.assertFalse(result["auto_granted_license_rights"])
                         built = folder / "output"
-                        self.assertEqual((built / "Dolphin.zip").read_bytes(), originals["Dolphin.zip"])
+                        self.assertEqual((built / "Dolphin.zip").read_bytes(), exact_sys_data)
+                        self.assertNotEqual((built / "Dolphin.zip").read_bytes(), originals["Dolphin.zip"])
+                        self.assertEqual(
+                            result["source_exact_dolphin_sys_evidence"],
+                            exact_sys_receipt,
+                        )
                         for name in TEN_EXPECTED:
                             package = built / f"{name}_libretro{ext}.zip"
                             self.assertTrue(package.is_file())
