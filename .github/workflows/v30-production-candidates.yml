@@ -62,6 +62,7 @@ jobs:
       AP_V30_APPROVED_RELEASE: '1'
       AP_V30_APPROVED_EIGHT: '1'
       AP_V30_APPROVED_TEN: '1'
+      TIA_PINNED_GIT_SHA: '6ae5bf998fe7a7842294089db17fc86fd73db1f0'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/immutable-inputs
       GH_TOKEN: ${{ github.token }}
       GPL_SNES_RUN_ID: '42494297281'
@@ -99,12 +100,12 @@ jobs:
           python - <<'PY'
           from tools.v30_release_lock import (
               load_approved_lock, selected_core_set, selected_source_families,
-              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_ELEVEN)
+              ALTERNATIVE_TIA_CORE_NAMES, SOURCE_BUILT_ELEVEN_TIA)
           lock = load_approved_lock()
-          assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
+          assert selected_core_set(lock) == ALTERNATIVE_TIA_CORE_NAMES, (
               "Production must use the FULL source-built GPL alternative core set; "
               "original Snes9x/Genesis GX are not accepted for v3")
-          assert selected_source_families(lock) == SOURCE_BUILT_ELEVEN, (
+          assert selected_source_families(lock) == SOURCE_BUILT_ELEVEN_TIA, (
               "Production must use ELEVEN verified original-source native families; "
               "historical unverified Dolphin binaries cannot ship")
           PY
@@ -186,7 +187,7 @@ jobs:
             --dir original-dolphin-corresponding-source
           test -s original-dolphin-corresponding-source/dolphin-parent-32c61f9d0e933331bb7087ba57e96883241b4960.tar.gz
           (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
-          for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
+          for name in fceumm prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
               --name "AnythingPlays-3.0-PINNED-REMAINING-$name-${{ matrix.target }}-UNAPPROVED" \
               --dir "original-five-source/$name"
@@ -213,6 +214,7 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-python
+            make
       - name: Capture exact candidate Winpthreads native bytes; immutable reviewed lock must approve this precise hash
         if: runner.os == 'Windows'
         shell: msys2 {0}
@@ -335,6 +337,55 @@ jobs:
           test -s "$native"
           sha256sum "$native"
           echo "NATIVE_DOLPHIN_CORE=$native" >> "$GITHUB_ENV"
+      - name: Checkout exact original GPL2+ Atari source; preserve copyright/license Git TAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init -q original-tia
+          git -C original-tia remote add origin https://github.com/warmenhoven/tia
+          for n in 1 2 3 4; do
+            if git -C original-tia fetch --depth=1 --no-tags origin "$TIA_PINNED_GIT_SHA"; then break; fi
+            if [[ "$n" == 4 ]]; then exit 1; fi
+            sleep "$((3*n))"
+          done
+          git -C original-tia checkout -q --detach FETCH_HEAD
+          test "$(git -C original-tia rev-parse HEAD)" = "$TIA_PINNED_GIT_SHA"
+          test "$(git -C original-tia remote get-url origin)" = https://github.com/warmenhoven/tia
+          grep -Fq 'GPL-2.0-or-later' original-tia/README.md
+          grep -Fq 'SPDX-License-Identifier: GPL-2.0-or-later' original-tia/src/libretro.c
+          git -C original-tia archive --format=tar --output="$GITHUB_WORKSPACE/original-tia.tar" HEAD
+          test -s original-tia.tar
+      - name: Compile original pinned Tia native on Linux or Mac
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          TIA_TARGET: ${{ matrix.target }}
+          TIA_EXT: ${{ matrix.extension }}
+        run: |
+          set -euo pipefail
+          platform=unix
+          if [[ "$TIA_TARGET" == macos-* ]]; then platform=osx; fi
+          make -C original-tia platform="$platform" -j2
+          test -s "original-tia/tia_libretro.$TIA_EXT"
+      - name: Compile original pinned Windows Atari source native
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          make -C original-tia platform=win CC=gcc -j2
+          test -s original-tia/tia_libretro.dll
+      - name: Verify actual pinned Tia source-compiled Atari video and PCM
+        shell: bash
+        env:
+          TIA_EXT: ${{ matrix.extension }}
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt
+          python tools/probe_atari_homebrew.py \
+            --core "original-tia/tia_libretro.$TIA_EXT" --seconds 8 \
+            --report ORIGINAL_TIA_PRODUCTION_ATARI_NATIVE_AV.json
+          test -s ORIGINAL_TIA_PRODUCTION_ATARI_NATIVE_AV.json
+          echo "ORIGINAL_TIA_NATIVE=original-tia/tia_libretro.$TIA_EXT" >> "$GITHUB_ENV"
       - name: Stage EXACT SOURCE-REVIEWED 11-core production offline inputs, or fail before build
         shell: bash
         env:
@@ -352,7 +403,10 @@ jobs:
             --sega-dir source-built-sega \
             --pce-artifact original-source-built-pce.zip \
             --fceumm-dir original-five-source/fceumm \
-            --stella2014-dir original-five-source/stella2014 \
+            --tia-dir original-tia \
+            --tia-native "$ORIGINAL_TIA_NATIVE" \
+            --tia-source-tar original-tia.tar \
+            --tia-playback-report ORIGINAL_TIA_PRODUCTION_ATARI_NATIVE_AV.json \
             --prosystem-dir original-five-source/prosystem \
             --mednafen-ngp-dir original-five-source/mednafen_ngp \
             --mednafen-wswan-dir original-five-source/mednafen_wswan \
@@ -384,7 +438,7 @@ jobs:
           assert manifest["source_exact_dolphin_sys_evidence"]["public_distribution_approved"] is False
           assert set(manifest["source_built_families"]) == {
               "mednafen_supafaust","blastem","mednafen_pce_fast",
-              "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan",
+              "fceumm","tia","prosystem","mednafen_ngp","mednafen_wswan",
               "mgba","parallel_n64","dolphin"}
           assert selected_core_set(lock) == set(lock["targets"][manifest["target"]]["cores"])
           PY
