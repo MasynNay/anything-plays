@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from anything_plays.v30_approved_core_map import ELEVEN_EXPECTED, ELEVEN_REPOSITORIES
+from tools.stage_v30_eleven_source_inputs import NOTICE_PATHS
 from tools.compile_v30_four_platform_source_evidence import (
     ARTIFACT_PREFIX, ARTIFACT_SUFFIX, INSTALL_STATUS, INSTALLED,
     STAGED, STAGING_STATUS, TARGETS, consolidate_evidence,
@@ -44,7 +45,12 @@ def make_fake_evidence(root):
                 "public_binary_distribution_approved": False,
                 "direct_original_gitlinks": 34,
                 "nested_original_gitlinks": 3,
-                "original_source_notices": {str(i): {} for i in range(5)},
+                "original_source_notices": {
+                    name: {"source_path": upstream, "sha256": "a" * 64}
+                    for upstream, name in NOTICE_PATHS.items()
+                },
+                "production_hardware_gameplay_reviewed": False,
+                "full_corresponding_source_and_transitive_rights_reviewed": False,
             },
         }), "utf-8")
 
@@ -105,6 +111,43 @@ class FourPlatformSourceEvidenceTests(unittest.TestCase):
             edit_report(root, "macos-arm64", STAGED,
                         lambda d: d["source_built_dolphin"].update(original_source_notices={}))
             with self.assertRaisesRegex(ValueError, "notices"):
+                consolidate_evidence(root, "42568420431")
+
+    def test_fabricated_five_notices_cannot_pass_source_review(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_fake_evidence(root)
+            edit_report(root, "linux-x64", STAGED,
+                        lambda d: d["source_built_dolphin"].update(
+                            original_source_notices={str(i): {} for i in range(5)}))
+            with self.assertRaisesRegex(ValueError, "notices"):
+                consolidate_evidence(root, "42568420431")
+
+    def test_mismatched_notice_path_or_hash_cannot_pass(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_fake_evidence(root)
+            name = next(iter(NOTICE_PATHS.values()))
+            edit_report(root, "macos-x64", STAGED,
+                        lambda d: d["source_built_dolphin"]["original_source_notices"][name].update(
+                            source_path="unrelated/COPYING"))
+            with self.assertRaisesRegex(ValueError, "notice path"):
+                consolidate_evidence(root, "42568420431")
+            edit_report(root, "macos-x64", STAGED,
+                        lambda d: d["source_built_dolphin"]["original_source_notices"][name].update(
+                            source_path=next(k for k, v in NOTICE_PATHS.items() if v == name),
+                            sha256="not-a-hash"))
+            with self.assertRaisesRegex(ValueError, "SHA256"):
+                consolidate_evidence(root, "42568420431")
+
+    def test_approval_claims_in_staging_fail_closed(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_fake_evidence(root)
+            edit_report(root, "windows-x64", STAGED,
+                        lambda d: d["source_built_dolphin"].update(
+                            full_corresponding_source_and_transitive_rights_reviewed=True))
+            with self.assertRaisesRegex(ValueError, "approval"):
                 consolidate_evidence(root, "42568420431")
 
     def test_missing_core_or_malformed_sha_fails(self):
