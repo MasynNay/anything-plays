@@ -13,9 +13,13 @@ exactly four platform installers, plus `SHA256SUMS.txt`:
 
 Source attribution, required redistribution notices, license texts and
 build provenance belong **inside each application package and in clearly
-linked project documentation**. If a full source ZIP is legally required,
-publish that in a separately labeled source archive release and link it
-prominently from the main release. Never hide or omit a source obligation.
+linked project documentation**. The stable publisher now drafts a separate `v3.0.0-sources` companion before
+creating the application release draft. It verifies all eleven pinned original
+upstream source archives, the checksum manifest and Dolphin's 37 Gitlinks.
+It publishes source access **before** the four-platform binary release and
+links the source companion prominently from the main release notes. The
+source archive alone does not settle combined GPL license compatibility or
+complete binary-to-source correspondence. Never hide or omit a source obligation.
 
 **Separate emulator-pack catalog:** one clearly named GitHub prerelease
 per approved 3.0 emulator generation; tag pattern
