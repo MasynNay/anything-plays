@@ -1,0 +1,64 @@
+name: Anything Plays 3.0 | Preserve all 11 pinned original corresponding sources
+
+# Source-only preservation. No emulator executables or game ROMs are built or
+# uploaded. GPL compatibility, transitive dependencies and binary matching
+# remain explicitly unapproved until complete review. This is NOT a release.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v30-corresponding-source-access.yml'
+      - 'tools/archive_v30_corresponding_sources.py'
+      - 'tests/test_v30_corresponding_source_access.py'
+      - 'anything_plays/v30_approved_core_map.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-eleven-source-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify archive rejects unsafe paths and does not imply rights
+        run: python -m unittest discover -s tests -p 'test_v30_corresponding_source_access.py' -v
+      - name: Retrieve all eleven exact original Git sources and recursive Gitlinks
+        run: |
+          python -m tools.archive_v30_corresponding_sources \
+            --fetch \
+            --workspace pinned-original-source-checkouts \
+            --output original-source-access
+      - name: Verify checksum inventory and source-only identity
+        run: |
+          set -euo pipefail
+          (cd original-source-access && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("original-source-access/SOURCE_ACCESS_CANDIDATE_UNAPPROVED.json").read_text("utf-8"))
+          assert report["core_count"] == 11
+          assert len(report["sources"]) == 11
+          assert report["newly_compiled_libretro_core_outputs_included"] is False
+          assert report["source_to_bundled_binary_review_complete"] is False
+          assert report["transitive_build_dependencies_review_complete"] is False
+          assert report["combined_gpl_distribution_reviewed"] is False
+          assert report["public_binary_distribution_approved"] is False
+          assert report["sources"]["dolphin"]["nested_gitlink_source_count"] == 37
+          files=list(Path("original-source-access").iterdir())
+          assert len(files) == 13 and sum(p.name.endswith(".tar.gz") for p in files) == 11
+          print("All 11 original pinned source trees captured, with 37 Dolphin Gitlinks, for source review.")
+          PY
+      - name: Preserve original source trees and immutable checksums; never release app binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-ELEVEN-ORIGINAL-CORE-SOURCES-UNAPPROVED
+          path: original-source-access/*
+          if-no-files-found: error
+          retention-days: 90
