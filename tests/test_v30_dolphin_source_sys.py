@@ -9,6 +9,7 @@ import tarfile
 from tempfile import TemporaryDirectory
 import unittest
 import zipfile
+from unittest.mock import patch
 
 from tools.fetch_dolphin_sys import extract_dolphin_sys
 from tools.prepare_v30_dolphin_source_sys import (
@@ -114,6 +115,58 @@ class PinnedOriginalDolphinSysTests(unittest.TestCase):
                     create_pinned_sys(source,out,meta)
                 self.assertFalse(out.exists())
                 self.assertFalse(meta.exists())
+
+    def test_rejects_partial_zip_when_postwrite_source_verification_fails(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.tar.gz"
+            source_tar(source)
+            tree = _git_tree_sha({name: (body, False) for name, body in FIXTURE.items()})
+            out, manifest = root / "Dolphin.zip", root / "review.json"
+            original = zipfile.ZipFile
+            calls = [0]
+
+            def broken_verifier(*args, **kwargs):
+                calls[0] += 1
+                if calls[0] == 2:
+                    raise zipfile.BadZipFile("simulated corrupt postwrite ZIP")
+                return original(*args, **kwargs)
+
+            with patch("tools.prepare_v30_dolphin_source_sys.zipfile.ZipFile",
+                       side_effect=broken_verifier):
+                with self.assertRaises(zipfile.BadZipFile):
+                    create_pinned_sys(source, out, manifest, expected_tree=tree)
+            self.assertEqual(calls[0], 2)
+            self.assertFalse(out.exists(), "corrupt output must be removed")
+            self.assertFalse(manifest.exists(), "no false source proof on failure")
+            # Recovery must work with the same paths, without manual cleanup.
+            create_pinned_sys(source, out, manifest, expected_tree=tree)
+            self.assertTrue(out.is_file())
+            self.assertTrue(manifest.is_file())
+
+    def test_rejects_partial_zip_when_manifest_write_fails(self):
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.tar.gz"
+            source_tar(source)
+            tree = _git_tree_sha({name: (body, False) for name, body in FIXTURE.items()})
+            out, manifest = root / "Dolphin.zip", root / "review.json"
+            original_write = Path.write_text
+
+            def failed_manifest_write(path, content, *args, **kwargs):
+                if path == manifest:
+                    original_write(path, "partial unapproved evidence", *args, **kwargs)
+                    raise OSError("simulated disk failure writing provenance")
+                return original_write(path, content, *args, **kwargs)
+
+            with patch.object(Path, "write_text", failed_manifest_write):
+                with self.assertRaisesRegex(OSError, "disk failure"):
+                    create_pinned_sys(source, out, manifest, expected_tree=tree)
+            self.assertFalse(out.exists(), "no ZIP without verified provenance")
+            self.assertFalse(manifest.exists(), "no partial provenance JSON")
+            create_pinned_sys(source, out, manifest, expected_tree=tree)
+            self.assertTrue(out.is_file())
+            self.assertTrue(manifest.is_file())
 
     def test_does_not_accept_missing_codehandler_or_existing_output(self):
         with TemporaryDirectory() as temp:
