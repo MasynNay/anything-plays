@@ -11,6 +11,8 @@ import argparse
 import hashlib
 import io
 import json
+import os
+import tempfile
 from pathlib import Path
 import re
 import sys
@@ -155,6 +157,31 @@ def build_candidate(artifact_paths):
     }
 
 
+
+def write_candidate_atomic(output: Path, candidate: dict) -> None:
+    """Commit a fully serialized lock without exposing partial JSON on failure."""
+    if output.is_symlink():
+        raise ValueError("Refusing symlinked lock output")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=output.parent,
+                                         prefix="." + output.name + ".", suffix=".tmp",
+                                         delete=False) as handle:
+            temporary = Path(handle.name)
+            json.dump(candidate, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        if output.is_symlink():
+            raise ValueError("Refusing symlinked lock output")
+        os.replace(temporary, output)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     for platform in PLATFORMS:
@@ -164,11 +191,7 @@ def main(argv=None):
     artifacts = {name: getattr(args, name.replace("-", "_")) for name in PLATFORMS}
     try:
         candidate = build_candidate(artifacts)
-        output = args.output
-        if output.is_symlink():
-            raise ValueError("Refusing symlinked lock output")
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_candidate_atomic(args.output, candidate)
     except (OSError, ValueError, zipfile.BadZipFile) as error:
         p.exit(1, f"Candidate lock generation failed: {error}\n")
     print(f"Locked {len(candidate['targets'])} targets with 11 original native archives and Dolphin Sys each (UNAPPROVED)")
