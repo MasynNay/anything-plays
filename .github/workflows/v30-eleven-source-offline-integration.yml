@@ -194,6 +194,151 @@ jobs:
             --output gpl-trial-native-inputs \
             --evidence test-evidence/ORIGINAL_10_SOURCE_BUILT_NATIVE_STAGING_UNAPPROVED.json \
             ${WIN_RUNTIME_ARG:+$WIN_RUNTIME_ARG}
+      - name: Install original Dolphin Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config libudev-dev libevdev-dev \
+            libasound2-dev libpulse-dev libgl-dev libegl1-mesa-dev libx11-dev \
+            libxi-dev libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev
+      - name: Install pristine Dolphin macOS build dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ninja cmake pkg-config
+      - name: Require Windows source-compatible Visual Studio 2026 compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $vsroot = & "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -products '*' -property installationPath
+          if ($LASTEXITCODE -ne 0 -or !$vsroot -or $vsroot -notmatch '\\18\\') { throw 'VS 2026 18.x required' }
+          if (-not ((cmake --help) -join [Environment]::NewLine -match 'Visual Studio 18 2026')) { throw 'VS 2026 generator missing' }
+      - name: Checkout genuine pinned pristine Dolphin and all 37 source Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin 32c61f9d0e933331bb7087ba57e96883241b4960
+          git -C original-dolphin checkout --detach 32c61f9d0e933331bb7087ba57e96883241b4960
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          p=verify_original_source(Path('original-dolphin'))
+          assert p['parent_commit']=='32c61f9d0e933331bb7087ba57e96883241b4960'
+          assert p['direct_gitlinks_verified']==34 and p['nested_gitlinks_verified']==3
+          print('All 37 source Gitlinks verified at exact immutable original commit')
+          PY
+      - name: Compile pristine source-built ELF on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
+            -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="$GITHUB_WORKSPACE/tools/v30_dolphin_original_link_order.cmake"
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+      - name: Compile pristine source-built Mach-O on macOS ARM and Intel
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch=arm64
+          if [[ "$TARGET" == macos-x64 ]]; then arch=x86_64; fi
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$arch" \
+            -DLIBRETRO=ON -DENABLE_QT=OFF -DENABLE_TESTS=OFF \
+            -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF -DENABLE_CCACHE=OFF \
+            -DENABLE_ANALYTICS=OFF -DUSE_RETRO_ACHIEVEMENTS=OFF \
+            -DUSE_SYSTEM_LIBS=OFF -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF \
+            -DENABLE_CLI_TOOL=OFF
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 3
+      - name: Compile pristine source-built Windows x64 PE DLL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $configure=@(
+            '-S', 'original-dolphin', '-B', 'original-dolphin-build',
+            '-G', 'Visual Studio 18 2026', '-A', 'x64',
+            '-DCMAKE_BUILD_TYPE=Release', '-DLIBRETRO=ON', '-DENABLE_QT=OFF',
+            '-DENABLE_TESTS=OFF', '-DENABLE_LTO=OFF', '-DENABLE_VULKAN=OFF',
+            '-DENABLE_CCACHE=OFF', '-DENABLE_ANALYTICS=OFF',
+            '-DUSE_RETRO_ACHIEVEMENTS=OFF', '-DUSE_SYSTEM_LIBS=OFF',
+            '-DUSE_MGBA=ON', '-DENABLE_AUTOUPDATE=OFF', '-DENABLE_CLI_TOOL=OFF'
+          )
+          & cmake @configure
+          if ($LASTEXITCODE -ne 0) { throw 'Pristine original Windows Dolphin configure failed' }
+          cmake --build original-dolphin-build --target dolphin_libretro --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Original source-built Windows Dolphin failed' }
+          $dlls=@(Get-ChildItem original-dolphin-build -Recurse -File -Filter dolphin_libretro.dll)
+          if ($dlls.Count -ne 1) { throw "Expected one source-built PE core, got $($dlls.Count)" }
+          New-Item -ItemType Directory -Force native-candidate | Out-Null
+          Copy-Item -LiteralPath $dlls[0].FullName -Destination native-candidate/dolphin_libretro.dll
+      - name: Audit pristine native compiler proof and exact 34 + 3 original sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == linux-x64 ]]; then
+            native=original-dolphin-build/dolphin_libretro.so
+            python -m tools.verify_v30_dolphin_original_build --source original-dolphin \
+              --native "$native" --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          elif [[ "$TARGET" == windows-x64 ]]; then
+            native=native-candidate/dolphin_libretro.dll
+            python -m tools.verify_v30_dolphin_original_windows --source original-dolphin \
+              --native "$native" --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          else
+            native=original-dolphin-build/dolphin_libretro.dylib
+            native_target="$TARGET"
+            if [[ "$TARGET" == macos-x64 ]]; then native_target=macos-x86_64; fi
+            python -m tools.verify_v30_dolphin_original_macos --source original-dolphin \
+              --native "$native" --target "$native_target" \
+              --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          fi
+          test -s "$native"
+          sha256sum "$native"
+          echo "NATIVE_DOLPHIN_CORE=$native" >> "$GITHUB_ENV"
+      - name: Stage all ELEVEN newly source-built core families; eliminate last buildbot Dolphin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v30_eleven_source_inputs \
+            --ten-dir gpl-trial-native-inputs --original-source original-dolphin \
+            --native "$NATIVE_DOLPHIN_CORE" \
+            --build-report DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json \
+            --target "$TARGET" --output eleven-source-native-inputs \
+            --evidence test-evidence/ORIGINAL_11_SOURCE_BUILT_STAGING_UNAPPROVED.json
+          mv gpl-trial-native-inputs ten-original-family-baseline
+          mv eleven-source-native-inputs gpl-trial-native-inputs
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          from anything_plays.v30_gpl_trial import MARKER
+          root=Path('gpl-trial-native-inputs')
+          marker=json.loads((root/MARKER).read_text('utf-8'))
+          assert marker['original_unchanged_core_archives']==0
+          assert marker['total_source_built_core_families']==11
+          assert marker['source_built_dolphin']['old_unverified_buildbot_replaced'] is True
+          assert marker['source_built_dolphin']['public_binary_distribution_approved'] is False
+          assert marker['source_exact_original_dolphin_sys']['public_distribution_approved'] is False
+          name=marker['source_built_dolphin']['native_filename']
+          with ZipFile(root/(name+'.zip')) as z:
+              assert z.namelist()==[name]
+          print('REPLACED historical Dolphin with genuine pinned original source-built core')
+          PY
+          cp DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json \
+            test-evidence/ORIGINAL_11TH_DOLPHIN_COMPILER_PROOF_UNAPPROVED.json
       - name: Validate exact Git original Dolphin Sys ZIP is now the embedded installed input
         shell: bash
         run: |
