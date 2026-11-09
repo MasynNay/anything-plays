@@ -48,6 +48,13 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 - **Source evidence improvement:** [PR #122](https://github.com/MasynNay/anything-plays/pull/122) adds a post-matrix reviewer artifact for 44 installed native hashes and exact upstream source identities. Additional regression tests now reject fabricated Dolphin license-notice dictionaries, invalid source paths or digests and falsely asserted approval. The PR is **pending new CI**; the review artifact is not a legal determination or a distributable binary.
 - **Public release remains v2.0.0.** Third-party GPL compatibility, exact corresponding-source distribution obligations, immutable release-mode native inputs and final production acceptance remain unresolved. No permissions or legal QA booleans are inferred from compilation or installed homebrew playback.
 
+
+### November 9, 2026 — additional source-lock hardening (pending CI)
+
+- [PR #130](https://github.com/MasynNay/anything-plays/pull/130) adds fail-closed validation and two synthetic regression tests for malformed original native core/archive metadata in four-platform candidate lock creation. **Open, CI not yet verified, not merged.**
+- [PR #129](https://github.com/MasynNay/anything-plays/pull/129) demonstrated a GPL-2.0-or-later Atari 2600 Tia source-built alternative on four operating systems. This is a research substitute only, **not yet substituted into the complete 11-core installer**. GPL compatibility and all source/rights approvals remain pending.
+- Public release remains **v2.0.0**; no unapproved 3.0 installer has been published.
+
 ## Delivered milestones
 
 ### 1.0–2.0 — Desktop foundation
