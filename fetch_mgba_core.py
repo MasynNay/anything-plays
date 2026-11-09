@@ -52,6 +52,12 @@ def core_names_for_build():
             raise ValueError("GPL alternative trial requires offline, unapproved 11-core preview only")
         if len(V30_GPL_TRIAL_CORES) != 11 or len(set(V30_GPL_TRIAL_CORES)) != 11:
             raise ValueError("GPL alternative trial core inventory changed")
+        # Same 18 profiles and eleven native images, Tia replaces the one
+        # GPLv2-only Stella2014 only when an exact original source/AV marker
+        # is present and checked. Never affect the stable v2 lanes.
+        if os.environ.get("AP_V30_TIA_TRIAL") == "1":
+            return tuple("tia" if name == "stella2014" else name
+                         for name in V30_GPL_TRIAL_CORES)
         return V30_GPL_TRIAL_CORES
     # A tampered environment flag cannot substitute for the approved
     # per-architecture binary/source/license lock.
@@ -92,6 +98,7 @@ SOURCE_REPOSITORIES = {
     "parallel_n64": "https://github.com/libretro/parallel-n64",
     "dolphin": "https://github.com/libretro/dolphin",
     "stella2014": "https://github.com/libretro/stella2014-libretro",
+    "tia": "https://github.com/warmenhoven/tia",
     "prosystem": "https://github.com/libretro/prosystem-libretro",
     "mednafen_pce_fast": "https://github.com/libretro/beetle-pce-fast-libretro",
     "mednafen_ngp": "https://github.com/libretro/beetle-ngp-libretro",
@@ -291,6 +298,8 @@ def fetch_core(name, destination=CORE_FOLDER):
         # CI artifacts, NOT a mutable Libretro nightly/buildbot ZIP.
         url = ("https://github.com/MasynNay/anything-plays/actions/runs/"
                + ("42494297281" if name == "mednafen_supafaust" else "42496671418"))
+    if os.environ.get("AP_V30_TIA_TRIAL") == "1" and name == "tia":
+        url = "https://github.com/warmenhoven/tia/tree/6ae5bf998fe7a7842294089db17fc86fd73db1f0"
     destination = Path(destination)
     print(f"Preparing {name}; upstream reference: {url}", flush=True)
 
