@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 from fetch_mgba_core import CORE_NAMES, OPTIONAL_V21_CORES
 from tools.v30_release_lock import (
     ALTERNATIVE_CORE_NAMES, TARGETS, load_approved_lock, selected_core_set,
-    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_FIVE,
+    selected_source_families, SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_FIVE,
     verify_core_archive, verify_core_payload, verify_dolphin_archive,
 )
 from tools.emit_v30_production_provenance import SOURCE_FILE, validate_source_inventory
@@ -39,18 +39,23 @@ from tools.probe_v30_gpl_core_switch import validate_original_source_artifact
 from tools.v30_pce_candidate import inspect_artifact, load_index
 from anything_plays.v30_approved_core_map import (
     REPOSITORIES, EXPECTED, EIGHT_REPOSITORIES, EIGHT_EXPECTED,
-    TEN_REPOSITORIES, TEN_EXPECTED, WINDOWS_RUNTIME,
+    TEN_REPOSITORIES, TEN_EXPECTED, ELEVEN_REPOSITORIES, ELEVEN_EXPECTED, WINDOWS_RUNTIME,
 )
 from tools.stage_v30_eight_source_inputs import check_original_five_artifact
 from tools.stage_v30_nine_source_inputs import inspect_original_mgba
 from tools.stage_v30_ten_source_inputs import check_original_n64_artifact
 from tools.stage_v30_original_dolphin_sys import exact_original_sys_artifact
 from tools.prepare_v30_dolphin_source_sys import DOLPHIN_REV, PINNED_SYS_TREE_SHA1
+from tools.verify_v30_dolphin_original_build import verify_original_source, verify_original_library
+from tools.verify_v30_dolphin_original_macos import verify_original_macos_native
+from tools.verify_v30_dolphin_original_windows import verify_original_windows_native
+from tools.package_v30_dolphin_source_bundle import validate_parent_archive
 
 UNAPPROVED_ORIGINAL = "PRESERVED_NATIVE_INPUTS.json"
 FIVE_FAMILY_SOURCE_RUN = 42515151314
 UNCHANGED_3 = frozenset(("mgba", "parallel_n64", "dolphin"))
 UNCHANGED_1 = frozenset(("dolphin",))
+UNCHANGED_0 = frozenset()
 assert len(UNCHANGED_3) == 3 and len(UNCHANGED_1) == 1
 RECEIPT = "V30_SOURCE_BUILT_INPUTS_MATCH_REVIEWED_LOCK.json"
 # The old Snes9x / Genesis Plus GX must NOT be copied into production.
@@ -153,7 +158,9 @@ def _source_original_family(root, name, target, extension):
 def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                              snes_dir, sega_dir, pce_artifact, output_dir,
                              windows_runtime=None, five_dirs=None,
-                             mgba_dir=None, n64_dir=None, dolphin_sys_dir=None):
+                             mgba_dir=None, n64_dir=None, dolphin_sys_dir=None,
+                             dolphin_source_dir=None, dolphin_native=None,
+                             dolphin_build_report=None, dolphin_parent_archive=None):
     """Validate EVERYTHING, then create exactly one review-bound input folder.
 
     A caller-supplied JSON or environment variable cannot flip the real repo's
@@ -171,8 +178,9 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
     validate_source_inventory(lock, inventory)
     reviewed_map = approved_core_map_from_lock(lock, target)
     families = selected_source_families(lock)
-    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
-    ten = families == SOURCE_BUILT_TEN
+    eleven = families == SOURCE_BUILT_ELEVEN
+    eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
+    ten = families in (SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
     if eight != (five_dirs is not None):
         raise ValueError("Eight/ten reviewed sources require EXACT original five-family artifact inputs")
     if eight and (not isinstance(five_dirs,dict) or set(five_dirs)!=SOURCE_BUILT_FIVE):
@@ -183,9 +191,14 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         raise ValueError("Unreviewed mGBA or N64 research artifacts in older production variant")
     if ten != (dolphin_sys_dir is not None):
         raise ValueError("Ten-source production must use exact original-source Dolphin Sys artifact")
-    retained = UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
-    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    dolphin_inputs = (dolphin_source_dir, dolphin_native, dolphin_build_report, dolphin_parent_archive)
+    if eleven != all(item is not None for item in dolphin_inputs):
+        raise ValueError("Eleven-source production requires ALL exact pinned Dolphin source/native/build/parent archive inputs")
+    if not eleven and any(item is not None for item in dolphin_inputs):
+        raise ValueError("Unreviewed original Dolphin native inputs in ten-source release")
+    retained = UNCHANGED_0 if eleven else UNCHANGED_1 if ten else UNCHANGED_3 if eight else UNCHANGED_8
+    expected = ELEVEN_EXPECTED if eleven else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
+    repositories = ELEVEN_REPOSITORIES if eleven else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
     ext = EXT[target]
     original_target = {
         "windows-x86_64": "windows-x64",
@@ -345,6 +358,91 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                 "original_license_sha256": original_notice_sha,
                 "original_owned_actions_run_id": proof["source_build_run_id"],
             }
+    if eleven:
+        # Production Dolphin may ONLY come from the newly compiled pristine
+        # original source tree, not the historically unverified buildbot ZIP.
+        # GPL source/rights approval is separate from this native identity proof.
+        original_source = Path(dolphin_source_dir)
+        compiled_dolphin = Path(dolphin_native)
+        compiler_record = Path(dolphin_build_report)
+        original_parent_tar = Path(dolphin_parent_archive)
+        if any(x.is_symlink() for x in (
+                original_source, compiled_dolphin, compiler_record, original_parent_tar)):
+            raise ValueError("Source/native Dolphin input symlink forbidden")
+        provenance = verify_original_source(original_source)
+        if (provenance["parent_commit"] != DOLPHIN_REV or
+                provenance["direct_gitlinks_verified"] != 34 or
+                provenance["nested_gitlinks_verified"] != 3):
+            raise ValueError("Pristine Dolphin source parent or 37 source Gitlinks differ")
+        if target == "windows-x86_64":
+            native_dolphin = verify_original_windows_native(compiled_dolphin)
+        elif target.startswith("macos"):
+            native_dolphin = verify_original_macos_native(compiled_dolphin, target)
+        else:
+            native_dolphin = verify_original_library(compiled_dolphin)
+        if (not compiler_record.is_file() or compiler_record.stat().st_size > 100000):
+            raise ValueError("Missing original Dolphin compiler-emitted proof")
+        compiled = json.loads(compiler_record.read_text("utf-8"))
+        approved_target = {
+            "windows-x86_64": "windows-x64", "linux-x86_64": "linux-x64",
+            "macos-arm64": "macos-arm64", "macos-x86_64": "macos-x86_64",
+        }[target]
+        if (compiled.get("parent_commit") != DOLPHIN_REV
+                or compiled.get("source_build_target") != approved_target
+                or compiled.get("direct_gitlinks_verified") != 34
+                or compiled.get("nested_gitlinks_verified") != 3
+                or compiled.get("original_unmodified_dolphin_source_compiled") is not True
+                or compiled.get("built_from_original_pinned_git_tree") is not True
+                or compiled.get("old_buildbot_binary_equivalence_claimed") is not False
+                or compiled.get("public_binary_distribution_approved") is not False
+                or compiled.get("native_sha256") != native_dolphin["native_sha256"]
+                or compiled.get("native_size_bytes") != native_dolphin["native_size_bytes"]):
+            raise ValueError("Actual Dolphin native/source/CI proof does not match pinned original compiler")
+        parent_sha, parent_size = validate_parent_archive(original_parent_tar)
+        original_licenses = {
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt": "COPYING",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-GPL2-OR-LATER.txt": "LICENSES/GPL-2.0-or-later.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-BSD3.txt": "LICENSES/BSD-3-Clause.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-CC0.txt": "LICENSES/CC0-1.0.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-MIT.txt": "LICENSES/MIT.txt",
+        }
+        license_payload = {}
+        for dest, location in original_licenses.items():
+            src = original_source / location
+            if (src.is_symlink() or not src.is_file()
+                    or not 50 < src.stat().st_size <= 1024 * 1024):
+                raise ValueError(f"Original Dolphin source copyright/notice missing: {location}")
+            license_payload[dest] = src.read_bytes()
+        notice_sha = sha(json.dumps(
+            {name: sha(data) for name, data in sorted(license_payload.items())},
+            sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        compiled_bytes = compiled_dolphin.read_bytes()
+        zipped = package_native_zip("dolphin", ext, compiled_bytes)
+        verify_core_archive(lock, _sys_platform(target), _architecture(target), "dolphin", zipped)
+        verify_core_payload(lock, _sys_platform(target), _architecture(target),
+                            "dolphin", f"dolphin_libretro{ext}", compiled_bytes)
+        reviewed = inventory["targets"][target]["cores"]["dolphin"]
+        if (reviewed.get("source_archive_sha256") != parent_sha
+                or reviewed.get("source_archive_size_bytes") != parent_size
+                or reviewed.get("source_commit_sha") != DOLPHIN_REV
+                or reviewed.get("source_repository") != "https://github.com/libretro/dolphin"
+                or reviewed.get("native_sha256") != sha(compiled_bytes)
+                or notice_sha != reviewed_map["cores"]["dolphin"]["license_notice_sha256"]):
+            raise ValueError("Original Dolphin source/native/parent TAR or licenses differ from reviewed inventory")
+        payload[f"dolphin_libretro{ext}.zip"] = zipped
+        payload.update(license_payload)
+        sources["dolphin"] = {
+            "source_revision": DOLPHIN_REV,
+            "source_archive_sha256": parent_sha,
+            "native_sha256": sha(compiled_bytes),
+            "original_native_archive_sha256": sha(zipped),
+            "original_license_sha256": notice_sha,
+            "original_source_gitlinks_verified": 37,
+            "source_build_report_sha256": sha(compiler_record.read_bytes()),
+            "old_unverified_buildbot_native_replaced": True,
+            "full_corresponding_source_and_license_decision_independently_approved":
+                reviewed.get("redistribution_license_reviewed") is True,
+        }
     if target == "windows-x86_64":
         binary = _file_bytes(Path(windows_runtime).parent, Path(windows_runtime).name,
                              max_size=8 * 1024 * 1024)
@@ -403,6 +501,10 @@ def main(argv=None):
     parser.add_argument("--mgba-dir", type=Path)
     parser.add_argument("--n64-dir", type=Path)
     parser.add_argument("--dolphin-sys-dir", type=Path)
+    parser.add_argument("--dolphin-source-dir", type=Path)
+    parser.add_argument("--dolphin-native", type=Path)
+    parser.add_argument("--dolphin-build-report", type=Path)
+    parser.add_argument("--dolphin-parent-archive", type=Path)
     for name in sorted(SOURCE_BUILT_FIVE):
         parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
@@ -412,7 +514,7 @@ def main(argv=None):
         if not (ROOT / "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md").is_file():
             raise ValueError("Independent reviewed copyright decision is missing")
         families = selected_source_families(lock)
-        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN)
+        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
         five={name: getattr(args,name+"_dir") for name in SOURCE_BUILT_FIVE}
         if wants_eight and any(path is None for path in five.values()):
             raise ValueError("Independent 8-family source lock requires all 5 original artifacts")
@@ -426,6 +528,10 @@ def main(argv=None):
             five_dirs=five if wants_eight else None,
             mgba_dir=args.mgba_dir, n64_dir=args.n64_dir,
             dolphin_sys_dir=args.dolphin_sys_dir,
+            dolphin_source_dir=args.dolphin_source_dir,
+            dolphin_native=args.dolphin_native,
+            dolphin_build_report=args.dolphin_build_report,
+            dolphin_parent_archive=args.dolphin_parent_archive,
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")

@@ -54,7 +54,7 @@ jobs:
             installer: anything-plays_3.0.0_amd64.deb
             core_manifest: dist/AnythingPlays/cores/CORE_PROVENANCE.json
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       SOURCE_RUN_ID: ${{ inputs.native_input_run_id }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
@@ -71,6 +71,7 @@ jobs:
       MGBA_SOURCE_RUN_ID: '42527449154'
       N64_SOURCE_RUN_ID: '42534736496'
       ORIGINAL_SOURCE_SYS_RUN_ID: '42553978214'
+      ORIGINAL_DOLPHIN_SOURCE_BUNDLE_RUN_ID: '42542696226'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,14 +99,14 @@ jobs:
           python - <<'PY'
           from tools.v30_release_lock import (
               load_approved_lock, selected_core_set, selected_source_families,
-              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_TEN)
+              ALTERNATIVE_CORE_NAMES, SOURCE_BUILT_ELEVEN)
           lock = load_approved_lock()
           assert selected_core_set(lock) == ALTERNATIVE_CORE_NAMES, (
               "Production must use the FULL source-built GPL alternative core set; "
               "original Snes9x/Genesis GX are not accepted for v3")
-          assert selected_source_families(lock) == SOURCE_BUILT_TEN, (
-              "Production must use ten independently source-built families; "
-              "only original Dolphin remains from the legacy archived binary")
+          assert selected_source_families(lock) == SOURCE_BUILT_ELEVEN, (
+              "Production must use ELEVEN verified original-source native families; "
+              "historical unverified Dolphin binaries cannot ship")
           PY
           test -s config/v3.0-corresponding-source-inventory.json
           test -s docs/V3_LICENSE_COMPATIBILITY_APPROVED.md
@@ -180,6 +181,10 @@ jobs:
           gh run download "$ORIGINAL_SOURCE_SYS_RUN_ID" \
             --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-${{ matrix.target }}-UNAPPROVED" \
             --dir original-source-sys
+          gh run download "$ORIGINAL_DOLPHIN_SOURCE_BUNDLE_RUN_ID" \
+            --name "AnythingPlays-3.0.0-DOLPHIN-38-SOURCE-CANDIDATES-UNAPPROVED" \
+            --dir original-dolphin-corresponding-source
+          test -s original-dolphin-corresponding-source/dolphin-parent-32c61f9d0e933331bb7087ba57e96883241b4960.tar.gz
           (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
@@ -216,6 +221,120 @@ jobs:
           test -s /mingw64/bin/libwinpthread-1.dll
           cp /mingw64/bin/libwinpthread-1.dll original-native-winpthread.dll
           test -s original-native-winpthread.dll
+      - name: Install original Dolphin Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git ninja-build cmake gcc g++ pkg-config libudev-dev libevdev-dev \
+            libasound2-dev libpulse-dev libgl-dev libegl1-mesa-dev libx11-dev \
+            libxi-dev libxrandr-dev libx11-xcb-dev libxext-dev libusb-1.0-0-dev
+      - name: Install pristine Dolphin macOS build dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install ninja cmake pkg-config
+      - name: Require Windows source-compatible Visual Studio 2026 compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $vsroot = & "${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe" -latest -products '*' -property installationPath
+          if ($LASTEXITCODE -ne 0 -or !$vsroot -or $vsroot -notmatch '\\18\\') { throw 'VS 2026 18.x required' }
+          if (-not ((cmake --help) -join [Environment]::NewLine -match 'Visual Studio 18 2026')) { throw 'VS 2026 generator missing' }
+      - name: Checkout genuine pinned pristine Dolphin and all 37 source Gitlinks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          git -C original-dolphin fetch --filter=blob:none origin 32c61f9d0e933331bb7087ba57e96883241b4960
+          git -C original-dolphin checkout --detach 32c61f9d0e933331bb7087ba57e96883241b4960
+          git -C original-dolphin submodule sync --recursive
+          git -C original-dolphin -c advice.detachedHead=false submodule update --init --recursive --jobs 4
+          python - <<'PY'
+          from pathlib import Path
+          from tools.verify_v30_dolphin_original_build import verify_original_source
+          p=verify_original_source(Path('original-dolphin'))
+          assert p['parent_commit']=='32c61f9d0e933331bb7087ba57e96883241b4960'
+          assert p['direct_gitlinks_verified']==34 and p['nested_gitlinks_verified']==3
+          print('All 37 source Gitlinks verified at exact immutable original commit')
+          PY
+      - name: Compile pristine source-built ELF on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_QT=OFF \
+            -DENABLE_TESTS=OFF -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_CCACHE=OFF -DENABLE_ANALYTICS=OFF \
+            -DUSE_RETRO_ACHIEVEMENTS=OFF -DUSE_SYSTEM_LIBS=OFF \
+            -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF -DENABLE_CLI_TOOL=OFF \
+            -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="$GITHUB_WORKSPACE/tools/v30_dolphin_original_link_order.cmake"
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 2
+      - name: Compile pristine source-built Mach-O on macOS ARM and Intel
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch=arm64
+          if [[ "$TARGET" == macos-x64 ]]; then arch=x86_64; fi
+          cmake -S original-dolphin -B original-dolphin-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$arch" \
+            -DLIBRETRO=ON -DENABLE_QT=OFF -DENABLE_TESTS=OFF \
+            -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF -DENABLE_CCACHE=OFF \
+            -DENABLE_ANALYTICS=OFF -DUSE_RETRO_ACHIEVEMENTS=OFF \
+            -DUSE_SYSTEM_LIBS=OFF -DUSE_MGBA=ON -DENABLE_AUTOUPDATE=OFF \
+            -DENABLE_CLI_TOOL=OFF
+          cmake --build original-dolphin-build --target dolphin_libretro --parallel 3
+      - name: Compile pristine source-built Windows x64 PE DLL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $configure=@(
+            '-S', 'original-dolphin', '-B', 'original-dolphin-build',
+            '-G', 'Visual Studio 18 2026', '-A', 'x64',
+            '-DCMAKE_BUILD_TYPE=Release', '-DLIBRETRO=ON', '-DENABLE_QT=OFF',
+            '-DENABLE_TESTS=OFF', '-DENABLE_LTO=OFF', '-DENABLE_VULKAN=OFF',
+            '-DENABLE_CCACHE=OFF', '-DENABLE_ANALYTICS=OFF',
+            '-DUSE_RETRO_ACHIEVEMENTS=OFF', '-DUSE_SYSTEM_LIBS=OFF',
+            '-DUSE_MGBA=ON', '-DENABLE_AUTOUPDATE=OFF', '-DENABLE_CLI_TOOL=OFF'
+          )
+          & cmake @configure
+          if ($LASTEXITCODE -ne 0) { throw 'Pristine original Windows Dolphin configure failed' }
+          cmake --build original-dolphin-build --target dolphin_libretro --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Original source-built Windows Dolphin failed' }
+          $dlls=@(Get-ChildItem original-dolphin-build -Recurse -File -Filter dolphin_libretro.dll)
+          if ($dlls.Count -ne 1) { throw "Expected one source-built PE core, got $($dlls.Count)" }
+          New-Item -ItemType Directory -Force native-candidate | Out-Null
+          Copy-Item -LiteralPath $dlls[0].FullName -Destination native-candidate/dolphin_libretro.dll
+      - name: Audit pristine native compiler proof and exact 34 + 3 original sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET" == linux-x64 ]]; then
+            native=original-dolphin-build/dolphin_libretro.so
+            python -m tools.verify_v30_dolphin_original_build --source original-dolphin \
+              --native "$native" --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          elif [[ "$TARGET" == windows-x64 ]]; then
+            native=native-candidate/dolphin_libretro.dll
+            python -m tools.verify_v30_dolphin_original_windows --source original-dolphin \
+              --native "$native" --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          else
+            native=original-dolphin-build/dolphin_libretro.dylib
+            native_target="$TARGET"
+            if [[ "$TARGET" == macos-x64 ]]; then native_target=macos-x86_64; fi
+            python -m tools.verify_v30_dolphin_original_macos --source original-dolphin \
+              --native "$native" --target "$native_target" \
+              --output DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json
+          fi
+          test -s "$native"
+          sha256sum "$native"
+          echo "NATIVE_DOLPHIN_CORE=$native" >> "$GITHUB_ENV"
       - name: Stage EXACT SOURCE-REVIEWED 11-core production offline inputs, or fail before build
         shell: bash
         env:
@@ -240,6 +359,10 @@ jobs:
             --mgba-dir source-built-mgba \
             --n64-dir source-built-n64 \
             --dolphin-sys-dir original-source-sys \
+            --dolphin-source-dir original-dolphin \
+            --dolphin-native "$NATIVE_DOLPHIN_CORE" \
+            --dolphin-build-report DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json \
+            --dolphin-parent-archive original-dolphin-corresponding-source/dolphin-parent-32c61f9d0e933331bb7087ba57e96883241b4960.tar.gz \
             --output-dir "$AP_CORE_ARCHIVE_DIR" \
             ${WIN_DLL:+$WIN_DLL}
           # This receipt is strictly source/native provenance; it is NOT a
@@ -254,7 +377,7 @@ jobs:
           manifest = json.loads((root/RECEIPT).read_text("utf-8"))
           assert manifest["native_core_count"] == 11
           assert manifest["system_profile_count"] == 18
-          assert manifest["unchanged_original_core_count"] == 1
+          assert manifest["unchanged_original_core_count"] == 0
           assert manifest["native_approval_comes_from_separately_reviewed_lock"] is True
           assert manifest["auto_granted_license_rights"] is False
           assert manifest["source_exact_dolphin_sys_evidence"]["original_git_data_sys_tree_sha1"] == "6abd87498928d5362d83f698a562e956072b8700"
@@ -262,7 +385,7 @@ jobs:
           assert set(manifest["source_built_families"]) == {
               "mednafen_supafaust","blastem","mednafen_pce_fast",
               "fceumm","stella2014","prosystem","mednafen_ngp","mednafen_wswan",
-              "mgba","parallel_n64"}
+              "mgba","parallel_n64","dolphin"}
           assert selected_core_set(lock) == set(lock["targets"][manifest["target"]]["cores"])
           PY
       - name: Install Windows installer compiler

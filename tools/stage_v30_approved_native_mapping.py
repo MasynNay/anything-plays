@@ -13,12 +13,12 @@ from pathlib import Path
 
 from anything_plays.v30_approved_core_map import (
     EXPECTED, REPOSITORIES, EIGHT_EXPECTED, EIGHT_REPOSITORIES,
-    TEN_EXPECTED, TEN_REPOSITORIES,
+    TEN_EXPECTED, TEN_REPOSITORIES, ELEVEN_EXPECTED, ELEVEN_REPOSITORIES,
     MARKER, STATUS, WINDOWS_RUNTIME, _require_hash, validate_installed_map,
 )
 from tools.v30_release_lock import (
     ALTERNATIVE_CORE_NAMES, selected_core_set, selected_source_families,
-    SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, TARGETS, load_approved_lock,
+    SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, TARGETS, load_approved_lock,
 )
 
 EXT = {
@@ -48,8 +48,9 @@ def approved_core_map_from_lock(lock, target):
     families = selected_source_families(lock)
     eight = families == SOURCE_BUILT_EIGHT
     ten = families == SOURCE_BUILT_TEN
-    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    eleven = families == SOURCE_BUILT_ELEVEN
+    expected = ELEVEN_EXPECTED if eleven else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
+    repositories = ELEVEN_REPOSITORIES if eleven else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
     result = {
         "schema_version": 1, "status": STATUS,
         "core_set_id": lock.get("core_set_id"),
@@ -63,6 +64,9 @@ def approved_core_map_from_lock(lock, target):
     if ten:
         result["ten_source_built_families_reviewed"] = True
         result["one_unchanged_dolphin_family_reviewed"] = True
+    if eleven:
+        result["eleven_source_built_families_reviewed"] = True
+        result["zero_unchanged_native_families_reviewed"] = True
     ext = EXT[target]
     for name, source in expected.items():
         core = cores[name]

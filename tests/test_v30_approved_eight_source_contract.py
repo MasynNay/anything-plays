@@ -195,18 +195,21 @@ class EightRealSourceApprovalContracts(unittest.TestCase):
                     staging.assemble_approved_inputs(**kwargs)
             self.assertFalse((folder/"out").exists())
 
-    def test_prod_workflow_requires_actual_pinned_ten_and_only_dolphin_original(self):
+    def test_prod_workflow_requires_all_eleven_actual_original_source_families(self):
         root=Path(__file__).resolve().parents[1]
         yml=(root/".github/workflows/v30-production-candidates.yml").read_text("utf-8")
-        self.assertIn("SOURCE_BUILT_TEN",yml)
+        self.assertIn("SOURCE_BUILT_ELEVEN",yml)
         self.assertIn("42515151314",yml)
         self.assertIn("42527449154",yml)
         self.assertIn("42534736496",yml)
         self.assertIn("--mednafen-wswan-dir original-five-source/mednafen_wswan",yml)
         self.assertIn("--mgba-dir source-built-mgba",yml)
         self.assertIn("--n64-dir source-built-n64",yml)
+        self.assertIn("--dolphin-native",yml)
+        self.assertIn("ORIGINAL_DOLPHIN_SOURCE_BUNDLE_RUN_ID",yml)
+        self.assertIn("DOLPHIN_11TH_SOURCE_BUILD_PROOF_UNAPPROVED.json",yml)
         self.assertIn("unchanged_original_core_count",yml)
-        self.assertIn('unchanged_original_core_count"] == 1',yml)
+        self.assertIn('unchanged_original_core_count"] == 0',yml)
         self.assertIn("AP_V30_APPROVED_EIGHT: '1'",yml)
         self.assertIn("AP_V30_APPROVED_TEN: '1'",yml)
         self.assertNotIn("gh release create",yml)

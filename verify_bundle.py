@@ -193,7 +193,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 "blastem": "BlastEm-COPYING.txt",
                 "mednafen_pce_fast": "PCE-COPYING.txt",
             }
-            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten"):
+            if selected["core_set_id"] in ("gpl-source-built-eight", "gpl-source-built-ten", "gpl-source-built-eleven"):
                 # A native same-name buildbot ZIP is NOT the verified
                 # original source-built NES/Atari/NGP/WonderSwan binary.
                 for name in ("fceumm","stella2014","prosystem",
@@ -209,7 +209,7 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 if (hashlib.sha256(license_file.read_bytes()).hexdigest()
                         != row["license_notice_sha256"]):
                     raise ValueError(f"Unreviewed GPL source notice bytes: {name}")
-            if selected["core_set_id"] == "gpl-source-built-ten":
+            if selected["core_set_id"] in ("gpl-source-built-ten", "gpl-source-built-eleven"):
                 # mGBA MPL original license plus 11 individually pinned
                 # ParaLLEl-N64 upstream GPL/LGPL/MIT notice files must be
                 # present. The aggregate SHA binds every filename and byte
@@ -236,6 +236,29 @@ def verify_bundle(bundle, platform_name, check_native=False):
                     if (selected["cores"][name]["native_sha256"]
                             != records[name]["native_sha256"]):
                         raise ValueError(f"Production {name} compiled binary differs from lock")
+            if selected["core_set_id"] == "gpl-source-built-eleven":
+                # Source-built Dolphin original upstream license notices are
+                # preserved individually; one sorted digest protects all five.
+                dolphin_notices = {
+                    "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt",
+                    "GPL-TRIAL-DOLPHIN-ORIGINAL-GPL2-OR-LATER.txt",
+                    "GPL-TRIAL-DOLPHIN-ORIGINAL-BSD3.txt",
+                    "GPL-TRIAL-DOLPHIN-ORIGINAL-CC0.txt",
+                    "GPL-TRIAL-DOLPHIN-ORIGINAL-MIT.txt",
+                }
+                digest_map = {}
+                for filename in sorted(dolphin_notices):
+                    notice = licenses / filename
+                    if (notice.is_symlink() or not notice.is_file()
+                            or not 50 < notice.stat().st_size <= 1024 * 1024):
+                        raise ValueError(f"Missing original upstream Dolphin license: {filename}")
+                    digest_map[filename] = hashlib.sha256(notice.read_bytes()).hexdigest()
+                original_notice_sha = hashlib.sha256(json.dumps(
+                    digest_map, sort_keys=True,
+                    separators=(",", ":")).encode("utf-8")).hexdigest()
+                if (original_notice_sha != selected["cores"]["dolphin"]["license_notice_sha256"]
+                        or selected["cores"]["dolphin"]["native_sha256"] != records["dolphin"]["native_sha256"]):
+                    raise ValueError("New source-built Dolphin native or original notices differ from approved lock")
             if platform_name == "windows":
                 win_notice = licenses / "Winpthreads-COPYING.txt"
                 if win_notice.is_symlink() or not win_notice.is_file() or not win_notice.read_bytes().strip():
