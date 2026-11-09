@@ -67,6 +67,7 @@ jobs:
       FIVE_SOURCE_RUN_ID: '42515151314'
       MGBA_SOURCE_RUN_ID: '42527449154'
       N64_SOURCE_RUN_ID: '42534736496'
+      SOURCE_SYS_RUN_ID: '42553978214'
       AP_V30_PINNED_N64: '1'
       AP_V30_PINNED_MGBA: '1'
       AP_CORE_ARCHIVE_DIR: ${{ github.workspace }}/gpl-trial-native-inputs
@@ -98,6 +99,9 @@ jobs:
           test "$(gh run view "$MGBA_SOURCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Pinned original MPL mGBA source and native GB GBC GBA (four OS)"
           test "$(gh run view "$N64_SOURCE_RUN_ID" --json conclusion --jq .conclusion)" = "success"
           test "$(gh run view "$N64_SOURCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Four-platform original source-built ParaLLEl N64"
+          test "$(gh run view "$SOURCE_SYS_RUN_ID" --json conclusion --jq .conclusion)" = success
+          test "$(gh run view "$SOURCE_SYS_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Original pinned Dolphin Sys from exact Git source"
+          python -m unittest discover -s tests -p 'test_v30_stage_original_dolphin_sys.py' -v
           python -m unittest discover -s tests -p 'test_v30_ten_source_staging.py' -v
           python -m unittest discover -s tests -p 'test_v30_nine_source_staging.py' -v
           test "$(gh run view "$FIVE_SOURCE_RUN_ID" --json name --jq .name)" = "Anything Plays 3.0 | Five more source-built 2D core families (20 genuine OS jobs)"
@@ -122,6 +126,8 @@ jobs:
           gh run download "$PINNED_PCE_RUN_ID" --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" --dir source-built-pce
           gh run download "$MGBA_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-mgba
           gh run download "$N64_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-n64
+          gh run download "$SOURCE_SYS_RUN_ID" --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" --dir original-source-sys
+          (cd original-source-sys && sha256sum --check SHA256SUMS.txt)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
             gh run download "$FIVE_SOURCE_RUN_ID" \
               --name "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
@@ -171,6 +177,7 @@ jobs:
             --pce-artifact original-source-built-pce.zip \
             --mgba-dir source-built-mgba \
             --n64-dir source-built-n64 \
+            --dolphin-sys-dir original-source-sys \
             --fceumm-dir source-built-five/fceumm \
             --stella2014-dir source-built-five/stella2014 \
             --prosystem-dir source-built-five/prosystem \
@@ -180,6 +187,22 @@ jobs:
             --output gpl-trial-native-inputs \
             --evidence test-evidence/ORIGINAL_10_SOURCE_BUILT_NATIVE_STAGING_UNAPPROVED.json \
             ${WIN_RUNTIME_ARG:+$WIN_RUNTIME_ARG}
+      - name: Validate exact Git original Dolphin Sys ZIP is now the embedded installed input
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.stage_v30_original_dolphin_sys import exact_original_sys_artifact
+          source_data, receipt=exact_original_sys_artifact("original-source-sys")
+          installed=Path("gpl-trial-native-inputs/Dolphin.zip")
+          assert installed.is_file() and installed.read_bytes()==source_data
+          marker=json.loads(Path("gpl-trial-native-inputs/V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json").read_text())
+          assert marker["source_exact_original_dolphin_sys"]==receipt
+          assert marker["source_exact_original_dolphin_sys"]["public_distribution_approved"] is False
+          print("Exact original pinned Dolphin Git source Sys staged for full offline installer; no public rights")
+          PY
       - name: Install Windows source-accurate packaging compiler
         if: runner.os == 'Windows'
         shell: pwsh
