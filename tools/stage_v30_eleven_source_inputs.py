@@ -90,7 +90,7 @@ def _staged_ten(root: Path, target: str) -> tuple[dict, Path]:
     return marker, archive
 
 
-def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
+def stage_eleven(*, ten_dir, original_source, native, source_build_report, target, output, evidence,
                  inspect_native=verified_native, inspect_source=verify_original_source):
     """Never copy a new native until all source, license and hash checks pass."""
     if target not in TARGET_EXT:
@@ -100,12 +100,12 @@ def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
             or os.environ.get("AP_RELEASE_BUILD", "0") != "0"
             or os.environ.get("AP_V30_APPROVED_RELEASE", "0") != "0"):
         raise ValueError("Unapproved research only; production rights must be independently reviewed")
-    old_root, source, native, out, report = map(
+    old_root, source, native, proof_file, out, report = map(
         lambda p: Path(p).expanduser(),
-        (ten_dir, original_source, native, output, evidence),
+        (ten_dir, original_source, native, source_build_report, output, evidence),
     )
-    if (any(p.is_symlink() for p in (source, native, out, report))
-            or not source.is_dir() or not native.is_file()
+    if (any(p.is_symlink() for p in (source, native, proof_file, out, report))
+            or not source.is_dir() or not native.is_file() or not proof_file.is_file()
             or out.exists() or report.exists()
             or out.resolve() in (old_root.resolve(), source.resolve())
             or report.resolve() == out.resolve()):
@@ -117,6 +117,23 @@ def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
             or proof.get("direct_gitlinks_verified") != 34
             or proof.get("nested_gitlinks_verified") != 3):
         raise ValueError("Not the FULL original pinned Dolphin parent plus 37 source Gitlinks")
+    # A matching ELF/Mach-O/PE plus an unchanged Git tree is not, by itself,
+    # evidence those specific bytes were compiled from that tree. Demand the
+    # source verifier's own build report emitted in the same native CI job.
+    if proof_file.stat().st_size > 100000:
+        raise ValueError("Oversized native original Dolphin build provenance")
+    source_build = json.loads(proof_file.read_text("utf-8"))
+    if (not isinstance(source_build, dict)
+            or source_build.get("parent_commit") != REV
+            or source_build.get("direct_gitlinks_verified") != 34
+            or source_build.get("nested_gitlinks_verified") != 3
+            or source_build.get("original_unmodified_dolphin_source_compiled") is not True
+            or source_build.get("built_from_original_pinned_git_tree") is not True
+            or source_build.get("source_build_target") not in (
+                (target, "macos-x86_64") if target == "macos-x64" else (target,))
+            or source_build.get("old_buildbot_binary_equivalence_claimed") is not False
+            or source_build.get("public_binary_distribution_approved") is not False):
+        raise ValueError("No credible source-built Dolphin parent/native compiler report")
     expected_name = f"dolphin_libretro{TARGET_EXT[target]}"
     if native.name != expected_name:
         raise ValueError("Native filename does not match target architecture")
@@ -126,6 +143,9 @@ def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
             or compiled.get("native_size_bytes") != native.stat().st_size
             or compiled.get("native_sha256") != sha(native.read_bytes())):
         raise ValueError("Native Dolphin differs from the actual newly compiled source proof")
+    if (source_build.get("native_sha256") != compiled.get("native_sha256")
+            or source_build.get("native_size_bytes") != compiled.get("native_size_bytes")):
+        raise ValueError("Dolphin native does not match the independently emitted build report")
     license_notices = {}
     for upstream, name in NOTICE_PATHS.items():
         path = source / upstream
@@ -140,6 +160,7 @@ def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
     row = {
         "source_repository": "https://github.com/libretro/dolphin",
         "source_commit": REV,
+        "source_build_report_sha256": sha(proof_file.read_bytes()),
         "native_filename": expected_name,
         "native_sha256": sha(compiled_native),
         "native_size_bytes": len(compiled_native),
@@ -195,13 +216,14 @@ def stage_eleven(*, ten_dir, original_source, native, target, output, evidence,
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    for name in ("ten-dir", "original-source", "native", "target", "output", "evidence"):
+    for name in ("ten-dir", "original-source", "native", "build-report", "target", "output", "evidence"):
         p.add_argument("--"+name, required=True)
     a=p.parse_args(argv)
     try:
         result=stage_eleven(
             ten_dir=a.ten_dir, original_source=a.original_source,
-            native=a.native, target=a.target, output=a.output, evidence=a.evidence)
+            native=a.native, source_build_report=a.build_report,
+            target=a.target, output=a.output, evidence=a.evidence)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         p.exit(1, f"Original 11-source native family staging BLOCKED: {exc}\n")
     print(f"Native source-built {result['source_built_dolphin']['native_filename']} replaced last unverified buildbot core; 11 original families; public rights FALSE")
