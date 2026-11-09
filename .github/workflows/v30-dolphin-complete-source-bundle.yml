@@ -1,0 +1,121 @@
+name: Anything Plays 3.0 | All pinned Dolphin source candidates (38 exact trees)
+
+# Consolidates immutable SOURCE ONLY, never modifies or redistributes emulator binaries.
+# Does not prove the archived Dolphin binary was built from these sources.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-complete-source-bundle.yml'
+      - 'tools/package_v30_dolphin_source_bundle.py'
+      - 'tests/test_v30_dolphin_source_bundle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anything-plays-dolphin-38-source-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-38-source-candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_DIRECT_RUN_ID: '42446758270'
+      ORIGINAL_REVIEW_RUN_ID: '42447184893'
+      ORIGINAL_NESTED_RUN_ID: '42452594761'
+      DOLPHIN_SOURCE_COMMIT: '32c61f9d0e933331bb7087ba57e96883241b4960'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test tamper resistance of the original source-only candidate bundler
+        run: |
+          python -m unittest discover -s tests -p 'test_v30_dolphin_source_bundle.py' -v
+          python -m unittest discover -s tests -p 'test_v30_dolphin_source_review.py' -v
+          python -m unittest discover -s tests -p 'test_v30_dolphin_nested_sources.py' -v
+      - name: Require only original successful immutable GitHub source-capture runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in \
+            "$ORIGINAL_DIRECT_RUN_ID|Anything Plays 3.0 | Audit pinned Dolphin submodule source archives" \
+            "$ORIGINAL_REVIEW_RUN_ID|Anything Plays 3.0 | Reconcile all 34 immutable Dolphin source snapshots" \
+            "$ORIGINAL_NESTED_RUN_ID|Anything Plays 3.0 | Complete nested Dolphin source Gitlink candidate capture"; do
+            run_id="${pair%%|*}"
+            expected="${pair#*|}"
+            [[ "$(gh run view "$run_id" --json conclusion --jq .conclusion)" == "success" ]] || exit 1
+            [[ "$(gh run view "$run_id" --json name --jq .name)" == "$expected" ]] || exit 1
+          done
+      - name: Download and rehash original immutable six-shard 34-source archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          for shard in 0 1 2 3 4 5; do
+            gh run download "$ORIGINAL_DIRECT_RUN_ID" \
+              --name "AnythingPlays-3.0.0-DOLPHIN-SOURCE-UNAPPROVED-shard-$shard" \
+              --dir "source-shards/shard-$shard"
+          done
+          gh run download "$ORIGINAL_REVIEW_RUN_ID" \
+            --name AnythingPlays-3.0.0-DOLPHIN-34-SOURCE-REVIEW-UNAPPROVED \
+            --dir original-direct-review
+          test "$(find original-direct-review -maxdepth 1 -type f | wc -l)" = 2
+          (cd original-direct-review && sha256sum --check SHA256SUMS.txt)
+      - name: Download original three nested source archives and pinned parent source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$ORIGINAL_NESTED_RUN_ID" \
+            --name AnythingPlays-3.0.0-DOLPHIN-THREE-NESTED-SOURCES-UNAPPROVED \
+            --dir original-nested-source
+          (cd original-nested-source && sha256sum --check SHA256SUMS.txt)
+          curl --fail --location --silent --show-error --retry 3 \
+            --connect-timeout 30 --max-time 600 \
+            "https://codeload.github.com/libretro/dolphin/tar.gz/$DOLPHIN_SOURCE_COMMIT" \
+            --output dolphin-original-parent.tar.gz
+          test -s dolphin-original-parent.tar.gz
+      - name: Independently reconcile original parent and exactly 37 Gitlink source TARs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.package_v30_dolphin_source_bundle \
+            --shards source-shards \
+            --review original-direct-review/DOLPHIN_34_SOURCE_ARCHIVE_REVIEW_UNAPPROVED.json \
+            --nested original-nested-source \
+            --parent dolphin-original-parent.tar.gz \
+            --output source-bundle-unapproved
+          (cd source-bundle-unapproved && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("source-bundle-unapproved")
+          manifest=json.loads((root/"DOLPHIN_37_GITLINK_SOURCE_BUNDLE_UNAPPROVED.json").read_text("utf-8"))
+          assert manifest["status"]=="UNAPPROVED-DOLPHIN-38-EXACT-SOURCE-CANDIDATES"
+          assert manifest["source_candidate_count_including_parent"]==38
+          assert manifest["verified_direct_gitlink_count"]==34
+          assert manifest["verified_nested_gitlink_count"]==3
+          assert len(manifest["sources"])==38
+          assert len(list(root.iterdir()))==40
+          for flag in ("independent_binary_to_source_match_proven",
+                       "complete_corresponding_source_and_build_dependencies_verified",
+                       "license_combination_approved",
+                       "dolphin_sys_source_and_rights_verified",
+                       "public_binary_distribution_approved"):
+              assert manifest[flag] is False,flag
+          print("Original pinned Dolphin parent source and 37 source Gitlinks preserved;")
+          print("NO signed binary, game files, GPL decision or public 3.0 approval generated.")
+          PY
+      - name: Retain source-only, UNAPPROVED package for corresponding-source review
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0.0-DOLPHIN-38-SOURCE-CANDIDATES-UNAPPROVED
+          path: source-bundle-unapproved/*
+          if-no-files-found: error
+          retention-days: 90
