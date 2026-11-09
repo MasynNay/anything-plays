@@ -67,12 +67,16 @@ def build_candidate(artifact_paths):
             names = manifest.get("cores")
             if not isinstance(names, list) or len(names) != 11:
                 raise ValueError(f"{platform}: expected 11 native core records")
+            if any(not isinstance(row, dict) for row in names):
+                raise ValueError(f"{platform}: malformed native core provenance row")
             by_name = {x.get("name"): x for x in names}
             if set(by_name) != CORES or len(by_name) != len(names):
                 raise ValueError(f"{platform}: missing or unexpected emulator core")
             file_table = record.get("files")
             if not isinstance(file_table, list) or len(file_table) != 12:
                 raise ValueError(f"{platform}: expected 12 original archives")
+            if any(not isinstance(row, dict) for row in file_table):
+                raise ValueError(f"{platform}: malformed original archive record")
             archive_index = {x.get("name"): x for x in file_table}
             if len(archive_index) != 12 or set(outer.namelist()) != set(archive_index) | {"PRESERVED_NATIVE_INPUTS.json"}:
                 raise ValueError(f"{platform}: unrecognized original input file")
