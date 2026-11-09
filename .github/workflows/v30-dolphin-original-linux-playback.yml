@@ -12,6 +12,8 @@ on:
       - 'anything_plays/gamecube_sys.py'
       - 'anything_plays/gamecube_software.py'
       - 'tools/v30_dolphin_original_link_order.cmake'
+      - 'tools/patch_v30_dolphin_headless_source.py'
+      - 'tests/test_v30_dolphin_headless_patch.py'
   workflow_dispatch:
 
 permissions:
