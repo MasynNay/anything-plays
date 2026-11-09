@@ -1,0 +1,98 @@
+name: Anything Plays 3.0 | Original pinned Dolphin source-built Windows research
+
+# Compile original source on Windows x64 for exact provenance; no unapproved DLL uploads.
+on:
+  pull_request:
+    branches: [feature/v3.0-unified-test]
+    paths:
+      - '.github/workflows/v30-dolphin-original-windows-source.yml'
+      - 'tools/verify_v30_dolphin_original_windows.py'
+      - 'tests/test_v30_dolphin_original_windows.py'
+      - 'tools/verify_v30_dolphin_original_build.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anything-plays-original-dolphin-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-dolphin-windows:
+    runs-on: windows-2025
+    timeout-minutes: 125
+    env:
+      DOLPHIN_SOURCE_SHA: '32c61f9d0e933331bb7087ba57e96883241b4960'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test original pinned Gitlink, Windows PE and rights rejection contracts
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p test_v30_dolphin_original_build.py -v
+          if ($LASTEXITCODE -ne 0) { throw "Original source verifier tests failed" }
+          python -m unittest discover -s tests -p test_v30_dolphin_original_windows.py -v
+          if ($LASTEXITCODE -ne 0) { throw "Windows PE verifier tests failed" }
+      - name: Retrieve exact original Dolphin upstream source and all pinned Gitlinks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git clone --filter=blob:none --no-checkout https://github.com/libretro/dolphin.git original-dolphin
+          if ($LASTEXITCODE -ne 0) { throw "Original Dolphin clone failed" }
+          git -C original-dolphin fetch --filter=blob:none origin $env:DOLPHIN_SOURCE_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Original Dolphin pinned fetch failed" }
+          git -C original-dolphin checkout --detach $env:DOLPHIN_SOURCE_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Original Dolphin checkout failed" }
+          git -C original-dolphin submodule sync --recursive
+          if ($LASTEXITCODE -ne 0) { throw "Dolphin Gitlink sync failed" }
+          git -C original-dolphin submodule update --init --recursive --jobs 4
+          if ($LASTEXITCODE -ne 0) { throw "Pinned Dolphin Gitlink checkout failed" }
+          python -c "from pathlib import Path; from tools.verify_v30_dolphin_original_build import verify_original_source; print(verify_original_source(Path('original-dolphin')))"
+          if ($LASTEXITCODE -ne 0) { throw "Exact original 37 Gitlink source identity changed" }
+      - name: Compile actual original unmodified Dolphin Libretro core using MSVC x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $configure = @(
+            "-S", "original-dolphin", "-B", "original-dolphin-build",
+            "-G", "Visual Studio 17 2022", "-A", "x64",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DLIBRETRO=ON", "-DENABLE_QT=OFF", "-DENABLE_TESTS=OFF",
+            "-DENABLE_LTO=OFF", "-DENABLE_VULKAN=OFF",
+            "-DENABLE_CCACHE=OFF", "-DENABLE_ANALYTICS=OFF",
+            "-DUSE_RETRO_ACHIEVEMENTS=OFF", "-DUSE_SYSTEM_LIBS=OFF",
+            "-DUSE_MGBA=ON", "-DENABLE_AUTOUPDATE=OFF",
+            "-DENABLE_CLI_TOOL=OFF"
+          )
+          & cmake @configure
+          if ($LASTEXITCODE -ne 0) { throw "Original Dolphin Windows source configure failed" }
+          cmake --build original-dolphin-build --target dolphin_libretro --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "Original Dolphin Windows MSVC build failed" }
+          $dlls = @(Get-ChildItem -Path original-dolphin-build -Recurse -File -Filter dolphin_libretro.dll)
+          if ($dlls.Count -ne 1) { throw "Expected EXACTLY one original compiled Dolphin Libretro Windows DLL" }
+          New-Item -ItemType Directory -Force native-candidate | Out-Null
+          Copy-Item -LiteralPath $dlls[0].FullName -Destination native-candidate/dolphin_libretro.dll
+          if (!(Test-Path native-candidate/dolphin_libretro.dll)) { throw "Compiled native DLL missing" }
+      - name: Verify exact source-built Windows PE 64-bit binary and six loadable Libretro exports
+        shell: pwsh
+        run: |
+          python -m tools.verify_v30_dolphin_original_windows --source original-dolphin --native native-candidate/dolphin_libretro.dll --output ORIGINAL_DOLPHIN_WINDOWS_SOURCE_PROOF_UNAPPROVED.json
+          if ($LASTEXITCODE -ne 0) { throw "Unmodified pinned Dolphin Windows binary provenance failed" }
+          python -c "import json; from pathlib import Path; p=Path('ORIGINAL_DOLPHIN_WINDOWS_SOURCE_PROOF_UNAPPROVED.json'); r=json.loads(p.read_text('utf-8')); assert r['original_unmodified_dolphin_source_compiled'] is True and r['direct_gitlinks_verified']==34 and r['nested_gitlinks_verified']==3 and len(r['verified_libretro_exports'])==6 and r['public_binary_distribution_approved'] is False and r['old_buildbot_binary_equivalence_claimed'] is False"
+          if ($LASTEXITCODE -ne 0) { throw "Original source report falsely grants release rights" }
+          $record=(Get-FileHash -Algorithm SHA256 ORIGINAL_DOLPHIN_WINDOWS_SOURCE_PROOF_UNAPPROVED.json).Hash.ToLower()
+          "$record  ORIGINAL_DOLPHIN_WINDOWS_SOURCE_PROOF_UNAPPROVED.json" | Set-Content -Encoding ascii ORIGINAL_DOLPHIN_WINDOWS_SHA256SUMS.txt
+      - name: Retain only Windows original-source research metadata, no unapproved native
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.0-DOLPHIN-ORIGINAL-WINDOWS-SOURCE-BUILD-REPORT-UNAPPROVED
+          path: |
+            ORIGINAL_DOLPHIN_WINDOWS_SOURCE_PROOF_UNAPPROVED.json
+            ORIGINAL_DOLPHIN_WINDOWS_SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
