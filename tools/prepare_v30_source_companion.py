@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 from anything_plays.v30_approved_core_map import ELEVEN_EXPECTED, ELEVEN_REPOSITORIES
@@ -126,7 +127,12 @@ def prepare_source_companion(source_dir: Path, output_dir: Path, version: str):
                 if name == "SOURCE_ACCESS_README.txt":
                     archive.writestr(info, readme.encode("utf-8"))
                 else:
-                    archive.write(src / name, arcname=name, compress_type=ZIP_STORED)
+                    # Fixed ZIP timestamps and stream-copy avoid depending on
+                    # Actions artifact extraction mtimes or reading huge
+                    # original source TARs into memory.
+                    with (src / name).open("rb") as original:
+                        with archive.open(info, "w") as copied:
+                            shutil.copyfileobj(original, copied, 1024 * 1024)
         digest, size = digest_file(archive_path)
         (dst / CHECKSUMS).write_text(f"{digest}  {filename}\n", "ascii")
         return {"filename": filename, "sha256": digest, "size_bytes": size,
