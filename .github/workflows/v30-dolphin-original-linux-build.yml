@@ -16,7 +16,9 @@ permissions:
 
 concurrency:
   group: anything-plays-original-dolphin-linux-${{ github.ref }}
-  cancel-in-progress: true
+  # Original full Dolphin source builds take many minutes. Preserve active
+  # compiled-source evidence across harmless PR documentation/merge updates.
+  cancel-in-progress: false
 
 jobs:
   original-dolphin-linux:
