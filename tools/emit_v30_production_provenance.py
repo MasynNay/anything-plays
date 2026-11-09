@@ -145,8 +145,9 @@ def prepare_production_artifact(*, target, version, source_commit, installer,
     input_file, output_file = input_file.resolve(), output_file.resolve()
     if not input_file.is_file() or input_file.name != names[target] or input_file.stat().st_size < 1024 * 1024:
         raise ValueError("Installer missing or not canonical reviewed 3.0 production file")
-    if output_file.exists() and any(output_file.iterdir()):
-        raise ValueError("Production output directory must be new or empty")
+    if output_file.exists():
+        if not output_file.is_dir() or any(output_file.iterdir()):
+            raise ValueError("Production output directory must be new or empty")
     if output_file == input_file.parent or output_file in input_file.parents or input_file in output_file.parents:
         raise ValueError("Production artifact input/output directories must be distinct")
     installer_sha = digest_file(input_file)
@@ -165,16 +166,26 @@ def prepare_production_artifact(*, target, version, source_commit, installer,
         "corresponding_source_inventory_sha256": source_digest,
         "license_review_record": "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md",
     }
+    # Never leave a plausible installer without its verified provenance, or
+    # a partial provenance file, if copy, hashing or JSON writing fails.
+    # Preflight above guarantees the directory is absent or empty.
     output_file.mkdir(parents=True, exist_ok=True)
     dest = output_file / input_file.name
-    shutil.copyfile(input_file, dest)
-    if digest_file(dest) != installer_sha:
-        dest.unlink(missing_ok=True)
-        raise RuntimeError("Staged production installer checksum changed")
-    (output_file / "PRODUCTION_PROVENANCE.json").write_text(
-        json.dumps(record, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    provenance = output_file / "PRODUCTION_PROVENANCE.json"
+    completed = False
+    try:
+        shutil.copyfile(input_file, dest)
+        if digest_file(dest) != installer_sha:
+            raise RuntimeError("Staged production installer checksum changed")
+        provenance.write_text(
+            json.dumps(record, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        completed = True
+    finally:
+        if not completed:
+            dest.unlink(missing_ok=True)
+            provenance.unlink(missing_ok=True)
     return record
 
 
