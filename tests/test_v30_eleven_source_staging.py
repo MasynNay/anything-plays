@@ -53,7 +53,20 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
             p=source/original
             p.parent.mkdir(parents=True,exist_ok=True)
             p.write_bytes((b'The original Dolphin source contains GPL, MIT, CC0 and BSD licensing records.\n')*3)
-        return ten,source,native
+        build_proof=root/'compiler-emitted-dolphin-source.json'
+        build_proof.write_text(json.dumps({
+            'parent_commit':REV,
+            'direct_gitlinks_verified':34,
+            'nested_gitlinks_verified':3,
+            'original_unmodified_dolphin_source_compiled':True,
+            'built_from_original_pinned_git_tree':True,
+            'source_build_target':'linux-x64',
+            'native_sha256':sha(native.read_bytes()),
+            'native_size_bytes':native.stat().st_size,
+            'old_buildbot_binary_equivalence_claimed':False,
+            'public_binary_distribution_approved':False,
+        }))
+        return ten,source,native,build_proof
 
     @staticmethod
     def verified_source(_source):
@@ -66,9 +79,10 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
                 'native_size_bytes':Path(path).stat().st_size}
 
     def run_stage(self,root,**changes):
-        ten,source,native=self.fixture(root)
+        ten,source,native,build_report=self.fixture(root)
         row={
             'ten_dir':ten,'original_source':source,'native':native,
+            'source_build_report':build_report,
             'target':'linux-x64','output':Path(root)/'eleven',
             'evidence':Path(root)/'report.json',
             'inspect_source':self.verified_source,
@@ -139,7 +153,7 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
         with TemporaryDirectory() as td:
             # Use one already-built fixture, not the standard helper that
             # creates a new file layout on each call.
-            ten,source,native=self.fixture(td)
+            ten,source,native,build_report=self.fixture(td)
             (source/'COPYING').unlink()
             with patch.dict(os.environ,{
                 'AP_V30_GPL_TRIAL':'1','AP_V30_TEST_CORES':'1',
@@ -147,6 +161,7 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'license'):
                     stage_eleven(
                         ten_dir=ten,original_source=source,native=native,
+                        source_build_report=build_report,
                         target='linux-x64',output=Path(td)/'eleven',
                         evidence=Path(td)/'report.json',
                         inspect_source=self.verified_source,
@@ -156,7 +171,7 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
 
     def test_approval_flag_in_existing_archive_does_not_allow_relabeling(self):
         with TemporaryDirectory() as td:
-            ten,source,native=self.fixture(td)
+            ten,source,native,build_report=self.fixture(td)
             marker=ten/MARKER
             data=json.loads(marker.read_text())
             data['public_binary_distribution_approved']=True
@@ -167,6 +182,27 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'authentic ten-original'):
                     stage_eleven(
                         ten_dir=ten,original_source=source,native=native,
+                        source_build_report=build_report,
+                        target='linux-x64',output=Path(td)/'eleven',
+                        evidence=Path(td)/'report.json',
+                        inspect_source=self.verified_source,
+                        inspect_native=self.verified_native,
+                    )
+            self.assertFalse((Path(td)/'eleven').exists())
+
+    def test_forged_compiler_report_does_not_convert_unknown_native_to_original(self):
+        with TemporaryDirectory() as td:
+            ten,source,native,build_report=self.fixture(td)
+            record=json.loads(build_report.read_text())
+            record['native_sha256']='0'*64
+            build_report.write_text(json.dumps(record))
+            with patch.dict(os.environ,{
+                'AP_V30_GPL_TRIAL':'1','AP_V30_TEST_CORES':'1',
+                'AP_RELEASE_BUILD':'0','AP_V30_APPROVED_RELEASE':'0'}):
+                with self.assertRaisesRegex(ValueError,'independently emitted build report'):
+                    stage_eleven(
+                        ten_dir=ten,original_source=source,native=native,
+                        source_build_report=build_report,
                         target='linux-x64',output=Path(td)/'eleven',
                         evidence=Path(td)/'report.json',
                         inspect_source=self.verified_source,
@@ -176,13 +212,14 @@ class ElevenOriginalSourceDolphinStages(unittest.TestCase):
 
     def test_no_production_build_can_call_unapproved_stager(self):
         with TemporaryDirectory() as td:
-            ten,source,native=self.fixture(td)
+            ten,source,native,build_report=self.fixture(td)
             with patch.dict(os.environ,{
                 'AP_V30_GPL_TRIAL':'1','AP_V30_TEST_CORES':'1',
                 'AP_RELEASE_BUILD':'1','AP_V30_APPROVED_RELEASE':'1'}):
                 with self.assertRaisesRegex(ValueError,'Unapproved research only'):
                     stage_eleven(
                         ten_dir=ten,original_source=source,native=native,
+                        source_build_report=build_report,
                         target='linux-x64',output=Path(td)/'eleven',
                         evidence=Path(td)/'report.json',
                         inspect_source=self.verified_source,
