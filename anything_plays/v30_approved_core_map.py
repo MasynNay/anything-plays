@@ -46,6 +46,21 @@ TEN_REPOSITORIES = {
     "parallel_n64": "https://github.com/libretro/parallel-n64",
 }
 assert len(TEN_EXPECTED) == len(TEN_REPOSITORIES) == 10
+ELEVEN_EXPECTED = {**TEN_EXPECTED, "dolphin": "32c61f9d0e933331bb7087ba57e96883241b4960"}
+ELEVEN_REPOSITORIES = {**TEN_REPOSITORIES, "dolphin": "https://github.com/libretro/dolphin"}
+assert len(ELEVEN_EXPECTED) == len(ELEVEN_REPOSITORIES) == 11
+# Same eighteen console profiles/eleven native cores with GPLv2-or-later
+# Tia substituted for the pinned GPLv2-only Stella2014. This describes
+# original-source identity, never a grant of public release permission.
+ELEVEN_TIA_EXPECTED = {name: sha for name, sha in ELEVEN_EXPECTED.items()
+                       if name != "stella2014"}
+ELEVEN_TIA_EXPECTED["tia"] = "6ae5bf998fe7a7842294089db17fc86fd73db1f0"
+ELEVEN_TIA_REPOSITORIES = {name: repo for name, repo in ELEVEN_REPOSITORIES.items()
+                           if name != "stella2014"}
+ELEVEN_TIA_REPOSITORIES["tia"] = "https://github.com/warmenhoven/tia"
+assert len(ELEVEN_TIA_EXPECTED) == len(ELEVEN_TIA_REPOSITORIES) == 11
+assert "stella2014" not in ELEVEN_TIA_EXPECTED
+
 ADDITIONAL_SYSTEMS = {
     "gb": "mgba", "gbc": "mgba", "gba": "mgba",
     "n64": "parallel_n64",
@@ -73,7 +88,7 @@ def validate_installed_map(folder, extension, *, verify_native=True):
     info = json.loads(marker.read_text("utf-8"))
     if (not isinstance(info, dict) or info.get("schema_version") != 1
             or info.get("status") != STATUS
-            or info.get("core_set_id") not in ("gpl-source-built-alternative", "gpl-source-built-eight", "gpl-source-built-ten")
+            or info.get("core_set_id") not in ("gpl-source-built-alternative", "gpl-source-built-eight", "gpl-source-built-ten", "gpl-source-built-eleven", "gpl-source-built-eleven-tia")
             or info.get("all_console_profiles") != 18
             or info.get("native_core_count") != 11
             or info.get("legacy_noncommercial_native_binaries_excluded") is not True):
@@ -81,13 +96,21 @@ def validate_installed_map(folder, extension, *, verify_native=True):
     rows = info.get("cores")
     eight = info["core_set_id"] == "gpl-source-built-eight"
     ten = info["core_set_id"] == "gpl-source-built-ten"
-    expected = TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED
-    repositories = TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES
+    eleven = info["core_set_id"] == "gpl-source-built-eleven"
+    eleven_tia = info["core_set_id"] == "gpl-source-built-eleven-tia"
+    expected = (ELEVEN_TIA_EXPECTED if eleven_tia else ELEVEN_EXPECTED if eleven
+                else TEN_EXPECTED if ten else EIGHT_EXPECTED if eight else EXPECTED)
+    repositories = (ELEVEN_TIA_REPOSITORIES if eleven_tia else ELEVEN_REPOSITORIES if eleven
+                    else TEN_REPOSITORIES if ten else EIGHT_REPOSITORIES if eight else REPOSITORIES)
     if (not isinstance(rows, dict) or set(rows) != set(expected)
             or (eight and info.get("eight_source_built_families_reviewed") is not True)
             or (eight and info.get("three_unchanged_native_families_reviewed") is not True)
             or (ten and info.get("ten_source_built_families_reviewed") is not True)
-            or (ten and info.get("one_unchanged_dolphin_family_reviewed") is not True)):
+            or (ten and info.get("one_unchanged_dolphin_family_reviewed") is not True)
+            or ((eleven or eleven_tia) and info.get("eleven_source_built_families_reviewed") is not True)
+            or ((eleven or eleven_tia) and info.get("zero_unchanged_native_families_reviewed") is not True)
+            or (eleven_tia and info.get("gpl2plus_atari_source_replacement_reviewed") is not True)
+            or (eleven_tia and info.get("original_gpl2_only_stella_excluded") is not True)):
         raise ValueError("Reviewed 3.0 original source-built library families incomplete")
     for name, revision in expected.items():
         row = rows[name]
@@ -101,10 +124,11 @@ def validate_installed_map(folder, extension, *, verify_native=True):
         if verify_native:
             path = root / filename
             if (path.is_symlink() or not path.is_file()
-                    or not 10000 < path.stat().st_size < MAX_LIBRARY
+                    or not 10000 < path.stat().st_size < (512 * 1024 * 1024 if name == "dolphin" else MAX_LIBRARY)
                     or hashlib.sha256(path.read_bytes()).hexdigest() != row["native_sha256"]):
                 raise ValueError(f"Missing/tampered approved source-built native image: {name}")
-    for forbidden in ("snes9x", "genesis_plus_gx"):
+    for forbidden in (("snes9x", "genesis_plus_gx", "stella2014")
+                      if eleven_tia else ("snes9x", "genesis_plus_gx")):
         if (root / f"{forbidden}_libretro{extension}").exists():
             raise ValueError("Original noncommercial library in reviewed alternative installer")
     if extension == ".dll":
@@ -145,7 +169,9 @@ def find_approved_core(directories, system, extension):
         if not marker.exists():
             continue
         info = validate_installed_map(root, extension)
-        name = ("mednafen_pce_fast" if system == "pce" else
+        name = ("tia" if system == "atari2600"
+                and info["core_set_id"] == "gpl-source-built-eleven-tia"
+                else "mednafen_pce_fast" if system == "pce" else
                 PROFILE_TO_CORE[system] if system in PROFILE_TO_CORE
                 else ADDITIONAL_SYSTEMS[system])
         if name not in info["cores"]:
