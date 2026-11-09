@@ -237,7 +237,7 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
     if five_dirs is not None:
         evidence_paths.extend(five_dirs.values())
     evidence_paths.extend(p for p in (mgba_dir, n64_dir, dolphin_sys_dir,
-                                      windows_runtime) if p is not None)
+                                      windows_runtime, *tia_inputs) if p is not None)
     resolved_output = output.resolve()
     for item in evidence_paths:
         evidence = Path(item).resolve()
@@ -304,11 +304,25 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         archives[name] = sha(zipped)
     if eight:
         for name,path in sorted(five_dirs.items()):
-            # Exact original Git TAR and original compiled binary plus real
-            # original tracked GPLv2 source notice, with A/V evidence. The
-            # matching source from OLD historical buildbot ZIP is UNKNOWN.
-            native, original_notice, original_record = check_original_five_artifact(
-                path, name, original_target, ext)
+            if name == "tia":
+                # Newly compiled original GPLv2-or-later source, not the old
+                # GPLv2-only Stella buildbot artifact. Exact GPL SPDX, Git
+                # source archive, compiled native and actual Atari A/V required.
+                proof = validate_production_tia(
+                    source_checkout=path, source_tar=tia_source_tar,
+                    native=tia_native, playback_report=tia_playback_report,
+                    target=original_target)
+                native, original_notice = proof["native"], proof["copying"]
+                original_record = {
+                    "source_archive_sha256": proof["source_archive_sha256"],
+                    "original_license_notice_copied": True,
+                }
+                payload["GPL-TRIAL-tia-ORIGINAL-SPDX.txt"] = proof["source_spdx"]
+            else:
+                # Source-built originals from independently pinned five-family
+                # run, never relabeled historical/unknown native binaries.
+                native, original_notice, original_record = check_original_five_artifact(
+                    path, name, original_target, ext)
             if original_notice is None:
                 raise ValueError(f"Unverified original GPL source notice: {name}")
             native_zip = package_native_zip(name, ext, native)
@@ -332,7 +346,7 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
                 "native_sha256": sha(native),
                 "original_native_archive_sha256": sha(native_zip),
                 "original_license_sha256": sha(original_notice),
-                "original_owned_actions_run_id": FIVE_FAMILY_SOURCE_RUN,
+                "original_owned_actions_run_id": 42625769973 if name == "tia" else FIVE_FAMILY_SOURCE_RUN,
             }
     if ten:
         # Source-native identity is authenticated by the ORIGINAL four-platform
@@ -476,11 +490,12 @@ def assemble_approved_inputs(*, lock, inventory, target, original_dir,
         if sha(binary) != reviewed_map["runtime_dependencies"][WINDOWS_RUNTIME]:
             raise ValueError("Source-reviewed Windows DLL native hash changed")
         payload[WINDOWS_RUNTIME] = binary
-    final_zip_names = {f"{n}_libretro{ext}.zip" for n in ALTERNATIVE_CORE_NAMES}
+    final_zip_names = {f"{n}_libretro{ext}.zip" for n in selected_cores}
     if ({n for n in payload if n.endswith(".zip")} != final_zip_names | {"Dolphin.zip"}
             or len(final_zip_names) != 11):
         raise ValueError("Approved full 11-core offline native inventory incomplete")
-    if any(f"{nc}_libretro{ext}.zip" in payload for nc in ("snes9x", "genesis_plus_gx")):
+    forbidden = ("snes9x", "genesis_plus_gx", "stella2014") if eleven_tia else ("snes9x", "genesis_plus_gx")
+    if any(f"{nc}_libretro{ext}.zip" in payload for nc in forbidden):
         raise ValueError("Original NC libraries remain in production payload")
     manifest = {
         "schema_version": 1,
@@ -530,7 +545,10 @@ def main(argv=None):
     parser.add_argument("--dolphin-native", type=Path)
     parser.add_argument("--dolphin-build-report", type=Path)
     parser.add_argument("--dolphin-parent-archive", type=Path)
-    for name in sorted(SOURCE_BUILT_FIVE):
+    parser.add_argument("--tia-native", type=Path)
+    parser.add_argument("--tia-source-tar", type=Path)
+    parser.add_argument("--tia-playback-report", type=Path)
+    for name in sorted(SOURCE_BUILT_FIVE | {"tia"}):
         parser.add_argument("--"+name.replace("_","-")+"-dir", type=Path)
     args = parser.parse_args(argv)
     try:
@@ -539,8 +557,13 @@ def main(argv=None):
         if not (ROOT / "docs/V3_LICENSE_COMPATIBILITY_APPROVED.md").is_file():
             raise ValueError("Independent reviewed copyright decision is missing")
         families = selected_source_families(lock)
-        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN)
-        five={name: getattr(args,name+"_dir") for name in SOURCE_BUILT_FIVE}
+        tia_mode = families == SOURCE_BUILT_ELEVEN_TIA
+        wants_eight = families in (SOURCE_BUILT_EIGHT, SOURCE_BUILT_TEN, SOURCE_BUILT_ELEVEN, SOURCE_BUILT_ELEVEN_TIA)
+        chosen_five = SOURCE_BUILT_FIVE_TIA if tia_mode else SOURCE_BUILT_FIVE
+        five={name: getattr(args,name+"_dir") for name in chosen_five}
+        excluded = SOURCE_BUILT_FIVE - chosen_five if tia_mode else {"tia"}
+        if any(getattr(args,name+"_dir") is not None for name in excluded):
+            raise ValueError("Cannot stage an excluded original emulator source")
         if wants_eight and any(path is None for path in five.values()):
             raise ValueError("Independent 8-family source lock requires all 5 original artifacts")
         if not wants_eight and any(path is not None for path in five.values()):
@@ -557,6 +580,8 @@ def main(argv=None):
             dolphin_native=args.dolphin_native,
             dolphin_build_report=args.dolphin_build_report,
             dolphin_parent_archive=args.dolphin_parent_archive,
+            tia_native=args.tia_native, tia_source_tar=args.tia_source_tar,
+            tia_playback_report=args.tia_playback_report,
         )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as err:
         parser.exit(1, f"3.0 SOURCE-BUILT PRODUCTION INPUTS BLOCKED: {err}\n")
