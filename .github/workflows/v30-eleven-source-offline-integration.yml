@@ -124,21 +124,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run download "$OLD_INPUT_RUN_ID" --name "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" --dir original-native-inputs
-          gh run download "$GPL_SNES_RUN_ID" --name "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" --dir source-built-snes
-          gh run download "$GPL_SEGA_RUN_ID" --name "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" --dir source-built-sega
-          gh run download "$PINNED_PCE_RUN_ID" --name "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" --dir source-built-pce
-          gh run download "$MGBA_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-mgba
-          gh run download "$N64_SOURCE_RUN_ID" --name "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" --dir source-built-n64
-          gh run download "$SOURCE_SYS_RUN_ID" --name "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" --dir original-source-sys
+          # A failed artifact request must never leave partial files for validation.
+          verified_download() {
+            local run="$1" artifact="$2" destination="$3" attempt scratch
+            if [[ -e "$destination" || -L "$destination" ]]; then
+              echo "::error::Artifact destination already exists: $destination"
+              return 1
+            fi
+            mkdir -p "$(dirname "$destination")"
+            for attempt in 1 2 3 4; do
+              scratch="$destination.try-$attempt"
+              if [[ -e "$scratch" || -L "$scratch" ]]; then
+                echo "::error::Unexpected temporary artifact path: $scratch"
+                return 1
+              fi
+              if gh run download "$run" --name "$artifact" --dir "$scratch"; then
+                mv "$scratch" "$destination"
+                return 0
+              fi
+              rm -rf -- "$scratch"
+              if [[ "$attempt" -lt 4 ]]; then
+                echo "::warning::Artifact API failure: $artifact attempt $attempt/4; retrying"
+                sleep "$((attempt * 3))"
+              fi
+            done
+            echo "::error::Unable to fetch immutable native input: $artifact"
+            return 1
+          }
+          verified_download "$OLD_INPUT_RUN_ID" "AnythingPlays-3.0.0-NATIVE-INPUTS-UNAPPROVED-$TARGET" "original-native-inputs"
+          verified_download "$GPL_SNES_RUN_ID" "AnythingPlays-3.0-SUPAFAUST-$TARGET-SOURCE-UNAPPROVED" "source-built-snes"
+          verified_download "$GPL_SEGA_RUN_ID" "AnythingPlays-3.0-GPL-FOUR-OS-blastem-$TARGET-UNAPPROVED" "source-built-sega"
+          verified_download "$PINNED_PCE_RUN_ID" "AnythingPlays-3.0-PCE-PINNED-SOURCE-$TARGET-UNAPPROVED" "source-built-pce"
+          verified_download "$MGBA_SOURCE_RUN_ID" "AnythingPlays-3.0-PINNED-MGBA-$TARGET-SOURCE-NATIVE-UNAPPROVED" "source-built-mgba"
+          verified_download "$N64_SOURCE_RUN_ID" "AnythingPlays-3.0-PARALLEL-N64-$TARGET-SOURCE-NATIVE-UNAPPROVED" "source-built-n64"
+          verified_download "$SOURCE_SYS_RUN_ID" "AnythingPlays-3.0-DOLPHIN-PINNED-SOURCE-SYS-$TARGET-UNAPPROVED" "original-source-sys"
           # Windows Python normalizes artifact checksum lines to CRLF; GNU sha256sum
           # otherwise mistakes the carriage return for part of each filename.
           # Normalize line endings for the checker, never the archived file hashes.
           (cd original-source-sys && tr -d '\r' < SHA256SUMS.txt | sha256sum --check -)
           for name in fceumm stella2014 prosystem mednafen_ngp mednafen_wswan; do
-            gh run download "$FIVE_SOURCE_RUN_ID" \
-              --name "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
-              --dir "source-built-five/$name"
+            verified_download "$FIVE_SOURCE_RUN_ID" \
+              "AnythingPlays-3.0-PINNED-REMAINING-$name-$TARGET-UNAPPROVED" \
+              "source-built-five/$name"
           done
           python - <<'PY'
           from pathlib import Path
