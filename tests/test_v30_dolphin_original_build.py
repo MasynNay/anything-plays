@@ -21,6 +21,61 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "parent source commit"):
                     candidate.verify_original_source(root)
 
+    def test_submodule_tracked_edit_fails_closed(self):
+        with TemporaryDirectory() as temp:
+            checkout = Path(temp)
+            with patch.object(candidate, "git", return_value=" M Source/Core/Core.cpp") as git_call:
+                with self.assertRaisesRegex(ValueError, "tracked source was edited: Externals/example"):
+                    candidate.require_clean_tracked_source(checkout, "Externals/example")
+                git_call.assert_called_once_with(checkout, "status", "--porcelain", "--untracked-files=no")
+
+    def test_clean_submodule_checkout_is_accepted(self):
+        with TemporaryDirectory() as temp:
+            checkout = Path(temp)
+            with patch.object(candidate, "git", return_value="") as git_call:
+                candidate.require_clean_tracked_source(checkout, "Externals/example")
+                git_call.assert_called_once()
+
+    def test_verifier_rejects_dirty_direct_submodule_before_native_audit(self):
+        """Exercise the complete direct Gitlink loop, not just its helper."""
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            sha = "a" * 40
+            paths = [f"Externals/submodule_{i}" for i in range(34)]
+            for path in paths:
+                (root / path).mkdir(parents=True)
+            for suffix in ("child_0", "child_1"):
+                (root / paths[0] / suffix).mkdir()
+            (root / paths[1] / "child_2").mkdir()
+            direct = {path: {"sha": sha} for path in paths}
+            nested = {"status": candidate.INDEX_STATUS,
+                      "dolphin_parent_commit": candidate.REV,
+                      "parents": [
+                          {"parent_path": paths[0], "parent_gitlink_commit": sha,
+                           "nested": [{"path": "child_0", "gitlink_commit": sha},
+                                      {"path": "child_1", "gitlink_commit": sha}]},
+                          {"parent_path": paths[1], "parent_gitlink_commit": sha,
+                           "nested": [{"path": "child_2", "gitlink_commit": sha}]}]}
+            direct_file = root / "direct.json"
+            nested_file = root / "nested.json"
+            direct_file.write_text(json.dumps({"parent_commit": candidate.REV}))
+            nested_file.write_text(json.dumps(nested))
+
+            def fake_git(checkout, *args):
+                if args == ("rev-parse", "HEAD"):
+                    return candidate.REV if checkout == root else sha
+                if args[:1] == ("rev-parse",):
+                    return sha
+                if args == ("status", "--porcelain", "--untracked-files=no"):
+                    return " M edited.cpp" if checkout == root / paths[17] else ""
+                raise AssertionError((checkout, args))
+
+            with patch.object(candidate, "validate_index", return_value=direct), \
+                 patch.object(candidate, "git", side_effect=fake_git):
+                with self.assertRaisesRegex(ValueError, "tracked source was edited: " + paths[17]):
+                    candidate.verify_original_source(root, direct_index=direct_file,
+                                                     nested_index=nested_file)
+
     def test_refuses_wrong_or_tampered_native(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)

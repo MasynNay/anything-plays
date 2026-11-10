@@ -29,14 +29,19 @@ def git(source, *args):
         stderr=subprocess.PIPE).strip()
 
 
+def require_clean_tracked_source(checkout, label):
+    """Reject edits to tracked files in every source checkout, not just the parent."""
+    if git(checkout, "status", "--porcelain", "--untracked-files=no"):
+        raise ValueError(f"Original Dolphin tracked source was edited: {label}")
+
+
 def verify_original_source(source, *, direct_index=PINNED, nested_index=NESTED):
     source = Path(source)
     if source.is_symlink() or not source.is_dir():
         raise ValueError("Missing original Dolphin Git checkout")
     if git(source, "rev-parse", "HEAD") != REV:
         raise ValueError("Original Dolphin parent source commit differs from exact pin")
-    if git(source, "status", "--porcelain", "--untracked-files=no"):
-        raise ValueError("Original tracked Dolphin source was edited before compilation")
+    require_clean_tracked_source(source, "parent")
     direct_data = json.loads(Path(direct_index).read_text("utf-8"))
     nested_data = json.loads(Path(nested_index).read_text("utf-8"))
     direct = validate_index(direct_data)
@@ -52,6 +57,7 @@ def verify_original_source(source, *, direct_index=PINNED, nested_index=NESTED):
                 or git(source, "rev-parse", f"HEAD:{path}") != row["sha"]
                 or git(checkout, "rev-parse", "HEAD") != row["sha"]):
             raise ValueError(f"Original Dolphin Gitlink mismatch: {path}")
+        require_clean_tracked_source(checkout, path)
     nested = {}
     for parent in nested_data["parents"]:
         prefix = parent["parent_path"]
@@ -69,6 +75,7 @@ def verify_original_source(source, *, direct_index=PINNED, nested_index=NESTED):
                     git(parent_root, "rev-parse", f"HEAD:{suffix}") != child["gitlink_commit"] or
                     git(checkout, "rev-parse", "HEAD") != child["gitlink_commit"]):
                 raise ValueError(f"Pinned Dolphin nested Gitlink missing: {key}")
+            require_clean_tracked_source(checkout, key)
             nested[key] = child["gitlink_commit"]
     if len(nested) != 3:
         raise ValueError("Not all three exact nested source Gitlinks installed")
