@@ -143,6 +143,42 @@ OPEN.** The upstream pygame-ce source tree by itself does not prove
 that every packaged SDL2, image, mixer, TTF and transitive dependency
 is covered by the correct original-source inputs and notices.
 
+## New completed candidate acceptance checks — November 10, 2026
+
+The four-platform
+[installed frozen RC1 graphical startup run 42880420023](https://github.com/MasynNay/anything-plays/actions/runs/42880420023)
+**PASSED all 4 native operating systems**. The actual full 18-console
+Linux DEB, Windows Setup and both signed Mac DMGs were installed or
+mounted on clean hosted runners, and their embedded executable
+initialized the real Tk window and application, ran a GUI event-loop
+interval, and exited with an independently authenticated receipt.
+All installer hashes, pinned 3.1 RC1 app identities, eleven original
+emulator cores and 18 profiles were verified before granting this
+limited startup result.
+
+[Installed RC1 UI acceptance runbook](V3_1_INSTALLED_UI_QA.md).
+Actual physical controllers, webcams, retail games, saves, graphics,
+sound and long-duration sessions are **not** established by startup
+alone, and those release gates remain open.
+
+A separate
+[macOS signed SDL2 collision audit 42879312220](https://github.com/MasynNay/anything-plays/actions/runs/42879312220)
+found two distinct bundled SDL2 builds with the same basename on
+Apple Silicon, representing Mach-O current versions `3201.8.0`
+and `3201.10.0`; Intel had no equivalent conflicting basename
+in its audited native files. This is a potential loader ambiguity
+to verify with camera+controller simultaneous runtime tests, not a
+verified functional failure.
+
+The
+[original SDL2 source-candidate run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)
+also **PASSED**, providing authenticated Git-tag source archives for
+SDL2 2.32.8 and 2.32.10, SDL2_image 2.8.12,
+SDL2_mixer 2.8.2 and SDL2_ttf 2.24.0. These are
+source **candidates**, not yet proven exact binary-to-source
+correspondence, complete LGPL license materials or legal approval.
+[Native SDL source review](V3_1_SDL_SOURCE_REVIEW.md).
+
 ## What is still required before a full 3.1 stable release
 
 - [x] **Build full-library QA candidates:** all 18 profiles with the exact
