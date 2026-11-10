@@ -30,6 +30,7 @@ PLATFORMS = {
 }
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 MAX_PROVENANCE_BYTES = 1024 * 1024  # metadata only; native binaries are verified separately
+MAX_NATIVE_PAYLOAD_BYTES = 512 * 1024 * 1024  # reject decompression bombs before extraction
 
 
 def hash_bytes(data: bytes) -> str:
@@ -46,7 +47,13 @@ def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str
         member = members[0]
         if member.create_system == 3 and stat.S_ISLNK(member.external_attr >> 16):
             raise ValueError(f"{platform}: symlinked core ZIP payload: {name}")
-        return inner.read(member)
+        if member.file_size > MAX_NATIVE_PAYLOAD_BYTES:
+            raise ValueError(f"{platform}: oversized native core ZIP payload: {name}")
+        with inner.open(member) as handle:
+            payload = handle.read(MAX_NATIVE_PAYLOAD_BYTES + 1)
+        if len(payload) > MAX_NATIVE_PAYLOAD_BYTES:
+            raise ValueError(f"{platform}: native core ZIP payload exceeds limit: {name}")
+        return payload
 
 
 def build_candidate(artifact_paths):
