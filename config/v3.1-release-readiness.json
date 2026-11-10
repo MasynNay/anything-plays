@@ -69,5 +69,29 @@
     "console_profiles": 18,
     "approval": false,
     "expires": "2026-11-17"
+  },
+  "verified_dependency_evidence": {
+    "status": "TECHNICAL_SOURCE_AUDIT_PASSED_LEGAL_REVIEW_OPEN",
+    "upstream_pygame_version": "2.5.8",
+    "upstream_git_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
+    "wheel_source_review_run": "https://github.com/MasynNay/anything-plays/actions/runs/42874882808",
+    "macos_signed_native_linkage_run": "https://github.com/MasynNay/anything-plays/actions/runs/42875616776",
+    "audited_original_wheel_matches": {
+      "linux-x64": 74,
+      "windows-x64": 62,
+      "macos-arm64": 0,
+      "macos-x64": 0
+    },
+    "unmatched_macos_native_candidates": {
+      "macos-arm64": 121,
+      "macos-x64": 120
+    },
+    "signed_macos_native_candidates": {
+      "macos-arm64": 121,
+      "macos-x64": 120
+    },
+    "original_sdl_binary_source_correspondence_complete": false,
+    "lgpl_relinking_review_complete": false,
+    "redistribution_approved": false
   }
 }
