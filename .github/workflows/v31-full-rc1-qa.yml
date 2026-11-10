@@ -1,0 +1,155 @@
+name: 3.1 RC1 | Full 18-console source-app QA (unreleased)
+
+# A fresh current-source RC1 executable from run 42863846059, plus exact
+# original-source native 3.0 emulator binaries verified byte-for-byte.
+# Never use preview binaries or approve licensing / publish a GitHub Release.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-full-rc1-qa.yml'
+      - 'tools/assemble_v31_full_linux.py'
+      - 'tools/assemble_v31_full_windows.py'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'tools/audit_v31_sdl_runtime.py'
+      - 'tools/verify_v31_rc.py'
+      - 'tests/test_v31_rc_full.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-full-rc1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-source-candidate:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Full RC1 QA · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, arch: none, runner: ubuntu-24.04, file: 'anything-plays-31-rc1_3.1.0~rc1full_amd64.deb', receipt: FULL_LIBRARY_QA_RECEIPT.json}
+          - {target: windows-x64, arch: none, runner: windows-latest, file: 'AnythingPlaysSetup-3.1.0-rc1-full.exe', receipt: FULL_WINDOWS_QA_RECEIPT.json}
+          - {target: macos-arm64, arch: arm64, runner: macos-15, file: 'AnythingPlays-3.1.0-rc1-full-macos-arm64.dmg', receipt: FULL_MACOS_QA_RECEIPT.json}
+          - {target: macos-x64, arch: x64, runner: macos-15-intel, file: 'AnythingPlays-3.1.0-rc1-full-macos-x64.dmg', receipt: FULL_MACOS_QA_RECEIPT.json}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    env:
+      AP_V31_RC: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      GH_TOKEN: ${{ github.token }}
+      RC_APP_RUN_ID: '42863846059'
+      RC_APP_SOURCE_SHA: '86baa6972ed923540f6ab49b636652a0f499d45c'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check all four candidate input pinning and nonrelease contracts
+        run: python -m unittest discover -s tests -p "test_v31_rc_full.py" -v
+      - name: Verify pinned source app build identity, never frozen Preview 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh run view "$RC_APP_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          run_name="$(gh run view "$RC_APP_RUN_ID" --repo "$GITHUB_REPOSITORY" --json name --jq '.name')"
+          if [[ "$actual" != "$RC_APP_SOURCE_SHA" ||
+                "$run_name" != "3.1 RC1 | Fresh source-built app QA (unreleased)" ]]; then
+            echo "::error::RC source-app workflow or immutable commit mismatch"
+            exit 1
+          fi
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Install Windows Inno Setup and image rendering prerequisites
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup missing' }
+          python -m pip install Pillow==12.3.0 numpy==2.5.4 opencv-python-headless==4.14.0.94
+          if ($LASTEXITCODE -ne 0) { throw 'Icon build prerequisites missing' }
+      - name: Download exact verified public 3.0 native installer and hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stable30
+          case "${{ matrix.target }}" in
+            linux-x64) baseline='anything-plays_3.0.0_amd64.deb' ;;
+            windows-x64) baseline='AnythingPlaysSetup-3.0.0.exe' ;;
+            macos-arm64) baseline='AnythingPlays-3.0.0-macos-arm64.dmg' ;;
+            macos-x64) baseline='AnythingPlays-3.0.0-macos-x64.dmg' ;;
+            *) exit 1 ;;
+          esac
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern "$baseline" --dir stable30
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt --dir stable30
+      - name: Download exact freshly built RC1 app and source hash receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="AnythingPlays-3.1-RC1-SOURCE-APP-${{ matrix.target }}-UNRELEASED"
+          for attempt in {1..24}; do
+            if gh run download "$RC_APP_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+                --name "$artifact" --dir source31; then
+              test -s source31/RC1_APP_STAGE_RECEIPT.json
+              exit 0
+            fi
+            rm -rf source31
+            if [[ "$attempt" == 24 ]]; then
+              echo "::error::Verified source-built RC1 app artifact unavailable"
+              exit 1
+            fi
+            sleep 15
+          done
+      - name: Assemble and verify complete Linux RC1 QA installer
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_linux --rc1 \
+            --stable stable30/anything-plays_3.0.0_amd64.deb \
+            --preview 'source31/anything-plays-31-rc1_3.1.0~rc1_amd64.deb' \
+            --sums stable30/SHA256SUMS.txt \
+            --receipt source31/RC1_APP_STAGE_RECEIPT.json --output full31
+      - name: Assemble and verify complete Windows RC1 QA installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_windows --rc1 \
+            --stable stable30/AnythingPlaysSetup-3.0.0.exe \
+            --preview source31/AnythingPlaysSetup-3.1.0-rc1.exe \
+            --sums stable30/SHA256SUMS.txt \
+            --receipt source31/RC1_APP_STAGE_RECEIPT.json --output full31
+      - name: Assemble and verify complete macOS RC1 QA DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_macos --rc1 --arch "${{ matrix.arch }}" \
+            --stable "stable30/AnythingPlays-3.0.0-macos-${{ matrix.arch }}.dmg" \
+            --preview "source31/AnythingPlays-3.1.0-rc1-macos-${{ matrix.arch }}.dmg" \
+            --checksums stable30/SHA256SUMS.txt \
+            --receipt source31/RC1_APP_STAGE_RECEIPT.json --output full31
+      - name: Preserve only verified candidate installer and SDL receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED
+          path: |
+            full31/${{ matrix.file }}
+            full31/${{ matrix.receipt }}
+            full31/SDL_RUNTIME_AUDIT.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
