@@ -245,13 +245,25 @@ class GamepadReader:
         return mapped_buttons(system, physical, bindings), self.name + " connected"
 
     def stop(self):
+        """Always release each SDL subsystem, even if another quit fails.
+
+        Drivers can raise during USB/Bluetooth removal or app shutdown.
+        Shutdown must never strand the joystick/video handles or crash Tk.
+        """
         self._close_device()
         api, self.api = self.api, None
         pg, self.pygame = self.pygame, None
-        if api is not None:
-            api.quit()
-        if pg is not None:
-            pg.joystick.quit()
-            pg.display.quit()
         self.last_scan = float("-inf")
         self.retry_after = float("-inf")
+        callbacks = []
+        if api is not None:
+            callbacks.append(api.quit)
+        if pg is not None:
+            callbacks.extend((pg.joystick.quit, pg.display.quit))
+        for callback in callbacks:
+            try:
+                callback()
+            except Exception:
+                # Handles are already detached from this reader. Continue
+                # closing other SDL subsystems, preserving keyboard play.
+                pass
