@@ -117,6 +117,15 @@ def prepare_test_preferences(home=None, *, channel=None):
         )
     destination = root / identity["settings_namespace"]
     _checked_directory(destination)
+    # Skip linked legacy/preview directories; they could redirect the
+    # migration to arbitrary files outside the user's actual settings.
+    if source_dir.is_symlink():
+        return destination / "preferences.json"
     for filename in MIGRATED_FILENAMES:
-        _copy_once_atomic(source_dir / filename, destination / filename)
+        target = destination / filename
+        _copy_once_atomic(source_dir / filename, target)
+        # A competing process can create a linked destination *during*
+        # our atomic os.link() attempt. Refuse to return that linked file.
+        if target.is_symlink():
+            raise ValueError("RC settings must not link to stable settings")
     return destination / "preferences.json"

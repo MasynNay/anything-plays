@@ -154,6 +154,40 @@ class AtomicCandidatePreferencesTests(unittest.TestCase):
             self.assertEqual((stable / "preferences.json").read_bytes(),
                              b'{"theme":"Ocean"}')
 
+    def test_source_directory_symlink_cannot_import_arbitrary_settings(self):
+        if os.name == "nt":
+            self.skipTest("Ordinary Windows CI users may lack symlink permissions")
+        with TemporaryDirectory() as d:
+            home = Path(d)
+            storage = home / "outside"
+            storage.mkdir()
+            (storage / "preferences.json").write_bytes(b'{"private":"no"}')
+            (home / LEGACY_DIR).parent.mkdir()
+            (home / LEGACY_DIR).symlink_to(storage, target_is_directory=True)
+            result = prepare_test_preferences(home, channel="rc1")
+            self.assertFalse(result.exists())
+            self.assertEqual((storage / "preferences.json").read_bytes(),
+                             b'{"private":"no"}')
+
+    def test_concurrent_symlink_creation_cannot_redirect_later_app_save(self):
+        if os.name == "nt":
+            self.skipTest("Ordinary Windows CI users may lack symlink permissions")
+        with TemporaryDirectory() as d:
+            home = Path(d)
+            stable = seed(home, LEGACY_DIR,
+                          preferences=b'{"theme":"Never overwrite stable"}')
+            def race_with_symlink(_temp, dest):
+                if Path(dest).name == "preferences.json":
+                    Path(dest).symlink_to(stable / "preferences.json")
+                    raise FileExistsError("malicious competing write")
+                return os.link(_temp, dest)
+            with patch("anything_plays.test_preferences.os.link",
+                       side_effect=race_with_symlink):
+                with self.assertRaises(ValueError):
+                    prepare_test_preferences(home, channel="rc1")
+            self.assertEqual((stable / "preferences.json").read_bytes(),
+                             b'{"theme":"Never overwrite stable"}')
+
     def test_oversized_legacy_file_never_materializes_partial_rc_file(self):
         with TemporaryDirectory() as d:
             home = Path(d)
