@@ -2,22 +2,22 @@
 
 ## Reporting a vulnerability
 
-Please use GitHub's private vulnerability reporting feature for this repository
-if it is available. If private reporting is not enabled, contact the project
-maintainer privately before publishing exploit details. Do not post sensitive
-reproduction material, private game files, or camera footage in a public issue.
+Use [GitHub's private vulnerability reporting](https://github.com/MasynNay/anything-plays/security/advisories/new) if enabled. If the feature is unavailable, contact the maintainer privately through an established project contact rather than posting exploit details publicly. Never upload commercial games, proprietary console firmware, private preferences or personal camera footage to a public issue.
 
-## Supported versions
+## Supported releases
 
-The last published release line is 1.5.x. Version 2.0 is being prepared and is
-not yet a public release. Security support and patch timing are not guaranteed
-for historical builds; check the Releases page for the current published
-version.
+| Release | Status |
+| --- | --- |
+| **3.0.x** | Current published release line; fixes reviewed through issues and tagged updates |
+| **2.0.x** | Previous stable release; historical downloads remain available |
+| **1.5.x** | Historical release; migrate to 3.0 when compatible |
+
+The current public version is [Anything Plays 3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0). This community portfolio project does not guarantee commercial support or fixed security-response times.
 
 ## Trust boundaries
 
-Anything Plays accesses local cameras and runs native emulator libraries.
-Only install packages from a verified source, and do not run arbitrary DLL,
-SO, or DYLIB files passed off as Libretro cores. Build-time downloads from the
-Libretro nightly service are not version-pinned; release maintainers must
-review their provenance and third-party license obligations before shipping.
+Anything Plays works with local cameras, user-supplied game files and native emulator libraries. Only install verified releases from the official repository; compare SHA256 checksums with the matching release manifest. Never load arbitrary DLL, SO or DYLIB files from untrusted sources. Keep untrusted ROMs and native code outside the version-controlled source tree.
+
+The official 3.0 release contains 11 original-source-built emulator cores and includes corresponding source archives and original third-party notices. Build-time source downloads are pinned and verified for the released core lineup. No commercial ROMs or proprietary console firmware are distributed. Consult [the source audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release evidence](docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md) for precise scope.
+
+We welcome reproducible vulnerability reports, responsibly disclosed through private channels before public technical details are posted.

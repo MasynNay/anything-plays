@@ -10,14 +10,14 @@
 | --- | --- | --- |
 | **1.5** — Original desktop application | Released | Camera-driven controls and local emulation |
 | **2.0** — Expanded studio | Released | Game Boy, Game Boy Color, GBA, SNES; ROM libraries, themes and configurable zones |
-| **3.0** — Unified offline console library | **Built and validated; publication in progress** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
+| **3.0** — Unified offline console library | **Released · November 9, 2026** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
-**Download status:** The [GitHub Releases page](https://github.com/MasynNay/anything-plays/releases/latest) is authoritative. A successful build, internal release candidate, or private draft is not automatically a publicly downloadable release.
+**Download status:** [Anything Plays 3.0.0 is publicly released](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with four genuine offline installers and [original emulator sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Stable 2.0 and 1.5 remain available in previous releases.
 
-## Version 3.0 — Implementation
+## Version 3.0 — Shipped features
 
-The 3.0 application expands from four supported console profiles to 18, with integrated Nintendo 64 and GameCube alongside handhelds and classic systems.
+The public stable 3.0 release expands from four supported console profiles to 18, with integrated Nintendo 64 and GameCube alongside handhelds and classic systems.
 
 **Implemented**
 
@@ -33,7 +33,7 @@ The 3.0 application expands from four supported console profiles to 18, with int
 - The original four-platform source-built [integration run](https://github.com/MasynNay/anything-plays/actions/runs/42686588072) passed native emulator, frozen UI, graphics/audio, and seven-session switching checks.
 - The [source correspondence audit](https://github.com/MasynNay/anything-plays/actions/runs/42717944132) matched 44 compiled emulator libraries to eleven pinned upstream source trees, including 37 Dolphin Git-linked source dependencies.
 - The maintainer has personally tested N64 game switching and GameCube, including testing on Windows, Linux and Apple Silicon. These reports count as valuable real-world testing.
-- Genuine versioned 3.0.0 installer builds are tracked in the [release workflow](https://github.com/MasynNay/anything-plays/actions/runs/42718569352).
+- The [genuine stable 3.0.0 installer build](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) passed all four operating-system targets. The [source-first public publisher](https://github.com/MasynNay/anything-plays/actions/runs/42724633466) also completed successfully, publishing original sources and SHA256 checksums before public installers.
 
 **Known limitations**
 
@@ -45,7 +45,7 @@ The distinction between technical source proof and upstream licensing obligation
 
 | Priority | Focus | Success criteria |
 | --- | --- | --- |
-| **P1** | 3.0 publication and distribution | Four genuine public 3.0 installers with checksums, source archive and clear notes |
+| **Shipped** | 3.0 release and source distribution | Four public installers, original emulator sources, checksums and release notes verified November 9, 2026 |
 | **P1** | Reliability and saved games | Repeatable save/reload, core switching and graceful recovery from failed ROM loads |
 | **P2** | GameCube performance | Measure actual emulation FPS and rendered preview FPS separately; improve frame pacing without damaging correctness |
 | **P2** | Camera usability | Faster color calibration, clearer multi-object indicators and accessible diagnostics |
