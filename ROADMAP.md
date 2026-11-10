@@ -252,3 +252,7 @@ PR #154 merged into v3 development at `4533b785` after Python 3.12, Python 3.13 
 ### November 10, 2026 — Unix special-file ZIP guard verified
 
 PR #155 passed Python 3.12, Python 3.13 and native mGBA compatibility in source checks 42822892858, and unapproved source review 42822892906 succeeded. The tested validator rejects FIFO, socket, character and block device ZIP members masquerading as a native library, retains existing symlink rejection and permits ordinary regular files. Squash merged as `50e4c042`. Packaging was skipped; this does not resolve Dolphin exact corresponding source, combined license obligations, immutable production lock approval or four-platform final installer acceptance. Public 3.0 remains unpublished; stable 2.0 is preserved.
+
+### November 10, 2026 — Dolphin submodule working-tree integrity (pending CI)
+
+PR #158 adds verification that all 34 direct and 3 nested pinned Dolphin submodule working trees have no tracked modifications, rather than trusting Gitlink HEAD hashes alone. Two regression tests cover modified and clean checkouts. Original source-build CI and Python checks are pending; this is not proof of final production corresponding source, mixed GPL license clearance, installer acceptance or public distribution rights. Stable v2.0 remains unchanged.
