@@ -59,4 +59,4 @@ Priorities are engineering directions, **not promises of a release date**. Chang
 
 Use [GitHub Issues](https://github.com/MasynNay/anything-plays/issues) to report reproducible problems or suggest features. Include the affected operating system and console when relevant. The [contribution guide](CONTRIBUTING.md) explains testing and code expectations.
 
-For anyone who wants the original CI logs, source hashes, dependency notices or build procedure, start with the [technical documentation index](docs/README.md). The detailed append-only [engineering checkpoint](CONTINUE_HERE.md) is retained for development recovery and is **not** the public product roadmap.
+For anyone who wants the original CI logs, source hashes, dependency notices or build procedure, start with the [technical documentation index](docs/README.md). The detailed append-only [engineering checkpoint](docs/development/CONTINUE_HERE.md) is retained for development recovery and is **not** the public product roadmap.

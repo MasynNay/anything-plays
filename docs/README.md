@@ -24,7 +24,7 @@ This directory holds the engineering, packaging, source, and test details behind
 | Physical-device test procedures | [3.0 QA runbook](V3_PHYSICAL_QA_RUNBOOK.md) |
 | Known distribution constraints | [Distribution readiness](V3_DISTRIBUTION_READINESS.md) |
 | Native source and licensing investigations | [Compatibility research](V3_LICENSE_COMPATIBILITY_GATE.md) |
-| Full development recovery record | [CONTINUE_HERE.md](../CONTINUE_HERE.md) |
+| Full development recovery record | [CONTINUE_HERE.md](development/CONTINUE_HERE.md) |
 
 The old Stella2014, Snes9x, Genesis Plus GX, and early ten-source experiments are retained as **historical research**, not the selected 3.0 native lineup. The current build selects eleven pinned original-source cores, including Tia and Dolphin. Consult [the current audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) rather than inferring present-day release status from an old experiment.
 
