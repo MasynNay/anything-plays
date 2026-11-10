@@ -86,6 +86,9 @@ class GamepadMixin:
             value=preferences.get("gamepad_enabled", False) is True
         )
         self.gamepad_status = tk.StringVar(value="Controller disabled")
+        # Separate clipboard feedback from the 65ms live connection status,
+        # otherwise a successful copy would visually disappear immediately.
+        self.gamepad_diagnostics_status = tk.StringVar(value="")
         self.gamepad_live_input = tk.StringVar(
             value="Enable gamepad input to test its buttons."
         )
@@ -184,11 +187,11 @@ class GamepadMixin:
             self.root.clipboard_append(json.dumps(report, indent=2) + "\n")
             self.root.update_idletasks()
         except (tk.TclError, RuntimeError, ValueError, OSError) as exc:
-            self.gamepad_status.set(
+            self.gamepad_diagnostics_status.set(
                 "Could not copy diagnostics: " + str(exc)[:105]
             )
             return False
-        self.gamepad_status.set(
+        self.gamepad_diagnostics_status.set(
             "Controller diagnostics copied. No ROMs, file paths or camera images."
         )
         return True
@@ -308,6 +311,10 @@ class GamepadMixin:
             command=self.copy_gamepad_diagnostics,
             style="Compact.TButton"
         ).pack(side="right", padx=(0, 6))
+        ttk.Label(
+            content, textvariable=self.gamepad_diagnostics_status,
+            style="Helper.TLabel", wraplength=515
+        ).pack(fill="x")
         ttk.Label(content, textvariable=self.gamepad_status,
                   style="Helper.TLabel", wraplength=515).pack(
                       fill="x", pady=(0, 9))
