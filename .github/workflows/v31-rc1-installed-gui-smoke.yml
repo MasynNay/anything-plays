@@ -112,20 +112,20 @@ jobs:
           $ErrorActionPreference = "Stop"
           $exe = Join-Path $env:RC_FULL_INSTALL "AnythingPlays.exe"
           if (-not (Test-Path $exe)) { throw "Installed RC1 executable missing" }
-          $home = Join-Path $env:RUNNER_TEMP "AP31-Settings-Migration-Home"
-          New-Item -ItemType Directory -Path $home -ErrorAction Stop | Out-Null
+          $qaHome = Join-Path $env:RUNNER_TEMP "AP31-Settings-Migration-Home"
+          New-Item -ItemType Directory -Path $qaHome -ErrorAction Stop | Out-Null
           $manifest = Join-Path $PWD "evidence/SETTINGS_QA_FIXTURE.json"
-          python -m tools.qa_v31_installed_settings_migration seed --home $home --manifest $manifest
+          python -m tools.qa_v31_installed_settings_migration seed --home $qaHome --manifest $manifest
           if ($LASTEXITCODE -ne 0) { throw "Could not create isolated Windows legacy-settings fixture" }
-          $env:USERPROFILE = $home
-          $env:HOME = $home
+          $env:USERPROFILE = $qaHome
+          $env:HOME = $qaHome
           $env:AP_V30_UI_SMOKE_CHECK = "1"
           $env:AP_V30_UI_SMOKE_REPORT = Join-Path $PWD "evidence/FROZEN_UI_SMOKE.json"
           $env:SDL_AUDIODRIVER = "dummy"
           $proc = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -PassThru -Wait -ErrorAction Stop
           if ($proc.ExitCode -ne 0) { throw "Installed Windows Tk UI smoke failed with exit $($proc.ExitCode)" }
           if (-not (Test-Path $env:AP_V30_UI_SMOKE_REPORT)) { throw "Frozen UI report missing" }
-          python -m tools.qa_v31_installed_settings_migration verify --home $home --manifest $manifest --output (Join-Path $PWD "evidence/RC1_INSTALLED_SETTINGS_RECEIPT.json")
+          python -m tools.qa_v31_installed_settings_migration verify --home $qaHome --manifest $manifest --output (Join-Path $PWD "evidence/RC1_INSTALLED_SETTINGS_RECEIPT.json")
           if ($LASTEXITCODE -ne 0) { throw "Installed Windows RC changed stable settings or did not import RC preferences" }
       - name: Mount and launch signed Apple/Intel RC1 app without changing the DMG
         if: runner.os == 'macOS'
