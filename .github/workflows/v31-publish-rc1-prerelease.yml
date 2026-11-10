@@ -67,6 +67,22 @@ jobs:
           set -euo pipefail
           mkdir -p verified
           gh release download "$TAG" --dir verified
+          # GitHub Releases normalizes the Debian package filename by
+          # replacing tilde with a dot when it receives the asset.
+          # Keep the audited binary byte-for-byte intact; correct ONLY the
+          # checksum listing to name the real downloadable GitHub asset.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('verified/SHA256SUMS.txt')
+          text=p.read_text('ascii')
+          original='anything-plays-31-rc1_3.1.0~rc1full_amd64.deb'
+          normalized='anything-plays-31-rc1_3.1.0.rc1full_amd64.deb'
+          assert text.count(original)==1
+          assert not (p.parent/original).exists()
+          assert (p.parent/normalized).is_file()
+          p.write_text(text.replace(original,normalized),'ascii')
+          print('Adapted checksum asset filename to GitHub download normalization')
+          PY
           (cd verified && sha256sum --check SHA256SUMS.txt)
           python - <<'PY'
           from pathlib import Path
@@ -81,11 +97,19 @@ jobs:
           assert r['public_release_approved'] is False
           assert len(r['installers'])==4
           for item in r['installers'].values():
-              p=d/item['filename']
+              real_name=item['filename'].replace('~','.')
+              p=d/real_name
+              assert p.is_file() and not p.is_symlink()
               assert p.stat().st_size==item['bytes']
               assert hashlib.sha256(p.read_bytes()).hexdigest()==item['sha256']
           assert len(list(d.iterdir()))==7
           PY
+          # Replace only the checksum TEXT asset while draft is private.
+          gh release upload "$TAG" verified/SHA256SUMS.txt --clobber
+          mkdir -p remote-checksums
+          gh release download "$TAG" --pattern SHA256SUMS.txt --dir remote-checksums
+          cmp verified/SHA256SUMS.txt remote-checksums/SHA256SUMS.txt
+          echo 'All four original installers verified; downloaded checksum names corrected'
       - name: Write accurate public release-candidate notes with rights and hardware caveats
         shell: bash
         run: |
@@ -105,7 +129,10 @@ jobs:
           Windows x64, Linux x64, macOS Apple Silicon and macOS Intel, and
           include 18 console profiles with 11 original-source emulator cores.
           All four are genuinely compiled 3.1 RC1 builds, not renamed
-          older installers. Check the attached SHA256SUMS.txt before use.
+          older installers. GitHub normalizes the Linux download filename
+          from a Debian tilde to a dot; its internal package version and
+          audited SHA-256 digest remain unchanged. The published
+          SHA256SUMS.txt uses the actual GitHub download filename.
           No copyrighted game ROMs, firmware or BIOS are included.
 
           **Test evidence:** all four full packages and actual installed
