@@ -1,5 +1,6 @@
 """Reject unverified extra entries inside candidate native core ZIPs."""
 import io
+import stat
 import sys
 import unittest
 import zipfile
@@ -22,6 +23,23 @@ class NativeZipSingleMemberTests(unittest.TestCase):
 
     def test_exact_single_native_file_is_accepted(self):
         self.assertEqual(self.read([("mgba_libretro.so", b"native")]), b"native")
+
+    def test_unix_regular_mode_is_accepted(self):
+        entry = zipfile.ZipInfo("mgba_libretro.so")
+        entry.create_system = 3
+        entry.external_attr = (stat.S_IFREG | 0o644) << 16
+        self.assertEqual(self.read([(entry, b"native")]), b"native")
+
+    def test_unix_special_file_modes_are_rejected(self):
+        for kind in (stat.S_IFIFO, stat.S_IFSOCK, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFLNK):
+            with self.subTest(kind=kind):
+                entry = zipfile.ZipInfo("mgba_libretro.so")
+                entry.create_system = 3
+                entry.external_attr = (kind | 0o644) << 16
+                expected_error = ("symlinked core ZIP payload" if kind == stat.S_IFLNK
+                                  else "non-regular core ZIP payload")
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    self.read([(entry, b"not a regular native library")])
 
     def test_unexpected_extra_file_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid core ZIP payload"):
