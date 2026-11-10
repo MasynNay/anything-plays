@@ -505,3 +505,49 @@ Last verified November 7, 2026. This is the durable handoff/checkpoint if a conv
 
 239. **2026-11-09 — PUBLIC 3.0.0 SHIPPED AND VERIFIED; STOP USING OLD "PENDING" CHECKPOINTS AS CURRENT STATE.** [Original four-OS authentic 3.0.0 build run 42718569352](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) finished **SUCCESS all FOUR**: Windows x64, Linux x64, macOS Apple Silicon, macOS Intel. [Source-first public publisher run 42724633466](https://github.com/MasynNay/anything-plays/actions/runs/42724633466) **SUCCESS**. Verified GitHub Releases API shows [PUBLIC stable v3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with `draft=false`, `prerelease=false` and exactly FIVE uploaded assets: genuine `AnythingPlaysSetup-3.0.0.exe` 64,539,768 bytes; `anything-plays_3.0.0_amd64.deb` 101,004,536 bytes; `AnythingPlays-3.0.0-macos-arm64.dmg` 105,899,391 bytes; `AnythingPlays-3.0.0-macos-x64.dmg` 91,036,214 bytes; `SHA256SUMS.txt`. GitHub native SHA256 digest metadata checked for all, matching approved artifact receipts. Public [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) has original 11 pinned Git emulator source tree ZIP 238,132,878 bytes and SHA256 manifest. App binaries are genuine 3.0.0 package versions, not renamed alpha files. Public [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) and v1.5.0 remain untouched; historical `v3.0.0-rc.1` owner-only draft is no longer relevant. Release known limitations and third-party source grants are documented without inventing blanket independent legal/game QA.
 240. **2026-11-09 — PROFESSIONAL README/PORTFOLIO SHOWCASE COMPLETED WITH REAL APP IMAGES.** Compared design and screenshot organization in actual `MasynNay/Keystoria` and `MasynNay/aftertone` READMEs, then merged [PR #149](https://github.com/MasynNay/anything-plays/pull/149) to main squash `c784380a5be3d43fcfbbda9e55e7d114ff0c03f8`. The public [README](https://github.com/MasynNay/anything-plays#readme) now leads with original fish art, actual packaged Linux 3.0 desktop screenshot (NOT a mockup), two separately labeled authentic screenshot detail crops of camera and ROM/audio UI, polished feature/18 console chart, genuine direct Windows/Linux/Intel/ARM stable 3.0.0 downloads, SHA checksums, simple start steps, real architecture, clean repository tree, roadmap/technical source links. `tools/prepare_readme_screenshots.py` deterministically crops the unchanged original 1342×846 WebP; [.github/workflows/readme-screenshots.yml](https://github.com/MasynNay/anything-plays/actions/runs/42726680894) **SUCCESS**, generated and committed `docs/screenshots/current/camera-controls.webp` and `game-library-and-audio.webp` by github-actions bot to main SHA `82cf23adbf0411c04663946eb71c9d6ad5036c2c`. Their actual Git blobs, dimensions and contents verified; these are crops of ONE real captured app UI, not fake gameplay or extra camera sessions. Static portfolio `site/index.html` now advertises truly public 3.0 stable and sources directly, correct roadmap/facts and section numbers; no client-side GitHub polling in `site/main.js`. [GitHub Pages deployment run 42726680827](https://github.com/MasynNay/anything-plays/actions/runs/42726680827) **SUCCESS**; static website updated at `https://anythingplays.masynnay.com/`. Root `ROADMAP.md`, `SECURITY.md`, `CONTRIBUTING.md`, site and original-source assessment docs corrected from obsolete "3.0 pending/1.5 current" claims. [PR #149 source checks](https://github.com/MasynNay/anything-plays/actions/runs/42726457687) and [main source checks](https://github.com/MasynNay/anything-plays/actions/runs/42726680633) passed Python 3.12 and 3.13 plus native mGBA. **Zero open PRs at last check.** Do NOT restart stable release research or ask user to retest N64/GameCube. Keep 2.0 unchanged. Future work: targeted 3.x fixes, verified UI/screenshots and clean code. The 3.0.0 release tag is immutable; a code fix in main does not retroactively patch published installers.
+
+## 3.1 continuation checkpoint — November 10, 2026
+
+**Current truth overrides historical pre-release entries above:** public stable
+3.0.0 shipped November 9, 2026. Leave 3.0 and 2.0 untouched. Active 3.1
+development is isolated on `feature/v3.1-controls-usability`, with
+[draft PR #156](https://github.com/MasynNay/anything-plays/pull/156).
+No 3.1 public stable release or tag has been created.
+
+- Existing 3.1 work: optional pygame-ce/SDL manual gamepad input, per-console
+  controller bindings, theme-aware right-side setup card, Game Controls and
+  keyboard shortcut separation, duplicate slider removal, safe focus/hotplug,
+  and four-platform Preview 2 full 18-profile/11-core QA packages.
+  [Download and evidence guide](../V3_1_QA_DOWNLOADS.md).
+- This continuation added a **read-only live controller tester** in the setup
+  dialogue. It identifies raw face buttons, D-pad, stick directions, and
+  triggers without loading a ROM, independent of in-game button mapping.
+  It suppresses the visual readout on focus loss.
+- The **Rescan** command now immediately releases emulated controller input
+  and clears raw diagnostic state. Malformed/non-string saved mapping targets
+  are safely ignored, preserving controller operation.
+- Regression file `tests/test_v31_live_controller.py` covers raw input,
+  mapping separation, no-ROM diagnostic, focus loss, disconnected device,
+  Rescan release, malformed preferences and bounded text display.
+  The four-platform virtual-controller CI now includes this file, and the
+  real Tk smoke asserts that the tester exists.
+- Commits in this continuation (ordered): `31d4a032`, `d176ff54`,
+  `d31a610a`, `0deacf98`, `d1bcd2f6`, `81a163ed`,
+  `41dc84d4`, `cfada2f5`. PR #156's draft review now mentions
+  these changes.
+- Latest source checks as started:
+  [run 42854121378](https://github.com/MasynNay/anything-plays/actions/runs/42854121378).
+  **Consult the finished GitHub run before claiming every job passed.**
+  Package jobs in the source workflow are intentionally skipped on this
+  feature branch; earlier complete four-platform QA packages remain
+  Preview 2 and DO NOT include these newly edited source files.
+
+**Still open, without substituting simulation for hardware:** full stable
+3.1.0 application rebundles with eleven original-source cores and verified
+four-platform checksums; original matching source for newly bundled pygame-ce
+and native SDL libraries, legal notices/relinking review; physical USB or
+Bluetooth controller hotplug/remap/focus acceptance; real-game/save/audio/
+long-session final installer checks. The public 3.0 build remains available
+and unchanged. Do not tag or merge a stable 3.1 release until those gates
+are explicitly satisfied. The next productive direction is actual SDL
+component inventory and final 3.1 native-source release packaging.
