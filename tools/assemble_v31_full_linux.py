@@ -15,12 +15,16 @@ import tempfile
 
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.audit_v31_sdl_runtime import inspect_bundle
+from tools.verify_v31_rc import validate_staged_identity
 from verify_bundle import verify_bundle
 
 STABLE = "anything-plays_3.0.0_amd64.deb"
 PREVIEW = "anything-plays-31-preview_3.1.0~preview1_amd64.deb"
 FULL = "anything-plays-31-preview_3.1.0~preview2_amd64.deb"
 SOURCE_REVISION = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
+RC_PREVIEW = "anything-plays-31-rc1_3.1.0~rc1_amd64.deb"
+RC_FULL = "anything-plays-31-rc1_3.1.0~rc1full_amd64.deb"
+RC_SOURCE_REVISION = "86baa6972ed923540f6ab49b636652a0f499d45c"
 
 
 def sha(path):
@@ -31,8 +35,10 @@ def sha(path):
     return h.hexdigest()
 
 
-def validate_inputs(stable, preview, sums, receipt):
-    if stable.name != STABLE or preview.name != PREVIEW:
+def validate_inputs(stable, preview, sums, receipt, rc1=False):
+    preview_name = RC_PREVIEW if rc1 else PREVIEW
+    source_sha = RC_SOURCE_REVISION if rc1 else SOURCE_REVISION
+    if stable.name != STABLE or preview.name != preview_name:
         raise ValueError("Unexpected native or 3.1 application installer name")
     if not stable.is_file() or not preview.is_file():
         raise ValueError("Missing baseline or 3.1 preview binary")
@@ -40,25 +46,31 @@ def validate_inputs(stable, preview, sums, receipt):
     if not any(line.strip() == sha(stable) + "  " + STABLE for line in checks):
         raise ValueError("Published 3.0 SHA-256 does not match")
     meta = json.loads(receipt.read_text("utf-8"))
-    if (meta.get("sha256") != sha(preview) or meta.get("installer") != PREVIEW
-            or meta.get("source_revision") != SOURCE_REVISION
+    if (meta.get("sha256") != sha(preview) or meta.get("installer") != preview_name
+            or meta.get("source_revision") != source_sha
             or meta.get("target") != "linux-x64"):
         raise ValueError("3.1 Preview 1 original artifact digest/source mismatch")
     return sha(stable)
 
 
-def build(stable, preview, sums, receipt, output_dir):
-    if os.getenv("AP_V31_PREVIEW") != "1" or os.getenv("AP_V31_FULL_TEST_CORES") != "1":
+def build(stable, preview, sums, receipt, output_dir, rc1=False):
+    if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Full library staging requires owner-only QA flags")
+    if rc1:
+        if os.getenv("AP_V31_RC") != "1" or os.getenv("AP_V31_PREVIEW") == "1":
+            raise ValueError("RC1 full assembly cannot use the preview channel")
+    elif os.getenv("AP_V31_PREVIEW") != "1":
+        raise ValueError("Legacy full-preview assembly needs preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("A full candidate is not automatically an approved release")
-    stable_sha = validate_inputs(stable, preview, sums, receipt)
+    stable_sha = validate_inputs(stable, preview, sums, receipt, rc1=rc1)
     with tempfile.TemporaryDirectory(prefix="ap31-full-") as temp:
         root = Path(temp)
         subprocess.run(["dpkg-deb", "-x", str(stable), str(root/"old")], check=True)
         subprocess.run(["dpkg-deb", "-R", str(preview), str(root/"new")], check=True)
         old = root/"old/opt/anything-plays"
-        new = root/"new/opt/anything-plays-31-preview"
+        new = root/("new/opt/anything-plays-31-rc1"
+                    if rc1 else "new/opt/anything-plays-31-preview")
         oldcores, newcores = old/"cores", new/"cores"
         original = validate_trial_core_directory(oldcores, ".so")
         if (original.get("total_source_built_core_families") != 11
@@ -89,32 +101,40 @@ def build(stable, preview, sums, receipt, output_dir):
 
         ctrl = root/"new/DEBIAN/control"
         data = ctrl.read_text("utf-8")
-        if "Package: anything-plays-31-preview" not in data or "Version: 3.1.0~preview1" not in data:
-            raise ValueError("Incorrect 3.1 Preview 1 input package")
-        ctrl.write_text(data.replace("Version: 3.1.0~preview1",
-                                      "Version: 3.1.0~preview2"), "utf-8")
+        pkg = "anything-plays-31-rc1" if rc1 else "anything-plays-31-preview"
+        original_version = "3.1.0~rc1" if rc1 else "3.1.0~preview1"
+        full_version = "3.1.0~rc1full" if rc1 else "3.1.0~preview2"
+        if ("Package: " + pkg) not in data or ("Version: " + original_version) not in data:
+            raise ValueError("Incorrect 3.1 source-stage input package")
+        ctrl.write_text(data.replace("Version: " + original_version,
+                                      "Version: " + full_version), "utf-8")
         desktop = root/"new/usr/share/applications/anything-plays-31-preview.desktop"
         data = desktop.read_text("utf-8")
         desktop.write_text(data.replace("Name=Anything Plays 3.1 Preview 1",
                                         "Name=Anything Plays 3.1 Full QA Preview"), "utf-8")
         verify_bundle(new, "linux", check_native=True)
         output_dir.mkdir(parents=True, exist_ok=True)
-        deb = output_dir/FULL
+        deb = output_dir/(RC_FULL if rc1 else FULL)
         subprocess.run(["dpkg-deb", "--build", "--root-owner-group", str(root/"new"), str(deb)], check=True)
         subprocess.run(["dpkg-deb", "-x", str(deb), str(root/"installed")], check=True)
-        payload = root/"installed/opt/anything-plays-31-preview"
+        payload = root/("installed/opt/anything-plays-31-rc1"
+                       if rc1 else "installed/opt/anything-plays-31-preview")
         verify_bundle(payload, "linux", check_native=True)
         if validate_trial_core_directory(payload/"cores", ".so") != original:
             raise ValueError("Repackaging modified 3.0 original binaries")
+        if rc1:
+            validate_staged_identity(payload)
         audit = inspect_bundle(payload, "linux-x64")
         (output_dir/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         result = {
-            "status": "UNRELEASED_3_1_FULL_LINUX_QA",
+            "status": ("UNRELEASED_3_1_FULL_LINUX_RC1_QA" if rc1
+                       else "UNRELEASED_3_1_FULL_LINUX_QA"),
             "public_release_approved": False,
             "source_stable_sha256": stable_sha,
             "source_preview_sha256": sha(preview),
-            "source_preview_revision": SOURCE_REVISION,
+            "source_preview_revision": RC_SOURCE_REVISION if rc1 else SOURCE_REVISION,
+            "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": deb.name,
             "sha256": sha(deb),
@@ -134,9 +154,11 @@ def main():
     p = argparse.ArgumentParser()
     for name in ("stable", "preview", "sums", "receipt", "output"):
         p.add_argument("--"+name, type=Path, required=True)
+    p.add_argument("--rc1", action="store_true",
+                   help="Assemble from exact fresh source-built RC1 app instead of frozen Preview 1")
     args = p.parse_args()
     build(*(getattr(args, x).resolve() for x in ("stable", "preview", "sums",
-                                                 "receipt", "output")))
+                                                 "receipt", "output")), rc1=args.rc1)
 
 
 if __name__ == "__main__":
