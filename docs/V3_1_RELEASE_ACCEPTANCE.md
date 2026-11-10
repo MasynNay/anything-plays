@@ -65,10 +65,30 @@ any incorrect document SHA-256. It records the wheel-license omission
 rather than disguising it. This adds inspectable compliance evidence,
 but leaves the broader LGPL native linkage/relinking/source gate **open**.
 
-**Do not mark the four updated packages passed until the new CI jobs finish
-and the actual resulting artifacts are checked.** The earlier Preview 2
-passes continue to apply to those earlier binaries only. Stable public
-3.0.0 remains unchanged.
+**Updated full-console QA packages: PASS on all four targets.** Exact successful
+runs for the newer controller application and pinned SDL license inventory:
+
+| Target | Verified workflow | Outcome |
+| --- | --- | --- |
+| Linux x64 | [42856511632](https://github.com/MasynNay/anything-plays/actions/runs/42856511632) | Passed installed DEB and frozen SDL notice audit |
+| Windows x64 | [42857106220](https://github.com/MasynNay/anything-plays/actions/runs/42857106220) | Passed installed Inno Setup, native runtime, and notice audit |
+| macOS Apple Silicon | [42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639) | Passed signed final DMG and frozen SDL audit |
+| macOS Intel | [42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639) | Passed signed final DMG and frozen SDL audit |
+
+All four QA artifact ZIPs contain an installer, full-console SHA-256
+receipt and `SDL_RUNTIME_AUDIT.json`, retained until roughly November 17,
+2026. The application source receipt is pinned to
+`d176ff54de90a3cc5e585c6fc6ffd4f68388c104`. The pinned
+LGPL attribution document uses LF line endings on all targets, preserving
+upstream bytes. [Latest successful source test run
+42857231009](https://github.com/MasynNay/anything-plays/actions/runs/42857231009)
+covers Python 3.12/3.13 and all new audit regression tests.
+
+**This passes updated full-library QA packaging only, not the stable
+3.1.0 release gate.** Physical device acceptance, actual gameplay and
+endurance on the new artifacts, full LGPL native dependency/source/relinking
+review, and a new genuine stable-identity installer rebuild remain open.
+Stable public 3.0.0 is unchanged.
 
 ## What is still required before a full 3.1 stable release
 
