@@ -4,6 +4,8 @@ No real hardware or SDL display is required. Integration runs on macOS,
 Windows and Linux still need hands-on controller acceptance before release.
 """
 import ast
+import os
+import sys
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -219,6 +221,24 @@ class GamepadLifecycleTests(unittest.TestCase):
         self.assertTrue(self.pad.closed)
         self.assertTrue(self.api.stopped)
         self.assertIsNone(self.reader.api)
+
+
+class SDLBackendSmokeTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Headless SDL smoke runs in Linux CI")
+    def test_real_sdl_controller_api_without_physical_hardware(self):
+        """Exercise actual pygame-ce initialization and poll in dummy video mode."""
+        with patch.dict(os.environ, {"SDL_VIDEODRIVER": "dummy"}):
+            reader = GamepadReader()
+            try:
+                reader.start()
+                self.assertIsNotNone(reader.api)
+                self.assertTrue(hasattr(reader.api, "CONTROLLER_BUTTON_A"))
+                self.assertTrue(hasattr(reader.api, "CONTROLLER_AXIS_LEFTX"))
+                held, status = reader.poll("gba")
+                self.assertIsInstance(held, frozenset)
+                self.assertIsInstance(status, str)
+            finally:
+                reader.stop()
 
 
 class WiringTests(unittest.TestCase):
