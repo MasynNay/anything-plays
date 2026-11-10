@@ -191,3 +191,7 @@ A focused pending- CI change replaces direct JSON lock writes with same-director
 ### November 9 — Tia runtime branch reconciliation (pending CI)
 
 The complete original-source Tia 11-core installer passed four-platform CI on `main` in [run 42668367910](https://github.com/MasynNay/anything-plays/actions/runs/42668367910). The active development branch still lacked the installed Tia runtime identity mapping; a focused PR ports that mapping with regression tests. This does not merge all diverged branches or approve any combined redistribution rights, Dolphin corresponding source, or public 3.0 release.
+
+### November 9, 2026 — preserved native archive metadata safety (CI pending)
+
+A focused development PR rejects Unix symlink ZIP members and provenance JSON larger than 1 MiB before candidate-lock processing, with three synthetic regression tests. This is defensive validation of unapproved input artifacts, not evidence of exact Dolphin corresponding source or redistribution rights. Do not merge without CI; public v3.0 remains blocked, stable v2.0 unchanged.
