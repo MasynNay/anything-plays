@@ -52,6 +52,20 @@ See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before co
 
 ## 3.1 — Controls and usability (development branch, unreleased)
 
+**Newest verified development candidate (November 10, 2026):** The
+updated 3.1 source app includes local Copy diagnostics, full
+four-platform camera/controller integration tests, and persistent
+clipboard feedback. [New source apps](https://github.com/MasynNay/anything-plays/actions/runs/42885525444) passed 4/4,
+[full 18-console owner-QA installers](https://github.com/MasynNay/anything-plays/actions/runs/42886791394) passed
+4/4, and [installed GUI boots](https://github.com/MasynNay/anything-plays/actions/runs/42887470580) passed 4/4.
+[Pixel-tracking plus synthetic SDL input](https://github.com/MasynNay/anything-plays/actions/runs/42884824976)
+passed on all four OSes with 18 profiles and 1,000 frames, while
+[private controller report tests](https://github.com/MasynNay/anything-plays/actions/runs/42885687277)
+passed four-platform clipboard and redaction checks.
+All packages remain temporary nonrelease QA, and hardware, native
+corresponding-source/LGPL and stable-release gates remain OPEN.
+
+
 **Development only:** Work is isolated on `feature/v3.1-controls-usability`.
 No 3.1 installers or release tags have been published; 3.0 remains stable.
 

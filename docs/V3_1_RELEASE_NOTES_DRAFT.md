@@ -15,6 +15,10 @@ Do not mark 3.1 as stable until the acceptance criteria in
 - **Live button tester:** View detected physical buttons and stick directions
   without starting a game. The tester is read-only, independent of remapping,
   and pauses its readout when Anything Plays loses focus.
+- **Copy diagnostics:** Copy a local SDL/controller JSON report from the
+  controller setup window without ROM filenames, personal paths,
+  Bluetooth names or camera images. A separate feedback line confirms
+  success without being overwritten by rapid gamepad status polling.
 - **Rescan safety:** Immediately release held controller buttons on Rescan;
   malformed saved mappings are ignored instead of interrupting controller play.
 - **Per-console remapping:** Choose face buttons, D-pad, both analog sticks,
@@ -27,6 +31,20 @@ Do not mark 3.1 as stable until the acceptance criteria in
   eleven original-source native emulator cores from 3.0.
 
 ## QA evidence already available
+
+**Newest verified development candidate (November 10, 2026):** The
+updated 3.1 source app includes local Copy diagnostics, full
+four-platform camera/controller integration tests, and persistent
+clipboard feedback. [New source apps](https://github.com/MasynNay/anything-plays/actions/runs/42885525444) passed 4/4,
+[full 18-console owner-QA installers](https://github.com/MasynNay/anything-plays/actions/runs/42886791394) passed
+4/4, and [installed GUI boots](https://github.com/MasynNay/anything-plays/actions/runs/42887470580) passed 4/4.
+[Pixel-tracking plus synthetic SDL input](https://github.com/MasynNay/anything-plays/actions/runs/42884824976)
+passed on all four OSes with 18 profiles and 1,000 frames, while
+[private controller report tests](https://github.com/MasynNay/anything-plays/actions/runs/42885687277)
+passed four-platform clipboard and redaction checks.
+All packages remain temporary nonrelease QA, and hardware, native
+corresponding-source/LGPL and stable-release gates remain OPEN.
+
 
 - Python 3.12 and 3.13 regression and Tk GUI smoke checks.
 - Synthetic gamepad, button remapping, analog axis, disconnect and focus-loss

@@ -3,6 +3,23 @@
 **Status: NOT READY FOR A STABLE RELEASE.** This document tracks evidence,
 not a promise of a release date. Stable 3.0 stays public and untouched.
 
+## Current reviewed source and full RC1 milestone — 4/4 PASS
+
+**Newest verified development candidate (November 10, 2026):** The
+updated 3.1 source app includes local Copy diagnostics, full
+four-platform camera/controller integration tests, and persistent
+clipboard feedback. [New source apps](https://github.com/MasynNay/anything-plays/actions/runs/42885525444) passed 4/4,
+[full 18-console owner-QA installers](https://github.com/MasynNay/anything-plays/actions/runs/42886791394) passed
+4/4, and [installed GUI boots](https://github.com/MasynNay/anything-plays/actions/runs/42887470580) passed 4/4.
+[Pixel-tracking plus synthetic SDL input](https://github.com/MasynNay/anything-plays/actions/runs/42884824976)
+passed on all four OSes with 18 profiles and 1,000 frames, while
+[private controller report tests](https://github.com/MasynNay/anything-plays/actions/runs/42885687277)
+passed four-platform clipboard and redaction checks.
+All packages remain temporary nonrelease QA, and hardware, native
+corresponding-source/LGPL and stable-release gates remain OPEN.
+
+The new 18-console installer source app is pinned to commit `fe0da0b8b5f478cf1172734ef38546c4f1e86229` and preserves the eleven verified original-source emulator core families. The earlier SDL/Mach-O source comparison was conducted on an **older** pinned RC1 installer and does not automatically prove correspondence for the newly signed full packages. Do not change the six release gates or mark public 3.1 approved.
+
 ## What is already working
 
 - [x] The 3.1 source branch includes Game Controls, per-console mapping,
