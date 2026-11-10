@@ -55,6 +55,12 @@ These are engineering milestones, **not an announcement of a stable 3.0 release*
 - [PR #129](https://github.com/MasynNay/anything-plays/pull/129) demonstrated a GPL-2.0-or-later Atari 2600 Tia source-built alternative on four operating systems. This is a research substitute only, **not yet substituted into the complete 11-core installer**. GPL compatibility and all source/rights approvals remain pending.
 - Public release remains **v2.0.0**; no unapproved 3.0 installer has been published.
 
+## November 10, 2026 — verified Dolphin source-build regression
+
+- [PR #157](https://github.com/MasynNay/anything-plays/pull/157) merged after [Python 3.12/3.13 and native mGBA checks passed](https://github.com/MasynNay/anything-plays/actions/runs/42847462128). A real CMake/Ninja regression now fails closed if an expected original Dolphin linker target disappears.
+- [Pinned original Dolphin Linux research build 42847462046](https://github.com/MasynNay/anything-plays/actions/runs/42847462046) succeeded, including native compilation and source-provenance JSON retention. The native binary was **not** uploaded for public redistribution. This is Linux source-build evidence, not an approved final four-platform production release.
+- **Still blocked:** documented combined GPL/source and runtime obligations, exact production artifact source correspondence and final release acceptance. No rights or hardware QA flags are automatically granted by passing compilation. Stable 2.0 remains preserved.
+
 ## Delivered milestones
 
 ### 1.0–2.0 — Desktop foundation
