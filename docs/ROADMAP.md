@@ -71,9 +71,12 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   live button diagnostics and immediate Rescan release, preserving original
   3.0 native-core hashes. A byte-verified pygame-ce LGPL notice now ships
   alongside an explicit JSON audit of actual frozen pygame/SDL libraries.
-  [Audit method](V3_1_SDL_RUNTIME_AUDIT.md). Linux, Apple Silicon and Intel
-  Mac packaging checks have passed; Windows is undergoing a line-ending-safe
-  repackaging verification. This is **not yet stable release readiness**.
+  [Audit method](V3_1_SDL_RUNTIME_AUDIT.md). All four updated
+  Windows/Linux/macOS QA packages passed checks, including installed SDL
+  native inventory and pinned LGPL text.
+  [Verified runs](V3_1_RELEASE_ACCEPTANCE.md). This is **not yet stable
+  release readiness**; real-device gameplay, corresponding native SDL source
+  and true 3.1.0 stable-identity installers remain open.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
