@@ -3,6 +3,13 @@
 **Status: PARTIAL TECHNICAL EVIDENCE, NOT APPROVED FOR REDISTRIBUTION.**
 Stable public 3.0.0 and the draft-only 3.1 RC1 candidate are unchanged.
 
+**New verified native RC1 audits:** SDL source/wheel checks, signed Mac
+library inspection, duplicate SDL2 detection, two-architecture
+dynamic loading and native SDL virtual joystick button press/release
+all passed against the *refreshed current RC1*.
+Mac original-wheel binary correspondence and physical hardware acceptance
+remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
+
 ## Verified pygame-ce source evidence
 
 The [successful 3.1 SDL source-review run

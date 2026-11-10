@@ -74,8 +74,8 @@
     "status": "TECHNICAL_SOURCE_AUDIT_PASSED_LEGAL_REVIEW_OPEN",
     "upstream_pygame_version": "2.5.8",
     "upstream_git_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
-    "wheel_source_review_run": "https://github.com/MasynNay/anything-plays/actions/runs/42874882808",
-    "macos_signed_native_linkage_run": "https://github.com/MasynNay/anything-plays/actions/runs/42875616776",
+    "wheel_source_review_run": "https://github.com/MasynNay/anything-plays/actions/runs/42888996921",
+    "macos_signed_native_linkage_run": "https://github.com/MasynNay/anything-plays/actions/runs/42888996877",
     "audited_original_wheel_matches": {
       "linux-x64": 74,
       "windows-x64": 62,
@@ -93,7 +93,7 @@
     "original_sdl_binary_source_correspondence_complete": false,
     "lgpl_relinking_review_complete": false,
     "redistribution_approved": false,
-    "sdl_loader_collision_review_run": "https://github.com/MasynNay/anything-plays/actions/runs/42879312220",
+    "sdl_loader_collision_review_run": "https://github.com/MasynNay/anything-plays/actions/runs/42889343414",
     "verified_sdl_source_tag_archives_run": "https://github.com/MasynNay/anything-plays/actions/runs/42879614179",
     "macos_arm64_duplicate_sdl_versions": [
       "3201.8.0",
@@ -103,7 +103,7 @@
     "dual_sdl_camera_controller_runtime_tested": false,
     "macos_signed_sdl_native_load_test": {
       "status": "PASSED_TESTED_DYLD_ONLY_NOT_HARDWARE",
-      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42881412802",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42889343645",
       "macos-arm64": {
         "cv2_sdl_runtime_version": "2.32.8",
         "pygame_sdl_runtime_version": "2.32.10",
@@ -117,16 +117,40 @@
       "source_correspondence_verified": false,
       "lgpl_relinking_reviewed": false,
       "redistribution_approved": false,
-      "hardware_free_joystick_controller_subsystem_run": "https://github.com/MasynNay/anything-plays/actions/runs/42882184466",
+      "hardware_free_joystick_controller_subsystem_run": "https://github.com/MasynNay/anything-plays/actions/runs/42889343645",
       "hardware_free_joystick_controller_init_passed": {
         "macos-arm64": true,
         "macos-x64": true,
         "physical_gamepad_connected": false,
         "physical_camera_connected": false
-      }
+      },
+      "source_app_commit": "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
     },
     "historical_native_source_review_qa_run": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
-    "current_native_source_correspondence_independently_reviewed": false
+    "current_native_source_correspondence_independently_reviewed": false,
+    "updated_full_rc1_artifact_source_app_commit": "fe0da0b8b5f478cf1172734ef38546c4f1e86229",
+    "updated_full_rc1_run": "https://github.com/MasynNay/anything-plays/actions/runs/42886791394",
+    "current_compiled_sdl_linkage_review_passed_both_macs": true,
+    "current_wheel_source_comparison_passed": true,
+    "current_official_wheel_matches": {
+      "linux-x64": 74,
+      "windows-x64": 62,
+      "macos-arm64": 0,
+      "macos-x64": 0
+    },
+    "current_native_sdl_virtual_joystick": {
+      "status": "PASSED_SIGNED_NATIVE_SDL2_VIRTUAL_BUTTON_ROUNDTRIPS_ONLY",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42889944381",
+      "exact_signed_package_run": "https://github.com/MasynNay/anything-plays/actions/runs/42886791394",
+      "macos_arm64_all_load_orders_passed": true,
+      "macos_intel_passed": true,
+      "native_button_press_and_release_tested": true,
+      "physical_controller_hardware_tested": false,
+      "real_camera_and_controller_coexistence_tested": false,
+      "real_gameplay_tested": false,
+      "corresponding_source_complete": false,
+      "redistribution_approved": false
+    }
   },
   "verified_installed_gui_qa": {
     "status": "PASSED_FOUR_PLATFORM_FROZEN_TK_DESKTOP_STARTUP_ONLY",

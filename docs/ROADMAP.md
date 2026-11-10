@@ -52,6 +52,15 @@ See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before co
 
 ## 3.1 — Controls and usability (development branch, unreleased)
 
+**New verified native RC1 audits:** SDL source/wheel checks, signed Mac
+library inspection, duplicate SDL2 detection, two-architecture
+dynamic loading and native SDL virtual joystick button press/release
+all passed against the *refreshed current RC1*.
+Mac original-wheel binary correspondence and physical hardware acceptance
+remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
+
+
+
 **Newest verified development candidate (November 10, 2026):** The
 updated 3.1 source app includes local Copy diagnostics, full
 four-platform camera/controller integration tests, and persistent

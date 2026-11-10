@@ -959,3 +959,8 @@ run 42886791394. Every public release gate remains FALSE.
 full 3.1 RC1 packages, inspect same-name SDL2 loader and
 physical camera/controller and gameplay once real devices
 are available. Keep PR #156 draft; never change released 3.0.
+
+## Refreshed signed SDL and virtual joystick QA — November 10, 2026
+
+Four refreshed RC1 installers: https://github.com/MasynNay/anything-plays/actions/runs/42886791394, source `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+Original-source/wheel audit https://github.com/MasynNay/anything-plays/actions/runs/42888996921 PASSED: Linux 74/74, Windows 62/62, ARM Mac 0/121, Intel Mac 0/120 byte matches. Signed Mac native linkage https://github.com/MasynNay/anything-plays/actions/runs/42888996877 PASSED both 121/120 files. Current collision audit https://github.com/MasynNay/anything-plays/actions/runs/42889343414 PASS: ARM one SDL2 version collision, Intel none. Real signed SDL dylib load + joystick/controller init https://github.com/MasynNay/anything-plays/actions/runs/42889343645 PASSED both Macs and both ARM load orders. New actual signed native SDL virtual joystick attach/pressed/released/removed test https://github.com/MasynNay/anything-plays/actions/runs/42889944381 PASSED both Macs, both ARM load orders. Added `tools/probe_v31_macos_virtual_joystick.py`, adversarial `tests/test_v31_macos_virtual_joystick.py` and `.github/workflows/v31-rc1-macos-virtual-joystick.yml`. All statuses were confirmed green through GitHub Actions. Physical USB/Bluetooth controllers and camera/gameplay are unverified; Mac signed library corresponding source and LGPL relink/replacement review remain unresolved. All 6 release gates FALSE, PR #156 DRAFT, public 3.0 unchanged. See `docs/V3_1_REFRESHED_SDL_NATIVE_QA.md`.

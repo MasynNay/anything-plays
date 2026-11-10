@@ -3,6 +3,13 @@
 **Status: NOT READY FOR A STABLE RELEASE.** This document tracks evidence,
 not a promise of a release date. Stable 3.0 stays public and untouched.
 
+**New verified native RC1 audits:** SDL source/wheel checks, signed Mac
+library inspection, duplicate SDL2 detection, two-architecture
+dynamic loading and native SDL virtual joystick button press/release
+all passed against the *refreshed current RC1*.
+Mac original-wheel binary correspondence and physical hardware acceptance
+remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
+
 ## Current reviewed source and full RC1 milestone — 4/4 PASS
 
 **Newest verified development candidate (November 10, 2026):** The
