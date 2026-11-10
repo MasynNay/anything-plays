@@ -107,6 +107,56 @@ and
 These JSON evidence archives are available for about **14 days**,
 through November 24, 2026, not public stable releases.
 
+## Apple Silicon duplicate SDL2 loader identity confirmed
+
+A new read-only
+[SDL loader collision review 42879312220](https://github.com/MasynNay/anything-plays/actions/runs/42879312220)
+**passed** its source/receipt safety tests and read both real signed
+native-lib inspection artifacts. It detected one potentially ambiguous
+SDL2 basename on Apple Silicon:
+
+| Actual installed library | Mach-O current version |
+| --- | --- |
+| `Contents/Frameworks/cv2/__dot__dylibs/libSDL2-2.0.0.dylib` | `3201.8.0` |
+| `Contents/Frameworks/pygame/__dot__dylibs/libSDL2-2.0.0.dylib` | `3201.10.0` |
+
+Additional same-named SDL2 paths in the ARM package share the pygame
+variant's exact hash. The Intel package showed **no conflicting SDL2
+basename hashes** among its audited files. The project now has a
+machine-readable `SDL_LIBRARY_COLLISIONS.json` report, stored for 14
+days. Different libraries of the same basename can potentially be
+resolved through different `@rpath` settings. This needs actual
+loader and simultaneous camera/controller behavioral testing; it is
+**not proof of a crash, regression or exploitable vulnerability**.
+
+## Five original SDL source trees preserved for comparison
+
+The
+[SDL2 pinned upstream source workflow 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)
+**passed** and published one temporary, checksummed, original-source
+candidate archive containing these exact Git-tag commit trees:
+
+| Upstream candidate | Exact Git commit |
+| --- | --- |
+| SDL2 2.32.8 (observed in ARM OpenCV dependency) | `98d1f3a45aae568ccd6ed5fec179330f47d4d356` |
+| SDL2 2.32.10 (observed in pygame dependency) | `5d249570393f7a37e037abf22cd6012a4cc56a71` |
+| SDL2_image 2.8.12 | `12cb2e40330d256d9b1329647be8f366546d715c` |
+| SDL2_mixer 2.8.2 | `b208916aed9250fe434360e6c6a95f0697bb7b01` |
+| SDL2_ttf 2.24.0 (filename suggests version; Mach-O reports 0.0.0) | `2a891473eaf05ba1707a4b7913e6c4db7de7458a` |
+
+The archive includes `SDL_CANDIDATE_SOURCE_MANIFEST.json` and
+`SDL_SOURCE_SHA256SUMS.txt`; every component was fetched by tag and
+verified against the pinned exact commit, its archived file structure
+and SHA-256 digest. Find it in the run's **Artifacts** section as
+`AnythingPlays-3.1-RC1-SDL2-CANDIDATE-SOURCES-UNAPPROVED`, retained
+through approximately **November 24, 2026**.
+
+These are *specific possible upstream source references*, based on
+observed Mach-O library versions and names. They are **not yet proof**
+that the final compiled dylibs were built from these precise checkouts,
+nor a complete source and relinking companion for the static/dynamic
+dependencies.
+
 ## How to obtain source-review artifacts
 
 Open
