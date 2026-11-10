@@ -117,7 +117,7 @@ class LayoutMixin:
                                   width=15)
         view_combo.pack(side='left', padx=(0, 8))
         view_combo.bind('<<ComboboxSelected>>', lambda _: self.set_view_mode())
-        self.shortcuts_button = ttk.Button(view_row, text='Keyboard shortcuts',
+        self.shortcuts_button = ttk.Button(view_row, text='Game Controls',
                                            command=self.configure_shortcuts)
         self.shortcuts_button.pack(side='right')
         # Put audio where the player actually watches the game. Gain applies
@@ -207,7 +207,7 @@ class LayoutMixin:
         self.game_canvas.bind('<KeyRelease>', self.manual_key_up)
         self.game_canvas.bind('<FocusOut>', self.deactivate_manual)
         self.root.bind_all('<Button-1>', self.deactivate_on_outside_click, add='+')
-        self.manual_label = tk.StringVar(value='Click game screen for manual controls · Open Keyboard shortcuts to customize')
+        self.manual_label = tk.StringVar(value='Click game screen for manual controls · Use Game Controls to view or edit keys')
         self.below_game = ttk.Frame(game)
         self.below_game.pack(fill='x', pady=(0, 6))
         self.library_strip = ttk.Frame(self.below_game)

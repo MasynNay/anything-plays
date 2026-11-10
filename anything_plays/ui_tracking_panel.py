@@ -264,17 +264,7 @@ def build_tracking_panel(app, right):
         app.advanced_tracking_controls, text="Zone appearance", padding=10,
     )
     appearance.pack(fill="x")
-    ttk.Label(appearance, text="Label size (8–160 px)").pack(anchor="w")
-    font_row = ttk.Frame(appearance)
-    font_row.pack(fill="x", pady=(3, 10))
-    ttk.Scale(
-        font_row, from_=8, to=160, variable=app.zone_font_size,
-        orient="horizontal",
-    ).pack(side="left", fill="x", expand=True)
-    ttk.Spinbox(
-        font_row, from_=8, to=160, textvariable=app.zone_font_size,
-        width=6,
-    ).pack(side="right", padx=(10, 0))
+    # Label size is controlled once, beside the camera preview on the left.
     ttk.Label(appearance, text="Overlay tint strength").pack(anchor="w")
     ttk.Scale(
         appearance, from_=75, to=100,
