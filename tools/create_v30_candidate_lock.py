@@ -53,6 +53,8 @@ def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str
             # socket, block or character device in its Unix mode. Some ordinary
             # ZIP writers omit the file-type bits, so accept those as well.
             kind = stat.S_IFMT(member.external_attr >> 16)
+            if kind == stat.S_IFLNK:
+                raise ValueError(f"{platform}: symlinked core ZIP payload: {name}")
             if kind not in (0, stat.S_IFREG):
                 raise ValueError(f"{platform}: non-regular core ZIP payload: {name}")
         if member.file_size > MAX_NATIVE_PAYLOAD_BYTES:
