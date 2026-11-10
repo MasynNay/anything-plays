@@ -551,3 +551,61 @@ long-session final installer checks. The public 3.0 build remains available
 and unchanged. Do not tag or merge a stable 3.1 release until those gates
 are explicitly satisfied. The next productive direction is actual SDL
 component inventory and final 3.1 native-source release packaging.
+
+## 3.1 release-engineering continuation — frozen SDL runtime audit
+
+**Context:** Stable 3.0.0 is public and unchanged; current work remains on
+`feature/v3.1-controls-usability` and draft PR #156. No 3.1 release,
+stable installer identities, or license approval yet.
+
+1. Four real 3.1 Preview 1 artifacts with the **new live controller
+   tester** were verified in
+   [run 42853582632](https://github.com/MasynNay/anything-plays/actions/runs/42853582632),
+   application commit `d176ff54de90a3cc5e585c6fc6ffd4f68388c104`.
+   The Linux, Windows, Mac ARM and Mac Intel full-library QA assemblers
+   now require exact receipt hashes **and this specific source commit**.
+   CI downloads run 42853582632, not the older 42822217817.
+2. Added `tools/audit_v31_sdl_runtime.py` and
+   `tests/test_v31_sdl_runtime_audit.py`. The former audits the
+   **installed/re-extracted final QA application** on each OS, hashes
+   pygame/SDL native library candidates and license notices, and emits
+   `SDL_RUNTIME_AUDIT.json` beside the QA installer. It never grants
+   redistribution approval, and guards against unsafe traversal,
+   tampering and external native symlinks.
+3. The initial Linux audit exposed a **real packaging shortfall**:
+   pygame-ce 2.5.8's frozen Python distribution inventory recorded
+   zero wheel-provided license files. Added the verbatim, pinned upstream
+   `docs/LGPL.txt` from pygame-ce 2.5.8 as
+   `licenses/Pygame-CE-LGPL-2.1.txt`, with exact SHA-256
+   `a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7`.
+   All three full-library QA assemblers install this pinned notice
+   *into their final packages*; the audit explicitly records the wheel
+   notice gap and the upstream fallback. This is attribution evidence,
+   not completed SDL native source/relinking review.
+4. A subsequent Linux audit identified ordinary in-package shared-library
+   SONAME symlinks. The tool now hashes resolved in-bundle target bytes
+   while **rejecting broken or out-of-package symlinks**; adversarial
+   tests cover this distinction.
+5. Workflows now upload `SDL_RUNTIME_AUDIT.json` together with existing
+   Preview 2 full-library installer checksums/receipts. Exact workflows:
+   `v31-full-linux-qa.yml`, `v31-full-windows-qa.yml`,
+   `v31-full-macos-qa.yml`. Documented at
+   [V3_1_SDL_RUNTIME_AUDIT.md](../V3_1_SDL_RUNTIME_AUDIT.md).
+6. The latest CI runs after the native-symlink fix began as
+   [Linux 42856511632](https://github.com/MasynNay/anything-plays/actions/runs/42856511632),
+   [Windows 42856511934](https://github.com/MasynNay/anything-plays/actions/runs/42856511934),
+   [macOS 42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639)
+   and [source 42856522778](https://github.com/MasynNay/anything-plays/actions/runs/42856522778).
+   **These results were pending at checkpoint creation: retrieve final
+   results and debug any failure before describing them as passed.**
+   Older intermediate failed jobs include intentionally strict checks
+   against old source receipts and missing wheel notices; do not confuse
+   those jobs with final QA verdicts.
+
+**Next:** verify all four latest installer QA artifacts/SDL inventories
+and full Python 3.12/3.13 source regression; update release acceptance and
+QA download instructions only for confirmed successes. Do not release stable
+3.1 until separate physical controller testing, real-game long-session,
+LGPL native linkage/corresponding source review, and real stable-identity
+rebuilds are complete. Do not ask for repeated 3.0 N64/Dolphin gameplay
+tests: maintainer already verified those.
