@@ -69,6 +69,21 @@ def read_original_archive(outer: zipfile.ZipFile, archive_name: str, platform: s
     return raw
 
 
+
+def read_preserved_provenance(outer: zipfile.ZipFile, entry: zipfile.ZipInfo, platform: str) -> dict:
+    """Reject oversized metadata before and during ZIP decompression."""
+    if entry.is_dir() or entry.file_size > MAX_PROVENANCE_BYTES:
+        raise ValueError(f"{platform}: oversized or invalid preserved provenance")
+    with outer.open(entry) as handle:
+        payload = handle.read(MAX_PROVENANCE_BYTES + 1)
+    if len(payload) > MAX_PROVENANCE_BYTES:
+        raise ValueError(f"{platform}: preserved provenance exceeds limit")
+    record = json.loads(payload)
+    if not isinstance(record, dict):
+        raise ValueError(f"{platform}: preserved provenance must be a JSON object")
+    return record
+
+
 def build_candidate(artifact_paths):
     if set(artifact_paths) != set(PLATFORMS):
         raise ValueError("Require preserved artifacts for exactly four platforms")
@@ -93,7 +108,7 @@ def build_candidate(artifact_paths):
                 raise ValueError(f"{platform}: duplicate ZIP member")
             if "PRESERVED_NATIVE_INPUTS.json" not in files:
                 raise ValueError(f"{platform}: preserved provenance is missing")
-            record = json.loads(outer.read("PRESERVED_NATIVE_INPUTS.json"))
+            record = read_preserved_provenance(outer, provenance_entry, platform)
             if not isinstance(record, dict):
                 raise ValueError(f"{platform}: preserved provenance must be a JSON object")
             source_sha = record.get("source_revision")
