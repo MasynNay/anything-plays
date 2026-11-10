@@ -128,7 +128,10 @@ def build(stable, preview, sums, receipt, output):
                 shutil.copy2(item, current_notices/item.name)
         if not (current_notices/"python-distribution-notices").is_dir():
             raise ValueError("Pygame/SDL license documents missing from candidate")
-        shutil.copy2(root/"licenses/Pygame-CE-LGPL-2.1.txt",
+        pygame_license = root/"licenses/Pygame-CE-LGPL-2.1.txt"
+        if hash_file(pygame_license) != UPSTREAM_LGPL_SHA256:
+            raise ValueError("Verbatim pygame-ce LGPL checkout altered by line endings")
+        shutil.copy2(pygame_license,
                      current_notices/"Pygame-CE-LGPL-2.1.txt")
         enable_windows_trial_runtime(dest/"cores")
         verify_bundle(dest, "windows", check_native=True)
