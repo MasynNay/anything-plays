@@ -114,6 +114,9 @@ class GamepadReader:
         # and whether an emulator is currently running.
         self.physical_buttons = frozenset()
         self.last_scan = float("-inf")
+        # A transient SDL enumeration/event error must not permanently
+        # disable the user's saved controller setting or spin every 65 ms.
+        self.retry_after = float("-inf")
 
     def start(self):
         if self.api is not None:
@@ -157,6 +160,7 @@ class GamepadReader:
 
     def refresh(self):
         self.last_scan = float("-inf")
+        self.retry_after = float("-inf")
         self._close_device()
 
     def _connect(self):
@@ -181,8 +185,14 @@ class GamepadReader:
                         continue
                 except (OSError, RuntimeError, ValueError):
                     continue
+                # SDL can lose the optional friendly name during hotplug;
+                # a healthy controller must still be usable in that case.
+                try:
+                    label = self.api.name_forindex(index)
+                except Exception:
+                    label = None
                 self.controller = device
-                self.name = str(self.api.name_forindex(index) or "Gamepad")
+                self.name = str(label or "Gamepad")
                 return
 
     def poll(self, system, bindings=None):
@@ -190,11 +200,24 @@ class GamepadReader:
         if self.api is None:
             self.physical_buttons = frozenset()
             return frozenset(), "Controller disabled"
-        # SDL requires the video event queue to be pumped/drained for fresh
-        # controller states. Avoid accumulating an unbounded event backlog.
-        self.pygame.event.pump()
-        self.pygame.event.get()
-        self._connect()
+        # Event pumping and enumeration may throw during an SDL hotplug race.
+        # Treat these as temporary input outages, not a reason for the GUI to
+        # uncheck and persistently disable the user's controller preference.
+        if self.clock() < self.retry_after:
+            self.physical_buttons = frozenset()
+            return frozenset(), "Controller temporarily unavailable · Retrying"
+        try:
+            # SDL requires pumping/draining for fresh button states. Never
+            # accumulate an unbounded event backlog during long sessions.
+            self.pygame.event.pump()
+            self.pygame.event.get()
+            self._connect()
+        except Exception:
+            self._close_device()
+            self.last_scan = self.clock()
+            self.retry_after = self.last_scan + SCAN_INTERVAL
+            return frozenset(), "Controller temporarily unavailable · Retrying"
+        self.retry_after = float("-inf")
         if self.controller is None:
             return frozenset(), "No compatible controller connected"
         physical = set()
@@ -231,3 +254,4 @@ class GamepadReader:
             pg.joystick.quit()
             pg.display.quit()
         self.last_scan = float("-inf")
+        self.retry_after = float("-inf")
