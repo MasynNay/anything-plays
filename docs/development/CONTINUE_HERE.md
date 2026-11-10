@@ -609,3 +609,34 @@ QA download instructions only for confirmed successes. Do not release stable
 LGPL native linkage/corresponding source review, and real stable-identity
 rebuilds are complete. Do not ask for repeated 3.0 N64/Dolphin gameplay
 tests: maintainer already verified those.
+
+## Updated 3.1 full-console QA verification — November 10, 2026
+
+**The latest four updated 18-console / 11 original-source-core QA installers
+have all PASSED on their actual target runners** with the read-only live
+controller UI and SDL audit now included:
+
+- Linux x64: [run 42856511632](https://github.com/MasynNay/anything-plays/actions/runs/42856511632), successful installed DEB and SDL audit.
+- Windows x64: [run 42857106220](https://github.com/MasynNay/anything-plays/actions/runs/42857106220), successful installed Inno Setup and SDL audit after enforcing LF checkout of the upstream LGPL document in `.gitattributes`.
+- macOS arm64 and x64: [run 42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639), both successful signed DMGs, 11 source-built cores and mounted-final-DMG SDL audit.
+- [Source run 42857231009](https://github.com/MasynNay/anything-plays/actions/runs/42857231009) passed Python 3.12/3.13, native mGBA and added regression tests. (Source-only documentation commits later may trigger additional non-release checks.)
+
+All four ZIP artifacts contain a **Preview 2 QA installer** with a package
+receipt and `SDL_RUNTIME_AUDIT.json`. Artifacts are retained for seven days
+and expire about November 17, 2026. The 3.1 controller app used for each
+package came from verified Preview 1 source
+`d176ff54de90a3cc5e585c6fc6ffd4f68388c104` / run 42853582632;
+the exact original 3.0 source-built native emulators were copied and checked.
+No newly authored application binary changes occurred after that source
+revision; the subsequent changes were build-engineering, tests, notices
+and docs. The pinned upstream pygame LGPL text SHA-256 is
+`a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7`.
+
+**Release gates still OPEN:** true stable-identity 3.1 builds from fresh
+source, native pygame/SDL linkage and complete LGPL corresponding-source /
+replacement review, physical controller testing, and installed live ROM
+save/reload, N64/GameCube game switching, graphics/audio and endurance.
+There is **no public 3.1 release** and no reason to modify 3.0.0 or 2.0.
+Draft PR #156 remains open for review. The
+[QA download guide](../V3_1_QA_DOWNLOADS.md) now names the successful
+four latest runs and the corresponding installer files.
