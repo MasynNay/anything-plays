@@ -226,3 +226,7 @@ PR #152 merged into the v3 development branch after Python 3.12, Python 3.13, na
 ### November 10, 2026 — provenance extraction limit (pending CI)
 
 A focused development fix closes the remaining unbounded read of preserved native provenance JSON, enforcing both declared and actual 1 MiB limits and rejecting non-object JSON. Four synthetic regression tests accompany the change. This is unapproved source-evidence input hardening, not a release gate approval; Dolphin source correspondence, combined license rights and final four-platform production acceptance remain outstanding. Stable v2.0 remains unchanged.
+
+### November 10, 2026 — provenance extraction bounds verified
+
+PR #153 was squash merged into the v3 development branch at `7435123d` after Python 3.12, Python 3.13, native mGBA compatibility (source checks 42770311186) and unapproved source review (42770311182) succeeded. Four synthetic regressions cover bounded actual provenance ZIP reads and invalid JSON. Packaging jobs were skipped; this is not production installer acceptance or a resolution of Dolphin exact corresponding source, combined licensing rights, or public distribution gates. Stable v2.0 remains preserved.
