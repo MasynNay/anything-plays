@@ -14,6 +14,8 @@ from pathlib import Path, PurePosixPath
 TARGETS = ("linux-x64", "windows-x64", "macos-arm64", "macos-x64")
 VERSION = "2.5.8"
 MAX_NOTICE_SIZE = 4 * 1024 * 1024
+# Verbatim upstream 2.5.8 docs/LGPL.txt, not inferred from wheel metadata.
+UPSTREAM_LGPL_SHA256 = "a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7"
 NATIVE_SUFFIXES = (".so", ".dylib", ".dll", ".pyd")
 
 
@@ -82,8 +84,8 @@ def inspect_bundle(bundle, target):
         raise ValueError("Exactly one pinned pygame-ce 2.5.8 runtime is required")
     dist = matches[0]
     recorded_notices = dist.get("license_files")
-    if not isinstance(recorded_notices, list) or not recorded_notices:
-        raise ValueError("No wheel-provided pygame-ce notices in packaged inventory")
+    if not isinstance(recorded_notices, list):
+        raise ValueError("Malformed pygame-ce notice inventory")
     notices = []
     for record in recorded_notices:
         if not isinstance(record, dict):
@@ -97,6 +99,22 @@ def inspect_bundle(bundle, target):
                         "sha256": file_hash(path), "size_bytes": path.stat().st_size})
     if len({entry["path"] for entry in notices}) != len(notices):
         raise ValueError("Duplicate license path in frozen manifest")
+
+    # pygame-ce 2.5.8's installed wheel inventory sometimes exposes no
+    # wheel-notice files. Preserve that gap honestly. The full 3.1 QA
+    # assembly adds the *verbatim upstream tagged license* as an independent
+    # corresponding notice; its exact bytes must match the pinned digest.
+    upstream = None
+    if not notices:
+        upstream_path = _safe_file(license_root, "Pygame-CE-LGPL-2.1.txt")
+        if file_hash(upstream_path) != UPSTREAM_LGPL_SHA256:
+            raise ValueError("Pinned upstream pygame-ce LGPL license mismatch")
+        upstream = {
+            "path": upstream_path.relative_to(bundle).as_posix(),
+            "sha256": UPSTREAM_LGPL_SHA256,
+            "source": "https://github.com/pygame-community/pygame-ce/blob/2.5.8/docs/LGPL.txt",
+            "wheel_provided": False,
+        }
     binaries = []
     for path in sorted(bundle.rglob("*")):
         if not _native_candidate(path):
@@ -116,6 +134,8 @@ def inspect_bundle(bundle, target):
         "python_inventory_scope": "Build environment, not a final runtime SBOM",
         "native_candidates": binaries,
         "wheel_notices": sorted(notices, key=lambda item: item["path"]),
+        "wheel_notice_files_missing": not bool(notices),
+        "pinned_upstream_lgpl_notice": upstream,
         "sdl_linkage_reviewed": False,
         "original_sources_verified": False,
         "lgpl_relinking_reviewed": False,
@@ -138,7 +158,9 @@ def main():
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"SDL runtime evidence: {args.target}, "
           f"{len(report['native_candidates'])} native candidates, "
-          f"{len(report['wheel_notices'])} notice files; approval remains false")
+          f"{len(report['wheel_notices'])} wheel notices; "
+          f"upstream fallback: {report['pinned_upstream_lgpl_notice'] is not None}; "
+          "approval remains false")
 
 
 if __name__ == "__main__":
