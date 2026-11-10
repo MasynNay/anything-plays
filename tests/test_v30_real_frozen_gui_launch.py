@@ -108,7 +108,7 @@ class RealFrozenAppLaunchContracts(unittest.TestCase):
 
     def test_four_real_installer_jobs_required_not_just_libretro_native_probes(self):
         base=Path(__file__).resolve().parents[1]
-        text=(base/".github/workflows/v30-eight-source-offline-integration.yml").read_text("utf-8")
+        text=(base/"docs/history/workflows/v30-eight-source-offline-integration.yml").read_text("utf-8")
         self.assertIn("tools/probe_v30_frozen_gui_launch.py",text)
         self.assertIn("ACTUAL_FROZEN_GUI_STARTUP_UNAPPROVED.json",text)
         self.assertIn("xvfb-run",text)

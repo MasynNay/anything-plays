@@ -122,7 +122,7 @@ class OriginalDolphinSourceReviewTests(unittest.TestCase):
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("--input", proc.stdout)
-        workflow = (root / ".github/workflows/v30-dolphin-source-review.yml").read_text()
+        workflow = (root / "docs/history/workflows/v30-dolphin-source-review.yml").read_text()
         self.assertIn("42446758270", workflow)
         self.assertIn("DOLPHIN_34_SOURCE_ARCHIVE_REVIEW_UNAPPROVED.json", workflow)
         self.assertIn("gh run download", workflow)

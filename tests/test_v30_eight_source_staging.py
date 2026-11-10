@@ -145,7 +145,7 @@ class EightOriginalCoreOfflineContracts(unittest.TestCase):
             self.assertFalse((root/"proof.json").exists())
 
     def test_actual_four_platform_complete_offline_workflow_never_uploads_unapproved_core(self):
-        path=Path(__file__).resolve().parents[1]/".github/workflows/v30-eight-source-offline-integration.yml"
+        path=Path(__file__).resolve().parents[1]/"docs/history/workflows/v30-eight-source-offline-integration.yml"
         yml=path.read_text("utf-8")
         for target in ("windows-x64","linux-x64","macos-arm64","macos-x64"):
             self.assertIn("target: "+target,yml)

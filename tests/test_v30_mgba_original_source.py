@@ -105,7 +105,7 @@ class PinnedMGBASourceContracts(unittest.TestCase):
 
     def test_true_upstream_source_safeguards_and_four_os_ci(self):
         yml=(Path(__file__).resolve().parents[1]/
-             ".github/workflows/v30-mgba-original-source-four-os.yml").read_text("utf-8")
+             "docs/history/workflows/v30-mgba-original-source-four-os.yml").read_text("utf-8")
         for name in EXTENSIONS:
             self.assertIn("target: "+name,yml)
         self.assertIn(SOURCE_REVISION,yml)

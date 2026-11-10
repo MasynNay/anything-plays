@@ -114,7 +114,7 @@ class RealFrozenUIContracts(unittest.TestCase):
             self.assertIn(snippet,smoke)
         self.assertIn('if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":',app)
         self.assertIn("root.after(100, self.scan_cameras)",app)
-        yml=(root/".github/workflows/v30-eight-source-offline-integration.yml").read_text("utf-8")
+        yml=(root/"docs/history/workflows/v30-eight-source-offline-integration.yml").read_text("utf-8")
         self.assertIn("tools.probe_v30_installed_desktop_window",yml)
         self.assertIn("ACTUAL_FROZEN_DESKTOP_UI_LAUNCH_UNAPPROVED.json",yml)
         for platform in VALID_PLATFORMS:

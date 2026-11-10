@@ -131,7 +131,7 @@ class NineOriginalSourceStaging(unittest.TestCase):
 
     def test_four_platform_9_of_11_real_gui_workflow_preserves_rights_gate(self):
         workflow=(Path(__file__).resolve().parents[1]/
-                  ".github/workflows/v30-nine-source-offline-integration.yml").read_text()
+                  "docs/history/workflows/v30-nine-source-offline-integration.yml").read_text()
         for target in ("windows-x64","linux-x64","macos-arm64","macos-x64"):
             self.assertIn("target: "+target,workflow)
         self.assertIn("42527449154",workflow)

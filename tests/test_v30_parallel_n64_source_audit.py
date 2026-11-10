@@ -170,7 +170,7 @@ class ParallelN64SourceAuditContracts(unittest.TestCase):
     def test_audit_contract_stays_research_only(self):
         index, tree, review = fixture()
         root = Path(__file__).resolve().parents[1]
-        yml = (root/".github/workflows/v30-parallel-n64-source-audit.yml").read_text("utf-8")
+        yml = (root/"docs/history/workflows/v30-parallel-n64-source-audit.yml").read_text("utf-8")
         self.assertIn("audit_v30_parallel_n64_source", yml)
         self.assertIn("42441448884", yml)
         self.assertIn("42444450521", yml)

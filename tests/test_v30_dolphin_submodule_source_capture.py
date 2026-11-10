@@ -115,7 +115,7 @@ class DolphinPinnedSourceCaptureTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--shard-count", result.stdout)
-        workflow = (root / ".github/workflows/v30-dolphin-submodule-sources.yml").read_text()
+        workflow = (root / "docs/history/workflows/v30-dolphin-submodule-sources.yml").read_text()
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("branches: [feature/v3.0-unified-test]", workflow)
         self.assertIn("retention-days: 45", workflow)

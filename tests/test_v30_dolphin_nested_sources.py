@@ -175,7 +175,7 @@ class NestedDolphinSourceContracts(unittest.TestCase):
 
     def test_workflow_is_strict_research_and_cannot_release_binaries(self):
         root = Path(__file__).resolve().parents[1]
-        yaml = (root / ".github/workflows/v30-dolphin-nested-sources.yml").read_text("utf-8")
+        yaml = (root / "docs/history/workflows/v30-dolphin-nested-sources.yml").read_text("utf-8")
         self.assertIn("42447184893", yaml)
         self.assertIn("DOLPHIN_THREE_NESTED_SOURCE_CANDIDATES_UNAPPROVED.json", yaml)
         self.assertIn("capture_v30_dolphin_nested_sources", yaml)

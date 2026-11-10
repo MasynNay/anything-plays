@@ -127,7 +127,7 @@ class PinnedOriginalFive2DSourceCaptureTests(unittest.TestCase):
 
     def test_actions_covers_5_cores_on_4_real_os_and_no_upstream_submission(self):
         workflow=(Path(__file__).resolve().parents[1]/
-                  ".github/workflows/v30-five-remaining-source-cores.yml").read_text("utf-8")
+                  "docs/history/workflows/v30-five-remaining-source-cores.yml").read_text("utf-8")
         for name in CANDIDATES:
             self.assertIn("candidate: "+name, workflow)
         for system in ("linux-x64","windows-x64","macos-arm64","macos-x64"):
