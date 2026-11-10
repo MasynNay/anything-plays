@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "version": "3.1.0",
+  "status": "IN_DEVELOPMENT",
+  "public_release_approved": false,
+  "release_gates": {
+    "full_eighteen_console_installer": {
+      "verified": false,
+      "evidence": null
+    },
+    "four_platform_full_installer_verification": {
+      "verified": false,
+      "evidence": null
+    },
+    "real_controller_hardware_acceptance": {
+      "verified": false,
+      "evidence": null
+    },
+    "pygame_sdl_redistribution_review": {
+      "verified": false,
+      "evidence": null
+    },
+    "corresponding_source_material": {
+      "verified": false,
+      "evidence": null
+    },
+    "release_notes_and_rollout": {
+      "verified": false,
+      "evidence": null
+    }
+  },
+  "verified_previews": {
+    "single_mgba_core_four_platforms": "https://github.com/MasynNay/anything-plays/actions/runs/42822217817",
+    "synthetic_controller_four_platforms": "https://github.com/MasynNay/anything-plays/actions/runs/42771771434"
+  }
+}

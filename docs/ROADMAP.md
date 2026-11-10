@@ -41,6 +41,8 @@ Individual game compatibility, graphics performance, physical cameras, save type
 
 The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
+See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before considering a public release.
+
 ### Preview 1 packaging and owner QA (unreleased)
 
 - Four dedicated build jobs run on Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. Each retains a SHA-256-recorded installer as a seven-day GitHub Actions artifact, **never a GitHub Release**.
