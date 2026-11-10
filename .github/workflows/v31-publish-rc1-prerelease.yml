@@ -1,0 +1,167 @@
+name: 3.1 | Publish verified RC1 as public prerelease
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/v31-publish-rc1-prerelease.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-31-rc1-publish
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v3.1.0-rc1
+      APP_SOURCE: 26de1e1ad1b701d0735e085158347f8c213ce437
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prove main source matches the exact already tested RC1 binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth 1 origin "$APP_SOURCE"
+          git diff --quiet "$APP_SOURCE" HEAD -- app.py anything_plays \
+            requirements.txt requirements-build.txt packaging licenses \
+            fetch_mgba_core.py verify_bundle.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.check_v31_release import blockers
+          p=json.loads(Path("config/v3.1-release-readiness.json").read_text())
+          assert p["public_release_approved"] is False
+          assert len(blockers(p)) == 7
+          print("Exact runtime source matched; stable 3.1 stays blocked")
+          PY
+      - name: Require source-first 3.0 availability and immutable four-platform RC1 draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view v3.0.0 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==false and (.assets|length)==5' | grep -qx true
+          gh release view v3.0.0-sources --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==2' | grep -qx true
+          gh release view "$TAG" --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          for id in 42905694504 42909893531 42906122307; do
+            gh run view "$id" --json conclusion --jq '.conclusion' | grep -qx success
+          done
+      - name: Verify all original RC1 installers and source archive after downloading from GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verified
+          gh release download "$TAG" --dir verified
+          (cd verified && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import json, hashlib
+          d=Path('verified')
+          r=json.loads((d/'RC1_DRAFT_QA_RECEIPT.json').read_text())
+          assert r['status']=='UNPUBLISHED_3_1_RC1_RELEASE_DRAFT_QA_ONLY'
+          assert r['app_source_commit']=='26de1e1ad1b701d0735e085158347f8c213ce437'
+          assert r['full_installer_qa_run']==42905694504
+          assert r['source_audit_run']==42909893531
+          assert r['redistribution_approved'] is False
+          assert r['public_release_approved'] is False
+          assert len(r['installers'])==4
+          for item in r['installers'].values():
+              p=d/item['filename']
+              assert p.stat().st_size==item['bytes']
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==item['sha256']
+          assert len(list(d.iterdir()))==7
+          PY
+      - name: Write accurate public release-candidate notes with rights and hardware caveats
+        shell: bash
+        run: |
+          cat > RC1_NOTES.md <<'NOTES'
+          # Anything Plays 3.1 RC1 | Public test release
+
+          This is a prerelease, not the final Anything Plays 3.1.0.
+          Anything Plays 3.0.0 remains the latest stable release.
+
+          **New in 3.1:** optional gamepad/controller support and remapping,
+          a right-side controller setup panel, live input testing, safer
+          hotplug and disconnection recovery, focus-safe button release,
+          copyable privacy-filtered diagnostics, and improved settings
+          isolation alongside existing camera and keyboard controls.
+
+          **Downloads:** the four attached full offline RC1 installers support
+          Windows x64, Linux x64, macOS Apple Silicon and macOS Intel, and
+          include 18 console profiles with 11 original-source emulator cores.
+          All four are genuinely compiled 3.1 RC1 builds, not renamed
+          older installers. Check the attached SHA256SUMS.txt before use.
+          No copyrighted game ROMs, firmware or BIOS are included.
+
+          **Test evidence:** all four full packages and actual installed
+          desktop GUI/settings migration passed:
+          https://github.com/MasynNay/anything-plays/actions/runs/42905694504
+          https://github.com/MasynNay/anything-plays/actions/runs/42906122307
+          Real SDL polling and synthetic camera/game frames sustained
+          180 seconds under Linux without excessive memory growth:
+          https://github.com/MasynNay/anything-plays/actions/runs/42909405091
+
+          **Known limitations:** no independently verified physical
+          USB/Bluetooth controller on these final RC1 installers, nor
+          broad retail-game save/audio or prolonged real-camera testing.
+          macOS installers are ad-hoc signed, not notarized.
+          Windows may display an unknown-publisher warning.
+
+          **Third-party sources and licenses:** exact original emulator
+          source trees and notices remain publicly available at
+          https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources
+          The attached source candidate ZIP includes original tagged
+          pygame-ce and SDL sources, original license texts, and source
+          hashes. Precise build-to-binary correspondence for all compiled
+          transitive native components, macOS signed library transforms,
+          and LGPL replacement/relinking review are not yet complete.
+          This source package is labeled candidate evidence, not certified
+          complete corresponding source. Check the included notices
+          before redistribution. We welcome reproducible bug reports.
+
+          3.1 RC1 is provided for evaluation without warranty. It installs
+          separately from stable 3.0 and does not replace public 2.0/3.0.
+          NOTES
+      - name: Publish only the prerelease from exact main source, never latest stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.tag_name=="v3.1.0-rc1") | .id' | head -n 1)"
+          test -n "$id"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          record={
+              'draft': False,
+              'prerelease': True,
+              'make_latest': 'false',
+              'target_commitish': os.environ['GITHUB_SHA'],
+              'name': 'Anything Plays 3.1 RC1 | Optional Controller Support',
+              'body': Path('RC1_NOTES.md').read_text('utf-8')
+          }
+          Path('promote.json').write_text(json.dumps(record)+'\n')
+          PY
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$id" \
+            --input promote.json \
+            --jq '{tag:.tag_name,draft:.draft,prerelease:.prerelease,assets:(.assets|length)}'
+          gh release view "$TAG" --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+          echo "Published public prerelease with genuine RC1 files; stable 3.0 unchanged"
