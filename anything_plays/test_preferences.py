@@ -44,7 +44,11 @@ def _copy_once_atomic(source, destination):
     A failed or partial temporary copy is cleaned up without ever unlinking
     a destination file, including one another process created concurrently.
     """
-    if destination.exists() or destination.is_symlink():
+    # Reject instead of skipping an existing symlink: otherwise the real
+    # app might later read or *save* through it into 3.0's stable files.
+    if destination.is_symlink():
+        raise ValueError("RC settings must not refer to another file")
+    if destination.exists():
         return
     if source.is_symlink() or not source.is_file():
         return
