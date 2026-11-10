@@ -43,7 +43,9 @@ def setup_fixture(d, arch):
 def successful_subprocess(cmd,**_):
     paths=cmd[3:]
     output=[{"path":x, "runtime_version":"2.32.8" if "/cv2/" in x
-             else "2.32.10"} for x in paths]
+             else "2.32.10",
+             "joystick_controller_initialized":True,
+             "enumerated_joystick_count":0} for x in paths]
     return SimpleNamespace(returncode=0,stdout=json.dumps(output),stderr="")
 
 
@@ -68,6 +70,7 @@ class ActualSDLLoadContracts(unittest.TestCase):
             result=probe(app,source,"macos-arm64",runner=successful_subprocess)
             self.assertEqual(len(result["load_orders"]),2)
             self.assertTrue(result["all_native_load_orders_passed"])
+            self.assertTrue(result["hardware_free_joystick_and_controller_subsystems_exercised"])
             self.assertFalse(result["real_camera_controller_coexistence_tested"])
             self.assertFalse(result["redistribution_approved"])
 
@@ -75,7 +78,9 @@ class ActualSDLLoadContracts(unittest.TestCase):
         with TemporaryDirectory() as d:
             app,source=setup_fixture(d,"macos-arm64")
             def coalesced(cmd,**kw):
-                records=[{"path":p,"runtime_version":"2.32.8"} for p in cmd[3:]]
+                records=[{"path":p,"runtime_version":"2.32.8",
+                          "joystick_controller_initialized":True,
+                          "enumerated_joystick_count":0} for p in cmd[3:]]
                 return SimpleNamespace(returncode=0,stdout=json.dumps(records),stderr="")
             result=probe(app,source,"macos-arm64",runner=coalesced)
             self.assertFalse(result["all_native_load_orders_passed"])
