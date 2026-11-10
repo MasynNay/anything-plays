@@ -42,7 +42,9 @@ def draw_gamepad(canvas, palette, *, connected=False, expanded=False):
     # D-pad and face buttons intentionally read as familiar controls without
     # copying any specific manufacturer's controller artwork.
     for box in ((20, 21, 25, 35), (16, 25, 29, 31)):
-        canvas.create_rectangle(*pt(*box), fill=foreground, outline="")
+        canvas.create_rectangle(*pt(box[0], box[1]),
+                                *pt(box[2], box[3]),
+                                fill=foreground, outline="")
     for x, y, face in ((75, 22, "Y"), (81, 28, "B"),
                        (69, 28, "X"), (75, 34, "A")):
         canvas.create_oval(*pt(x-4, y-4), *pt(x+4, y+4),
