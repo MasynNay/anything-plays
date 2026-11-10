@@ -1,0 +1,126 @@
+name: 3.1 | SDL pygame source evidence (unreleased review)
+
+# This is an independent source/attribution research artifact, NOT a
+# corresponding-source compliance certificate or a public release.
+# Examine exact finished four-platform 3.1 RC1 audits from an immutable run,
+# include upstream pygame-ce tagged sources, and note unmatched native files.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-sdl-source-evidence.yml'
+      - 'tools/prepare_v31_sdl_source_review.py'
+      - 'tests/test_v31_sdl_source_evidence.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-sdl-upstream-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upstream-sdl-review:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RC_FULL_RUN_ID: '42865608433'
+      RC_FULL_SOURCE_SHA: '29d0f9bced7b19952e70b12567c292c470b6b44f'
+      PYGAME_TAG_SHA: 'c8200a9eaa530f884a0a4c3384cefc48006e58be'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prove source-review code cannot approve a public release
+        run: python -m unittest discover -s tests -p 'test_v31_sdl_source_evidence.py' -v
+      - name: Require exact four-platform green QA run on pinned application source
+        shell: bash
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run view "$RC_FULL_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          source_sha="$(gh run view "$RC_FULL_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          run_name="$(gh run view "$RC_FULL_RUN_ID" --repo "$GITHUB_REPOSITORY" --json name --jq '.name')"
+          if [[ "$conclusion" != success || "$source_sha" != "$RC_FULL_SOURCE_SHA" ||
+                "$run_name" != '3.1 RC1 | Full 18-console source-app QA (unreleased)' ]]; then
+            echo "::error::Refusing a source archive for unverified or wrong RC1 full QA"
+            exit 1
+          fi
+      - name: Obtain exact installed-package audit and SHA receipts for all four targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            artifact="AnythingPlays-3.1-RC1-FULL-18-$target-UNRELEASED"
+            gh run download "$RC_FULL_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact" --dir "audit-input/$target"
+            test -s "audit-input/$target/SDL_RUNTIME_AUDIT.json"
+          done
+      - name: Fetch exact upstream pygame-ce 2.5.8 tag and preserve source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --single-branch --branch 2.5.8 \
+            https://github.com/pygame-community/pygame-ce.git pygame-upstream
+          sha="$(git -C pygame-upstream rev-parse HEAD)"
+          if [[ "$sha" != "$PYGAME_TAG_SHA" ]]; then
+            echo "::error::Upstream pygame-ce tag changed: $sha"
+            exit 1
+          fi
+          echo 'a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7  pygame-upstream/docs/LGPL.txt' | sha256sum --check
+          git -C pygame-upstream archive --format=tar.gz \
+            --prefix=pygame-ce-2.5.8/ \
+            --output="$PWD/pygame-ce-2.5.8-tagged-upstream-source.tar.gz" HEAD
+          test -s pygame-ce-2.5.8-tagged-upstream-source.tar.gz
+      - name: Fetch only exact tagged official CPython 3.13 platform wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pygame-wheels
+          for wheel in \
+            'pygame_ce-2.5.8-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl' \
+            'pygame_ce-2.5.8-cp313-cp313-win_amd64.whl' \
+            'pygame_ce-2.5.8-cp313-cp313-macosx_10_13_universal2.whl'; do
+            gh release download 2.5.8 --repo pygame-community/pygame-ce \
+              --pattern "$wheel" --dir pygame-wheels
+            test -s "pygame-wheels/$wheel"
+          done
+      - name: Hash upstream binaries and compare with all four frozen native audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.prepare_v31_sdl_source_review \
+            --input audit-input \
+            --wheels pygame-wheels \
+            --source pygame-ce-2.5.8-tagged-upstream-source.tar.gz \
+            --output sdl-source-evidence
+          (cd sdl-source-evidence && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("sdl-source-evidence/SDL_SOURCE_REVIEW.json")
+          r = json.loads(p.read_text("utf-8"))
+          assert len(r["targets"]) == 4
+          assert r["redistribution_approved"] is False
+          assert r["corresponding_source_complete"] is False
+          assert r["bundled_sdl_sources_matched"] is False
+          for entry in r["targets"]:
+              print(entry["target"], "upstream wheel byte matches:",
+                    entry["wheel_match_count"], "unresolved candidates:",
+                    len(entry["unmatched_native_candidates"]))
+          PY
+      - name: Retain unapproved source/provenance evidence, never a public release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-SDL-UPSTREAM-SOURCE-REVIEW-UNAPPROVED
+          path: |
+            sdl-source-evidence/SDL_SOURCE_REVIEW.json
+            sdl-source-evidence/SHA256SUMS.txt
+            sdl-source-evidence/pygame-ce-2.5.8-tagged-upstream-source.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
