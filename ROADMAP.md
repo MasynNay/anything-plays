@@ -268,3 +268,7 @@ PR #158 merged as `4f79b1ea` after source checks 42882148318 passed Python 3.12/
 ### November 10, 2026 — original Dolphin missing-common-target guard verified and merged
 
 PR #159 was merged as `6029e67e` after Python 3.12/3.13, native mGBA compatibility and original pinned Dolphin Linux source build passed in runs 42897798422 and 42897798588. Production packaging was skipped. The source-preserving CMake/Ninja regression exercises the complementary failure case: upstream Dolphin has its video-context archive but no `common` archive. Configuration must fail closed before a misleading source-built candidate can be produced. This test does not approve production binaries, mixed GPL obligations, installer acceptance or public release. The original pinned Dolphin macOS Intel and ARM research jobs in run 42882148304 have both completed successfully; these remain research-only provenance evidence. Stable v2.0 is preserved.
+
+### November 10, 2026 — original Dolphin archive type guard (CI pending)
+
+A focused development PR rejects Dolphin CMake graphs that substitute INTERFACE or SHARED targets for either pinned static archive. Four real CMake/Ninja negative regressions cover these substitutions. Full CI and original Linux compilation must pass before merge. Production source correspondence, combined GPL obligations, four-platform installer acceptance and public release approval remain open; v2.0 preserved.
