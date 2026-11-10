@@ -52,8 +52,24 @@ jobs:
               with Image.open(asset) as shot:
                   assert shot.format=="WEBP" and shot.size==size,filename
           print("Two real UI crops validated; no simulated ROM, camera or gameplay")
+
+          # Export standard PNGs for reliable inline rendering on GitHub.
+          # Preserve the source captures pixel-for-pixel: no mock gameplay or overlays.
+          sources = {
+              Path("site/assets/anything-plays-desktop-preview.webp"): root / "desktop-overview.png",
+              root / "camera-controls.webp": root / "camera-controls.png",
+              root / "game-library-and-audio.webp": root / "game-library-and-audio.png",
+          }
+          for original, exported in sources.items():
+              with Image.open(original) as shot:
+                  shot.convert("RGB").save(exported, format="PNG", optimize=True)
+              with Image.open(exported) as validated:
+                  with Image.open(original) as source:
+                      assert validated.size == source.size
+                      assert validated.format == "PNG"
+              print(f"Verified GitHub PNG image: {exported}")
           PY
-      - name: Commit only the generated real application screenshots on main
+      - name: Commit genuine screenshots and GitHub-compatible PNG exports on main
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
@@ -61,7 +77,7 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- docs/screenshots/current/camera-controls.webp docs/screenshots/current/game-library-and-audio.webp
+          git add -- docs/screenshots/current/camera-controls.webp docs/screenshots/current/game-library-and-audio.webp docs/screenshots/current/desktop-overview.png docs/screenshots/current/camera-controls.png docs/screenshots/current/game-library-and-audio.png
           if git diff --cached --quiet; then
             echo "Verified README captures already current"
             exit 0
