@@ -125,6 +125,113 @@ jobs:
                         [v["installed_path"] for v in
                          entry["unmatched_native_candidates"][:5]])
           PY
+      - name: Preserve all five separately verified SDL source-tag candidates alongside pygame
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin_run=42879614179
+          origin_sha=d91019908f8bfbff588d3c6fc1af00d80ae2d96c
+          actual="$(gh run view "$origin_run" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          status="$(gh run view "$origin_run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          name="$(gh run view "$origin_run" --repo "$GITHUB_REPOSITORY" --json name --jq '.name')"
+          [[ "$actual" == "$origin_sha" && "$status" == success && "$name" == '3.1 | Pinned SDL2 source-tag candidates (unreleased)' ]] || {
+            echo "::error::Source-tag candidate provenance not verified"
+            exit 1
+          }
+          gh run download "$origin_run" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1-RC1-SDL2-CANDIDATE-SOURCES-UNAPPROVED \
+            --dir original-sdl-sources
+          python - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          from tools.verify_v31_sdl_component_sources import COMPONENTS, verify_archive
+          from tools.prepare_v31_sdl_source_review import RC_APP_COMMIT, RC_RUN, SOURCE_ARCHIVE, PYGAME_COMMIT
+          original = Path("original-sdl-sources")
+          candidate = json.loads((original / "SDL_CANDIDATE_SOURCE_MANIFEST.json").read_text("utf-8"))
+          current = json.loads(Path("sdl-source-evidence/SDL_SOURCE_REVIEW.json").read_text("utf-8"))
+          if (candidate.get("status") != "UNRELEASED_3_1_SDL_OBSERVED_VERSION_SOURCE_CANDIDATES"
+                  or candidate.get("redistribution_approved") is not False
+                  or candidate.get("original_binary_source_correspondence_verified") is not False
+                  or candidate.get("complete_transitive_source_verified") is not False
+                  or candidate.get("lgpl_relinking_reviewed") is not False):
+              raise ValueError("SDL source manifest is missing or overclaims approval")
+          if (current.get("full_rc_qa_run") != RC_RUN
+                  or current.get("source_app_commit") != RC_APP_COMMIT
+                  or current.get("pygame_git_commit") != PYGAME_COMMIT
+                  or current.get("corresponding_source_complete") is not False
+                  or current.get("redistribution_approved") is not False):
+              raise ValueError("Current RC source review must remain pinned and unapproved")
+          rows = candidate.get("components")
+          if not isinstance(rows, list) or len(rows) != 5:
+              raise ValueError("Expected all five original upstream SDL source tags")
+          destination = Path("sdl-source-evidence/SDL-original-tagged-source-candidates")
+          destination.mkdir()
+          names = set()
+          for row in rows:
+              if not isinstance(row, dict):
+                  raise ValueError("Malformed upstream SDL record")
+              key = row.get("name")
+              if key not in COMPONENTS or key in names:
+                  raise ValueError("Unknown or duplicated SDL upstream source")
+              names.add(key)
+              upstream = COMPONENTS[key]
+              if (row.get("pinned_commit") != upstream["commit"]
+                      or row.get("git_tag") != upstream["tag"]
+                      or row.get("git_repository") != upstream["repository"]
+                      or row.get("exact_binary_to_source_correspondence_verified") is not False):
+                  raise ValueError("SDL candidate tag or approval fields mutated")
+              archive = original / (key + ".tar.gz")
+              recorded = verify_archive(key, archive)
+              original_hash = row.get("source_archive")
+              if (not isinstance(original_hash, dict)
+                      or original_hash.get("sha256") != recorded["sha256"]
+                      or original_hash.get("archive") != archive.name):
+                  raise ValueError("Original SDL source archive checksum mismatch")
+              shutil.copyfile(archive, destination / archive.name)
+          if names != set(COMPONENTS):
+              raise ValueError("Incomplete SDL component inventory")
+          pygame = Path("sdl-source-evidence") / SOURCE_ARCHIVE
+          if not pygame.is_file() or pygame.is_symlink():
+              raise ValueError("Missing audited pygame original source")
+          shutil.copyfile(original / "SDL_CANDIDATE_SOURCE_MANIFEST.json",
+                          destination / "SDL_CANDIDATE_SOURCE_MANIFEST.json")
+          notice = Path("licenses/Pygame-CE-LGPL-2.1.txt")
+          shutil.copyfile(notice, destination / "Pygame-CE-LGPL-2.1.txt")
+          files = [pygame] + sorted(destination.iterdir())
+          hashes = [
+              hashlib.sha256(path.read_bytes()).hexdigest() + "  " +
+              path.relative_to(Path("sdl-source-evidence")).as_posix()
+              for path in files if path.is_file() and not path.is_symlink()
+          ]
+          (Path("sdl-source-evidence") / "SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt").write_text(
+              "\n".join(hashes) + "\n", "utf-8")
+          report = {
+              "schema_version": 1,
+              "status": "UNRELEASED_3_1_ORIGINAL_SOURCE_CANDIDATES_ONLY",
+              "full_rc_qa_run": RC_RUN,
+              "source_app_commit": RC_APP_COMMIT,
+              "pygame_source_commit": PYGAME_COMMIT,
+              "sdl_upstream_git_commits": {key: COMPONENTS[key]["commit"] for key in sorted(names)},
+              "original_source_archive_count": 6,
+              "original_emulator_source_release": "https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources",
+              "exact_binary_to_source_correspondence_verified": False,
+              "complete_transitive_source_verified": False,
+              "lgpl_relinking_reviewed": False,
+              "redistribution_approved": False,
+              "public_release_approved": False,
+          }
+          (Path("sdl-source-evidence") / "SIX_SOURCE_COMPANION_READINESS.json").write_text(
+              json.dumps(report, indent=2) + "\n", "utf-8")
+          (Path("sdl-source-evidence") / "README_SOURCE_CANDIDATES.txt").write_text(
+              "Six original upstream tagged SDL and pygame source archives.\n"
+              "UNRELEASED QA ONLY: Not proven complete corresponding source;\n"
+              "macOS signed binary provenance and LGPL replacement/relinking\n"
+              "review are still open. No stable 3.1 release authorization.\n"
+              "See SIX_SOURCE_COMPANION_READINESS.json and both manifests.\n",
+              "utf-8")
+          print("Preserved six original source candidates, source audit, SHA receipts; approval remains false")
+          PY
+          (cd sdl-source-evidence && sha256sum --check SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt)
       - name: Retain unapproved source/provenance evidence, never a public release
         uses: actions/upload-artifact@v4
         with:
@@ -133,6 +240,10 @@ jobs:
             sdl-source-evidence/SDL_SOURCE_REVIEW.json
             sdl-source-evidence/SHA256SUMS.txt
             sdl-source-evidence/pygame-ce-2.5.8-tagged-upstream-source.tar.gz
+            sdl-source-evidence/SDL-original-tagged-source-candidates/
+            sdl-source-evidence/SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt
+            sdl-source-evidence/SIX_SOURCE_COMPANION_READINESS.json
+            sdl-source-evidence/README_SOURCE_CANDIDATES.txt
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
