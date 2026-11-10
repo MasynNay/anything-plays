@@ -103,10 +103,14 @@ The [full RC1 QA workflow](../.github/workflows/v31-full-rc1-qa.yml)
 combines those precisely hashed applications with the independently
 verified eleven original-source emulator binaries from public 3.0.0.
 It revalidates the resulting installed full packages, original core
-manifest and SDL runtime. Its results are **pending acceptance** until
-all Windows, Linux, ARM Mac and Intel Mac jobs pass. This workflow cannot
-publish a GitHub Release or substitute preview-only binaries for current
-source. See the [RC1 source-build runbook](V3_1_RC_SOURCE_BUILD.md).
+manifest and SDL runtime. Its [four-platform QA run 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433)
+**PASSED all four hosts** and retained the complete installable RC1 QA
+artifacts, original native-library integrity receipts, and SDL audit
+manifests. This closes the source-built, full-console **candidate packaging
+milestone only**. It cannot publish a GitHub Release, and is not a
+license/physical hardware acceptance or a final stable-identity build.
+See the [RC1 source-build runbook](V3_1_RC_SOURCE_BUILD.md)
+and [latest owner QA downloads](V3_1_RC_QA_DOWNLOADS.md).
 
 ## What is still required before a full 3.1 stable release
 
