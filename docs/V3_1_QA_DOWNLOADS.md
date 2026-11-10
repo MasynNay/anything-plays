@@ -1,5 +1,10 @@
 # Anything Plays 3.1 — Four-platform QA downloads
 
+**Superseded for new testing:** the current [3.1 full RC1 QA builds](V3_1_RC_QA_DOWNLOADS.md)
+were built from freshly compiled 3.1 application source and passed all
+four targets. This page is retained to preserve the earlier frozen
+Preview 2 QA evidence and their exact artifact/source revisions.
+
 **QA only. These are not public/stable 3.1 releases.**
 All four installers are full 18-profile, 11-core test packages assembled from
 the exact published 3.0 native emulator libraries and the controller-enabled
