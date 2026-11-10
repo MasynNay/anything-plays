@@ -147,9 +147,12 @@ add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
                             capture_output=True, text=True, timeout=35,
                         )
                         self.assertNotEqual(result.returncode, 0, result.stdout)
+                        # CMake wraps long diagnostics at terminal width.
+                        import re
+                        diagnostic = re.sub(r"\s+", " ", result.stdout + result.stderr)
                         self.assertIn(
                             f"Original Dolphin archive target is not STATIC_LIBRARY: {replaced_target}",
-                            result.stdout + result.stderr,
+                            diagnostic,
                         )
 
 
