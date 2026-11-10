@@ -217,3 +217,8 @@ PR #151 was squash merged into the v3 development branch after Python 3.12, Pyth
 ### November 10, 2026 — preserved input decompression guard (pending CI)
 
 A focused 3.0 development PR now caps decompression of original native archive and Dolphin Sys members while generating unapproved candidate locks. This is defense in depth for source-evidence processing, not Dolphin source-to-binary correspondence, licensing approval, or final installer acceptance. The stable release remains 2.0.0.
+
+
+### November 10, 2026 — preserved archive bounds verified
+
+PR #152 merged into the v3 development branch after Python 3.12, Python 3.13, native compatibility (run 42755797848), and unapproved source-review (run 42755796217) passed. Original native archives and Dolphin Sys outer members now have declared-size and bounded extraction checks, covered by three synthetic regressions. Packaging jobs were skipped. This does not establish final installer acceptance, Dolphin binary/source correspondence, combined licensing clearance or distribution rights. Public 3.0 remains blocked; stable 2.0 is preserved.
