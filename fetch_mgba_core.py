@@ -43,6 +43,16 @@ V30_GPL_TRIAL_CORES = (
 
 
 def core_names_for_build():
+    # Owner-only 3.1 full-library staging reuses the *exact* original-source
+    # compiled binaries from the public 3.0.0 release. No buildbot downloads,
+    # released 3.0 approval flags, or silently substituted cores are allowed.
+    if os.environ.get("AP_V31_FULL_TEST_CORES") == "1":
+        if (os.environ.get("AP_V31_PREVIEW") != "1"
+                or os.environ.get("AP_RELEASE_BUILD") == "1"
+                or os.environ.get("AP_V30_APPROVED_RELEASE") == "1"):
+            raise ValueError("3.1 full original-source core reuse must be a private preview")
+        from tools.v30_release_lock import ALTERNATIVE_TIA_CORE_ORDER
+        return ALTERNATIVE_TIA_CORE_ORDER
     # Official 3.0 is a completely separate, 11-core release lane.
     if os.environ.get("AP_V30_GPL_TRIAL") == "1":
         if (os.environ.get("AP_RELEASE_BUILD", "0") != "0"

@@ -170,6 +170,27 @@ def verify_bundle(bundle, platform_name, check_native=False):
         cores = bundle / "cores"
 
     expected_cores = core_names_for_build()
+    if os.environ.get("AP_V31_FULL_TEST_CORES") == "1":
+        # Reused native images must be byte-for-byte identical to the released
+        # source-built eleven-core family. The core map is technical identity
+        # evidence, not an automatic new distribution rights grant.
+        from anything_plays.v30_approved_core_map import validate_installed_map
+        original = validate_installed_map(cores, EXTENSIONS[platform_name])
+        if (original["core_set_id"] != "gpl-source-built-eleven-tia"
+                or original["native_core_count"] != 11
+                or original["all_console_profiles"] != 18):
+            raise ValueError("3.1 full candidate is missing reviewed 3.0 core identities")
+        original_notices = (
+            "Supafaust-COPYING.txt", "BlastEm-COPYING.txt",
+            "PCE-COPYING.txt", "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt",
+            "GPL-TRIAL-tia-ORIGINAL-SPDX.txt",
+            "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt",
+        )
+        for name in original_notices:
+            original_notice = licenses / name
+            if (original_notice.is_symlink() or not original_notice.is_file()
+                    or original_notice.stat().st_size < 50):
+                raise ValueError(f"3.1 full-library source notice missing: {name}")
     if os.environ.get("AP_V30_APPROVED_RELEASE") == "1":
         # The production binary's installed paths MUST match the 44-asset
         # independently reviewed native lock, not the original Snes9x /
