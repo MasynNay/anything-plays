@@ -64,6 +64,28 @@ class SDLRuntimeAuditTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     inspect_bundle(d, "linux-x64")
 
+    def test_tag_pinned_upstream_lgpl_notice_handles_missing_wheel_files(self):
+        upstream = (Path(__file__).resolve().parents[1] /
+                    "licenses/Pygame-CE-LGPL-2.1.txt")
+        self.assertTrue(upstream.is_file())
+        with tempfile.TemporaryDirectory() as d:
+            licenses, _ = fixture(d)
+            manifest = licenses / "PYTHON_DISTRIBUTIONS.json"
+            data = json.loads(manifest.read_text("utf-8"))
+            data["distributions"][0]["license_files"] = []
+            manifest.write_text(json.dumps(data), "utf-8")
+            fallback = licenses / "Pygame-CE-LGPL-2.1.txt"
+            fallback.write_bytes(upstream.read_bytes())
+            report = inspect_bundle(d, "linux-x64")
+            self.assertTrue(report["wheel_notice_files_missing"])
+            self.assertEqual(report["wheel_notices"], [])
+            self.assertEqual(report["pinned_upstream_lgpl_notice"]["source"],
+                             "https://github.com/pygame-community/pygame-ce/blob/2.5.8/docs/LGPL.txt")
+            self.assertFalse(report["redistribution_approved"])
+            fallback.write_bytes(upstream.read_bytes() + b"tampered")
+            with self.assertRaises(ValueError):
+                inspect_bundle(d, "linux-x64")
+
     def test_rejects_missing_native_or_duplicated_metadata(self):
         with tempfile.TemporaryDirectory() as d:
             licenses, native = fixture(d)
