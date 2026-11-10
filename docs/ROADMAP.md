@@ -77,6 +77,17 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   [Verified runs](V3_1_RELEASE_ACCEPTANCE.md). This is **not yet stable
   release readiness**; real-device gameplay, corresponding native SDL source
   and true 3.1.0 stable-identity installers remain open.
+- **Fresh 3.1 RC1 application and complete library: Verified.** Separate,
+  truly source-built 3.1 applications (not renamed frozen Preview 1 code)
+  passed Windows, Linux, Apple Silicon and Intel
+  [run 42863846059](https://github.com/MasynNay/anything-plays/actions/runs/42863846059).
+  Each was then combined with exactly the reviewed public 3.0 original-source
+  eleven-core set, and all four new **full 18-console RC1 QA packages passed**
+  [run 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433),
+  with checksummed installer, native-core verification and SDL inventory.
+  [New test downloads](V3_1_RC_QA_DOWNLOADS.md). Candidate installation IDs
+  and preferences are isolated from 3.0. This does not pass hardware,
+  corresponding-source/rights or final stable release approval.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
