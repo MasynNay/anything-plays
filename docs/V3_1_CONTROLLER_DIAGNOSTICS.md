@@ -49,12 +49,7 @@ local snapshots.
   controller focus loss, hotplug/reconnect, remapped buttons, camera
   disarming, pulse mode, rescan and a 1,000-frame loop.
   A generated image or simulated SDL event is **not** physical hardware.
-- [Previously verified installed RC1 GUI startup 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42880420023)
-  confirms the older frozen full 18-console QA build opens on all OSes.
-  **That older pinned executable predates this newly added copy
-  control.** Newer 3.1 source-app artifacts must be rebuilt and
-  full-console packages reassembled before claiming this specific UI
-  appears in the installable candidate.
+- The updated Copy diagnostics application compiled on four native hosts in [source build 42885525444](https://github.com/MasynNay/anything-plays/actions/runs/42885525444), was integrated into the complete 18-console QA installers in [run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394), and passed installed frozen GUI startup [4/4 here](https://github.com/MasynNay/anything-plays/actions/runs/42887470580). All remain unreleased test packages.
 - Source tests include an adversarial privacy/clipboard suite:
   unrecognized raw SDL values and arbitrary device strings are
   excluded, malformed settings cannot inject names or file paths,

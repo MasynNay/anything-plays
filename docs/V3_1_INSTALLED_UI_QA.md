@@ -1,15 +1,15 @@
 # Anything Plays 3.1 RC1 — Installed desktop UI startup checks
 
-**Result: PASS on all four native operating system targets.**
+**Result: PASS on all four native operating system targets.** The refreshed packages include the new controller Copy diagnostics interface from source revision `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
 This is real frozen application startup validation, not an emulation,
 physical USB/Bluetooth controller, real-camera or license approval.
 
-[Four-platform installed RC1 UI smoke run 42880420023](https://github.com/MasynNay/anything-plays/actions/runs/42880420023)
+[Four-platform installed RC1 UI smoke run 42887470580](https://github.com/MasynNay/anything-plays/actions/runs/42887470580)
 completed successfully on November 10, 2026.
 The input installer set is the unchanged
-[full 18-console RC1 QA run 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433);
+[full 18-console RC1 QA run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394);
 its original source-app revision was pinned to
-`86baa6972ed923540f6ab49b636652a0f499d45c`.
+`fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
 
 | Test host | Full RC1 installed desktop GUI | CI result |
 | --- | --- | --- |

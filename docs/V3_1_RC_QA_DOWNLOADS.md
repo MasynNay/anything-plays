@@ -1,14 +1,14 @@
 # Anything Plays 3.1 RC1 — Full 18-console QA downloads
 
-**Temporary owner QA, not the public 3.1.0 release.** Unlike earlier
+**Temporary owner QA, not the public 3.1.0 release.** The current packages contain the new Copy diagnostics controller action and have passed actual installed GUI startup on all four platforms in run 42887470580. Unlike earlier
 Preview 2 installers, these RC1 packages use **fresh platform-native
-3.1 application builds**, [verified at source run 42863846059](https://github.com/MasynNay/anything-plays/actions/runs/42863846059),
+3.1 application builds**, [verified at source run 42885525444](https://github.com/MasynNay/anything-plays/actions/runs/42885525444),
 plus eleven **original-source emulator core binaries** whose exact byte
 hashes come from the existing public stable 3.0.0. No ROMs or firmware.
 
 ## Where the RC1 full installers are built
 
-The [full RC1 QA Actions run 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433)
+The [full RC1 QA Actions run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394)
 builds the packages separately. For each **green** platform job, open
 its Actions run and use the **Artifacts** section to download the
 appropriately named ZIP. GitHub sign-in may be required.
@@ -43,6 +43,7 @@ inventory. Compare the installer hash **before installing**:
 3. Open controller configuration on the right. Verify the visual
    diagram, status, per-console mapping dropdowns and **Live Controller
    Test**. Its default disconnected state must be understandable.
+   Use **Copy diagnostics** and verify the clipboard confirmation remains visible; no ROM names or camera images are included.
 4. Confirm all **18 supported console profiles** appear; inspect
    N64 and GameCube along with the handhelds. The native cores are
    checked by CI but individual game compatibility is not universal.
