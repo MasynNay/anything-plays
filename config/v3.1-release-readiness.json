@@ -100,7 +100,24 @@
       "3201.10.0"
     ],
     "intel_duplicate_sdl_installed_name_conflict_count": 0,
-    "dual_sdl_camera_controller_runtime_tested": false
+    "dual_sdl_camera_controller_runtime_tested": false,
+    "macos_signed_sdl_native_load_test": {
+      "status": "PASSED_TESTED_DYLD_ONLY_NOT_HARDWARE",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42881412802",
+      "macos-arm64": {
+        "cv2_sdl_runtime_version": "2.32.8",
+        "pygame_sdl_runtime_version": "2.32.10",
+        "both_library_load_orders_passed": true
+      },
+      "macos-x64": {
+        "pygame_sdl_runtime_version": "2.32.10",
+        "native_load_passed": true
+      },
+      "camera_controller_coexistence_tested": false,
+      "source_correspondence_verified": false,
+      "lgpl_relinking_reviewed": false,
+      "redistribution_approved": false
+    }
   },
   "verified_installed_gui_qa": {
     "status": "PASSED_FOUR_PLATFORM_FROZEN_TK_DESKTOP_STARTUP_ONLY",
