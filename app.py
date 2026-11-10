@@ -13,6 +13,7 @@ from anything_plays.gba_emulator import Emulator
 from anything_plays.systems import SYSTEMS
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.test_preferences import prepare_test_preferences
+from anything_plays.build_identity import app_title
 from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
 from anything_plays.ui_gameplay import GameplayMixin
@@ -37,7 +38,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
     """Own application state and delegate UI behavior to focused modules."""
     def __init__(self, root):
         self.root = root
-        root.title('Anything Plays 3.1 · Preview 1')
+        root.title(app_title())
         self.set_app_icon()
         root.geometry('1400x880')
         root.minsize(820, 540)
