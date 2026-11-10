@@ -23,10 +23,11 @@ class SourceContracts(unittest.TestCase):
         self.assertTrue(callable(App.save_profile))
         self.assertTrue(callable(ProfileStore.get))
         self.assertIn("rgb", DEFAULT)
-        # 2.1 copies settings from the stable 2.0 path into a dedicated
-        # test directory rather than writing directly into the old location.
+        # The unreleased 3.1 build copies older preview settings once and
+        # never changes the 3.0 preview or stable 2.0 directories.
         from anything_plays.test_preferences import (
-            LEGACY_DIR, TEST_DIR, prepare_test_preferences,
+            LEGACY_DIR, TEST_DIR, PREVIOUS_PREVIEW_DIR,
+            prepare_test_preferences,
         )
         self.assertEqual(
             LEGACY_DIR / "preferences.json",
@@ -34,9 +35,14 @@ class SourceContracts(unittest.TestCase):
         )
         self.assertEqual(
             TEST_DIR / "preferences.json",
+            Path(".config/anything-plays-31-preview/preferences.json"),
+        )
+        self.assertEqual(
+            PREVIOUS_PREVIEW_DIR / "preferences.json",
             Path(".config/anything-plays-30-preview/preferences.json"),
         )
         self.assertNotEqual(LEGACY_DIR, TEST_DIR)
+        self.assertNotEqual(TEST_DIR, PREVIOUS_PREVIEW_DIR)
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertIn("self.preferences_path = prepare_test_preferences()", source)
         self.assertTrue(callable(prepare_test_preferences))
