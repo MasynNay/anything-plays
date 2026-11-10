@@ -128,6 +128,8 @@ def build(stable, preview, sums, receipt, output):
                 shutil.copy2(item, current_notices/item.name)
         if not (current_notices/"python-distribution-notices").is_dir():
             raise ValueError("Pygame/SDL license documents missing from candidate")
+        shutil.copy2(root/"licenses/Pygame-CE-LGPL-2.1.txt",
+                     current_notices/"Pygame-CE-LGPL-2.1.txt")
         enable_windows_trial_runtime(dest/"cores")
         verify_bundle(dest, "windows", check_native=True)
 
