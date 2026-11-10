@@ -93,7 +93,11 @@ def build_candidate(artifact_paths):
                 raise ValueError(f"{platform}: duplicate ZIP member")
             if "PRESERVED_NATIVE_INPUTS.json" not in files:
                 raise ValueError(f"{platform}: preserved provenance is missing")
-            record = json.loads(outer.read("PRESERVED_NATIVE_INPUTS.json"))
+            with outer.open(provenance_entry) as provenance_handle:
+                provenance_bytes = provenance_handle.read(MAX_PROVENANCE_BYTES + 1)
+            if len(provenance_bytes) > MAX_PROVENANCE_BYTES:
+                raise ValueError(f"{platform}: preserved provenance exceeds limit")
+            record = json.loads(provenance_bytes)
             if not isinstance(record, dict):
                 raise ValueError(f"{platform}: preserved provenance must be a JSON object")
             source_sha = record.get("source_revision")
