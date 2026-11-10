@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/anything_plays_v21.webp" alt="Anything Plays betta fish logo" width="136">
+  <img src="assets/anything_plays.png" alt="Original Anything Plays betta fish artwork from 2.0" width="150">
 
   # Anything Plays
 
@@ -9,7 +9,7 @@
 
   **Camera-powered play · 18 console profiles · Windows, macOS & Linux**
 
-  [Download 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) ·
+  [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) ·
   [Screenshots](#screenshots) ·
   [Get started](#get-started) ·
   [How it works](#how-it-works) ·
@@ -19,6 +19,29 @@
 
 ---
 
+## Screenshots
+
+### The Anything Plays 3.0 desktop application
+
+[![Real Anything Plays 3.0 desktop application showing the camera tracking panel and game library](docs/screenshots/current/desktop-overview.png)](docs/screenshots/current/desktop-overview.png)
+
+<sub>Actual packaged 3.0 desktop application on Linux. No webcam or game ROM was connected for this capture, so the video panels are blank. Select the image for the full-size version.</sub>
+
+### Camera controls and game library
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/current/camera-controls.png"><img src="docs/screenshots/current/camera-controls.png" width="100%" alt="Real Anything Plays 3.0 camera controls, camera picker and movement preview"></a></td>
+    <td width="50%" align="center"><a href="docs/screenshots/current/game-library-and-audio.png"><img src="docs/screenshots/current/game-library-and-audio.png" width="100%" alt="Real Anything Plays 3.0 console selection, ROM library and game volume controls"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Camera setup and control zones</sub></td>
+    <td align="center"><sub>Console, ROM library and sound</sub></td>
+  </tr>
+</table>
+
+These are unaltered app captures, not generated interfaces or mock gameplay. The [capture workflow](.github/workflows/readme-screenshots.yml) exports GitHub-friendly PNGs, and the [portfolio site](https://anythingplays.masynnay.com/) showcases the overall project.
+
 ## Play a game. Let something else hold the controller.
 
 Anything Plays follows a selected color through a webcam and translates movement into gamepad buttons. Divide the camera view into zones, then let a toy, a fish, a hand, or anything else you can track move between them. Each zone triggers a button inside an embedded emulator, **not a system-wide keyboard event**.
@@ -27,30 +50,7 @@ Prefer a conventional controller? Click the game display and play using the keyb
 
 **Version 3.0** expands the original four-console release into a desktop gaming studio supporting **18 console profiles**, including Nintendo 64 and GameCube. The packaged app includes its emulator cores, so you do not need to install a separate emulator to get started.
 
-[**Download the latest release**](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Visit the portfolio website](https://anythingplays.masynnay.com/)
-
-## Screenshots
-
-Real captures from the packaged Anything Plays 3.0 desktop application, with no commercial game ROM or personal camera footage included.
-
-### Anything Plays 3.0 desktop
-
-[![Anything Plays 3.0 desktop window showing the camera control area, console and ROM library, and sound controls](site/assets/anything-plays-desktop-preview.webp)](site/assets/anything-plays-desktop-preview.webp)
-
-### Camera controls and game library
-
-<table>
-  <tr>
-    <td width="50%" align="center"><a href="docs/screenshots/current/camera-controls.webp"><img src="docs/screenshots/current/camera-controls.webp" alt="Camera selection and color-tracking control panel" width="100%"></a></td>
-    <td width="50%" align="center"><a href="docs/screenshots/current/game-library-and-audio.webp"><img src="docs/screenshots/current/game-library-and-audio.webp" alt="Console selection, game library and audio controls" width="100%"></a></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Camera and movement controls</sub></td>
-    <td align="center"><sub>Console library and audio</sub></td>
-  </tr>
-</table>
-
-The close-ups are crops of the full application capture. The [screenshot preparation script](tools/prepare_readme_screenshots.py) and [verification workflow](.github/workflows/readme-screenshots.yml) document how the images were produced.
+[**Download the latest release**](https://github.com/MasynNay/anything-plays/releases/latest) · [Visit the portfolio website](https://anythingplays.masynnay.com/)
 
 ## Supported consoles
 
