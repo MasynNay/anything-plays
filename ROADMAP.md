@@ -272,3 +272,7 @@ PR #159 was merged as `6029e67e` after Python 3.12/3.13, native mGBA compatibili
 ### November 10, 2026 — original Dolphin archive type guard (CI pending)
 
 A focused development PR rejects Dolphin CMake graphs that substitute INTERFACE or SHARED targets for either pinned static archive. Four real CMake/Ninja negative regressions cover these substitutions. Full CI and original Linux compilation must pass before merge. Production source correspondence, combined GPL obligations, four-platform installer acceptance and public release approval remain open; v2.0 preserved.
+
+### November 10, 2026 — Dolphin target type guard CI diagnostic repair (pending rerun)
+
+PR #160's first CI run failed because CMake line-wrapped a long expected target name in two negative tests, not because the archive-type guard accepted a non-static target. The regression assertion now normalizes diagnostic whitespace. Fresh CI and original pinned Linux compilation must succeed before merge; final production source matching, combined licensing and installer acceptance remain unresolved. Public 3.0 is not approved; v2.0 preserved.
