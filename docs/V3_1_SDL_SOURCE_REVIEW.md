@@ -129,6 +129,31 @@ resolved through different `@rpath` settings. This needs actual
 loader and simultaneous camera/controller behavioral testing; it is
 **not proof of a crash, regression or exploitable vulnerability**.
 
+## Native dynamic-loader coexistence probe: PASSED on both Mac architectures
+
+The
+[actual signed SDL2 dynamic-loader run 42881412802](https://github.com/MasynNay/anything-plays/actions/runs/42881412802)
+**PASSED** on Apple Silicon and Intel Mac. It used the original
+read-only mounted 18-console RC1 DMGs and independently authenticated
+signed dylib bytes against the previous immutable native-linkage reports,
+then called SDL's real `SDL_GetVersion` through `ctypes.CDLL` on
+the host's architecture.
+
+On Apple Silicon the two audited SDL2 libraries reported their
+expected versions, **2.32.8 and 2.32.10**, when loaded in
+**both orders** in a single native process. On Intel, the signed
+pygame SDL2 dylib successfully loaded and reported **2.32.10**.
+The subprocess tests check for a mismatched version returned because
+of potential dyld library coalescing. The result receipts
+`SDL_DYLD_LOAD_arm64.json` and `SDL_DYLD_LOAD_x64.json`
+are retained for 14 days.
+
+This establishes successful direct native loading of both signed
+libraries from the actual mounted candidate, **not** that OpenCV and
+pygame's full camera/controller subsystems have been exercised together,
+nor that all possible `@rpath` resolution scenarios in the compiled app
+are safe. It does not establish corresponding-source or LGPL rights.
+
 ## Five original SDL source trees preserved for comparison
 
 The
