@@ -259,3 +259,8 @@ PR #158 adds verification that all 34 direct and 3 nested pinned Dolphin submodu
 
 
 **Follow-up correction (November 10):** PR #158's initial implementation guarded the parent and three nested checkouts but missed the 34 direct submodules. Commits `81cf457b` and `283bec2d` add the direct guard and an integration regression exercising the full verification loop with a dirty pinned direct checkout. Fresh CI is required; prior successful workflows cannot certify these commits. Public release gates remain closed.
+
+
+### November 10, 2026 — Dolphin submodule tracked-source guard verified and merged
+
+PR #158 merged as `4f79b1ea` after source checks 42882148318 passed Python 3.12/3.13 and native mGBA compatibility, and original pinned Linux source compilation 42882148328 and Windows source research 42882148519 succeeded. macOS ARM source research succeeded; macOS Intel was still running at merge review (42882148304). This verifies tracked-file cleanliness for the original Dolphin parent and all 37 pinned submodule checkouts, including a full-loop dirty direct-submodule regression. It does **not** establish matching final production binaries, combined GPL licensing clearance, source/notice distribution completeness or final four-platform installer acceptance. Public 3.0 remains unpublished and v2.0 remains unchanged.
