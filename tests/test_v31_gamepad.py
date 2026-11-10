@@ -248,7 +248,8 @@ class WiringTests(unittest.TestCase):
     def test_callback_cleanup_and_safe_persistence(self):
         source = (self.root / "app.py").read_text("utf-8")
         self.assertIn("self._gamepad_tick_job = root.after", source)
-        self.assertIn("cleanup(\"SDL controller\", self._gamepad.stop)", source)
+        self.assertIn("cleanup(\"gamepad\", self.close_gamepad)", source)
+        self.assertIn("self.initialize_gamepad_preferences(preferences)", source)
         ui = (self.root / "anything_plays/ui_gamepad.py").read_text("utf-8")
         self.assertIn("if self._gamepad.api is None:", ui)
         self.assertIn("self.root.focus_get() is None", ui)

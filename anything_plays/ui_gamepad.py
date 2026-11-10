@@ -11,6 +11,25 @@ from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 
 
 class GamepadMixin:
+    def initialize_gamepad_preferences(self, preferences):
+        """Load optional controller preferences without initializing SDL."""
+        self._gamepad = GamepadReader()
+        self.gamepad_enabled = tk.BooleanVar(
+            value=preferences.get("gamepad_enabled", False) is True
+        )
+        self.gamepad_status = tk.StringVar(value="Controller disabled")
+        settings = preferences.get("gamepad_bindings", {})
+        self._gamepad_bindings = settings if isinstance(settings, dict) else {}
+
+    def close_gamepad(self):
+        """Release gamepad state even for partially constructed App objects."""
+        try:
+            self.emu.release_gamepad()
+        finally:
+            reader = getattr(self, "_gamepad", None)
+            if reader is not None:
+                reader.stop()
+
     def toggle_gamepad(self):
         """Enable an optional local gamepad; keep keyboard play available."""
         if self.gamepad_enabled.get():
@@ -135,5 +154,9 @@ class GamepadMixin:
     def _save_gamepad_binding(self, system, source, button):
         if source not in SOURCES or button not in (DISABLED, *BUTTONS_BY_SYSTEM[system]):
             return
-        self._gamepad_bindings.setdefault(system, {})[source] = button
+        saved = self._gamepad_bindings.get(system)
+        if not isinstance(saved, dict):
+            saved = {}
+            self._gamepad_bindings[system] = saved
+        saved[source] = button
         self.save_preferences()

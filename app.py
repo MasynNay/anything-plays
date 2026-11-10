@@ -26,7 +26,6 @@ from anything_plays.ui_zones import ZonesMixin
 from anything_plays.ui_view import ViewMixin
 from anything_plays.ui_shortcuts import ShortcutsMixin
 from anything_plays.ui_gamepad import GamepadMixin
-from anything_plays.gamepad import GamepadReader
 from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 from anything_plays.ui_icon import IconMixin
@@ -65,18 +64,10 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self._selected_emulator_status = tk.StringVar(value='')
         self._core_install_busy = False
         self.emu = Emulator()
-        # Preserve stable 2.0 preferences; make an independent alpha copy.
         self.preferences_path = prepare_test_preferences()
         self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
         preferences = self.read_preferences()
-        self._gamepad = GamepadReader()
-        self.gamepad_enabled = tk.BooleanVar(
-            value=preferences.get("gamepad_enabled", False) is True
-        )
-        self.gamepad_status = tk.StringVar(value="Controller disabled")
-        self._gamepad_bindings = preferences.get("gamepad_bindings", {})
-        if not isinstance(self._gamepad_bindings, dict):
-            self._gamepad_bindings = {}
+        self.initialize_gamepad_preferences(preferences)
         self._shortcut_bindings = preferences.get('key_bindings', {})
         if not isinstance(self._shortcut_bindings, dict):
             self._shortcut_bindings = {}
@@ -167,14 +158,11 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.protocol('WM_DELETE_WINDOW', self.close)
         if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":
             root.after(100, self.scan_cameras)
-        # Keep exactly one camera timer and one game timer alive. Record their
-        # identifiers so all pending callbacks can be cancelled on shutdown.
+        # Track cancellable timers for reliable shutdown.
         self._camera_tick_job = root.after(45, self.tick)
         self._game_tick_job = root.after(16, self.game_render_tick)
         self._gamepad_tick_job = root.after(65, self.gamepad_tick)
-        self._updates_start_job = root.after(
-            8000, self.schedule_emulator_update_checks
-        )
+        self._updates_start_job = root.after(8000, self.schedule_emulator_update_checks)
     def uses_embedded_emulator(self, system=None):
         """Choose in-panel video for each console; keep GPU fallback explicit."""
         key = self.system_key.get() if system is None else system
@@ -223,8 +211,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
             if job is not None:
                 cleanup(job_name, lambda job=job: self.root.after_cancel(job))
         cleanup("manual input", self.deactivate_manual)
-        cleanup("gamepad input", self.emu.release_gamepad)
-        cleanup("SDL controller", self._gamepad.stop)
+        cleanup("gamepad", self.close_gamepad)
         cleanup("camera controls", self.stop_controls)
         capture, self.cap = self.cap, None
         if capture is not None:
