@@ -18,8 +18,9 @@ import time
 
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
+from tools.audit_v31_sdl_runtime import inspect_bundle
 
-PREVIEW_RUN_SHA = "ffee5dcdf0415440c9f5bffc7f9049a07c094ff3"
+PREVIEW_RUN_SHA = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 
 
 def digest(path):
@@ -137,12 +138,17 @@ def build(arch, stable, preview, checksums, receipt, output):
             verify_bundle(final, "macos", check_native=False)
             if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
-        report = {
-            "status": "UNRELEASED_3_1_FULL_MACOS_QA",
+            # Inventory the *mounted final signed DMG*, not the unsigned app.
+            audit = inspect_bundle(final, "macos-" + arch)
+        (output/"SDL_RUNTIME_AUDIT.json").write_text(
+            json.dumps(audit, indent=2)+"\n", encoding="utf-8")
+        report = {            "status": "UNRELEASED_3_1_FULL_MACOS_QA",
             "public_release_approved": False,
             "target": "macos-" + arch,
             "original_stable_sha256": stable_sha,
             "original_preview_sha256": digest(preview),
+            "source_preview_revision": PREVIEW_RUN_SHA,
+            "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": filename, "sha256": digest(dmg),
             "size_bytes": dmg.stat().st_size,
             "original_source_core_families": original["total_source_built_core_families"],
