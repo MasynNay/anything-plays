@@ -165,16 +165,18 @@ class DraftPreparationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             draft.stage(self.installers, self.source, self.out, minimum=1)
 
-    def test_workflow_preserves_full_qa_without_unapproved_release_write(self):
+    def test_draft_uses_default_branch_target_and_remains_unpublished(self):
         path = Path(__file__).resolve().parents[1] / ".github/workflows/v31-stage-rc1-release-draft.yml"
         text = path.read_text("utf-8")
         for required in ("42905694504", "42909893531",
                          "RC1_DRAFT_QA_RECEIPT.json", "GH_TOKEN",
                          "SHA256SUMS.txt", "retention-days: 90",
-                         "actions/upload-artifact@v4", "contents: read"):
+                         "actions/upload-artifact@v4", "contents: write",
+                         "--draft --prerelease", "--target main",
+                         ".isDraft==true", "source and four installer QA"):
             self.assertIn(required, text)
-        for forbidden in ("--latest", "gh release create",
-                          "gh release delete", "--clobber", "contents: write"):
+        for forbidden in ("--latest", "--target \"$APP_COMMIT\"",
+                          "gh release delete", "--clobber"):
             self.assertNotIn(forbidden, text)
 
 

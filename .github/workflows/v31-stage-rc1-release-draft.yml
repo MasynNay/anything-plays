@@ -1,8 +1,9 @@
-name: 3.1 | Preserve verified four-platform RC1 owner QA downloads
+name: 3.1 | Preserve QA assets and create private RC1 release draft
 
-# Retain all exact four-platform RC1 source-built installers without needing
-# the repo's restricted Releases API. These are OWNER QA artifacts only;
-# NO public 3.1.0 release or distribution approval is implied.
+# The GitHub GITHUB_TOKEN cannot create releases targeting commits whose
+# workflow files differ from main. Stage a private draft against main ONLY;
+# before any publication move to 3.1's actual source when merged and reviewed.
+# All files remain owner-only draft QA. NO public distribution is approved.
 on:
   push:
     branches: [feature/v3.1-controls-usability]
@@ -14,7 +15,7 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
 
 concurrency:
   group: v31-owner-qa-private-draft
@@ -108,6 +109,9 @@ jobs:
           Upstream pygame/SDL source and notice candidate evidence:
           https://github.com/MasynNay/anything-plays/actions/runs/42909893531
 
+          Draft currently targets default branch 'main' ONLY to pass
+          GitHub workflow-file permissions; it MUST NOT be published until
+          the real 3.1 source commit is present on main and retargeted.
           The assets have REAL RC1 filenames and SHA256SUMS.txt. The
           original-source candidate ZIP is not certified complete LGPL
           corresponding source. No rename of a preview/alpha binary into
@@ -131,10 +135,33 @@ jobs:
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
-      - name: Explain why this is intentionally not a public GitHub release
+      - name: Open exact verified 3.1 RC1 GitHub Release as an UNPUBLISHED draft
         shell: bash
         run: |
-          echo "Four installers and source companion retained as private owner QA artifact."
-          echo "The GitHub Releases API denied draft creation (HTTP 403) despite contents:write."
-          echo "Do not publish automatically or change the six 3.1 release readiness gates."
-          echo "The public 3.0.0 and 2.0 releases were not modified."
+          set -euo pipefail
+          # GitHub refuses releases targeted at an unmerged commit which
+          # changes .github/workflows, even with contents:write. The draft
+          # target MUST be main until the matching 3.1 code is on main.
+          # Never publish this provisional target as a public prerelease.
+          [[ "$(gh repo view "$GITHUB_REPOSITORY" --json defaultBranchRef --jq '.defaultBranchRef.name')" == main ]]
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,isPrerelease,assets \
+              --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+            mkdir -p previous
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern SHA256SUMS.txt --dir previous
+            cmp draft-assets/SHA256SUMS.txt previous/SHA256SUMS.txt
+            echo 'Existing RC1 private draft verified byte-for-byte, no overwrite'
+          else
+            gh release create "$TAG" draft-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target main \
+              --draft --prerelease \
+              --title 'Anything Plays 3.1 RC1 | Four verified installers (PRIVATE DRAFT)' \
+              --notes-file RC1_DRAFT_NOTES.md
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          echo 'Verified 7 candidate assets in UNPUBLISHED draft, production acceptance still open'
