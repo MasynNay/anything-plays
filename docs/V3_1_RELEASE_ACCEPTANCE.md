@@ -166,9 +166,14 @@ A separate
 found two distinct bundled SDL2 builds with the same basename on
 Apple Silicon, representing Mach-O current versions `3201.8.0`
 and `3201.10.0`; Intel had no equivalent conflicting basename
-in its audited native files. This is a potential loader ambiguity
-to verify with camera+controller simultaneous runtime tests, not a
-verified functional failure.
+in its audited native files. This is a potential loader ambiguity, not a verified failure.
+The
+[native dylib loading test 42881412802](https://github.com/MasynNay/anything-plays/actions/runs/42881412802)
+subsequently **PASSED both Macs**: Apple Silicon successfully loaded the
+actual signed SDL2 versions 2.32.8 and 2.32.10 in **both orders** and
+confirmed their runtime versions; Intel's 2.32.10 library also loaded.
+The successful `ctypes` test does not replace a simultaneous real camera
+and USB/Bluetooth controller integration test.
 
 The
 [original SDL2 source-candidate run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)
