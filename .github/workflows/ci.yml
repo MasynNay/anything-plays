@@ -200,3 +200,5 @@ jobs:
         run: python -m unittest discover -s tests -p "test_v31_controller_diagnostics.py" -v
       - name: Prove RC settings copy is atomic, private and race safe
         run: python -m unittest discover -s tests -p "test_v31_preferences_atomic.py" -v
+      - name: Prove installed-build settings test fixture rejects touching stable user data
+        run: python -m unittest discover -s tests -p "test_v31_installed_settings_migration.py" -v
