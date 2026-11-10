@@ -264,3 +264,7 @@ PR #158 adds verification that all 34 direct and 3 nested pinned Dolphin submodu
 ### November 10, 2026 — Dolphin submodule tracked-source guard verified and merged
 
 PR #158 merged as `4f79b1ea` after source checks 42882148318 passed Python 3.12/3.13 and native mGBA compatibility, and original pinned Linux source compilation 42882148328 and Windows source research 42882148519 succeeded. macOS ARM source research succeeded; macOS Intel was still running at merge review (42882148304). This verifies tracked-file cleanliness for the original Dolphin parent and all 37 pinned submodule checkouts, including a full-loop dirty direct-submodule regression. It does **not** establish matching final production binaries, combined GPL licensing clearance, source/notice distribution completeness or final four-platform installer acceptance. Public 3.0 remains unpublished and v2.0 remains unchanged.
+
+### November 10, 2026 — original Dolphin missing-common-target guard (pending CI)
+
+A focused source-preserving CMake/Ninja regression now exercises the complementary failure case: upstream Dolphin has its video-context archive but no `common` archive. Configuration must fail closed before a misleading source-built candidate can be produced. This test does not approve production binaries, mixed GPL obligations, installer acceptance or public release. The original pinned Dolphin macOS Intel and ARM research jobs in run 42882148304 have both completed successfully; these remain research-only provenance evidence. Stable v2.0 is preserved.
