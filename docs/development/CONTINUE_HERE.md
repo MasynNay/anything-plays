@@ -850,3 +850,33 @@ draft. Never overwrite public stable 3.0.0 or stable 2.0.
 subsystem initialization from the exact signed Mac DMGs, then plan
 real hardware camera/controller and commercial-game/manual tests.
 Do not treat synthetic observations as real hardware acceptance.
+
+## Signed Mac SDL joystick subsystem initialization — verified both targets (November 10, 2026)
+
+New `tools/probe_v31_macos_sdl_load.py` and
+`tests/test_v31_macos_dyld.py` now go beyond the earlier native
+`SDL_GetVersion` experiment: in each checked signed SDL2 dylib,
+the isolated real native process calls
+`SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER)`,
+then `SDL_NumJoysticks` and `SDL_QuitSubSystem`. Both Apple Silicon
+SDL2 2.32.8 and 2.32.10 are initialized in each loading order
+and their versions confirmed. Intel SDL2 2.32.10 is also initialized.
+All code enforces the immutable 3.1 RC1 source SHA and signed native
+library SHA-256s before testing.
+
+**[Verified extended native SDL controller run 42882184466](https://github.com/MasynNay/anything-plays/actions/runs/42882184466)
+SUCCEEDED BOTH Mac jobs**. Two fresh QA evidence JSON ZIPs are
+available through approximately **November 24, 2026**.
+
+This only verifies *hardware-free* native SDL joystick/controller
+initialization in the real signed RC1 DMGs. It is NOT physical
+USB/Bluetooth hardware acceptance, does NOT open an actual camera
+or game ROM, and does NOT prove all `@rpath` resolution cases or
+LGPL source/relinking compliance. Release flags remain false.
+Updated `docs/V3_1_SDL_SOURCE_REVIEW.md`, 3.1 acceptance,
+readiness JSON and PR #156 (still draft). Public 3.0 stays untouched.
+
+Next priority: actual paired camera and controller tests, gameplay/
+save/load/audio/endurance checks on each OS, corresponding-source
+and LGPL reviews, then version-correct stable 3.1.0 builds and an
+explicit release acceptance decision.
