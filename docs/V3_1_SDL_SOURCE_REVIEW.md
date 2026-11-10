@@ -164,10 +164,11 @@ then releases the subsystems. This tests SDL controller backend
 initialization without claiming a physical gamepad exists.
 
 [Extended native joystick/controller run 42882184466](https://github.com/MasynNay/anything-plays/actions/runs/42882184466)
-has **PASSED Apple Silicon**: both SDL2 2.32.8 and SDL2 2.32.10
-initialize those subsystems successfully in either library loading
-order. The Intel Mac job was **queued as of the last verification**;
-check the Actions job conclusion before claiming both are green.
+**PASSED on both Mac architectures**. Apple Silicon confirms that
+SDL2 2.32.8 and SDL2 2.32.10 initialize those subsystems in either
+library loading order; Intel's signed SDL2 2.32.10 backend also
+initializes successfully. Both jobs completed successfully and retained
+fresh JSON evidence, through approximately November 24, 2026.
 
 The full GUI startup and physical device acceptance are **separate**:
 a passing backend initialization in CI still does not prove an actual
