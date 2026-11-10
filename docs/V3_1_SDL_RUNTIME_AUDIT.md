@@ -38,9 +38,16 @@ The tool refuses to create a success record unless:
 
 1. The frozen package's actual
    `licenses/PYTHON_DISTRIBUTIONS.json` lists **exactly one pygame-ce 2.5.8**
-   distribution and wheel-provided notice files.
-2. Every recorded notice exists in the frozen package, is regular, nonempty,
-   unsymlinked and inside the application. Unsafe paths are rejected.
+   distribution and records whether the wheel supplies license files.
+2. Every recorded wheel notice exists in the frozen package, is regular,
+   nonempty, unsymlinked and inside the application. If **the wheel supplies
+   none**, the assembly must include the **verbatim pinned pygame-ce 2.5.8
+   upstream `docs/LGPL.txt`**, at
+   `licenses/Pygame-CE-LGPL-2.1.txt` with SHA-256
+   `a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7`.
+   The audit explicitly records the missing wheel notices and distinct
+   upstream fallback, without claiming that either alone resolves compliance.
+   Unsafe paths and modified license text are rejected.
 3. At least one native pygame or SDL library/extension is present. All
    matching candidates and wheel notices are hashed with SHA-256 and their
    exact paths and sizes recorded.
