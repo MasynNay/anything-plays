@@ -1,7 +1,8 @@
-name: 3.1 | Preserve four verified RC1 installers in PRIVATE release draft
+name: 3.1 | Preserve verified four-platform RC1 owner QA downloads
 
-# UNPUBLISHED draft only; no public 3.1.0 release or licensing approval.
-# This workflow refuses changes to existing stable releases.
+# Retain all exact four-platform RC1 source-built installers without needing
+# the repo's restricted Releases API. These are OWNER QA artifacts only;
+# NO public 3.1.0 release or distribution approval is implied.
 on:
   push:
     branches: [feature/v3.1-controls-usability]
@@ -13,7 +14,7 @@ on:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
 
 concurrency:
   group: v31-owner-qa-private-draft
@@ -119,29 +120,21 @@ jobs:
           Do not remove DRAFT; this does not authorize public redistribution.
           Existing public 3.0.0 and 2.0.0 releases remain unchanged.
           NOTES
-      - name: Create or verify the unchanged private RC1 release draft
+      - name: Preserve authenticated source and four installer QA assets for extended review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-FOUR-OS-FULL-INSTALLERS-AND-SOURCE-OWNER-QA
+          path: |
+            draft-assets/
+            RC1_DRAFT_NOTES.md
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+      - name: Explain why this is intentionally not a public GitHub release
         shell: bash
         run: |
-          set -euo pipefail
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --json isDraft,isPrerelease,assets \
-              --jq '{draft:.isDraft,prerelease:.isPrerelease,count:(.assets|length)}')"
-            echo "$existing" | python -c 'import json,sys; x=json.load(sys.stdin); assert x == {"draft":True, "prerelease":True, "count":7}, x'
-            mkdir -p previous
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --pattern SHA256SUMS.txt --dir previous
-            cmp draft-assets/SHA256SUMS.txt previous/SHA256SUMS.txt
-            echo "Unpublished draft already exists with identical assets"
-          else
-            gh release create "$TAG" draft-assets/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$APP_COMMIT" \
-              --draft --prerelease \
-              --title 'Anything Plays 3.1 RC1 | Verified four-platform QA (PRIVATE DRAFT)' \
-              --notes-file RC1_DRAFT_NOTES.md
-          fi
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --json isDraft,isPrerelease,assets \
-            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
-          echo "RC1 GitHub release draft preserved. Still NOT publicly released."
+          echo "Four installers and source companion retained as private owner QA artifact."
+          echo "The GitHub Releases API denied draft creation (HTTP 403) despite contents:write."
+          echo "Do not publish automatically or change the six 3.1 release readiness gates."
+          echo "The public 3.0.0 and 2.0 releases were not modified."
