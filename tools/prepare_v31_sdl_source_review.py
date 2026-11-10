@@ -16,6 +16,8 @@ import shutil
 import tarfile
 import zipfile
 
+from tools.macho_wheel_slices import architecture_slices
+
 TARGETS = ("linux-x64", "windows-x64", "macos-arm64", "macos-x64")
 RC_APP_COMMIT = "86baa6972ed923540f6ab49b636652a0f499d45c"
 RC_RUN = 42865608433
@@ -129,7 +131,16 @@ def wheel_hashes(path, target):
                 continue
             if info.file_size == 0:
                 continue
-            hashes.setdefault(hashlib.sha256(archive.read(info)).hexdigest(), []).append(filename)
+            original_bytes = archive.read(info)
+            hashes.setdefault(hashlib.sha256(original_bytes).hexdigest(), []).append(filename)
+            # macOS wheels contain universal2 Mach-O. PyInstaller may thin
+            # a fat image to one architecture, so compare byte-identical
+            # architecture slices too, without altering signed binaries.
+            if target.startswith("macos-"):
+                for arch, digest in architecture_slices(original_bytes).items():
+                    hashes.setdefault(digest, []).append(
+                        filename + " [exact " + arch + " slice]"
+                    )
     if not hashes:
         raise ValueError("Official pygame-ce wheel contains no native binary")
     return hashes
@@ -157,6 +168,7 @@ def match_installed_runtime(target, receipt, audit, wheel_hashes_map):
         raise ValueError("No native library evidence: " + target)
     hits = []
     unresolved = []
+    arch_slice_matches = 0
     for item in native:
         if not isinstance(item, dict):
             raise ValueError("Invalid native file entry: " + target)
@@ -170,6 +182,11 @@ def match_installed_runtime(target, receipt, audit, wheel_hashes_map):
         entry = {"installed_path": file_path, "sha256": hash_value}
         if found:
             entry["official_wheel_paths"] = sorted(found)
+            if any(" [exact " in path for path in found):
+                entry["match_kind"] = "exact_macos_architecture_slice"
+                arch_slice_matches += 1
+            else:
+                entry["match_kind"] = "exact_whole_wheel_member"
             hits.append(entry)
         else:
             unresolved.append(entry)
@@ -179,6 +196,7 @@ def match_installed_runtime(target, receipt, audit, wheel_hashes_map):
         "exact_wheel_byte_matches": hits,
         "unmatched_native_candidates": unresolved,
         "wheel_match_count": len(hits),
+        "exact_architecture_slice_matches": arch_slice_matches,
         "native_coverage": "Partially mapped; sign/repack may alter binary bytes",
         "wheel_provenance_in_installed_bundle_proven": False,
         "sdl_native_source_correspondence_proven": False,
