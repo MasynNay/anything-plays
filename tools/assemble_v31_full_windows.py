@@ -17,7 +17,7 @@ from anything_plays.v30_gpl_trial import (
     enable_windows_trial_runtime, validate_trial_core_directory,
 )
 from verify_bundle import verify_bundle
-from tools.audit_v31_sdl_runtime import inspect_bundle
+from tools.audit_v31_sdl_runtime import UPSTREAM_LGPL_SHA256, inspect_bundle
 
 STABLE = "AnythingPlaysSetup-3.0.0.exe"
 PREVIEW = "AnythingPlaysSetup-3.1.0-preview1.exe"
