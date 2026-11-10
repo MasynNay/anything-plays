@@ -44,7 +44,7 @@ ARM and Intel Mach-O architecture slices compared byte for byte,
 without stripping signatures, editing native code or falsely labelling
 a rebuilt binary an exact match.
 
-<escape>|</escape> System <escape>|</escape> Exact full-file or Mach-O slice matches <escape>|</escape> Unmatched native candidates <escape>|</escape>
+| System | Exact full-file or Mach-O slice matches | Unmatched native candidates |
 | --- | ---: | ---: |
 | Linux x64 | 74 | 0 |
 | Windows x64 | 62 | 0 |
