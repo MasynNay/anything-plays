@@ -1,0 +1,77 @@
+name: 3.1 | Sustained Tk camera and SDL gamepad polling QA (unreleased)
+
+# Actual Tk window and OpenCV camera processing, plus the real SDL event pump.
+# Synthetic frames, NO physical controller, camera, ROM, gameplay or approval.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - ".github/workflows/v31-gamepad-endurance.yml"
+      - "tests/soak_gui.py"
+      - "tests/test_v31_gamepad_soak_ci.py"
+      - "anything_plays/gamepad.py"
+      - "anything_plays/ui_gamepad.py"
+      - "anything_plays/ui_camera.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-sdl-polling-soak
+  cancel-in-progress: true
+
+jobs:
+  real-tk-sdl-synthetic-camera-soak:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Three-minute real Tk/SDL controller polling soak (Linux x64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Verify provenance and no hardware/public release claims
+        run: python -m unittest discover -s tests -p "test_v31_gamepad_soak_ci.py" -v
+      - name: Install Tk, OpenCV, SDL and audio runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk xvfb xauth libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Exercise 180 seconds of real Tk, camera and SDL polling
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py --seconds 180 --enable-gamepad \
+              --max-growth-mb 96 --report test-evidence/v31-sdl-camera-soak.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("test-evidence/v31-sdl-camera-soak.json").read_text("utf-8"))
+          assert report["passed"] is True
+          assert report["seconds_requested"] == 180
+          assert report["sdl_initialized_samples"] >= 2
+          assert report["gamepad_sdl_polling_requested"] is True
+          assert report["real_controller_hardware_tested"] is False
+          assert report["physical_camera_tested"] is False
+          assert report["resident_growth_mb"] <= 96
+          PY
+      - name: Preserve bounded-memory evidence (not a public release)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-THREE-MINUTE-SDL-CAMERA-SOAK-UNRELEASED
+          path: test-evidence/v31-sdl-camera-soak.json
+          if-no-files-found: warn
+          retention-days: 14
