@@ -14,6 +14,10 @@ Actions are grouped by purpose. Routine development, platform integration, and p
 
 The many additional `v30-*` files record historical experiments, isolated core builds, platform diagnostics, and earlier license/source investigations. They are retained for reproducibility, **not** endorsements of whichever core names were in the older experiments. For the selected 3.0 core lineup, use the [current original-source report](../docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md).
 
+## Archived release-candidate workflows
+
+Obsolete **2.0 and 3.0 private release-draft jobs** have been moved to [historical workflows](../docs/history/workflows/) so the Actions menu focuses on useful current engineering. These archived definitions are preserved for provenance and are not active GitHub Actions workflows. The stable 1.5, 2.0 and 3.0 releases are unaffected.
+
 ## Release safety
 
 - A successful CI run verifies the specific conditions tested, not every commercial game or physical device.
