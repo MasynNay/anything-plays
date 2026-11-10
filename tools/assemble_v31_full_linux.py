@@ -108,10 +108,16 @@ def build(stable, preview, sums, receipt, output_dir, rc1=False):
             raise ValueError("Incorrect 3.1 source-stage input package")
         ctrl.write_text(data.replace("Version: " + original_version,
                                       "Version: " + full_version), "utf-8")
-        desktop = root/"new/usr/share/applications/anything-plays-31-preview.desktop"
+        desktop_name = ("anything-plays-31-rc1.desktop" if rc1
+                        else "anything-plays-31-preview.desktop")
+        desktop = root/"new/usr/share/applications"/desktop_name
         data = desktop.read_text("utf-8")
-        desktop.write_text(data.replace("Name=Anything Plays 3.1 Preview 1",
-                                        "Name=Anything Plays 3.1 Full QA Preview"), "utf-8")
+        if rc1:
+            if "Name=Anything Plays 3.1 Release Candidate 1" not in data:
+                raise ValueError("RC1 desktop identity mismatch")
+        else:
+            desktop.write_text(data.replace("Name=Anything Plays 3.1 Preview 1",
+                                            "Name=Anything Plays 3.1 Full QA Preview"), "utf-8")
         verify_bundle(new, "linux", check_native=True)
         output_dir.mkdir(parents=True, exist_ok=True)
         deb = output_dir/(RC_FULL if rc1 else FULL)
