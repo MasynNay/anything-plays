@@ -194,3 +194,5 @@ jobs:
         run: python -m unittest discover -s tests -p "test_v31_gamepad*.py" -v
       - name: Verify visual controller settings without a display
         run: python -m unittest discover -s tests -p "test_v31_controller_gui.py" -v
+      - name: Verify live controller diagnostics and immediate rescan safety
+        run: python -m unittest discover -s tests -p "test_v31_live_controller.py" -v
