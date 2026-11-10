@@ -48,8 +48,13 @@ def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str
         if len(members) != 1 or members[0].filename != expected_file or members[0].is_dir():
             raise ValueError(f"{platform}: invalid core ZIP payload: {name}")
         member = members[0]
-        if member.create_system == 3 and stat.S_ISLNK(member.external_attr >> 16):
-            raise ValueError(f"{platform}: symlinked core ZIP payload: {name}")
+        if member.create_system == 3:
+            # A ZIP entry can impersonate a native file while declaring a FIFO,
+            # socket, block or character device in its Unix mode. Some ordinary
+            # ZIP writers omit the file-type bits, so accept those as well.
+            kind = stat.S_IFMT(member.external_attr >> 16)
+            if kind not in (0, stat.S_IFREG):
+                raise ValueError(f"{platform}: non-regular core ZIP payload: {name}")
         if member.file_size > MAX_NATIVE_PAYLOAD_BYTES:
             raise ValueError(f"{platform}: oversized native core ZIP payload: {name}")
         with inner.open(member) as handle:
