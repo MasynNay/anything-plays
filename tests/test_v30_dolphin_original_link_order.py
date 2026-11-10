@@ -74,5 +74,28 @@ target_link_libraries(dolphin_libretro PRIVATE
                     self.assertIn("undefined reference",built.stdout+built.stderr)
 
 
+    def test_missing_original_archive_target_fails_closed(self):
+        """Never silently produce a candidate when the pinned source target layout changes."""
+        self.assertTrue(FIX.is_file())
+        with TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "CMakeLists.txt").write_text(r"""
+cmake_minimum_required(VERSION 3.25)
+project(missing_original_dolphin_target CXX)
+file(WRITE "${CMAKE_BINARY_DIR}/stub.cpp" "extern \"C\" int stub(){return 1;}\\n")
+add_library(common STATIC "${CMAKE_BINARY_DIR}/stub.cpp")
+add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
+# Deliberately omit dolphin_libretro_videocontexts.
+""", encoding="utf-8")
+            result = subprocess.run(
+                ["cmake", "-S", str(root), "-B", str(root / "build"),
+                 "-G", "Ninja", f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={FIX}"],
+                capture_output=True, text=True, timeout=35,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Original Dolphin source-linked native targets absent",
+                          result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
