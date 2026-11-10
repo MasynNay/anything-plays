@@ -30,6 +30,20 @@ def fixture(root, target="linux-x64"):
 
 
 class SDLRuntimeAuditTests(unittest.TestCase):
+    def test_upstream_lgpl_bytes_are_immutable_across_checkouts(self):
+        from tools.audit_v31_sdl_runtime import (
+            UPSTREAM_LGPL_SHA256, file_hash,
+        )
+
+        root = Path(__file__).resolve().parents[1]
+        self.assertEqual(
+            file_hash(root / "licenses/Pygame-CE-LGPL-2.1.txt"),
+            UPSTREAM_LGPL_SHA256,
+        )
+        attributes = (root / ".gitattributes").read_text("utf-8")
+        self.assertIn("licenses/Pygame-CE-LGPL-2.1.txt text eol=lf",
+                      attributes)
+
     def test_all_four_platform_identifiers_are_supported(self):
         self.assertEqual(len(TARGETS), 4)
         for target in TARGETS:
