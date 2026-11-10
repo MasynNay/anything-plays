@@ -35,3 +35,13 @@
 /* Genuine app screenshot, captured from the actual Linux full installer. */
 .desktop-section{padding-top:55px}.desktop-shot{padding:16px;border-radius:20px;border:1px solid #3d7099;background:linear-gradient(150deg,#152240,#0b152d);box-shadow:0 20px 60px #0006}.shot-toolbar,.shot-caption{display:flex;justify-content:space-between;gap:15px;align-items:center;font:10px/1.5 var(--mono);letter-spacing:.10em;color:#b7cddb;padding:8px 7px 16px}.desktop-shot img{width:100%;height:auto;border:1px solid #3e719b;border-radius:8px;background:#10223c}.shot-caption{padding:15px 7px 6px;color:#9ebacd}
 @media(max-width:660px){.desktop-section{padding-top:20px}.desktop-shot{padding:8px}.shot-toolbar,.shot-caption{font-size:8px;flex-wrap:wrap;gap:6px}.shot-toolbar{padding:8px 5px}}
+
+/* Original fish artwork has a square black matte outside its rounded cyan frame.
+   Clip only the outer corners of the existing image; do not redraw/recolor the fish.
+   Apply consistently to the hero, header mark and footer mark. */
+.brand img,
+.hero-fish,
+.footer-brand img {
+  border-radius: 23%;
+  clip-path: inset(0 round 23%);
+}
