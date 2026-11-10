@@ -99,6 +99,25 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   [Source correspondence investigation](V3_1_SDL_SOURCE_REVIEW.md).
   This advances traceability, **not** legal approval; additional native
   source build provenance and LGPL replacement/relinking review are open.
+- **Actual installed desktop UI QA: Verified 4/4.**
+  The complete Windows, Linux and two Mac RC1 installers now pass
+  independent **real frozen Tk window/App startup and event-loop tests**
+  on clean native CI runners
+  ([run 42880420023](https://github.com/MasynNay/anything-plays/actions/runs/42880420023)).
+  This is stronger than packaging-only verification but does not
+  certify actual camera, gamepad or game ROM operation.
+  [Startup QA details](V3_1_INSTALLED_UI_QA.md).
+- **SDL2 source/loader evidence expanded:** Apple Silicon contains
+  two different signed `libSDL2-2.0.0.dylib` versions sharing a library
+  name (Mach-O 3201.8.0 and 3201.10.0); Intel has no equivalent
+  audited basename collision. Full
+  [dual-library audit](https://github.com/MasynNay/anything-plays/actions/runs/42879312220)
+  passed. Original-source references for **both SDL2 versions** plus
+  SDL2_image, SDL2_mixer and SDL2_ttf are now pinned and archived from
+  authentic Git commits
+  ([source QA run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)).
+  Verify actual simultaneous camera/controller loader behavior and
+  original binary-to-source correspondence before claiming clearance.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
