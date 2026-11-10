@@ -19,8 +19,10 @@ import time
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
 from tools.audit_v31_sdl_runtime import inspect_bundle
+from tools.verify_v31_rc import validate_staged_identity
 
 PREVIEW_RUN_SHA = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
+RC_SOURCE_REVISION = "86baa6972ed923540f6ab49b636652a0f499d45c"
 
 
 def digest(path):
@@ -58,11 +60,13 @@ def mount(dmg, location):
             command("hdiutil", "detach", "-force", location)
 
 
-def verify_inputs(arch, stable, preview, checksums, receipt):
+def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False):
     if arch not in ("arm64", "x64"):
         raise ValueError("Only reviewed Apple Silicon or Intel architecture")
     stable_name = "AnythingPlays-3.0.0-macos-" + arch + ".dmg"
-    preview_name = "AnythingPlays-3.1.0-preview1-macos-" + arch + ".dmg"
+    preview_name = ("AnythingPlays-3.1.0-rc1-macos-" if rc1
+                    else "AnythingPlays-3.1.0-preview1-macos-") + arch + ".dmg"
+    expected_sha = RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA
     if (stable.name != stable_name or preview.name != preview_name
             or not stable.is_file() or not preview.is_file()):
         raise ValueError("Missing exact named original/3.1 preview disk image")
@@ -71,24 +75,30 @@ def verify_inputs(arch, stable, preview, checksums, receipt):
         raise ValueError("3.0 public DMG hash mismatch")
     meta = json.loads(receipt.read_text("utf-8"))
     if (meta.get("target") != "macos-" + arch or meta.get("installer") != preview_name
-            or meta.get("source_revision") != PREVIEW_RUN_SHA
+            or meta.get("source_revision") != expected_sha
             or meta.get("sha256") != digest(preview)):
         raise ValueError("3.1 app does not match independently verified Preview 1")
     return stable_sha
 
 
-def build(arch, stable, preview, checksums, receipt, output):
-    if os.getenv("AP_V31_PREVIEW") != "1" or os.getenv("AP_V31_FULL_TEST_CORES") != "1":
+def build(arch, stable, preview, checksums, receipt, output, rc1=False):
+    if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Private QA flags not set")
+    if rc1:
+        if os.getenv("AP_V31_RC") != "1" or os.getenv("AP_V31_PREVIEW") == "1":
+            raise ValueError("RC1 source assembly requires isolated candidate flags")
+    elif os.getenv("AP_V31_PREVIEW") != "1":
+        raise ValueError("Original full preview requires preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("Cannot treat preview as approved stable release")
-    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt)
+    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt, rc1=rc1)
     with tempfile.TemporaryDirectory(prefix="ap31-mac-full-") as temp:
         tmp = Path(temp)
         with mount(stable, tmp/"stable"), mount(preview, tmp/"preview"):
             old = tmp/"stable/AnythingPlays.app/Contents/Resources"
-            src = tmp/"preview/AnythingPlays31Preview.app"
-            app = tmp/"AnythingPlays31Preview.app"
+            app_name = "AnythingPlays31RC.app" if rc1 else "AnythingPlays31Preview.app"
+            src = tmp/"preview"/app_name
+            app = tmp/app_name
             shutil.copytree(src, app, symlinks=True)
             resources = app/"Contents/Resources"
             orig_core = old/"cores"
@@ -120,7 +130,8 @@ def build(arch, stable, preview, checksums, receipt, output):
         info = app/"Contents/Info.plist"
         with info.open("rb") as stream:
             plist = plistlib.load(stream)
-        if plist.get("CFBundleIdentifier") != "com.anythingplays.preview31":
+        expected_id = "com.anythingplays.rc31" if rc1 else "com.anythingplays.preview31"
+        if plist.get("CFBundleIdentifier") != expected_id:
             raise ValueError("3.1 candidate could overwrite stable 3.0 app")
         verify_bundle(app, "macos", check_native=True)
         command("codesign", "--force", "--sign", "-", app)
@@ -128,12 +139,13 @@ def build(arch, stable, preview, checksums, receipt, output):
         verify_bundle(app, "macos", check_native=True)
 
         output.mkdir(parents=True, exist_ok=True)
-        filename = "AnythingPlays-3.1.0-preview2-macos-" + arch + ".dmg"
+        filename = ("AnythingPlays-3.1.0-rc1-full-macos-" if rc1
+                    else "AnythingPlays-3.1.0-preview2-macos-") + arch + ".dmg"
         dmg = output/filename
         command("hdiutil", "create", "-volname", "Anything Plays 3.1 Full QA",
                 "-srcfolder", app, "-ov", "-format", "UDZO", dmg)
         with mount(dmg, tmp/"final-dmg"):
-            final = tmp/"final-dmg/AnythingPlays31Preview.app"
+            final = tmp/"final-dmg"/app.name
             # Native loading from an attached read-only DMG leaves a library
             # mapped into this process, which blocks DiskImages unmount.
             # We already did actual native checks on the extracted .app
@@ -142,15 +154,20 @@ def build(arch, stable, preview, checksums, receipt, output):
             if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
             # Inventory the *mounted final signed DMG*, not the unsigned app.
+            if rc1:
+                validate_staged_identity(final)
             audit = inspect_bundle(final, "macos-" + arch)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
-        report = {            "status": "UNRELEASED_3_1_FULL_MACOS_QA",
+        report = {
+            "status": ("UNRELEASED_3_1_FULL_MACOS_RC1_QA" if rc1
+                       else "UNRELEASED_3_1_FULL_MACOS_QA"),
             "public_release_approved": False,
             "target": "macos-" + arch,
             "original_stable_sha256": stable_sha,
             "original_preview_sha256": digest(preview),
-            "source_preview_revision": PREVIEW_RUN_SHA,
+            "source_preview_revision": RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA,
+            "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": filename, "sha256": digest(dmg),
             "size_bytes": dmg.stat().st_size,
@@ -170,9 +187,11 @@ def main():
     p.add_argument("--arch", choices=("arm64", "x64"), required=True)
     for name in ("stable", "preview", "checksums", "receipt", "output"):
         p.add_argument("--"+name, type=Path, required=True)
+    p.add_argument("--rc1", action="store_true",
+                   help="Assemble full 18-console QA from source-built RC1 app")
     a = p.parse_args()
     build(a.arch, *(getattr(a, x).resolve() for x in (
-        "stable", "preview", "checksums", "receipt", "output")))
+        "stable", "preview", "checksums", "receipt", "output")), rc1=a.rc1)
 
 
 if __name__ == "__main__":
