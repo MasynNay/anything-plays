@@ -57,6 +57,7 @@ def verify_original_source(source, *, direct_index=PINNED, nested_index=NESTED):
                 or git(source, "rev-parse", f"HEAD:{path}") != row["sha"]
                 or git(checkout, "rev-parse", "HEAD") != row["sha"]):
             raise ValueError(f"Original Dolphin Gitlink mismatch: {path}")
+        require_clean_tracked_source(checkout, path)
     nested = {}
     for parent in nested_data["parents"]:
         prefix = parent["parent_path"]
