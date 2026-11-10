@@ -213,3 +213,7 @@ Candidate-lock verification now caps native core ZIP decompression at 512 MiB, r
 ### November 10, 2026 — bounded payload verification merged
 
 PR #151 was squash merged into the v3 development branch after Python 3.12, Python 3.13, native mGBA compatibility (run 42743372447) and unapproved source-review (run 42743372436) succeeded. Three regression tests cover ordinary, oversized compressed and exact-limit ZIP native payloads. Packaging jobs were skipped; this does not approve four-platform production installers, exact Dolphin binary/source correspondence, combined licensing or distribution. Public 3.0 remains blocked and stable 2.0 is preserved.
+
+### November 10, 2026 — preserved input decompression guard (pending CI)
+
+A focused 3.0 development PR now caps decompression of original native archive and Dolphin Sys members while generating unapproved candidate locks. This is defense in depth for source-evidence processing, not Dolphin source-to-binary correspondence, licensing approval, or final installer acceptance. The stable release remains 2.0.0.
