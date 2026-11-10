@@ -80,7 +80,10 @@ def verify_installers(folder, minimum=1_000_000):
         receipt = read_json(base / record_name)
         audit = read_json(base / "SDL_RUNTIME_AUDIT.json")
         if (receipt.get("status") != status
-                or receipt.get("target") != target
+                # The 3.1 Linux QA receipt predates the explicit target
+                # field. Its unique filename/status and SDL audit target
+                # still pin it to Linux; reject any supplied wrong target.
+                or receipt.get("target", target) != target
                 or receipt.get("installer") != filename
                 or receipt.get("source_preview_revision") != APP_SOURCE
                 or receipt.get("native_core_count") != 11
