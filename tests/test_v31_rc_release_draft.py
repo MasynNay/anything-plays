@@ -95,6 +95,20 @@ class DraftPreparationTests(unittest.TestCase):
             sha, name = line.split("  ")
             self.assertEqual(sha, draft.digest(self.out / name))
 
+    def test_original_linux_receipt_has_no_target_but_audit_pins_target(self):
+        record_file = self.installers / "linux-x64" / draft.TARGETS["linux-x64"][1]
+        receipt = json.loads(record_file.read_text())
+        receipt.pop("target")
+        record_file.write_text(json.dumps(receipt))
+        # The actual 3.1 Linux assembler omits target in its QA receipt;
+        # the unique filename/status and independent SDL audit carry it.
+        valid = draft.verify_installers(self.installers, minimum=1)
+        self.assertIn("linux-x64", valid)
+        receipt["target"] = "windows-x64"
+        record_file.write_text(json.dumps(receipt))
+        with self.assertRaises(ValueError):
+            draft.verify_installers(self.installers, minimum=1)
+
     def test_fake_approval_or_wrong_platform_sha_is_rejected(self):
         target = "windows-x64"
         file = self.installers / target / draft.TARGETS[target][1]
