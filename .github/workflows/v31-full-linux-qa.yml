@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/assemble_v31_full_linux.py \
+          python -m tools.assemble_v31_full_linux \
             --stable original30/anything-plays_3.0.0_amd64.deb \
             --preview preview31/anything-plays-31-preview_3.1.0~preview1_amd64.deb \
             --sums original30/SHA256SUMS.txt \
