@@ -1,0 +1,83 @@
+name: 3.1 | Pinned SDL2 source-tag candidates (unreleased)
+
+# Collect official Git-tag source at the versions suggested by real Mach-O
+# dependency metadata, including BOTH SDL2 builds in the ARM64 candidate.
+# These are reference candidates, NOT proven binary corresponding source.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-sdl2-upstream-source-candidates.yml'
+      - 'tools/verify_v31_sdl_component_sources.py'
+      - 'tests/test_v31_sdl_component_sources.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-sdl2-upstream-sources-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pin-original-sdl-sources:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run source security and nonrelease assertions
+        run: python -m unittest discover -s tests -p 'test_v31_sdl_component_sources.py' -v
+      - name: Download each immutable upstream SDL component source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source-pins source-checkout
+          while IFS='|' read -r label repo tag expected; do
+            [[ -n "$label" ]] || continue
+            git clone --quiet --depth 1 --single-branch \
+              --branch "$tag" "https://github.com/$repo.git" "source-checkout/$label"
+            actual="$(git -C "source-checkout/$label" rev-parse HEAD)"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "::error::Unexpected immutable upstream source SHA for $label"
+              exit 1
+            fi
+            git -C "source-checkout/$label" archive --format=tar.gz \
+              --prefix="$label/" \
+              --output="$PWD/source-pins/$label.tar.gz" HEAD
+            test -s "source-pins/$label.tar.gz"
+            echo "$label source commit $actual verified"
+          done <<'SDL_PINNED_SOURCES'
+          sdl2-2.32.8|libsdl-org/SDL|release-2.32.8|98d1f3a45aae568ccd6ed5fec179330f47d4d356
+          sdl2-2.32.10|libsdl-org/SDL|release-2.32.10|5d249570393f7a37e037abf22cd6012a4cc56a71
+          sdl2-image-2.8.12|libsdl-org/SDL_image|release-2.8.12|12cb2e40330d256d9b1329647be8f366546d715c
+          sdl2-mixer-2.8.2|libsdl-org/SDL_mixer|release-2.8.2|b208916aed9250fe434360e6c6a95f0697bb7b01
+          sdl2-ttf-2.24.0|libsdl-org/SDL_ttf|release-2.24.0|2a891473eaf05ba1707a4b7913e6c4db7de7458a
+          SDL_PINNED_SOURCES
+      - name: Verify complete original source archives and generate nonapproval manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v31_sdl_component_sources \
+            --sources source-pins --output source-pins
+          (cd source-pins && sha256sum --check SDL_SOURCE_SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("source-pins/SDL_CANDIDATE_SOURCE_MANIFEST.json").read_text("utf-8"))
+          assert len(x["components"])==5
+          assert x["redistribution_approved"] is False
+          assert x["lgpl_relinking_reviewed"] is False
+          assert x["original_binary_source_correspondence_verified"] is False
+          PY
+      - name: Retain tagged source reference candidates without publishing release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-SDL2-CANDIDATE-SOURCES-UNAPPROVED
+          path: source-pins/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
