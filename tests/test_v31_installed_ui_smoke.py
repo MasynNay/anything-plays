@@ -118,7 +118,7 @@ class InstalledFrozeGUIContracts(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / ".github/workflows/v31-rc1-installed-gui-smoke.yml"
         ).read_text("utf-8")
-        self.assertIn("42865608433", text)
+        self.assertIn("42886791394", text)
         self.assertIn("--ap-v30-ui-smoke", text)
         self.assertIn("AP_V30_UI_SMOKE_CHECK", text)
         self.assertIn("actions/upload-artifact@v4", text)

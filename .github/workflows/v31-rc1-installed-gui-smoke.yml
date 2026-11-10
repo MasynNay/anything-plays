@@ -37,8 +37,8 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      QA_RUN: '42865608433'
-      QA_SHA: '29d0f9bced7b19952e70b12567c292c470b6b44f'
+      QA_RUN: '42886791394'
+      QA_SHA: '2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
