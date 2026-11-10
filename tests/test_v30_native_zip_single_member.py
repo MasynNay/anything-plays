@@ -36,7 +36,9 @@ class NativeZipSingleMemberTests(unittest.TestCase):
                 entry = zipfile.ZipInfo("mgba_libretro.so")
                 entry.create_system = 3
                 entry.external_attr = (kind | 0o644) << 16
-                with self.assertRaisesRegex(ValueError, "non-regular core ZIP payload"):
+                expected_error = ("symlinked core ZIP payload" if kind == stat.S_IFLNK
+                                  else "non-regular core ZIP payload")
+                with self.assertRaisesRegex(ValueError, expected_error):
                     self.read([(entry, b"not a regular native library")])
 
     def test_unexpected_extra_file_is_rejected(self):
