@@ -87,7 +87,10 @@ def validate_source_archive(archive):
             if (member.name.startswith("/") or ".." in parts
                     or not member.name.startswith("pygame-ce-2.5.8/")
                     or member.isdev()):
-                raise ValueError("Unsafe upstream source member")
+                raise ValueError(
+                    "Unsafe upstream source member: "
+                    + repr(member.name) + ", type=" + repr(member.type)
+                )
         names = {m.name for m in entries}
         license_name = "pygame-ce-2.5.8/docs/LGPL.txt"
         if license_name not in names:
