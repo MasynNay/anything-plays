@@ -1,4 +1,6 @@
-#ifdef V31PreviewBuild
+#ifdef V31RCBuild
+  #define AppName "Anything Plays 3.1 Release Candidate 1"
+#elif defined(V31PreviewBuild)
   #define AppName "Anything Plays 3.1 Preview 1"
 #elif defined(ProductionBuild)
   #define AppName "Anything Plays"
@@ -9,7 +11,9 @@
   #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-#ifdef V31PreviewBuild
+#ifdef V31RCBuild
+AppId={{A3C2BEE4-4F7E-476F-A514-940FB1E1E071}
+#elif defined(V31PreviewBuild)
 AppId={{C9B0B32A-78D9-47DA-B991-41AC320D10F1}
 #elif defined(ProductionBuild)
 AppId={{A10F0E4B-E548-4C9A-B93F-5B05493AA844}
@@ -19,7 +23,10 @@ AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-#ifdef V31PreviewBuild
+#ifdef V31RCBuild
+DefaultDirName={autopf}\Anything Plays 3.1 Release Candidate 1
+DefaultGroupName=Anything Plays 3.1 Release Candidate 1
+#elif defined(V31PreviewBuild)
 DefaultDirName={autopf}\Anything Plays 3.1 Preview 1
 DefaultGroupName=Anything Plays 3.1 Preview 1
 #elif defined(ProductionBuild)
@@ -46,7 +53,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-#ifdef V31PreviewBuild
+#ifdef V31RCBuild
+Name: "{group}\Anything Plays 3.1 Release Candidate 1"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.1 Release Candidate 1"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+#elif defined(V31PreviewBuild)
 Name: "{group}\Anything Plays 3.1 Preview 1"; Filename: "{app}\AnythingPlays.exe"
 Name: "{autodesktop}\Anything Plays 3.1 Preview 1"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 #elif defined(ProductionBuild)
