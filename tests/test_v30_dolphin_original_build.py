@@ -21,6 +21,21 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "parent source commit"):
                     candidate.verify_original_source(root)
 
+    def test_submodule_tracked_edit_fails_closed(self):
+        with TemporaryDirectory() as temp:
+            checkout = Path(temp)
+            with patch.object(candidate, "git", return_value=" M Source/Core/Core.cpp") as git_call:
+                with self.assertRaisesRegex(ValueError, "tracked source was edited: Externals/example"):
+                    candidate.require_clean_tracked_source(checkout, "Externals/example")
+                git_call.assert_called_once_with(checkout, "status", "--porcelain", "--untracked-files=no")
+
+    def test_clean_submodule_checkout_is_accepted(self):
+        with TemporaryDirectory() as temp:
+            checkout = Path(temp)
+            with patch.object(candidate, "git", return_value="") as git_call:
+                candidate.require_clean_tracked_source(checkout, "Externals/example")
+                git_call.assert_called_once()
+
     def test_refuses_wrong_or_tampered_native(self):
         with TemporaryDirectory() as temp:
             root = Path(temp)
