@@ -85,6 +85,9 @@ class GamepadMixin:
             value=preferences.get("gamepad_enabled", False) is True
         )
         self.gamepad_status = tk.StringVar(value="Controller disabled")
+        self.gamepad_live_input = tk.StringVar(
+            value="Enable gamepad input to test its buttons."
+        )
         settings = preferences.get("gamepad_bindings", {})
         self._gamepad_bindings = settings if isinstance(settings, dict) else {}
 
@@ -116,15 +119,45 @@ class GamepadMixin:
             self._gamepad.stop()
             self.gamepad_status.set("Controller disabled")
         self.save_preferences()
+        self._refresh_gamepad_live_input()
         self.refresh_controller_artwork()
 
     def refresh_gamepad(self):
+        # Rescanning closes the previous SDL handle immediately. Also clear
+        # its emulated held buttons now, rather than waiting for the next tick.
+        self.emu.release_gamepad()
         if self.gamepad_enabled.get():
             self._gamepad.refresh()
             self.gamepad_status.set("Looking for a controller…")
         else:
             self.gamepad_status.set("Enable controller input to scan")
+        self._refresh_gamepad_live_input()
         self.refresh_controller_artwork()
+
+    def _gamepad_live_message(self):
+        """Read-only diagnostic; raw buttons never inject emulated input."""
+        if not self.gamepad_enabled.get():
+            return "Enable gamepad input to test its buttons."
+        if self._gamepad.controller is None:
+            return "Connect a compatible controller, then press a button."
+        if self.root.focus_get() is None:
+            return "Focus Anything Plays to see live controller input."
+        pressed = self._gamepad.physical_buttons
+        if not pressed:
+            return "Connected. Press a button or move a stick to test."
+        labels = [source.replace("_", " ").title()
+                  for source in SOURCES if source in pressed]
+        shown = ", ".join(labels[:4])
+        if len(labels) > 4:
+            shown += f" (+{len(labels) - 4} more)"
+        return "Detected: " + shown
+
+    def _refresh_gamepad_live_input(self):
+        label = getattr(self, "gamepad_live_input", None)
+        if label is not None:
+            message = self._gamepad_live_message()
+            if label.get() != message:
+                label.set(message)
 
     def gamepad_tick(self):
         """Keep manual control independent of camera arming and keyboard focus.
@@ -154,6 +187,7 @@ class GamepadMixin:
                 if status != self.gamepad_status.get():
                     self.gamepad_status.set(status)
                     self.refresh_controller_artwork()
+                self._refresh_gamepad_live_input()
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception as exc:
@@ -164,6 +198,7 @@ class GamepadMixin:
                 "Controller disconnected or unavailable: " + str(exc)[:130]
             )
             self.save_preferences()
+            self._refresh_gamepad_live_input()
             self.refresh_controller_artwork()
         finally:
             if not self._closing:
@@ -237,6 +272,18 @@ class GamepadMixin:
         ttk.Label(content, textvariable=self.gamepad_status,
                   style="Helper.TLabel", wraplength=515).pack(
                       fill="x", pady=(0, 9))
+
+        # Live detection is independent of each console's button mappings and
+        # works with no ROM loaded. This is a diagnostic, not button capture.
+        tester = ttk.LabelFrame(
+            content, text="LIVE CONTROLLER TEST", padding=(9, 7)
+        )
+        tester.pack(fill="x", pady=(0, 9))
+        ttk.Label(
+            tester, textvariable=self.gamepad_live_input,
+            style="Helper.TLabel", wraplength=490
+        ).pack(anchor="w")
+        self._refresh_gamepad_live_input()
 
         group = ttk.LabelFrame(
             content, text="BUTTON MAPPING · " + system.upper(), padding=(8, 7)
