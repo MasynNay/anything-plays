@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import tempfile
 
-from anything_plays.v30_approved_core_map import validate_installed_map
+from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
 
 STABLE = "anything-plays_3.0.0_amd64.deb"
@@ -59,14 +59,16 @@ def build(stable, preview, sums, receipt, output_dir):
         old = root/"old/opt/anything-plays"
         new = root/"new/opt/anything-plays-31-preview"
         oldcores, newcores = old/"cores", new/"cores"
-        original = validate_installed_map(oldcores, ".so")
-        if original.get("core_set_id") != "gpl-source-built-eleven-tia":
-            raise ValueError("Expected source reviewed 3.0 11-core family")
+        original = validate_trial_core_directory(oldcores, ".so")
+        if (original.get("total_source_built_core_families") != 11
+                or original.get("source_built_dolphin") is None
+                or original.get("source_built_tia") is None):
+            raise ValueError("Expected verified 3.0 eleven original-source core families")
         if any(x.is_symlink() for x in oldcores.rglob("*")):
             raise ValueError("Unsafe core link in 3.0 baseline")
         shutil.rmtree(newcores)
         shutil.copytree(oldcores, newcores)
-        if validate_installed_map(newcores, ".so") != original:
+        if validate_trial_core_directory(newcores, ".so") != original:
             raise ValueError("Original-source emulator core bytes changed")
         oldlicenses, newlicenses = old/"licenses", new/"licenses"
         skip = {"PYTHON_DISTRIBUTIONS.json", "THIRD_PARTY_NOTICES.md",
@@ -96,7 +98,7 @@ def build(stable, preview, sums, receipt, output_dir):
         subprocess.run(["dpkg-deb", "-x", str(deb), str(root/"installed")], check=True)
         payload = root/"installed/opt/anything-plays-31-preview"
         verify_bundle(payload, "linux", check_native=True)
-        if validate_installed_map(payload/"cores", ".so") != original:
+        if validate_trial_core_directory(payload/"cores", ".so") != original:
             raise ValueError("Repackaging modified 3.0 original binaries")
         result = {
             "status": "UNRELEASED_3_1_FULL_LINUX_QA",
@@ -108,7 +110,7 @@ def build(stable, preview, sums, receipt, output_dir):
             "size_bytes": deb.stat().st_size,
             "native_core_count": 11,
             "console_profiles": 18,
-            "source_core_set_id": original["core_set_id"],
+            "source_core_families": original["total_source_built_core_families"],
             "real_controller_accepted": False,
         }
         (output_dir/"FULL_LIBRARY_QA_RECEIPT.json").write_text(

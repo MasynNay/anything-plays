@@ -174,12 +174,14 @@ def verify_bundle(bundle, platform_name, check_native=False):
         # Reused native images must be byte-for-byte identical to the released
         # source-built eleven-core family. The core map is technical identity
         # evidence, not an automatic new distribution rights grant.
-        from anything_plays.v30_approved_core_map import validate_installed_map
-        original = validate_installed_map(cores, EXTENSIONS[platform_name])
-        if (original["core_set_id"] != "gpl-source-built-eleven-tia"
+        from anything_plays.v30_gpl_trial import validate_trial_core_directory
+        original = validate_trial_core_directory(cores, EXTENSIONS[platform_name])
+        if (original["total_source_built_core_families"] != 11
+                or original["source_built_dolphin"] is None
+                or original["source_built_tia"] is None
                 or original["native_core_count"] != 11
                 or original["all_console_profiles"] != 18):
-            raise ValueError("3.1 full candidate is missing reviewed 3.0 core identities")
+            raise ValueError("3.1 full candidate is missing the complete 3.0 source-built family")
         original_notices = (
             "Supafaust-COPYING.txt", "BlastEm-COPYING.txt",
             "PCE-COPYING.txt", "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt",

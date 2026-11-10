@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import time
 
-from anything_plays.v30_approved_core_map import validate_installed_map
+from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
 
 PREVIEW_RUN_SHA = "ffee5dcdf0415440c9f5bffc7f9049a07c094ff3"
@@ -80,12 +80,14 @@ def build(arch, stable, preview, checksums, receipt, output):
             resources = app/"Contents/Resources"
             orig_core = old/"cores"
             new_core = resources/"cores"
-            original = validate_installed_map(orig_core, ".dylib")
-            if original.get("core_set_id") != "gpl-source-built-eleven-tia":
-                raise ValueError("Wrong source-built native emulator inventory")
+            original = validate_trial_core_directory(orig_core, ".dylib")
+            if (original.get("total_source_built_core_families") != 11
+                    or original.get("source_built_dolphin") is None
+                    or original.get("source_built_tia") is None):
+                raise ValueError("Expected verified 3.0 eleven original-source core families")
             shutil.rmtree(new_core)
             shutil.copytree(orig_core, new_core, symlinks=True)
-            if validate_installed_map(new_core, ".dylib") != original:
+            if validate_trial_core_directory(new_core, ".dylib") != original:
                 raise ValueError("3.0 released native core bytes were changed")
             source_licenses = old/"licenses"
             current_licenses = resources/"licenses"
@@ -117,7 +119,7 @@ def build(arch, stable, preview, checksums, receipt, output):
         with mount(dmg, tmp/"final-dmg"):
             final = tmp/"final-dmg/AnythingPlays31Preview.app"
             verify_bundle(final, "macos", check_native=True)
-            if validate_installed_map(final/"Contents/Resources/cores", ".dylib") != original:
+            if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
         report = {
             "status": "UNRELEASED_3_1_FULL_MACOS_QA",
@@ -127,7 +129,7 @@ def build(arch, stable, preview, checksums, receipt, output):
             "original_preview_sha256": digest(preview),
             "installer": filename, "sha256": digest(dmg),
             "size_bytes": dmg.stat().st_size,
-            "original_core_set_id": original["core_set_id"],
+            "original_source_core_families": original["total_source_built_core_families"],
             "native_core_count": 11,
             "console_profiles": 18,
             "notarized": False,
