@@ -27,6 +27,41 @@ def main():
                     root.update_idletasks()
                     assert app.library_canvas.winfo_exists()
                     assert app.game_canvas.winfo_exists()
+                    # 3.1: the controller belongs in the right-hand game
+                    # panel, and should be a real, theme-aware Tk interface.
+                    assert app.gamepad_quick_canvas.winfo_exists()
+                    assert len(app.gamepad_quick_canvas.find_all()) > 10
+                    assert app.gamepad_status.get() == "Controller disabled"
+                    app.open_controller_settings()
+                    root.update_idletasks()
+                    assert app._gamepad_setup_window.winfo_exists()
+                    assert app.gamepad_setup_canvas.winfo_exists()
+                    assert len(app.gamepad_setup_canvas.find_all()) > 15
+                    # The right-side shortcut and the setup window must
+                    # survive a theme change without duplicating canvas art.
+                    original_icon_count = len(app.gamepad_quick_canvas.find_all())
+                    app.theme_name.set("Plum Dark")
+                    root.update_idletasks()
+                    assert app.gamepad_quick_canvas.cget("bg") == app.THEMES["Plum Dark"][1]
+                    assert len(app.gamepad_quick_canvas.find_all()) == original_icon_count
+                    app._save_gamepad_binding("gba", "A", "B")
+                    assert app._gamepad_bindings["gba"]["A"] == "B"
+
+                    def find_widgets(widget):
+                        yield widget
+                        for child in widget.winfo_children():
+                            yield from find_widgets(child)
+
+                    from tkinter import ttk
+                    done = [
+                        button for button in find_widgets(app._gamepad_setup_window)
+                        if isinstance(button, ttk.Button)
+                        and button.cget("text") == "Done"
+                    ]
+                    assert len(done) == 1
+                    done[0].invoke()
+                    assert app._gamepad_setup_window is None
+                    assert app.gamepad_setup_canvas is None
                     assert len(app.THEMES) == 16
                     assert app.system_key.get() in {
                         "gb", "gbc", "gba", "snes", "nes", "genesis", "n64", "gamecube"

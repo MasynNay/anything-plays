@@ -50,6 +50,7 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
 - Step 8 now has a dedicated Keyboard Shortcuts button; both open editable per-console keyboard keys.
 - Keep one control-label sizing slider beside the camera preview; remove the redundant advanced right-side control.
 - Add optional SDL2 gamepad input for embedded manual play, per-console configurable mappings, D-pad and analog stick directions, and connection/rescan status. Controller and keyboard holds remain independent.
+- Add a small theme-matched controller graphic and one-click controller setup beneath Display & Sound on the right; group physical buttons visually by D-pad, face, menu, sticks and triggers. Keep keyboard shortcuts in their dedicated dialog rather than duplicating switches.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
