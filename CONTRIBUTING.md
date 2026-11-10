@@ -11,7 +11,7 @@ ROMs, BIOS images, personal camera footage, or private settings files**.
 
 ## Development setup
 
-Use Python 3.12 with Tkinter, install `requirements.txt`, and run the program
+Use Python 3.12 or 3.13 with Tkinter, install `requirements.txt`, and run the program
 from source. `README.md` contains platform-specific instructions. Use a
 virtual environment; do not commit `.venv`, `cores/`, `dist/`, or `release/`.
 
@@ -26,11 +26,11 @@ virtual environment; do not commit `.venv`, `cores/`, `dist/`, or `release/`.
 - Never add global keyboard injection or silently download native code at app
   runtime.
 - Preserve the legacy settings location and per-console profile migration.
-- Preserve the 18 existing 3.0 console profiles, 11 bundled native core integrations and all 16 themes. Changes to button IDs,
-  cartridge art, grid geometry, and saved layouts require regression tests.
+- Preserve the 18 existing 3.0 console profiles, eleven bundled native core integrations and all 16 themes. Changes to button IDs, cartridge art, grid geometry and saved layouts require regression tests.
 - Preserve complete offline core and Dolphin Sys verification in all three platform packaging scripts.
 - Keep downloaded third-party emulator cores, installer outputs and game ROMs out of Git; repository hygiene is enforced by CI.
-- Do not declare a public release complete until the exact-core source/license compatibility and real-device acceptance gates pass.
+- Do not report a release as published until GitHub's public tag, installer assets, SHA256 manifest and corresponding original source archive are verifiably available. Describe tested configurations accurately; never convert an unperformed hardware test into a pass.
+- Keep original application screenshots separate from diagrams or simulated concept images. The [README screenshot script](tools/prepare_readme_screenshots.py) produces only crops of the existing authentic Linux desktop capture; do not invent footage of a camera or ROM.
 
 ## Test before opening a pull request
 
