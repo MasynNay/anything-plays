@@ -1,0 +1,130 @@
+name: 3.1 | Inspect original signed macOS pygame machine-code provenance
+
+# Read-only original RC1 integrity and official pygame wheel section analysis.
+# Exact __TEXT,__text machine bytes are clues, NOT corresponding source
+# certification, LGPL relinking review, or stable-release authorization.
+on:
+  push:
+    branches: [feature/v31-native-source-audit]
+    paths:
+      - ".github/workflows/v31-macos-text-provenance.yml"
+      - "tools/inspect_v31_macos_text_provenance.py"
+      - "tests/test_v31_macos_text_provenance.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ap31-macos-wheel-text-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-signed-rc1:
+    if: github.ref == 'refs/heads/feature/v31-native-source-audit'
+    name: Signed RC1 code comparison · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, arch: arm64, target: macos-arm64}
+          - {runner: macos-15-intel, arch: x64, target: macos-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: "42905694504"
+      QA_SHA: "c67fab048d7e44f371f2589a6d73b9d556de84d0"
+      RELEASE: v3.1.0-rc1
+      PYGAME_WHEEL: pygame_ce-2.5.8-cp313-cp313-macosx_10_13_universal2.whl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Test malformed Mach-O rejection, tampering and no false approval
+        run: python -m unittest discover -s tests -p 'test_v31_macos_text_provenance.py' -v
+      - name: Require pinned successful 18-console RC1 and unchanged stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$QA_RUN" --json headSha --jq .headSha)" = "$QA_SHA"
+          test "$(gh run view "$QA_RUN" --json conclusion --jq .conclusion)" = success
+          gh release view "$RELEASE" --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+      - name: Retrieve exact source-built RC1 DMG, receipt and frozen native audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original-rc1
+          test -s original-rc1/FULL_MACOS_QA_RECEIPT.json
+          test -s original-rc1/SDL_RUNTIME_AUDIT.json
+          test -s "original-rc1/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+      - name: Fetch exact official pygame-ce 2.5.8 universal2 wheel with pinned SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original-wheel
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern "$PYGAME_WHEEL" --dir original-wheel
+          echo "56441a9bb75c2461750dc0e6e4a46e3833b3cf6339bfbaf16f93ecac037510f3  original-wheel/$PYGAME_WHEEL" | shasum -a 256 --check
+      - name: Mount genuine RC1 DMG READ-ONLY and verify every candidate native file
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="original-rc1/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-wheel.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mounted=0
+          for retry in 1 2 3 4 5 6; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            sleep 5
+          done
+          test "$mounted" = 1
+          app="$mountdir/AnythingPlays31RC.app"
+          codesign --verify --verbose=2 "$app"
+          python -m tools.inspect_v31_macos_text_provenance \
+            --bundle "$app" \
+            --installer "$dmg" \
+            --receipt original-rc1/FULL_MACOS_QA_RECEIPT.json \
+            --audit original-rc1/SDL_RUNTIME_AUDIT.json \
+            --wheel "original-wheel/$PYGAME_WHEEL" \
+            --target "${{ matrix.target }}" \
+            --output "review/${{ matrix.target }}-TEXT-WHEEL-CORRESPONDENCE.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          target="${{ matrix.target }}"
+          data=json.loads((Path("review")/(target+"-TEXT-WHEEL-CORRESPONDENCE.json")).read_text())
+          assert data["installed_frozen_native_files_audited"]=={"macos-arm64":121,"macos-x64":120}[target]
+          assert data["native_corresponding_source_complete"] is False
+          assert data["lgpl_library_replacement_verified"] is False
+          assert data["redistribution_approved"] is False
+          assert data["stable_3_1_release_approved"] is False
+          print("Original installed natives:",data["installed_frozen_native_files_audited"],
+                "Exact matching text:",data["exact_executable_text_section_matches"])
+          PY
+      - name: Preserve evidence for future audited final production build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SIGNED-WHEEL-TEXT-AUDIT
+          path: review/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 9
