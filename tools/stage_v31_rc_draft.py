@@ -141,12 +141,16 @@ def verify_sources(source):
                 or ".." in posix.parts or "\\" in rel or rel in checksums):
             raise ValueError("Unsafe or duplicated source archive entry")
         checksums[rel] = checksum
+    # The retained six-source checksum file covers six original archives,
+    # five original SDL licenses, pygame's LGPL notice, and the SDL manifest.
+    # The other QA JSON reports are validated above and authenticated
+    # through the newly computed outer draft SHA ledger.
     expected_checks = required - {
         "SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt",
         "README_SOURCE_CANDIDATES.txt",
+        "SDL_SOURCE_REVIEW.json",
+        "SIX_SOURCE_COMPANION_READINESS.json",
     }
-    # The source manifest covers archives, licenses and pygame; two reports
-    # are additionally packed and authenticated by the outer draft SHA list.
     if not expected_checks.issubset(set(checksums)):
         raise ValueError("Source verification missing upstream archives or notices")
     for name in sorted(required):
