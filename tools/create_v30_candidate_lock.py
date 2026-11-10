@@ -31,6 +31,7 @@ PLATFORMS = {
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 MAX_PROVENANCE_BYTES = 1024 * 1024  # metadata only; native binaries are verified separately
 MAX_NATIVE_PAYLOAD_BYTES = 512 * 1024 * 1024  # reject decompression bombs before extraction
+MAX_ORIGINAL_ARCHIVE_BYTES = MAX_NATIVE_PAYLOAD_BYTES + 1024 * 1024  # ZIP overhead allowance
 
 
 def hash_bytes(data: bytes) -> str:
@@ -54,6 +55,18 @@ def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str
         if len(payload) > MAX_NATIVE_PAYLOAD_BYTES:
             raise ValueError(f"{platform}: native core ZIP payload exceeds limit: {name}")
         return payload
+
+
+def read_original_archive(outer: zipfile.ZipFile, archive_name: str, platform: str) -> bytes:
+    """Bound untrusted outer ZIP member expansion before hashing its contents."""
+    entry = outer.getinfo(archive_name)
+    if entry.is_dir() or entry.file_size > MAX_ORIGINAL_ARCHIVE_BYTES:
+        raise ValueError(f"{platform}: oversized or invalid original archive: {archive_name}")
+    with outer.open(entry) as handle:
+        raw = handle.read(MAX_ORIGINAL_ARCHIVE_BYTES + 1)
+    if len(raw) > MAX_ORIGINAL_ARCHIVE_BYTES:
+        raise ValueError(f"{platform}: original archive exceeds limit: {archive_name}")
+    return raw
 
 
 def build_candidate(artifact_paths):
@@ -128,7 +141,7 @@ def build_candidate(artifact_paths):
                 zip_record = archive_index.get(archive_name)
                 if not isinstance(zip_record, dict):
                     raise ValueError(f"{platform}: missing archive for {name}")
-                raw = outer.read(archive_name)
+                raw = read_original_archive(outer, archive_name, platform)
                 if (hash_bytes(raw) != core.get("archive_sha256")
                         or hash_bytes(raw) != zip_record.get("sha256")
                         or len(raw) != core.get("archive_size_bytes")
@@ -153,7 +166,7 @@ def build_candidate(artifact_paths):
             index = archive_index.get("Dolphin.zip")
             if not isinstance(sysinfo, dict) or not isinstance(index, dict):
                 raise ValueError(f"{platform}: original Dolphin source archive missing")
-            sysbytes = outer.read("Dolphin.zip")
+            sysbytes = read_original_archive(outer, "Dolphin.zip", platform)
             if (hash_bytes(sysbytes) != sysinfo.get("archive_sha256")
                     or hash_bytes(sysbytes) != index.get("sha256")
                     or len(sysbytes) != sysinfo.get("archive_size_bytes")
