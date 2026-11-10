@@ -10,11 +10,58 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Portfolio website](https://anythingplays.masynnay.com/) · [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Portfolio website](https://anythingplays.masynnay.com/) · [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
 ---
+
+## Screenshots
+
+The screenshots below come from the actual Anything Plays 3.0 macOS application. The macOS menu bar and Dock have been cropped out. The GameCube capture shows the game panel rather than private camera footage. Click any image to view the larger capture.
+
+### Real gameplay across consoles
+
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <a href="docs/screenshots/3.0/gamecube-wind-waker.webp"><img src="docs/screenshots/3.0/gamecube-wind-waker.webp" alt="Anything Plays 3.0 running The Legend of Zelda: The Wind Waker through GameCube emulation" width="100%"></a>
+      <sub>GameCube · The Wind Waker · Ocean Dark</sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <a href="docs/screenshots/3.0/n64-ocarina.webp"><img src="docs/screenshots/3.0/n64-ocarina.webp" alt="Anything Plays 3.0 running Ocarina of Time on Nintendo 64 with the Forest Dark theme" width="100%"></a>
+      <sub>Nintendo 64 · Ocarina of Time · Forest Dark</sub>
+      <br>
+      <a href="docs/screenshots/3.0/gbc-pokemon-crystal.webp"><img src="docs/screenshots/3.0/gbc-pokemon-crystal.webp" alt="Anything Plays 3.0 playing Pokémon Crystal in the Plum Dark theme" width="100%"></a>
+      <sub>Game Boy Color · Pokémon Crystal · Plum Dark</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="docs/screenshots/3.0/gba-warm-cream.webp"><img src="docs/screenshots/3.0/gba-warm-cream.webp" alt="Game Boy Advance gameplay displayed in Anything Plays 3.0 using the Warm Cream theme" width="820"></a>
+  <br><sub>Game Boy Advance · Warm Cream</sub>
+</p>
+
+### Camera controls and customization
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/3.0/camera-object-settings.webp"><img src="docs/screenshots/3.0/camera-object-settings.webp" alt="Camera object color selection, multiple objects per color, button behavior and custom zones" width="100%"></a>
+      <sub>Camera tracking, multiple objects and button zones</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/3.0/advanced-settings.webp"><img src="docs/screenshots/3.0/advanced-settings.webp" alt="Adjust detection timing, color tolerance and control zone appearance" width="100%"></a>
+      <sub>Advanced detection and zone appearance</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="docs/screenshots/3.0/safety-and-profiles.webp"><img src="docs/screenshots/3.0/safety-and-profiles.webp" alt="Anything Plays safety controls, stopping all camera input and saving or loading profiles" width="820"></a>
+  <br><sub>Input safety and saved profiles</sub>
+</p>
 
 ## Play a game. Let something else hold the controller.
 
