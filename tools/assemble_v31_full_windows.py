@@ -26,7 +26,7 @@ FULL = "AnythingPlaysSetup-3.1.0-preview2.exe"
 SOURCE_REVISION = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 RC_PREVIEW = "AnythingPlaysSetup-3.1.0-rc1.exe"
 RC_FULL = "AnythingPlaysSetup-3.1.0-rc1-full.exe"
-RC_SOURCE_REVISION = "86baa6972ed923540f6ab49b636652a0f499d45c"
+RC_SOURCE_REVISION = "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
 
 
 def hash_file(path):
