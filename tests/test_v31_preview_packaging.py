@@ -81,9 +81,13 @@ class PreviewOneContracts(unittest.TestCase):
             self.assertEqual(record["bundled_console_profiles"], ["gb", "gbc", "gba"])
             self.assertRegex(record["sha256"], "^[0-9a-f]{64}$")
 
-    def test_application_title_is_3_1_not_3_0(self):
+    def test_application_title_is_loaded_from_embedded_build_identity(self):
         title = (ROOT / "app.py").read_text("utf-8")
-        self.assertIn("Anything Plays 3.1 · Preview 1", title)
+        self.assertIn("root.title(app_title())", title)
+        from anything_plays.build_identity import app_title, make_identity
+        self.assertEqual(make_identity("preview1")["title"],
+                         "Anything Plays 3.1 · Preview 1")
+        self.assertEqual(app_title(), "Anything Plays 3.1 · Preview 1")
 
 
 if __name__ == "__main__":
