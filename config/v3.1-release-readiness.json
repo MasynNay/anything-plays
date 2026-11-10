@@ -296,6 +296,28 @@
       "physical_camera_tested": false,
       "retail_rom_gameplay_or_native_audio_save_tested": false,
       "public_release_approved": false
+    },
+    "preserved_owner_qa": {
+      "status": "PASSED_90_DAY_AUTHENTICATED_4_PLATFORM_DOWNLOAD_NOT_RELEASED",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42911996640",
+      "files": 7,
+      "artifact_name": "AnythingPlays-3.1-RC1-FOUR-OS-FULL-INSTALLERS-AND-SOURCE-OWNER-QA",
+      "artifact_size_bytes": 472372599,
+      "expires_at": "2027-02-08T22:10:08Z",
+      "installers": 4,
+      "source_companion_included": true,
+      "original_rc1_identity_unchanged": true,
+      "public_release_approved": false
+    },
+    "github_release_draft_attempt": {
+      "status": "FAILED_GITHUB_RELEASES_API_AUTHORIZATION",
+      "workflow_run": "https://github.com/MasynNay/anything-plays/actions/runs/42911646991",
+      "http_status": 403,
+      "message": "Resource not accessible by integration",
+      "workflow_reported_contents_write": true,
+      "draft_created": false,
+      "public_release_created": false,
+      "fallback_90_day_artifact_success": true
     }
   }
 }

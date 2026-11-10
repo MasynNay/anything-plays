@@ -25,6 +25,8 @@ measured RSS growth. This does not certify a physical gamepad or
 retail ROM endurance. Five original SDL license texts were also preserved
 in the [six-source upstream companion](https://github.com/MasynNay/anything-plays/actions/runs/42909893531).
 
+**3.1 owner testing:** The four-source-built, 18-console RC1 installers, original-source candidates and checksum reports are retained in a [90-day QA collection](https://github.com/MasynNay/anything-plays/actions/runs/42911996640) (through February 8, 2027). GitHub Releases returned 403 for a draft creation with the GitHub Actions token; a public release has not been created. Stable installer identity, precise native licensing, and physical controller acceptance remain open.
+
 **Download status:** [Anything Plays 3.0.0 is publicly released](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with four genuine offline installers and [original emulator sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Stable 2.0 and 1.5 remain available in previous releases.
 
 ## Version 3.0 — Shipped features

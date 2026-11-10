@@ -11,6 +11,23 @@ Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 
+## Current owner QA handoff: all four real packages preserved
+
+The [90-day combined QA collection](https://github.com/MasynNay/anything-plays/actions/runs/42911996640) succeeded on November 10, 2026,
+retaining 472 MB of the genuine four-platform full RC1 installers,
+SHA-256 checksums and original-source candidate report. The artifact
+expires **February 8, 2027**. It is not a newly built production
+3.1.0 installer, and existing public 3.0.0/2.0 are unchanged.
+
+**Publishing access:** An authenticated GitHub Actions workflow with
+`Contents: write` successfully performed source and package checks but
+received HTTP 403 `Resource not accessible by integration` on
+`POST /repos/MasynNay/anything-plays/releases`. No 3.1 release draft
+was created. The read-only artifact fallback passed, so rebuilding
+the same binaries repeatedly is unnecessary. Publishing will require
+an authorized GitHub release creation path after the outstanding
+source, licensing and final-identity acceptance work is complete.
+
 ### Current original-source candidate bundle (technical QA only)
 
 [Six-source archive and checksum companion](https://github.com/MasynNay/anything-plays/actions/runs/42909893531) **PASS**.

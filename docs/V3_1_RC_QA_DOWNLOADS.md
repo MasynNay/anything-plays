@@ -1,5 +1,36 @@
 # Anything Plays 3.1 RC1 — Full 18-console QA downloads
 
+## Persistent four-OS owner QA collection — November 10, 2026
+
+**[Download the complete 3.1 RC1 owner QA collection](https://github.com/MasynNay/anything-plays/actions/runs/42911996640)**
+from the GitHub Actions run's **Artifacts** section. This new
+**472 MB** artifact contains the exact independently verified Windows
+x64, Linux x64, macOS Intel, and macOS Apple Silicon installers;
+original pygame/SDL source candidates; five original SDL LICENSE.txt
+notices; the SHA256SUMS.txt checksum list; the strict QA receipt; and
+explicit draft release notes. Verified in workflow
+[42911996640](https://github.com/MasynNay/anything-plays/actions/runs/42911996640).
+
+**Retained through February 8, 2027** rather than November 17, 2026.
+The older per-platform seven-day artifacts may expire; prefer this
+combined 90-day collection. These packages are still **RC1, not stable
+3.1.0**; no physical controller/game ROM guarantees or public
+redistribution authorization are claimed. The SHA-256 manifest checks
+the installer bytes before use. Opening a GitHub Actions download
+may require signing in to GitHub.
+
+### Why this is an Actions download instead of a GitHub release
+
+A complete verified release-draft preparation pipeline ran, but the
+GitHub Releases API returned **HTTP 403 Resource not accessible by
+integration** when creating an owner-only `v3.1.0-rc1` draft, despite
+the job receiving a `Contents: write` token. This is a GitHub publishing
+authorization problem, **not a failed installer build**. The workflow
+was changed to retain the same bytes for 90 days with read-only
+repository permissions, rather than repeatedly requesting the denied
+API action. A draft release was **not** created. Do not silently
+reinterpret successful QA as legal or hardware approval.
+
 **Latest four-target QA: November 10, 2026.** The current full-console
 unreleased artifacts were compiled from the updated controller-recovery app
 (`26de1e1ad1b701d0735e085158347f8c213ce437`) on all four OS hosts.
