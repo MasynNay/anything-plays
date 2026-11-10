@@ -2,7 +2,7 @@ name: 3.1 | SDL pygame source evidence (unreleased review)
 
 # This is an independent source/attribution research artifact, NOT a
 # corresponding-source compliance certificate or a public release.
-# Examine exact finished four-platform 3.1 RC1 audits from an immutable run,
+# Examine refreshed Copy-diagnostics four-platform 3.1 RC1 audits from an immutable run,
 # include upstream pygame-ce tagged sources, and note unmatched native files.
 on:
   push:
@@ -30,8 +30,8 @@ jobs:
     timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
-      RC_FULL_RUN_ID: '42865608433'
-      RC_FULL_SOURCE_SHA: '29d0f9bced7b19952e70b12567c292c470b6b44f'
+      RC_FULL_RUN_ID: '42886791394'
+      RC_FULL_SOURCE_SHA: '2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d'
       PYGAME_TAG_SHA: 'c8200a9eaa530f884a0a4c3384cefc48006e58be'
     steps:
       - uses: actions/checkout@v4

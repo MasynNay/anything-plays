@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 
-RC_SHA = "86baa6972ed923540f6ab49b636652a0f499d45c"
+RC_SHA = "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
 ARCHES = {"macos-arm64": "arm64", "macos-x64": "x86_64"}
 MAX_OUTPUT_CHARS = 12_000
 OTOOLED = re.compile(r"^\s*(.*?)\s*\(compatibility version ([^,]+), current version ([^)]+)\)\s*$")

@@ -114,8 +114,8 @@ class MacNativeLinkageReviewContracts(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[1] /
                     ".github/workflows/v31-macos-native-linkage-review.yml")
         contents = workflow.read_text("utf-8")
-        self.assertIn("42865608433", contents)
-        self.assertIn("29d0f9bced7b19952e70b12567c292c470b6b44f", contents)
+        self.assertIn("42886791394", contents)
+        self.assertIn("2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d", contents)
         self.assertIn("actions/upload-artifact@v4", contents)
         self.assertNotIn("gh release create", contents)
         self.assertNotIn("contents: write", contents)

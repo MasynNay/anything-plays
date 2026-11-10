@@ -19,8 +19,8 @@ import zipfile
 from tools.macho_wheel_slices import architecture_slices
 
 TARGETS = ("linux-x64", "windows-x64", "macos-arm64", "macos-x64")
-RC_APP_COMMIT = "86baa6972ed923540f6ab49b636652a0f499d45c"
-RC_RUN = 42865608433
+RC_APP_COMMIT = "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
+RC_RUN = 42886791394
 PYGAME_COMMIT = "c8200a9eaa530f884a0a4c3384cefc48006e58be"
 PYGAME_VERSION = "2.5.8"
 UPSTREAM_LGPL_HASH = "a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7"

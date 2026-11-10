@@ -160,7 +160,7 @@ class SDLCorrespondenceEvidenceTests(unittest.TestCase):
 
     def test_source_evidence_workflow_never_publishes_or_claims_license_approval(self):
         flow = (ROOT / ".github/workflows/v31-sdl-source-evidence.yml").read_text("utf-8")
-        self.assertIn("42865608433", flow)
+        self.assertIn("42886791394", flow)
         self.assertIn("c8200a9eaa530f884a0a4c3384cefc48006e58be", flow)
         self.assertIn("actions/upload-artifact@v4", flow)
         self.assertNotIn("contents: write", flow)
