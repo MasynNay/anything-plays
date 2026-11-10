@@ -711,3 +711,59 @@ original source and native linked libraries from the four RC audit
 JSON receipts, preserve matching source/attribution as a separate
 corresponding-source package, and keep an independent legal review
 rather than marking distribution approved prematurely.
+
+## Pinned SDL pygame source and signed macOS runtime follow-up — November 10, 2026
+
+**Scope:** GitHub `MasynNay/anything-plays`,
+`feature/v3.1-controls-usability`, open/draft PR #156. Public
+v3.0.0 and v2.0 remain untouched. **No 3.1 public release**.
+
+- New `tools/prepare_v31_sdl_source_review.py` and
+  `tests/test_v31_sdl_source_evidence.py` verify the exact official
+  pygame-ce **2.5.8 source commit**
+  `c8200a9eaa530f884a0a4c3384cefc48006e58be` and
+  its LGPL file digest, official CPython 3.13 wheel-release SHA-256
+  metadata, and all four genuine RC1 installed-package native audit
+  reports. Creates a temporary pinned tagged source archive, a complete
+  `SDL_SOURCE_REVIEW.json`, and checksums, but **never** grants rights.
+- `tools/macho_wheel_slices.py`,
+  `tests/test_v31_macho_slices.py` and the upstream review workflow
+  also compare exact arm64/x86_64 slices of macOS universal wheels.
+- [SDL upstream source evidence run 42874882808](https://github.com/MasynNay/anything-plays/actions/runs/42874882808)
+  **SUCCESS**. Exact installed-native candidate matches: Linux **74/74**,
+  Windows **62/62**; macOS ARM **0/121**, Intel **0/120** even with
+  universal2 architecture-slice comparisons.
+  Unmatched native code is not attested; it must NOT pass a source gate.
+- Added `tools/inspect_v31_macos_linkage.py` plus
+  `tests/test_v31_macos_linkage_review.py`, verifying each already
+  installed signed RC1 native library hash and preserving read-only
+  `otool -L`, `lipo` architecture, and `codesign -dv` evidence.
+  [Mac native linkage review 42875616776](https://github.com/MasynNay/anything-plays/actions/runs/42875616776)
+  **SUCCESS both platforms**. All 121 ARM64 and 120 Intel candidates
+  have passing `otool` inspections, `lipo` reports solely their
+  respective CPU architectures and `Signature=adhoc` metadata.
+  The native SDL2 Mach-O current version is recorded as
+  `3201.10.0` on both Macs (this is NOT verified SDL2 original-source
+  correspondence). Input DMG was mounted read-only and never modified.
+- All new workflows are **read-only** and retain independent 14-day
+  nonrelease source and JSON audit ZIP artifacts, expiring around
+  **November 24, 2026**. Full investigation and source SHA values:
+  [V3_1_SDL_SOURCE_REVIEW.md](../V3_1_SDL_SOURCE_REVIEW.md).
+- Updated `docs/ROADMAP.md`, release acceptance, and
+  `config/v3.1-release-readiness.json` with these technical facts.
+  All six release gates and `public_release_approved` remain FALSE.
+
+**Recommended next development:**
+1. Identify exact bundled SDL2, SDL2_image, SDL2_mixer and SDL2_ttf
+   upstream source releases and their other native transitive
+   dependencies; prove the source-to-**final signed Mac library**
+   chain including wheel/native postprocessing or leave explicitly
+   unmatched. Avoid claiming that a version string is proof of source.
+2. Complete any required corresponding-source, attribution and
+   LGPL end-user replacement/relinking review independently.
+3. Capture physical USB/Bluetooth controller QA and installed
+   real-game/save/reload/game switching/audio/camera/endurance tests.
+4. After both rights and device gates, prepare genuine final stable
+   3.1.0 installer upgrade identities, release notes and explicit
+   owner approval. Keep PR #156 draft and stable 3.0 unchanged.
+
