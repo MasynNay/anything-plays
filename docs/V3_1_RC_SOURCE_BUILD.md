@@ -49,9 +49,19 @@ license/runtime audit. The workflows emit temporary seven-day QA ZIP
 artifacts **only when their full build jobs succeed**. Exact output names
 include `rc1-full` or `rc1full`, and never claim to be public 3.1.0.
 
-This pipeline is *under verification*. It is not considered passed
-until all four host jobs finish successfully; the existing 3.0 and 3.1
-Preview 2 verified packages remain separate, unchanged baselines.
+**Full RC1 source-built QA: PASSED all four platforms on November 10,
+2026.** [GitHub Actions run 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433)
+verified installed native packages and preserved four temporary, checksummed
+18-console/11-core QA artifacts: Windows x64, Linux x64, macOS Apple Silicon
+and Intel. Every package pairs the freshly built 3.1 RC application with
+unchanged verified public 3.0 original-source emulator cores and ships a
+frozen SDL runtime inventory. [Owner downloads and test steps](V3_1_RC_QA_DOWNLOADS.md).
+
+This is stronger release-candidate **engineering evidence**, not a green
+light for publication. Real hardware/gameplay, complete SDL corresponding
+source/relinking review, final stable-identity migration and owner signoff
+are still pending. Stable public 3.0.0 and earlier 3.1 QA packages remain
+unchanged.
 
 ## Next technical release gates
 
