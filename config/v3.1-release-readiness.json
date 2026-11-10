@@ -116,7 +116,14 @@
       "camera_controller_coexistence_tested": false,
       "source_correspondence_verified": false,
       "lgpl_relinking_reviewed": false,
-      "redistribution_approved": false
+      "redistribution_approved": false,
+      "hardware_free_joystick_controller_subsystem_run": "https://github.com/MasynNay/anything-plays/actions/runs/42882184466",
+      "hardware_free_joystick_controller_init_passed": {
+        "macos-arm64": true,
+        "macos-x64": true,
+        "physical_gamepad_connected": false,
+        "physical_camera_connected": false
+      }
     }
   },
   "verified_installed_gui_qa": {
