@@ -17,11 +17,12 @@ from anything_plays.v30_gpl_trial import (
     enable_windows_trial_runtime, validate_trial_core_directory,
 )
 from verify_bundle import verify_bundle
+from tools.audit_v31_sdl_runtime import inspect_bundle
 
 STABLE = "AnythingPlaysSetup-3.0.0.exe"
 PREVIEW = "AnythingPlaysSetup-3.1.0-preview1.exe"
 FULL = "AnythingPlaysSetup-3.1.0-preview2.exe"
-SOURCE_REVISION = "ffee5dcdf0415440c9f5bffc7f9049a07c094ff3"
+SOURCE_REVISION = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 
 
 def hash_file(path):
@@ -161,7 +162,10 @@ def build(stable, preview, sums, receipt, output):
         verify_bundle(installed, "windows", check_native=False)
         if validate_trial_core_directory(installed/"cores", ".dll") != first:
             raise ValueError("Final Setup installer altered original source-built cores")
+        audit = inspect_bundle(installed, "windows-x64")
         output.mkdir(parents=True, exist_ok=True)
+        (output/"SDL_RUNTIME_AUDIT.json").write_text(
+            json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         target = output/FULL
         shutil.copyfile(produced, target)
         report = {
@@ -170,6 +174,8 @@ def build(stable, preview, sums, receipt, output):
             "target": "windows-x64",
             "original_stable_sha256": stable_sha,
             "source_preview1_sha256": hash_file(preview),
+            "source_preview_revision": SOURCE_REVISION,
+            "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": target.name,
             "sha256": hash_file(target),
             "size_bytes": target.stat().st_size,
