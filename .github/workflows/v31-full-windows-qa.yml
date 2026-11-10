@@ -34,8 +34,8 @@ jobs:
       - name: Install Windows Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
-      - name: Install Pillow solely to render original application icon
-        run: python -m pip install Pillow==12.3.0
+      - name: Install Pillow and NumPy to generate unchanged original fish application icon
+        run: python -m pip install Pillow==12.3.0 numpy==2.5.4
       - name: Download exact public 3.0 installer and original SHA256 manifest
         shell: pwsh
         run: |
