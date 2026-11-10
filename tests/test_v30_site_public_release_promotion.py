@@ -1,56 +1,70 @@
-"""3.0 marketing must never present an unpublished draft as a public release."""
+"""Public website must reflect the verified stable release without client polling."""
+from html.parser import HTMLParser
+from pathlib import Path
 import shutil
 import subprocess
 import unittest
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class PortfolioPublicReleasePromotionTests(unittest.TestCase):
+class LinkParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            value = dict(attrs).get("href")
+            if value:
+                self.links.append(value)
+
+
+class PublicThreeOhSiteTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.html = (ROOT / "site/index.html").read_text("utf-8")
-        cls.js = (ROOT / "site/main.js").read_text("utf-8")
+        cls.html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        cls.js = (ROOT / "site/main.js").read_text(encoding="utf-8")
+        cls.links = LinkParser()
+        cls.links.feed(cls.html)
 
-    def test_fallback_download_remains_stable_2_until_real_release_exists(self):
+    def test_stable_3_release_is_visible_in_static_html(self):
         self.assertIn('id="public-stable-download"', self.html)
-        self.assertIn('releases/tag/v2.0.0', self.html)
-        self.assertIn('STABLE 2.0 AVAILABLE', self.html)
-        self.assertIn("releases/tags/v3.0.0", self.js)
-        self.assertIn("published.draft !== false", self.js)
-        self.assertIn("published.prerelease !== false", self.js)
-        self.assertIn("published.tag_name !== 'v3.0.0'", self.js)
-        self.assertIn("required.every(name => available.has(name))", self.js)
+        self.assertIn('releases/tag/v3.0.0', self.html)
+        self.assertIn('releases/tag/v3.0.0-sources', self.html)
+        self.assertIn("Download stable 3.0", self.html)
+        self.assertIn("STABLE 3.0 AVAILABLE", self.html)
+        self.assertIn("18 offline console profiles", self.html)
+        self.assertIn("03 / RELEASED", self.html)
+        self.assertNotIn("STABLE 2.0 AVAILABLE", self.html)
+        self.assertNotIn("Public release is pending", self.html)
+        self.assertNotIn("3.0 installers are not public", self.html)
+        self.assertNotIn("REVIEW REQUIRED", self.html)
 
-    def test_platform_downloads_and_release_provenance_required(self):
-        for name in (
-            "AnythingPlaysSetup-3.0.0.exe",
-            "anything-plays_3.0.0_amd64.deb",
-            "AnythingPlays-3.0.0-macos-arm64.dmg",
-            "AnythingPlays-3.0.0-macos-x64.dmg",
-            "SHA256SUMS.txt",
-        ):
-            with self.subTest(name=name):
-                self.assertIn(name, self.js)
-        for marker in (
-            'id="download-summary"',
-            'id="consoles-summary"',
-            'id="roadmap-summary"',
-            'id="stable-profiles-count"',
-            'id="download-release-status"',
-        ):
-            self.assertIn(marker, self.html)
-        self.assertIn("catch (_)", self.js)
+    def test_3_0_release_links_are_actual_public_release_urls(self):
+        expected = {
+            "https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0",
+            "https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources",
+        }
+        self.assertTrue(expected.issubset(set(self.links.links)))
+        # A public website should not point visitors at the private draft
+        # or auto-promote an unverified development artifact.
+        self.assertNotIn("untagged-", self.html)
+        self.assertNotIn("v3.0.0-rc.1", self.html)
+
+    def test_browser_concept_is_not_fake_playable_game(self):
+        self.assertIn("INTERACTIVE CONCEPT", self.html)
+        self.assertIn("This is an illustrative browser interaction", self.html)
+        self.assertNotIn("fetch(", self.js)
         self.assertNotIn("localStorage", self.js)
 
     def test_static_javascript_parses(self):
         node = shutil.which("node")
-        if not node:
-            self.skipTest("Node interpreter unavailable")
+        if node is None:
+            self.skipTest("Node not installed")
         result = subprocess.run(
-            [node, "--check", "site/main.js"],
-            cwd=ROOT, capture_output=True, text=True, timeout=15,
+            [node, "--check", "site/main.js"], cwd=ROOT,
+            capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
