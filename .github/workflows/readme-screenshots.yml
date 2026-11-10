@@ -1,0 +1,70 @@
+name: Verify and update actual Anything Plays README screenshots
+
+# Only screenshots of an existing, genuine packaged 3.0 Linux UI are used.
+# Never invent gameplay, camera activity, ROMs or altered emulator controls.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/prepare_readme_screenshots.py'
+      - '.github/workflows/readme-screenshots.yml'
+      - 'site/assets/anything-plays-desktop-preview.webp'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/prepare_readme_screenshots.py'
+      - '.github/workflows/readme-screenshots.yml'
+      - 'site/assets/anything-plays-desktop-preview.webp'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture-actual-app-details:
+    if: github.repository == 'MasynNay/anything-plays'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: readme-real-app-screenshot-capture
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned lossless screenshot processing dependency
+        run: python -m pip install "Pillow==11.3.0"
+      - name: Capture two authentic application UI detail crops
+        run: |
+          python -m tools.prepare_readme_screenshots
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          root=Path("docs/screenshots/current")
+          expected={"camera-controls.webp":(647,687),"game-library-and-audio.webp":(664,687)}
+          assert set(p.name for p in root.glob("*.webp"))==set(expected)
+          for filename,size in expected.items():
+              asset=root/filename
+              assert asset.stat().st_size>10000, filename
+              with Image.open(asset) as shot:
+                  assert shot.format=="WEBP" and shot.size==size,filename
+          print("Two real UI crops validated; no simulated ROM, camera or gameplay")
+          PY
+      - name: Commit only the generated real application screenshots on main
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- docs/screenshots/current/camera-controls.webp docs/screenshots/current/game-library-and-audio.webp
+          if git diff --cached --quiet; then
+            echo "Verified README captures already current"
+            exit 0
+          fi
+          git commit -m "docs: refresh authentic 3.0 camera and game-library README screenshot details"
+          git push origin HEAD:main
