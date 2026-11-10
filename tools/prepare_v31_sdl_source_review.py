@@ -84,8 +84,13 @@ def validate_source_archive(archive):
             raise ValueError("Missing or excessive upstream source entries")
         for member in entries:
             parts = member.name.split("/")
+            # Git archive emits a safe root directory entry *without*
+            # the trailing slash. Allow only that exact directory; keep
+            # traversal, unknown roots and device files forbidden.
+            valid_root = member.name == "pygame-ce-2.5.8" and member.isdir()
             if (member.name.startswith("/") or ".." in parts
-                    or not member.name.startswith("pygame-ce-2.5.8/")
+                    or (not valid_root
+                        and not member.name.startswith("pygame-ce-2.5.8/"))
                     or member.isdev()):
                 raise ValueError(
                     "Unsafe upstream source member: "
