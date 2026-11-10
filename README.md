@@ -1,200 +1,202 @@
 <div align="center">
+  <img src="assets/anything_plays_v21.webp" alt="Anything Plays betta fish logo" width="136">
 
-<img src="assets/anything_plays_v21.webp" alt="Original Anything Plays betta fish logo" width="132">
+  # Anything Plays
 
-# Anything Plays
+  **If it moves, it plays.**
 
-**If it moves, it plays.**
+  Turn everyday movement into a controller for classic video games.
 
-A camera-powered desktop gaming studio that turns real-world movement into controls for classic games.
+  **Camera-powered play · 18 console profiles · Windows, macOS & Linux**
 
-**18 console profiles · 11 embedded emulator cores · Windows, macOS and Linux**
-
-[**Portfolio website**](https://anythingplays.masynnay.com/) · [**Download 3.0**](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [Roadmap](ROADMAP.md) · [Source and licenses](#source-and-licenses)
-
+  [Download 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) ·
+  [Screenshots](#screenshots) ·
+  [Get started](#get-started) ·
+  [How it works](#how-it-works) ·
+  [Roadmap](ROADMAP.md) ·
+  [Report an issue](https://github.com/MasynNay/anything-plays/issues)
 </div>
 
 ---
 
-## Your world is the controller
+## Play a game. Let something else hold the controller.
 
-Anything Plays makes a different kind of game controller possible. Point a webcam at a colorful object—a toy, your hand, or even a fish—and map the places it moves to the buttons on your favorite games.
+Anything Plays follows a selected color through a webcam and translates movement into gamepad buttons. Divide the camera view into zones, then let a toy, a fish, a hand, or anything else you can track move between them. Each zone triggers a button inside an embedded emulator, **not a system-wide keyboard event**.
 
-Customize the control zones, choose a console, and play in the same desktop application. Don't have a camera handy? Keyboard controls work too.
+Prefer a conventional controller? Click the game display and play using the keyboard. A webcam is optional for manual play.
 
-**The idea:** Anything Plays started with a simple experiment: could a fish swimming in a tank play a video game? It has grown into a customizable, multi-console desktop application where movement, color tracking, and traditional keyboard inputs can all become controls.
+**Version 3.0** expands the original four-console release into a desktop gaming studio supporting **18 console profiles**, including Nintendo 64 and GameCube. The packaged app includes its emulator cores, so you do not need to install a separate emulator to get started.
 
-**Explore the project:** [View the app screenshots](#screenshots) · [See all supported consoles](#console-support) · [Download the desktop application](#download-the-application) · [Explore the engineering](#how-it-works)
-
-**Version 3.0 is now publicly available** with Nintendo 64, GameCube, and 16 more console profiles. The four platform installers contain the native emulator cores; you don't have to install RetroArch or Dolphin separately.
+[**Download the latest release**](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Visit the portfolio website](https://anythingplays.masynnay.com/)
 
 ## Screenshots
 
-These are captures of the **real packaged Anything Plays 3.0 Linux desktop application**, not concept art, a browser mockup, or generated gameplay. The original capture was made with no webcam connected and no commercial ROM loaded.
+Real captures from the packaged Anything Plays 3.0 desktop application, with no commercial game ROM or personal camera footage included.
 
-### The desktop studio
+### Anything Plays 3.0 desktop
 
-The camera tracking panel, console selector, ROM library controls, audio volume, and display preferences share one window.
+[![Anything Plays 3.0 desktop window showing the camera control area, console and ROM library, and sound controls](site/assets/anything-plays-desktop-preview.webp)](site/assets/anything-plays-desktop-preview.webp)
 
-[![Anything Plays 3.0 desktop UI with camera tracking on the left and console library and sound controls on the right](site/assets/anything-plays-desktop-preview.webp)](site/assets/anything-plays-desktop-preview.webp)
-
-<sub>Actual packaged app UI · Linux capture · [See the portfolio experience](https://anythingplays.masynnay.com/#desktop)</sub>
-
-### A closer look at the controls
+### Camera controls and game library
 
 <table>
   <tr>
-    <td width="50%" align="center"><a href="docs/screenshots/current/camera-controls.webp"><img src="docs/screenshots/current/camera-controls.webp" width="100%" alt="Close-up of the actual desktop camera selection and movement tracking controls"></a></td>
-    <td width="50%" align="center"><a href="docs/screenshots/current/game-library-and-audio.webp"><img src="docs/screenshots/current/game-library-and-audio.webp" width="100%" alt="Close-up of the actual console selection, ROM folder, display mode and volume controls"></a></td>
+    <td width="50%" align="center"><a href="docs/screenshots/current/camera-controls.webp"><img src="docs/screenshots/current/camera-controls.webp" alt="Camera selection and color-tracking control panel" width="100%"></a></td>
+    <td width="50%" align="center"><a href="docs/screenshots/current/game-library-and-audio.webp"><img src="docs/screenshots/current/game-library-and-audio.webp" alt="Console selection, game library and audio controls" width="100%"></a></td>
   </tr>
   <tr>
-    <td align="center"><sub>Camera studio · Select a device, preview tracking, and shuffle control zones</sub></td>
-    <td align="center"><sub>Game library · Pick a console, browse games, and adjust display and sound</sub></td>
+    <td align="center"><sub>Camera and movement controls</sub></td>
+    <td align="center"><sub>Console library and audio</sub></td>
   </tr>
 </table>
 
-<sub>Screenshot provenance: These two close-ups are reproducible **crops of the full real application screenshot**, not screenshots of different gameplay sessions. See the [capture script](tools/prepare_readme_screenshots.py) and [screenshot verification workflow](.github/workflows/readme-screenshots.yml). No game ROMs or private camera footage are included.</sub>
+The close-ups are crops of the full application capture. The [screenshot preparation script](tools/prepare_readme_screenshots.py) and [verification workflow](.github/workflows/readme-screenshots.yml) document how the images were produced.
+
+## Supported consoles
+
+| Console | Libretro core |
+| :-- | :-- |
+| Game Boy / Game Boy Color / Game Boy Advance | mGBA |
+| Nintendo Entertainment System | FCEUmm |
+| Super Nintendo | Supafaust |
+| Nintendo 64 | ParaLLEl-N64 |
+| Nintendo GameCube | Dolphin |
+| Sega Genesis / Mega Drive | BlastEm |
+| Sega Master System / Game Gear / SG-1000 | BlastEm |
+| Atari 2600 | Stella/Tia |
+| Atari 7800 | ProSystem |
+| TurboGrafx-16 / PC Engine | Beetle PCE Fast |
+| Neo Geo Pocket / Neo Geo Pocket Color | NeoPop |
+| WonderSwan / WonderSwan Color | Beetle WonderSwan |
+
+The console selector chooses the appropriate emulator core automatically. Game folders and console-specific settings can be remembered separately. Compatibility and performance vary with the game and computer.
+
+**No commercial game ROMs or proprietary BIOS files are distributed.** Supply your own legally usable game files and required firmware.
 
 ## Features
 
-- **Anything can be a controller.** Track a chosen object color with OpenCV and map movement through on-screen zones to game inputs.
-- **Make the layout yours.** Position, size, shuffle, and remap controls. Tune button labels, save console-specific preferences, and use keyboard controls when you prefer.
-- **18 console profiles in one place.** Choose from Nintendo, Sega, Atari, NEC, SNK, and Bandai platforms without switching to a separate emulator application.
-- **Embedded local play.** The desktop app includes 11 native Libretro cores, including Dolphin for GameCube and ParaLLEl-N64 for Nintendo 64.
-- **Organized game libraries.** Browse your local folders with a ROM shelf and keep library locations associated with each console.
-- **Video and audio controls.** Adjust game volume, mute, switch display modes, and use console-specific input mappings.
-- **Local-first design.** Camera processing and gameplay run on your computer. No account or hosted service is required for normal local use.
-- **Reproducible four-platform releases.** GitHub Actions builds, tests, and packages the application for Windows, Linux, Apple Silicon, and Intel Mac.
-
-## Console support
-
-| Family | Supported systems |
-| --- | --- |
-| **Nintendo handhelds** | Game Boy, Game Boy Color, Game Boy Advance |
-| **Nintendo home consoles** | NES, Super Nintendo, Nintendo 64, GameCube |
-| **Sega** | Genesis / Mega Drive, Master System, Game Gear, SG-1000 |
-| **Atari** | Atari 2600, Atari 7800 |
-| **NEC** | TurboGrafx-16 / PC Engine (HuCard) |
-| **SNK** | Neo Geo Pocket, Neo Geo Pocket Color |
-| **Bandai** | WonderSwan, WonderSwan Color |
-
-The bundled 3.0 cores are **mGBA, Supafaust, FCEUmm, BlastEm, ParaLLEl-N64, Dolphin, Tia, ProSystem, Beetle PCE Fast, NeoPop, and Beetle WonderSwan**.
-
-Emulator compatibility varies with the title and hardware. Anything Plays does **not** include commercial game files or proprietary BIOS images. Supply only ROMs or firmware you are legally entitled to use.
+- **Color-tracked camera controls.** Choose a webcam and target color; adjust tracking settings, camera mirroring, button duration and control-zone behavior.
+- **Control zones built your way.** Arrange or resize button zones, return to a balanced layout, shuffle positions, and customize mapping and label size.
+- **Profiles for each console.** Keep independent game folders, control layouts and button mappings as you switch between systems.
+- **A tactile ROM shelf.** Browse locally stored games from the application instead of reopening a file dialog every time.
+- **Customizable appearance.** Select visual themes and adjust the controls shown over the camera feed.
+- **Keyboard play and game audio.** Use manual input without a webcam and adjust game volume, mute and display settings.
+- **Embedded emulation.** Native Libretro cores are packaged with official installers for Windows, Linux and both Mac architectures.
+- **Local by design.** Camera tracking, games and settings run on your computer without an account or cloud service.
 
 ## Get started
 
-### Download the application
+### Install a packaged application
 
-**[Download Anything Plays 3.0.0 for your computer](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0)**
+**[Download Anything Plays 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0)** from GitHub Releases.
 
-| Platform | Official 3.0 installer |
-| --- | --- |
-| **Windows 64-bit** | [AnythingPlaysSetup-3.0.0.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlaysSetup-3.0.0.exe) |
-| **macOS Apple Silicon** | [AnythingPlays-3.0.0-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-arm64.dmg) |
-| **macOS Intel** | [AnythingPlays-3.0.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-x64.dmg) |
-| **Ubuntu / Debian 64-bit** | [anything-plays_3.0.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/anything-plays_3.0.0_amd64.deb) |
+| Platform | Download |
+| :-- | :-- |
+| Windows x64 | [AnythingPlaysSetup-3.0.0.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlaysSetup-3.0.0.exe) |
+| macOS Apple Silicon | [AnythingPlays-3.0.0-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-arm64.dmg) |
+| macOS Intel | [AnythingPlays-3.0.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-x64.dmg) |
+| Ubuntu / Debian x64 | [anything-plays_3.0.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/anything-plays_3.0.0_amd64.deb) |
 
-### First launch
+Packaged installations do not require separate Python, RetroArch or Dolphin setup. Windows installers may be unsigned; macOS applications are not Apple Developer ID notarized and may display a security prompt. Confirm the release source and verify downloads with [SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/SHA256SUMS.txt).
 
-1. **Choose a console.** Select one of the supported systems in the desktop studio.
-2. **Add your games.** Point the ROM library to a local folder containing games you have the right to use.
-3. **Set up controls.** Select a webcam and a trackable color, adjust the input zones, or choose keyboard input instead.
-4. **Play and customize.** Launch a game, fine-tune the zone layout and button labels, and adjust audio and display preferences.
+### The first five minutes
 
-A webcam is optional, and the application does not bundle commercial games or proprietary BIOS files.
+1. **Choose a console.** Select the system you want to play.
+2. **Choose a ROM folder.** Browse to your own game files; the shelf lists compatible items.
+3. **Open a game.** Choose a title in the library.
+4. **Choose how to play.** Click the game display to use the keyboard, or start your webcam and select a color to track.
+5. **Set up object controls.** Arrange the control zones, map your buttons and enable camera input.
 
-**Verify your download:** [SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/SHA256SUMS.txt). Windows builds may be unsigned and macOS apps use ad hoc signatures rather than Apple notarization, so your operating system may display a security warning. Verify the release and checksum before proceeding.
-
-[Latest public release](https://github.com/MasynNay/anything-plays/releases/latest) · [Previous stable 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Original emulator sources for 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) · [All releases](https://github.com/MasynNay/anything-plays/releases)
+Bright, even lighting and a target color that contrasts with its surroundings help the tracker work reliably. Manual controls remain available if you do not have a webcam.
 
 ### Run from source
 
-You'll need **Python 3.12 or 3.13**, Tkinter, and the dependencies listed in the repository. For a local development environment:
+Python **3.12 or 3.13**, Tkinter and the listed dependencies are needed for local development.
 
 ```bash
 python -m venv .venv
-# Activate .venv using the appropriate command for your operating system.
+# Activate .venv for your operating system.
 python -m pip install -r requirements.txt
 python app.py
 ```
 
-The Git repository contains the application and build tools, but native emulator libraries are intentionally not checked into Git. For a ready-to-play offline package, use the downloadable installers above.
+Source checkouts do not contain the packaged native emulator binaries. Use an official release for the bundled desktop application; see the [technical documentation](docs/README.md) for developer and core setup details.
 
 ## How it works
 
 ```text
-Webcam or keyboard
-        |
-        v
- OpenCV color tracking  --->  Adjustable control zones
-                                       |
-                                       v
-                              Libretro input mapping
-                                       |
-                                       v
-                Embedded emulator selected by console
-                                       |
-                                       v
-                         Local video, audio and saves
+Camera frame ──► OpenCV color tracker ──► Control zone ──► Gamepad input ─┐
+                                                                        │
+Focused keyboard ───────────────────────► Manual gamepad input ────────┤
+                                                                        ▼
+ROM shelf ─► Console/core selection ───────────────────────► Libretro session
+                                                                        │
+                                                    ┌───────────────────┤
+                                                    ▼                   ▼
+                                                Game video          Game audio
+                                                    │
+                                                    ▼
+                                              Tkinter display
 ```
 
-The Python/Tkinter UI manages cameras, game libraries, themes, layouts, and preferences. OpenCV recognizes selected colors in camera frames. Each active Libretro core receives local input callbacks while its video and audio appear inside the application. Core lifecycle and saved game handling are separated into focused modules.
+Tkinter manages the interface, camera preview and game shelf. OpenCV detects movement of selected colors. Emulator sessions handle input, audio, video and game saves. Separate modules manage camera tracking, layouts, preferences and emulator lifecycle.
 
-For deeper implementation details, read [Architecture](docs/ARCHITECTURE.md) and the [technical documentation index](docs/README.md).
+See the [architecture guide](docs/ARCHITECTURE.md) for implementation details.
 
 ## Repository structure
 
 ```text
 anything-plays/
-├── .github/workflows/    Tests, original-source verification and release automation
-├── anything_plays/       Camera UI, console profiles, emulator sessions and saves
-├── assets/               Original artwork and desktop application assets
-├── config/               Auditable release inputs and settings
-├── docs/                 Architecture, QA, provenance and screenshots
-│   └── screenshots/      Verified real desktop UI detail captures
-├── licenses/             Third-party notices and license reference material
-├── packaging/            Windows, macOS and Linux installer builders
-├── site/                 Static portfolio website at anythingplays.masynnay.com
-├── tests/                Python, UI and release regression tests
-├── tools/                Build, validation and screenshot capture helpers
-├── app.py                Desktop application entry point
-├── README.md             Project introduction
-└── ROADMAP.md            Public development milestones
+├── anything_plays/       Desktop UI, camera tracking and emulator sessions
+├── app.py                Application entry point
+├── assets/               Original branding and icons
+├── config/               Release inputs and configuration
+├── docs/                 Architecture, QA and screenshots
+├── licenses/             Third-party license information
+├── packaging/            Installers for supported platforms
+├── site/                 Portfolio website
+├── tests/                Automated regression and integration tests
+├── tools/                Verification and screenshot utilities
+├── .github/workflows/    Build, test and release automation
+├── ROADMAP.md            Active development roadmap
+└── README.md             Project overview
 ```
 
-The original application source is separate from generated installers, native binaries, and personal game libraries. CI and packaging helpers are organized by responsibility rather than bundled into the README.
+The main application code is in `anything_plays/`; `app.py` is the entry point. The repository does not store private camera footage, commercial games or native core binaries.
 
-## Development and testing
-
-Anything Plays 3.0 has verified original-source builds on **Windows x64, Linux x64, macOS Apple Silicon, and macOS Intel**. Its release checks exercise native core identity, packaged GUI startup, original homebrew graphics/audio, repeated game-session switching, and source archive correspondence.
-
-[View the successful four-platform build](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) · [View the publication run](https://github.com/MasynNay/anything-plays/actions/runs/42724633466) · [Browse source and native checks](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md)
-
-Run regression tests locally:
+## Develop and test
 
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-Actual retail-game, camera, GPU, save compatibility, and very long sessions vary by computer and aren't all exhaustively tested. Please report reproducible issues with the relevant console and operating system, without uploading copyrighted ROMs or personal camera footage.
+The 3.0 release has automated build and runtime checks for **Windows x64, Linux x64, macOS Intel and macOS Apple Silicon**. These checks cover original-source emulator builds, application startup and selected emulator behavior. They do not replace real-world testing with every game, webcam and GPU.
 
-## Roadmap
+[Four-platform build](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) · [Release workflow](https://github.com/MasynNay/anything-plays/actions/runs/42724633466) · [Technical validation notes](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) · [Contributing](CONTRIBUTING.md)
 
-3.0 is a **shipped milestone**, not a roadmap promise. Active work now focuses on GameCube performance, camera calibration, save reliability, long-session stability, and better platform diagnostics.
+## Settings and saves
 
-[**Read the development roadmap**](ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues) · [Contributing](CONTRIBUTING.md)
+Anything Plays preserves its established settings location for compatibility with earlier versions:
 
-## Portfolio website
+```text
+~/.config/fish-plays-pokemon-studio/preferences.json
+~/.config/fish-plays-pokemon-studio/system_profiles.json
+```
 
-Looking at Anything Plays as a portfolio project? The README screenshots show the actual desktop interface, while the [portfolio website](https://anythingplays.masynnay.com/) introduces the concept, design, and development journey. For technical reviewers, the [architecture notes](docs/ARCHITECTURE.md), [automated tests](tests/), and [release workflows](.github/workflows/) show how the application is built and maintained.
+Console profiles can remember separate libraries and control configurations. Back up your game files, save data and preferences before replacing an installation.
 
-The public [Anything Plays portfolio](https://anythingplays.masynnay.com/) showcases the original artwork, a real desktop capture, an interactive camera-zone *concept*, the engineering approach, and the development roadmap. The browser concept is illustrative; **the playable emulator is the downloadable desktop application**, not a hosted web game.
+## Roadmap and project resources
 
-## Source and licenses
+Anything Plays 3.0 is a released milestone. Development continues with a focus on GameCube performance, camera calibration, save reliability, long-running sessions and platform diagnostics.
 
-The Anything Plays application source is published under the [MIT License](LICENSE). Embedded emulator cores and other libraries retain their own upstream copyright and license terms. The corresponding original emulator source trees and checksums are available in the [3.0 source companion release](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources).
+[Development roadmap](ROADMAP.md) · [Project issues](https://github.com/MasynNay/anything-plays/issues) · [Portfolio website](https://anythingplays.masynnay.com/) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md)
 
-For exact compiled-source provenance, third-party licensing scope and known limitations, see [Original-source audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [Source-first release assessment](docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md).
+## Free and open source
 
-Anything Plays is an independent open-source portfolio project and is not affiliated with the console manufacturers or emulator teams.
+Anything Plays is offered **free of charge**, without advertisements, subscriptions or paid features.
+
+The original Anything Plays source code is licensed under [MIT](LICENSE). Bundled third-party emulator cores have **their own licenses** and are not automatically covered by the project's MIT License. Corresponding upstream source and checksums are available in the [3.0 source companion release](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources).
+
+Read the [source and license audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) for component-specific terms and provenance.
+
+Anything Plays is an independent project and is not affiliated with or endorsed by console manufacturers or emulator developers.
