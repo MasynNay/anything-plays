@@ -172,8 +172,15 @@ The
 subsequently **PASSED both Macs**: Apple Silicon successfully loaded the
 actual signed SDL2 versions 2.32.8 and 2.32.10 in **both orders** and
 confirmed their runtime versions; Intel's 2.32.10 library also loaded.
-The successful `ctypes` test does not replace a simultaneous real camera
-and USB/Bluetooth controller integration test.
+The `ctypes` evidence now also includes a separate
+[hardware-free SDL joystick/controller subsystem initialization test
+42882184466](https://github.com/MasynNay/anything-plays/actions/runs/42882184466)
+which **PASSED both macOS architectures**: the actual signed SDL2
+2.32.8 and SDL2 2.32.10 variants initialized joystick and
+gamecontroller support in both load orders on ARM64, and the Intel
+pygame SDL2 version did the same. This does **not** replace a
+simultaneous real camera and USB/Bluetooth controller integration
+test, or close LGPL and original-source requirements.
 
 The
 [original SDL2 source-candidate run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)
