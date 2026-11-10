@@ -1,4 +1,4 @@
-"""Give the 3.0 preview a private copy of the stable user's settings.
+"""Give the 3.1 preview a private copy of the stable user's settings.
 
 The 2.0 and 2.1 preferences and profiles are never written by the test branch.
 A later production 3.0 release should use the explicit upgrade/migration
@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 LEGACY_DIR = Path(".config") / "fish-plays-pokemon-studio"
-TEST_DIR = Path(".config") / "anything-plays-30-preview"
-PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-21-test"
+TEST_DIR = Path(".config") / "anything-plays-31-preview"
+PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-30-preview"
 
 
 def prepare_test_preferences(home=None):

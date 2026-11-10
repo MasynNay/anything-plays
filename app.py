@@ -37,7 +37,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
     """Own application state and delegate UI behavior to focused modules."""
     def __init__(self, root):
         self.root = root
-        root.title('Anything Plays 3.0 · Preview')
+        root.title('Anything Plays 3.1 · Preview 1')
         self.set_app_icon()
         root.geometry('1400x880')
         root.minsize(820, 540)
