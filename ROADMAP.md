@@ -204,3 +204,7 @@ After the outer preserved ZIP member protections merged in PR #143, a separate c
 ### November 10, 2026 — inner ZIP source-evidence regression verified
 
 PR #150 merged into the v3 development branch after Python 3.12, Python 3.13, native mGBA and unapproved source review CI succeeded (runs 42729723317 and 42729723218). This guards against symlink impersonation inside native core archives, but packaging jobs were skipped; full production installer, exact Dolphin source correspondence, combined rights and final acceptance remain unapproved. Do not publish 3.0 or modify stable 2.0 until release gates are met.
+
+### November 10, 2026 — bounded native payload extraction (pending CI)
+
+Candidate-lock verification now caps native core ZIP decompression at 512 MiB, rejecting oversized declared members before extraction and limiting actual bytes read. Three synthetic regressions cover normal, oversized compressed, and exact-limit inputs. This is source-evidence parser hardening, not corresponding-source approval or release acceptance. Merge only after required CI passes; public 3.0 and redistribution rights remain unapproved, stable v2.0 preserved.
