@@ -195,3 +195,7 @@ The complete original-source Tia 11-core installer passed four-platform CI on `m
 ### November 9, 2026 — preserved native archive metadata safety (CI pending)
 
 A focused development PR rejects Unix symlink ZIP members and provenance JSON larger than 1 MiB before candidate-lock processing, with three synthetic regression tests. This is defensive validation of unapproved input artifacts, not evidence of exact Dolphin corresponding source or redistribution rights. Do not merge without CI; public v3.0 remains blocked, stable v2.0 unchanged.
+
+### November 10, 2026 — inner native ZIP payload type verification (CI pending)
+
+After the outer preserved ZIP member protections merged in PR #143, a separate core archive still allowed a Unix symlink with the exact native library filename. A focused development change rejects that impersonation and adds three direct regression tests. Merge is conditional on Python 3.12/3.13 and native compatibility checks. This is unapproved input validation only; corresponding source, combined distribution rights, immutable production acceptance and public v3.0 remain outstanding. Stable v2.0 is unchanged.
