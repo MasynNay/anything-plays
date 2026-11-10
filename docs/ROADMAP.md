@@ -88,6 +88,17 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   [New test downloads](V3_1_RC_QA_DOWNLOADS.md). Candidate installation IDs
   and preferences are isolated from 3.0. This does not pass hardware,
   corresponding-source/rights or final stable release approval.
+- **pygame/SDL source-review evidence:** Original pygame-ce 2.5.8 git
+  sources (pinned commit `c8200a9`) now archived; official Python 3.13
+  release-wheel hashes verified and compared to the full RC1 packages.
+  Linux has **74/74** byte matches, Windows **62/62** for the audited
+  native files. The two signed, architecture-specific Mac packages
+  are still unmatched against wheel bytes; their **121 ARM and 120 Intel**
+  native dylibs now have separate validated `otool`, `lipo` and
+  `codesign` reports.
+  [Source correspondence investigation](V3_1_SDL_SOURCE_REVIEW.md).
+  This advances traceability, **not** legal approval; additional native
+  source build provenance and LGPL replacement/relinking review are open.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
