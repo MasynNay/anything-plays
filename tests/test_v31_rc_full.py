@@ -110,6 +110,31 @@ class FullReleaseCandidateInputs(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mac.build("arm64", *inputs, rc1=True)
 
+    def test_original_native_core_selection_is_strictly_nonrelease(self):
+        from fetch_mgba_core import core_names_for_build
+        reviewed = {
+            "AP_V31_RC": "1", "AP_V31_PREVIEW": "0",
+            "AP_V31_FULL_TEST_CORES": "1",
+            "AP_RELEASE_BUILD": "0", "AP_V30_APPROVED_RELEASE": "0",
+            "AP_V30_STABLE_CANDIDATE": "0",
+        }
+        with patch.dict(os.environ, reviewed):
+            selection = core_names_for_build()
+            self.assertEqual(len(selection), 11)
+            self.assertIn("dolphin", selection)
+            self.assertIn("tia", selection)
+        for override in (
+            {"AP_V31_RC": "1", "AP_V31_PREVIEW": "1"},
+            {"AP_V31_RC": "0", "AP_V31_PREVIEW": "0"},
+            {"AP_RELEASE_BUILD": "1"},
+            {"AP_V30_APPROVED_RELEASE": "1"},
+            {"AP_V30_STABLE_CANDIDATE": "1"},
+        ):
+            with self.subTest(override=override), patch.dict(
+                    os.environ, dict(reviewed, **override)):
+                with self.assertRaises(ValueError):
+                    core_names_for_build()
+
     def test_full_rc_workflows_only_generate_unreleased_qa_artifacts(self):
         root = Path(__file__).resolve().parents[1]
         workflow = root/".github/workflows/v31-full-rc1-qa.yml"
