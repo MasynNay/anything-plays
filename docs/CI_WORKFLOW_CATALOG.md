@@ -18,6 +18,12 @@ The many additional `v30-*` files record historical experiments, isolated core b
 
 Obsolete **2.0 and 3.0 private release-draft jobs** have been moved to [historical workflows](../docs/history/workflows/) so the Actions menu focuses on useful current engineering. These archived definitions are preserved for provenance and are not active GitHub Actions workflows. The stable 1.5, 2.0 and 3.0 releases are unaffected.
 
+## Historical 3.0 research workflows
+
+The original developer-preview experiments below have been **archived**, not erased. They no longer appear as executable Actions. Their verified runs and exact source definitions remain in [the historical workflow folder](history/workflows/). The present-day CI, platform builds, source audit, release publisher and manual regression workflows remain under `.github/workflows/`.
+
+Archived in this cleanup: `capture-sources.yml`, `v30-corresponding-source-access.yml`, `v30-dolphin-complete-source-bundle.yml`, `v30-dolphin-original-linux-build.yml`, `v30-dolphin-original-macos-source.yml`, `v30-dolphin-original-windows-source.yml`, `v30-dolphin-pinned-source-sys.yml`, `v30-eleven-source-offline-integration.yml`, `v30-eleven-tia-source-offline-integration.yml`, `v30-four-platform-source-evidence-review.yml`, `v30-parallel-n64-original-native.yml`, `v30-pce-source-delta.yml`, `v30-tia-corresponding-source-access.yml`, `v30-source-snapshots.yml`.
+
 ## Release safety
 
 - A successful CI run verifies the specific conditions tested, not every commercial game or physical device.
