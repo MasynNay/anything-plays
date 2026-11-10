@@ -1,0 +1,70 @@
+name: 3.1 | Full 18-console Linux QA
+
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-full-linux-qa.yml'
+      - 'tools/assemble_v31_full_linux.py'
+      - 'verify_bundle.py'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  full-linux:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      AP_V31_PREVIEW: '1'
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install native libraries for original mGBA and UI verification
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Download exact public 3.0 original-source native installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original30
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern 'anything-plays_3.0.0_amd64.deb' --dir original30
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern 'SHA256SUMS.txt' --dir original30
+      - name: Download built 3.1 controller-enabled application installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 42822217817 --repo "$GITHUB_REPOSITORY" --name AnythingPlays-3.1-Preview1-linux-x64-UNRELEASED --dir preview31
+          test -s preview31/anything-plays-31-preview_3.1.0~preview1_amd64.deb
+          test -s preview31/PREVIEW1_RECEIPT.json
+      - name: Build, independently verify and hash full 18-console QA package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/assemble_v31_full_linux.py \
+            --stable original30/anything-plays_3.0.0_amd64.deb \
+            --preview preview31/anything-plays-31-preview_3.1.0~preview1_amd64.deb \
+            --sums original30/SHA256SUMS.txt \
+            --receipt preview31/PREVIEW1_RECEIPT.json \
+            --output full31
+      - name: Retain full Linux test package only, never publish a release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-FULL-18-Linux-QA-UNRELEASED
+          path: |
+            full31/anything-plays-31-preview_3.1.0~preview2_amd64.deb
+            full31/FULL_LIBRARY_QA_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
