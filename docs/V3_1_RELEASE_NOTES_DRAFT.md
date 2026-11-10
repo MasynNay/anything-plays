@@ -12,6 +12,11 @@ Do not mark 3.1 as stable until the acceptance criteria in
 - **Visual configuration:** A compact controller card on the right of the game
   screen, with connection status, rescan, themed controller artwork and a
   dedicated visual mapping window.
+- **Live button tester:** View detected physical buttons and stick directions
+  without starting a game. The tester is read-only, independent of remapping,
+  and pauses its readout when Anything Plays loses focus.
+- **Rescan safety:** Immediately release held controller buttons on Rescan;
+  malformed saved mappings are ignored instead of interrupting controller play.
 - **Per-console remapping:** Choose face buttons, D-pad, both analog sticks,
   triggers, shoulders and menu buttons independently for each console.
 - **Safer input:** Clear controller-only held buttons on disconnect, focus loss,
