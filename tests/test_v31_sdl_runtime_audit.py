@@ -144,6 +144,29 @@ class SDLRuntimeAuditTests(unittest.TestCase):
                 self.assertIn("gh run download " + run_id, workflow)
                 self.assertNotIn("gh run download 42822217817", workflow)
 
+    def test_valid_relative_soname_symlink_is_hashed_and_cannot_escape(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, native = fixture(d)
+            link = native / "libSDL2.so"
+            try:
+                link.symlink_to("base.pyd")
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlinks unavailable on this OS")
+            report = inspect_bundle(d, "linux-x64")
+            entry = next(item for item in report["native_candidates"]
+                         if item["path"].endswith("libSDL2.so"))
+            self.assertEqual(entry["symlink_target"],
+                             "_internal/pygame/base.pyd")
+            self.assertEqual(entry["sha256"],
+                             next(item["sha256"] for item in
+                                  report["native_candidates"]
+                                  if item["path"].endswith("base.pyd")))
+            link.unlink()
+            outside = Path(d).parent / "outside-does-not-exist.so"
+            link.symlink_to(outside)
+            with self.assertRaises(ValueError):
+                inspect_bundle(d, "linux-x64")
+
     def test_source_workflow_fails_closed_and_does_not_publish(self):
         root = Path(__file__).resolve().parents[1]
         for path in (".github/workflows/v31-full-linux-qa.yml",
