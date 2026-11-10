@@ -81,6 +81,11 @@ def build(stable, preview, sums, receipt, output_dir):
                 shutil.copy2(path, newlicenses/path.name)
         if not (newlicenses/"python-distribution-notices").is_dir():
             raise ValueError("3.1 SDL dependency notices missing")
+        # Current pygame-ce wheel inventory has no wheel notice files.
+        # Include and exact-hash the verbatim pinned upstream LGPL document.
+        shutil.copy2(Path(__file__).resolve().parents[1] /
+                     "licenses/Pygame-CE-LGPL-2.1.txt",
+                     newlicenses/"Pygame-CE-LGPL-2.1.txt")
 
         ctrl = root/"new/DEBIAN/control"
         data = ctrl.read_text("utf-8")
