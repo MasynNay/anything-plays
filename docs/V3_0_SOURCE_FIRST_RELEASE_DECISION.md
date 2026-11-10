@@ -1,5 +1,7 @@
 # Anything Plays 3.0.0 — source-first distribution assessment and known limitations
 
+**Release outcome:** [Public stable v3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) was published November 9, 2026, after [successful source-first verification](https://github.com/MasynNay/anything-plays/actions/runs/42724633466), with all four native installers, checksums and [matching original upstream sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). The notes below record the technical distribution assessment, not legal certainty or a promise that every game and physical device is verified.
+
 **Scope:** exactly the eleven original-source Libretro libraries compiled in the successful four-platform build, not historical Stella/Snes9x/Genesis Plus GX previews.
 
 This is an **engineering and maintainer distribution assessment** based on the actual source and binary identities. It is not legal advice, a warranty, or a claim that an independent lawyer approved each dependency. The project maintainer has repeatedly authorized publication of the free, open-source, noncommercial portfolio application with all four installers.
