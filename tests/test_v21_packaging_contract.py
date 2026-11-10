@@ -24,7 +24,11 @@ class PackagingContractTests(unittest.TestCase):
         self.assertIn('DMG_NAME="AnythingPlays-3.0.0-alpha.1.dmg"', script)
         self.assertIn('DMG="release/$DMG_NAME"', script)
         self.assertIn('AnythingPlays-3.0.0-alpha1-macOS-', ci)
-        self.assertIn('dist/AnythingPlays30Preview.app', script)
+        # Keep 3.0's original default without forcing newer isolated preview
+        # installers to reuse its app bundle directory.
+        self.assertIn('BUNDLE_FILE="AnythingPlays30Preview.app"', script)
+        self.assertIn('APP_BUNDLE="dist/$BUNDLE_FILE"', script)
+        self.assertIn('mv dist/AnythingPlays.app "$APP_BUNDLE"', script)
         self.assertIn('release/AnythingPlays-3.0.0-alpha.1.dmg', ci)
 
     def test_linux_alpha_package_is_unique_and_launchable(self):

@@ -41,6 +41,13 @@ Individual game compatibility, graphics performance, physical cameras, save type
 
 The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
+### Preview 1 packaging and owner QA (unreleased)
+
+- Four dedicated build jobs run on Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. Each retains a SHA-256-recorded installer as a seven-day GitHub Actions artifact, **never a GitHub Release**.
+- Preview 1 uses distinct application identifiers and a separate 3.1 settings directory. It cannot overwrite the stable 3.0 installation or the older 3.0 test-preview installation.
+- This is deliberately an initial controller and GUI acceptance build containing only the mGBA native core (GB, GBC, GBA). Other system selections may be visible but their cores are not included, and the full 18-system offline package is **not** claimed.
+- Test users should verify real controller recognition and button remapping first; complete physical-device and redistribution approvals remain future release gates.
+
 ## 3.1 — Controls and usability (development branch, unreleased)
 
 **Development only:** Work is isolated on `feature/v3.1-controls-usability`.
