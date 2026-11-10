@@ -41,6 +41,18 @@ Individual game compatibility, graphics performance, physical cameras, save type
 
 The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
+## 3.1 — Controls and usability (development branch, unreleased)
+
+**Development only:** Work is isolated on `feature/v3.1-controls-usability`.
+No 3.1 installers or release tags have been published; 3.0 remains stable.
+
+- Game Controls button replaces the old Keyboard shortcuts label above gameplay.
+- Step 8 now has a dedicated Keyboard Shortcuts button; both open editable per-console keyboard keys.
+- Keep one control-label sizing slider beside the camera preview; remove the redundant advanced right-side control.
+- Add optional SDL2 gamepad input for embedded manual play, per-console configurable mappings, D-pad and analog stick directions, and connection/rescan status. Controller and keyboard holds remain independent.
+- **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
+- 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
+
 ## Next priorities
 
 | Priority | Focus | Success criteria |

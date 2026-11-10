@@ -48,6 +48,10 @@ class GamepadMixin:
             return
         try:
             if self.gamepad_enabled.get():
+                # A saved enabled preference also needs SDL initialization
+                # after startup; the checkbox callback is not run by Tk.
+                if self._gamepad.api is None:
+                    self._gamepad.start()
                 system = self.system_key.get()
                 settings = self._gamepad_bindings.get(system)
                 buttons, status = self._gamepad.poll(system, settings)
@@ -70,6 +74,7 @@ class GamepadMixin:
             self.gamepad_status.set(
                 "Controller disconnected or unavailable: " + str(exc)[:130]
             )
+            self.save_preferences()
         finally:
             if not self._closing:
                 self._gamepad_tick_job = self.root.after(65, self.gamepad_tick)
