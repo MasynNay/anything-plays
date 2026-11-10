@@ -183,8 +183,9 @@ def verify_bundle(bundle, platform_name, check_native=False):
                 or original["all_console_profiles"] != 18):
             raise ValueError("3.1 full candidate is missing the complete 3.0 source-built family")
         original_notices = (
-            "Supafaust-COPYING.txt", "BlastEm-COPYING.txt",
-            "PCE-COPYING.txt", "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt",
+            "GPL-TRIAL-Supafaust-COPYING.txt",
+            "GPL-TRIAL-BlastEm-COPYING.txt",
+            "GPL-TRIAL-PCE-COPYING.txt", "MPL-TRIAL-mGBA-ORIGINAL-LICENSE.txt",
             "GPL-TRIAL-tia-ORIGINAL-SPDX.txt",
             "GPL-TRIAL-DOLPHIN-ORIGINAL-COPYING.txt",
         )
