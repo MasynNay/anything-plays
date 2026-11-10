@@ -18,6 +18,6 @@ The current public version is [Anything Plays 3.0.0](https://github.com/MasynNay
 
 Anything Plays works with local cameras, user-supplied game files and native emulator libraries. Only install verified releases from the official repository; compare SHA256 checksums with the matching release manifest. Never load arbitrary DLL, SO or DYLIB files from untrusted sources. Keep untrusted ROMs and native code outside the version-controlled source tree.
 
-The official 3.0 release contains 11 original-source-built emulator cores and includes corresponding source archives and original third-party notices. Build-time source downloads are pinned and verified for the released core lineup. No commercial ROMs or proprietary console firmware are distributed. Consult [the source audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release evidence](docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md) for precise scope.
+The official 3.0 release contains 11 original-source-built emulator cores and includes corresponding source archives and original third-party notices. Build-time source downloads are pinned and verified for the released core lineup. No commercial ROMs or proprietary console firmware are distributed. Consult [the source audit](../docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release evidence](../docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md) for precise scope.
 
 We welcome reproducible vulnerability reports, responsibly disclosed through private channels before public technical details are posted.

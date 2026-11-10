@@ -2,7 +2,7 @@
 
 **If it moves, it plays.** This roadmap tracks what has shipped, what has been verified in development, and where the project is going. It deliberately separates completed engineering work from public release availability.
 
-[Website](https://anythingplays.masynnay.com/) · [Latest public release](https://github.com/MasynNay/anything-plays/releases/latest) · [Issues](https://github.com/MasynNay/anything-plays/issues) · [Architecture](docs/ARCHITECTURE.md)
+[Website](https://anythingplays.masynnay.com/) · [Latest public release](https://github.com/MasynNay/anything-plays/releases/latest) · [Issues](https://github.com/MasynNay/anything-plays/issues) · [Architecture](ARCHITECTURE.md)
 
 ## Progress at a glance
 
@@ -39,7 +39,7 @@ The public stable 3.0 release expands from four supported console profiles to 18
 
 Individual game compatibility, graphics performance, physical cameras, save types, and extended-session stability vary by computer and are not exhaustively certified. Unsigned Windows installers and macOS applications without Apple notarization may display operating-system warnings. No commercial ROMs or console firmware are included.
 
-The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](docs/V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](docs/V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
+The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
 ## Next priorities
 
@@ -57,6 +57,6 @@ Priorities are engineering directions, **not promises of a release date**. Chang
 
 ## Contributing and tracking
 
-Use [GitHub Issues](https://github.com/MasynNay/anything-plays/issues) to report reproducible problems or suggest features. Include the affected operating system and console when relevant. The [contribution guide](CONTRIBUTING.md) explains testing and code expectations.
+Use [GitHub Issues](https://github.com/MasynNay/anything-plays/issues) to report reproducible problems or suggest features. Include the affected operating system and console when relevant. The [contribution guide](../.github/CONTRIBUTING.md) explains testing and code expectations.
 
-For anyone who wants the original CI logs, source hashes, dependency notices or build procedure, start with the [technical documentation index](docs/README.md). The detailed append-only [engineering checkpoint](docs/development/CONTINUE_HERE.md) is retained for development recovery and is **not** the public product roadmap.
+For anyone who wants the original CI logs, source hashes, dependency notices or build procedure, start with the [technical documentation index](README.md). The detailed append-only [engineering checkpoint](development/CONTINUE_HERE.md) is retained for development recovery and is **not** the public product roadmap.

@@ -1,6 +1,6 @@
 # Anything Plays — Technical documentation
 
-This directory holds the engineering, packaging, source, and test details behind [Anything Plays](../README.md). The root README is the public project introduction; the [roadmap](../ROADMAP.md) describes milestones and priorities.
+This directory holds the engineering, packaging, source, and test details behind [Anything Plays](../README.md). The root README is the public project introduction; the [roadmap](ROADMAP.md) describes milestones and priorities.
 
 ## Start here
 
@@ -8,8 +8,8 @@ This directory holds the engineering, packaging, source, and test details behind
 | --- | --- |
 | How the application works | [Architecture](ARCHITECTURE.md) |
 | Building and validating releases | [CI workflows](V3_CI_WORKFLOWS.md) |
-| Contributing and local tests | [Contributing](../CONTRIBUTING.md) |
-| Security and responsible reporting | [Security policy](../SECURITY.md) |
+| Contributing and local tests | [Contributing](../.github/CONTRIBUTING.md) |
+| Security and responsible reporting | [Security policy](../.github/SECURITY.md) |
 | Current 3.0 original-source and binary audit | [Exact 11-core source assessment](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) |
 | Source-first distribution assessment | [3.0 source and release notes](V3_0_SOURCE_FIRST_RELEASE_DECISION.md) |
 | Licensing and attribution | [Third-party notices](THIRD_PARTY_NOTICES.md) |

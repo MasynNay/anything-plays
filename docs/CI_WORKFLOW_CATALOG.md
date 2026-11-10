@@ -32,4 +32,4 @@ Archived in this cleanup: `capture-sources.yml`, `v30-corresponding-source-acces
 - **Published downloads:** [GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest). Private draft and workflow artifacts are not public releases.
 - Older public version 2.0 installers remain separate and unchanged.
 
-For local development, see [Contributing](../CONTRIBUTING.md), [Architecture](../docs/ARCHITECTURE.md), and [technical documentation](../docs/README.md). Detailed CI reproduction and license provenance belong in those documents, not the repository landing page.
+For local development, see [Contributing](../.github/CONTRIBUTING.md), [Architecture](ARCHITECTURE.md), and [technical documentation](README.md). Detailed CI reproduction and license provenance belong in those documents, not the repository landing page.

@@ -10,7 +10,7 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Portfolio website](https://anythingplays.masynnay.com/) · [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Portfolio website](https://anythingplays.masynnay.com/) · [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
@@ -146,17 +146,17 @@ anything-plays/
 ├── tests/                Unit, integration and native checks
 ├── tools/                Build and verification helpers
 ├── .github/workflows/    CI and release automation
-├── ROADMAP.md            Current development roadmap
+├── docs/ROADMAP.md       Current development roadmap
 └── README.md             Project overview
 ```
 
 ## Development roadmap
 
-Anything Plays is actively maintained. The [public roadmap](ROADMAP.md) separates released functionality from ongoing reliability work and future proposals.
+Anything Plays is actively maintained. The [public roadmap](docs/ROADMAP.md) separates released functionality from ongoing reliability work and future proposals.
 
 **Current priorities:** GameCube GPU performance and long-session stability, more camera and save compatibility testing, and better setup diagnostics. Planned work includes easier camera calibration and portable control profiles.
 
-[Read the roadmap](ROADMAP.md) · [Browse development issues](https://github.com/MasynNay/anything-plays/issues)
+[Read the roadmap](docs/ROADMAP.md) · [Browse development issues](https://github.com/MasynNay/anything-plays/issues)
 
 ## Development and testing
 
@@ -166,7 +166,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 The source includes automated tests and four-platform release checks. The [verified 3.0 build](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) covers packaged startup and selected emulator behavior. This is **not** a claim of compatibility with every retail game, webcam, GPU or extended session.
 
-See [technical documentation](docs/README.md), [contributing](CONTRIBUTING.md), and the [security policy](SECURITY.md). If you encounter an issue, include your OS, console, expected behavior, and steps to reproduce, without uploading copyrighted game files or private camera footage.
+See [technical documentation](docs/README.md), [contributing](.github/CONTRIBUTING.md), and the [security policy](.github/SECURITY.md). If you encounter an issue, include your OS, console, expected behavior, and steps to reproduce, without uploading copyrighted game files or private camera footage.
 
 ## Technology
 

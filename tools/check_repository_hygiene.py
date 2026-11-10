@@ -14,9 +14,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = frozenset({
-    ".gitattributes", ".gitignore", "CODE_OF_CONDUCT.md",
-    "CONTINUE_HERE.md", "CONTRIBUTING.md", "LICENSE", "README.md",
-    "ROADMAP.md", "SECURITY.md", "app.py", "fetch_mgba_core.py",
+    ".gitattributes", ".gitignore",
+    "LICENSE", "README.md", "app.py", "fetch_mgba_core.py",
     "requirements-build.txt", "requirements.txt", "verify_bundle.py",
 })
 ROOT_DIRECTORIES = frozenset({

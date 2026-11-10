@@ -30,7 +30,7 @@ virtual environment; do not commit `.venv`, `cores/`, `dist/`, or `release/`.
 - Preserve complete offline core and Dolphin Sys verification in all three platform packaging scripts.
 - Keep downloaded third-party emulator cores, installer outputs and game ROMs out of Git; repository hygiene is enforced by CI.
 - Do not report a release as published until GitHub's public tag, installer assets, SHA256 manifest and corresponding original source archive are verifiably available. Describe tested configurations accurately; never convert an unperformed hardware test into a pass.
-- Keep original application screenshots separate from diagrams or simulated concept images. The [README screenshot script](tools/prepare_readme_screenshots.py) produces only crops of the existing authentic Linux desktop capture; do not invent footage of a camera or ROM.
+- Keep original application screenshots separate from diagrams or simulated concept images. The [README screenshot script](../tools/prepare_readme_screenshots.py) produces only crops of the existing authentic Linux desktop capture; do not invent footage of a camera or ROM.
 
 ## Test before opening a pull request
 
