@@ -1,0 +1,102 @@
+name: 3.1 | Native macOS two SDL2 dylib load-order smoke (unreleased)
+
+# Direct dyld loading from exact signed frozen RC1 apps, isolated in
+# sub-processes to test possible duplicate SDL2 install-name conflicts.
+# Does not request a camera or physical gamepad, and cannot publish.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-rc1-macos-dyld-load-probe.yml'
+      - 'tools/probe_v31_macos_sdl_load.py'
+      - 'tests/test_v31_macos_dyld.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-macos-dyld-sdl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-both-sdl:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Real signed SDL2 dyld load · ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, arch: arm64, target: macos-arm64}
+          - {runner: macos-15-intel, arch: x64, target: macos-x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42865608433'
+      QA_SHA: '29d0f9bced7b19952e70b12567c292c470b6b44f'
+      SIGNED_RUN: '42875616776'
+      SIGNED_SHA: '54b6bd721c1d298849b1fb5b624311a12e0fa79d'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test that changing native bytes and coalescing is detected
+        run: python -m unittest discover -s tests -p 'test_v31_macos_dyld.py' -v
+      - name: Pin both source runs and successful native inspections
+        shell: bash
+        run: |
+          set -euo pipefail
+          for line in "$QA_RUN:$QA_SHA" "$SIGNED_RUN:$SIGNED_SHA"; do
+            run="${line%%:*}"
+            sha="${line#*:}"
+            real="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+            status="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            [[ "$sha" == "$real" && "$status" == success ]] || {
+              echo "::error::Refusing mutable unverified signed library input"
+              exit 1
+            }
+          done
+      - name: Download the exact full 18-console signed DMG and native JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original
+          gh run download "$SIGNED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SDL-LINKAGE-REVIEW-UNAPPROVED" \
+            --dir signed
+          test -s "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json"
+          test -s "original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+      - name: Read-only mount and test actual SDL2 dynamic loading in both orders
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          dmg="$PWD/original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-dyld.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"
+          app="$mountdir/AnythingPlays31RC.app"
+          test -d "$app"
+          codesign --verify --verbose=2 "$app"
+          python -m tools.probe_v31_macos_sdl_load \
+            --bundle "$app" \
+            --linkage "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json" \
+            --target "${{ matrix.target }}" \
+            --output "evidence/SDL_DYLD_LOAD_${{ matrix.arch }}.json"
+      - name: Retain exact SDL dynamic-loader evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SDL-DYLD-LOAD-UNRELEASED
+          path: evidence/SDL_DYLD_LOAD_${{ matrix.arch }}.json
+          if-no-files-found: warn
+          retention-days: 14
