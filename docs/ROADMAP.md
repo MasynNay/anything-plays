@@ -66,6 +66,14 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   cores passed across Linux x64, Windows x64, macOS ARM64 and Intel, with
   exact 3.0 binary provenance and package verification. [Evidence](V3_1_RELEASE_ACCEPTANCE.md).
   The packages remain unreleased QA artifacts, not stable installers.
+- **Updated controller build and frozen-runtime audit:** Newer QA candidates
+  replace the old frozen controller executable with the version containing
+  live button diagnostics and immediate Rescan release, preserving original
+  3.0 native-core hashes. A byte-verified pygame-ce LGPL notice now ships
+  alongside an explicit JSON audit of actual frozen pygame/SDL libraries.
+  [Audit method](V3_1_SDL_RUNTIME_AUDIT.md). Linux, Apple Silicon and Intel
+  Mac packaging checks have passed; Windows is undergoing a line-ending-safe
+  repackaging verification. This is **not yet stable release readiness**.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
