@@ -767,3 +767,86 @@ v3.0.0 and v2.0 remain untouched. **No 3.1 public release**.
    3.1.0 installer upgrade identities, release notes and explicit
    owner approval. Keep PR #156 draft and stable 3.0 unchanged.
 
+## Fresh RC1 installed desktop GUI, SDL loader and five original source candidate milestones — November 10, 2026
+
+All work below was performed and **committed** to
+`feature/v3.1-controls-usability` with draft PR #156. Stable public
+`v3.0.0` and v2.0 remain unchanged, no release approval or public 3.1
+was issued. The verified full 18-console/11-original-source-core
+RC1 QA installers remain the pinned 4/4 successful source build
+[42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433),
+built from app source revision
+`86baa6972ed923540f6ab49b636652a0f499d45c`.
+
+**New concrete work with verified results:**
+
+- New `tools/audit_v31_sdl_collision.py` and tests, plus
+  read-only [SDL loader collision run 42879312220](https://github.com/MasynNay/anything-plays/actions/runs/42879312220),
+  **PASSED**. The real Apple Silicon 3.1 RC1 signed .app has
+  OpenCV `cv2/__dot__dylibs/libSDL2-2.0.0.dylib` version
+  `3201.8.0` and pygame's separate
+  `pygame/__dot__dylibs/libSDL2-2.0.0.dylib` version
+  `3201.10.0`, with additional same-digest framework paths. One
+  same-basename different-version collision was reported on ARM64,
+  none on Intel. This is a potential loader ambiguity, not evidence
+  of crash, camera compatibility, malicious exploit or legal approval.
+  Machine-readable `SDL_LIBRARY_COLLISIONS.json` was uploaded.
+- New `tools/verify_v31_sdl_component_sources.py`,
+  `tests/test_v31_sdl_component_sources.py` and
+  [source-tag QA run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179),
+  **PASSED**. A five-tree original upstream SDL source archive was
+  prepared and sha256-verified: SDL2 2.32.8
+  (`98d1f3a45aae568ccd6ed5fec179330f47d4d356`),
+  SDL2 2.32.10
+  (`5d249570393f7a37e037abf22cd6012a4cc56a71`),
+  SDL2_image 2.8.12
+  (`12cb2e40330d256d9b1329647be8f366546d715c`),
+  SDL2_mixer 2.8.2
+  (`b208916aed9250fe434360e6c6a95f0697bb7b01`) and
+  SDL2_ttf 2.24.0
+  (`2a891473eaf05ba1707a4b7913e6c4db7de7458a`).
+  The versions were identified by actual Mach-O strings/filenames.
+  These are **source candidates**, not certified exact binary build
+  inputs or a complete corresponding-source LGPL package.
+- New `tools/verify_v31_installed_ui_smoke.py`, adversarial tests
+  and [actual installed desktop GUI run 42880420023](https://github.com/MasynNay/anything-plays/actions/runs/42880420023),
+  **PASSED all 4/4** on Linux x64, Windows x64, Apple Silicon and
+  Intel macOS. This extracted/installed the actual complete QA
+  installers on native hosts and launched each real frozen Tk
+  application using embedded `--ap-v30-ui-smoke`, initialized
+  `App`, ran the Tk event loop and verified 18 console profiles
+  and exact RC identity/source hash. Only desktop GUI startup is
+  proved, not real game or camera/controller hardware acceptance.
+  Report archives: `FROZEN_UI_SMOKE.json` and
+  `RC1_INSTALLED_UI_RECEIPT.json` for each target.
+- New `tools/probe_v31_macos_sdl_load.py` and tests, plus
+  [native SDL2 dyld coexistence run 42881412802](https://github.com/MasynNay/anything-plays/actions/runs/42881412802),
+  **PASSED both Mac OS targets**. Actual signed original
+  `libSDL2-2.0.0.dylib` file SHA-256s were checked against
+  source-linked original native inspection, then loaded from the
+  readonly mounted RC1 DMG with native `ctypes.CDLL`.
+  Apple Silicon returns SDL versions `2.32.8` (cv2) and
+  `2.32.10` (pygame) in **both library load orders**, no error.
+  Intel pygame SDL2 `2.32.10` loaded and returned its version
+  without error. Does not exercise real camera+USB gamepad
+  concurrency or every possible host loader path.
+- All new workflows use **read-only** permissions and upload
+  temporary 14-day QA reports/source references expiring around
+  **November 24, 2026**. Open docs:
+  [V3_1_INSTALLED_UI_QA.md](../V3_1_INSTALLED_UI_QA.md) and
+  [V3_1_SDL_SOURCE_REVIEW.md](../V3_1_SDL_SOURCE_REVIEW.md).
+  Source checks passed on the recent development commits.
+
+**Still open:** no physical USB/Bluetooth gamepad/camera combination
+test, no retail game/saves/audio/graphics switching or extended
+runtime on new RC hardware, no complete source-to-exact-native-binary
+build evidence for SDL deps or explicit LGPL replacement/relinking
+verification, no final stable 3.1.0 installer identity/upgrade
+verification, and no explicit public release approval. Keep all
+`config/v3.1-release-readiness.json` release gates false and PR #156
+draft. Never overwrite public stable 3.0.0 or stable 2.0.
+
+**Next:** attempt more direct (safe, hardware-free) SDL controller
+subsystem initialization from the exact signed Mac DMGs, then plan
+real hardware camera/controller and commercial-game/manual tests.
+Do not treat synthetic observations as real hardware acceptance.
