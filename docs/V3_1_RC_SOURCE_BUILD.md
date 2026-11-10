@@ -32,6 +32,27 @@ They must subsequently be combined with all 11 separately verified
 original-source native cores, and the finished installed packages
 revalidated on every host.
 
+## Full 18-console RC1 candidate pipeline (active QA)
+
+The [full RC1 QA workflow](../.github/workflows/v31-full-rc1-qa.yml)
+reuses only the **new source-built RC1 application artifacts** from run
+[42863846059](https://github.com/MasynNay/anything-plays/actions/runs/42863846059),
+pinned to source commit
+`86baa6972ed923540f6ab49b636652a0f499d45c`.
+It checks that run's exact source identity, verifies each target's
+app SHA-256 receipt and the public 3.0.0 native release SHA-256,
+then assembles all 11 original-source cores into isolated 3.1 RC1 packages.
+
+The installed full packages are independently verified with native
+emulation smoke checks, full core correspondence and the JSON SDL
+license/runtime audit. The workflows emit temporary seven-day QA ZIP
+artifacts **only when their full build jobs succeed**. Exact output names
+include `rc1-full` or `rc1full`, and never claim to be public 3.1.0.
+
+This pipeline is *under verification*. It is not considered passed
+until all four host jobs finish successfully; the existing 3.0 and 3.1
+Preview 2 verified packages remain separate, unchanged baselines.
+
 ## Next technical release gates
 
 1. Receive all four RC1 source-build successes and inspect actual
