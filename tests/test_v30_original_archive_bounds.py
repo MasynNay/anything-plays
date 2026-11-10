@@ -36,7 +36,7 @@ class OriginalArchiveBoundsTests(unittest.TestCase):
                     return False
                 def read(self, limit):
                     self.limit = limit
-                    return b"x" * (limit)
+                    return type("SyntheticOversize", (), {"__len__": lambda self: limit})()
             reader = ExcessReader()
             with patch.object(outer, "open", return_value=reader):
                 with self.assertRaisesRegex(ValueError, "exceeds limit"):
