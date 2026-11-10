@@ -26,6 +26,8 @@ TEXT_SHA = "93485b815db3d2aec3ae06cce142e167fe96d9eb8d3bf906b3585fcad4756afb"
 TEXT_LENGTH = 840688
 EXPECTED_PACKAGE_NATIVE_COUNT = 121
 EXPECTED_PYGAME_MATCHED_COUNT = 120
+MIN_WHEEL_BYTES = 40_000_000
+MAX_WHEEL_BYTES = 60_000_000
 
 
 def inspect(original_arm_report, wheel):
@@ -51,7 +53,7 @@ def inspect(original_arm_report, wheel):
         raise ValueError("Unexpected, forged or changed extra cv2 SDL2 native")
     wheel = Path(wheel)
     if (wheel.is_symlink() or not wheel.is_file()
-            or wheel.name != WHEEL or not 40_000_000 <= wheel.stat().st_size <= 60_000_000
+            or wheel.name != WHEEL or not MIN_WHEEL_BYTES <= wheel.stat().st_size <= MAX_WHEEL_BYTES
             or sha256_file(wheel) != WHEEL_SHA):
         raise ValueError("OpenCV wheel does not match the official PyPI hash")
     candidates = []
