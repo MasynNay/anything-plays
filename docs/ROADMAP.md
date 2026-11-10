@@ -61,6 +61,7 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
 - Add optional SDL2 gamepad input for embedded manual play, per-console configurable mappings, D-pad and analog stick directions, and connection/rescan status. Controller and keyboard holds remain independent.
 - Add a small theme-matched controller graphic and one-click controller setup beneath Display & Sound on the right; group physical buttons visually by D-pad, face, menu, sticks and triggers. Keep keyboard shortcuts in their dedicated dialog rather than duplicating switches.
 - **Hardware-free CI simulation:** Replay 18 console profiles, buttons, sticks, triggers, remapping, hotplug, focus changes and stale-input recovery on Linux, Windows, macOS Apple Silicon and macOS Intel, while also initializing each host's actual pygame SDL runtime. Physical hardware testing remains separate.
+- **Live input diagnostics:** The controller setup now identifies physical button/stick inputs without loading a ROM; Rescan immediately clears any held controller buttons. A new regression suite covers detection, lost focus, disconnects and invalid preferences, and is configured for the four operating-system CI runners. Physical HID acceptance remains separate.
 - **Full-library QA packaging:** 18 profiles / 11 source-built emulator
   cores passed across Linux x64, Windows x64, macOS ARM64 and Intel, with
   exact 3.0 binary provenance and package verification. [Evidence](V3_1_RELEASE_ACCEPTANCE.md).
