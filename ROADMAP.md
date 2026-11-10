@@ -234,3 +234,7 @@ PR #153 was squash merged into the v3 development branch at `7435123d` after Pyt
 ### November 10, 2026 — native ZIP extra-member rejection (pending CI)
 
 A focused development change rejects additional unverified files and directories inside native core ZIPs, requiring exactly one expected regular native library. Four synthetic regression tests cover valid and invalid archive structures. Await Python 3.12/3.13 and native compatibility CI before merge. Dolphin source correspondence, combined license rights, final production acceptance and public release remain blocked. Stable 2.0 unchanged.
+
+### November 10, 2026 — native ZIP single-member enforcement verified
+
+PR #154 merged into v3 development at `4533b785` after Python 3.12, Python 3.13 and native mGBA compatibility succeeded in source checks 42782067323, with unapproved source review 42782066937 successful. Four synthetic regressions reject extra native ZIP files, directories and duplicate entries while accepting the exact expected library. Packaging jobs were skipped. The remaining publication path requires exact source-built Dolphin production correspondence, complete combined license/notice verification, an approved immutable lock and final four-platform installer acceptance. No release flags were changed; public 3.0 is not published and stable 2.0 remains intact.
