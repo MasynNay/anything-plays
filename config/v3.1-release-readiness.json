@@ -32,5 +32,23 @@
   "verified_previews": {
     "single_mgba_core_four_platforms": "https://github.com/MasynNay/anything-plays/actions/runs/42822217817",
     "synthetic_controller_four_platforms": "https://github.com/MasynNay/anything-plays/actions/runs/42771771434"
+  },
+  "verified_qa_builds": {
+    "linux-x64": {
+      "status": "PASSED_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42842903097"
+    },
+    "windows-x64": {
+      "status": "PASSED_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42847847307"
+    },
+    "macos-arm64": {
+      "status": "PASSED_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42843346985"
+    },
+    "macos-x64": {
+      "status": "PASSED_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42843346985"
+    }
   }
 }

@@ -28,9 +28,14 @@ Do not mark 3.1 as stable until the acceptance criteria in
   tests on Linux x64, Windows x64, Intel macOS and Apple Silicon.
 - Four minimal 3.1 Preview 1 test installers with checksum receipts, containing
   *only* GB/GBC/GBA support: [Preview 1](https://github.com/MasynNay/anything-plays/actions/runs/42822217817).
-- A verified complete 18-console Linux QA package using the exact public 3.0
-  original-source core bytes, plus the new controller interface:
-  [Linux full QA run](https://github.com/MasynNay/anything-plays/actions/runs/42842903097).
+- Four verified complete 18-console **QA packages** using exactly the
+  published 3.0 original-source emulator binaries plus the frozen 3.1
+  controller-enabled application:
+  [Linux](https://github.com/MasynNay/anything-plays/actions/runs/42842903097),
+  [Windows](https://github.com/MasynNay/anything-plays/actions/runs/42847847307),
+  and [both macOS architectures](https://github.com/MasynNay/anything-plays/actions/runs/42843346985).
+  All are temporary Preview 2 artifacts rather than final stable builds.
+  [QA download and test instructions](V3_1_QA_DOWNLOADS.md).
 
 The existence of builds and CI evidence is not evidence of real-world
 USB/Bluetooth device compatibility or automatically sufficient licensing proof.

@@ -19,16 +19,45 @@ not a promise of a release date. Stable 3.0 stays public and untouched.
 - [x] Each first preview provides checksum receipts and isolates installer
   identities and settings from stable 3.0.
 
+
+## Four-platform full-library QA milestone: PASS (not a stable release)
+
+All four isolated QA installers have passed native library identity checks
+and packaging. Each contains the original 11 source-built emulator families
+used by the publicly released 3.0.0 package, preserving the 18-console map,
+alongside the 3.1 controller-enabled preview application. The input packages
+and compiled cores are checked against their recorded SHA-256 values.
+
+| System | Full 18-console QA run | Result |
+| --- | --- | --- |
+| Linux x64 | [42842903097](https://github.com/MasynNay/anything-plays/actions/runs/42842903097) | Passed; DEB installed and core hashes checked |
+| macOS Apple Silicon | [42843346985](https://github.com/MasynNay/anything-plays/actions/runs/42843346985) | Passed; re-signed QA app and DMG contents verified |
+| macOS Intel | [42843346985](https://github.com/MasynNay/anything-plays/actions/runs/42843346985) | Passed; re-signed QA app and DMG contents verified |
+| Windows x64 | [42847847307](https://github.com/MasynNay/anything-plays/actions/runs/42847847307) | Passed; real Inno Setup install plus native DLL check in isolated process |
+
+These are **Preview 2 QA binaries**, assembled from the exact published 3.0
+native payload and frozen 3.1 Preview 1. They may still display "Preview 1"
+inside the application; they are not an independently rebuilt 3.1.0 stable
+release. They are retained as temporary Actions artifacts for 7 days.
+[How to obtain and test them](V3_1_QA_DOWNLOADS.md).
+
+The remaining stable release gates (physical controller hardware,
+corresponding source for new SDL runtime, final native gameplay acceptance,
+final reproducible installer builds, and exact release notes) remain open.
+A green CI check does not replace those responsibilities.
+
 ## What is still required before a full 3.1 stable release
 
-- [ ] **Restore the full offline package:** all 18 profiles backed by
-  the eleven reviewed, source-built emulator libraries from published 3.0,
-  with their original upstream code, licensing notices, and Dolphin resources.
-  Preview 1 deliberately bundles only mGBA for GB/GBC/GBA, so this gate is
-  not met by the four successful preview installers.
-- [ ] **Rebuild and exercise all four full installers:** installed app and
-  native core hash checks, source correspondence, title and install identity,
-  save/reload, N64/GameCube switching, native GUI/video/audio.
+- [x] **Build full-library QA candidates:** all 18 profiles with the exact
+  eleven native source-built cores from published 3.0, including Dolphin,
+  their core manifests and licenses, verified on all four OS targets.
+  **This closes packaging parity for QA only, not final stable approval.**
+- [ ] **Final 3.1.0 stable rebuild and gameplay verification:** turn the
+  verified source-built QA installers into true 3.1.0 native builds, confirm
+  stable title and install identity, and exercise N64/GameCube game switching,
+  save/reload, real native audio/video, and long-session behavior across all
+  supported targets. Full-library QA package hashes are passed, but final
+  stable identity and real-game end-to-end acceptance are not.
 - [ ] **Actual controller testing:** at least one real USB or Bluetooth
   SDL-compatible gamepad on accessible hardware; test recognition,
   remapping, disconnect/reconnect, focus loss, startup/shutdown and
@@ -52,6 +81,7 @@ has full offline console functionality; it must not be replaced by mGBA-only
 3.1 Preview 1. **Neither a CI green check nor a GitHub draft PR is proof that
 the untested physical controller or redistribution requirements are satisfied.**
 
-The next engineering milestone is a complete four-platform 3.1 release
-candidate with all eleven native cores. A documented hardware test and
-licensing review are then the remaining approval steps before publication.
+The four-platform full-library packaging milestone is now complete.
+The next steps are a final source-built **stable-identity** candidate,
+real-game/physical-controller acceptance, and SDL/pygame-ce redistribution
+review before any public stable release.
