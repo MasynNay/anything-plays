@@ -1,0 +1,73 @@
+name: 3.1 | Full 18-console macOS QA
+
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-full-macos-qa.yml'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'verify_bundle.py'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  full-macos:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Full 3.1 QA · ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: arm64, runner: macos-15}
+          - {arch: x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 65
+    env:
+      AP_V31_PREVIEW: '1'
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Obtain exact public 3.0 original-source DMG and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original30
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern "AnythingPlays-3.0.0-macos-${{ matrix.arch }}.dmg" --dir original30
+          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" --pattern "SHA256SUMS.txt" --dir original30
+      - name: Obtain exact controller-enabled 3.1 Preview 1 DMG and receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 42822217817 --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-Preview1-macos-${{ matrix.arch }}-UNRELEASED" --dir preview31
+          test -s "preview31/AnythingPlays-3.1.0-preview1-macos-${{ matrix.arch }}.dmg"
+          test -s preview31/PREVIEW1_RECEIPT.json
+      - name: Assemble and verify exact eleven original-source native cores inside full 3.1 DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_macos --arch "${{ matrix.arch }}" \
+            --stable "original30/AnythingPlays-3.0.0-macos-${{ matrix.arch }}.dmg" \
+            --preview "preview31/AnythingPlays-3.1.0-preview1-macos-${{ matrix.arch }}.dmg" \
+            --checksums original30/SHA256SUMS.txt \
+            --receipt preview31/PREVIEW1_RECEIPT.json --output full31
+      - name: Retain full macOS QA artifact only, never a public release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-FULL-18-macos-${{ matrix.arch }}-QA-UNRELEASED
+          path: |
+            full31/AnythingPlays-3.1.0-preview2-macos-${{ matrix.arch }}.dmg
+            full31/FULL_MACOS_QA_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
