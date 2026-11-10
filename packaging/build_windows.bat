@@ -37,6 +37,16 @@ if "%AP_V31_PREVIEW%"=="1" (
   if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
   set "VERSION=3.1.0-preview1"
 )
+REM Independent source-built RC1 application stage: still mGBA only,
+REM never a stable installer or a replacement for the public 3.0.
+if "%AP_V31_RC%"=="1" (
+  if "%AP_V31_PREVIEW%"=="1" exit /b 1
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  if "%AP_V30_STABLE_CANDIDATE%"=="1" exit /b 1
+  if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
+  set "VERSION=3.1.0-rc1"
+)
 REM Both CI preview and fully approved 3.0 builds include all 11 cores.
 REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
 set "AP_FULL_CORE_BUILD=0"
@@ -77,7 +87,15 @@ if errorlevel 1 exit /b 1
 REM The corrected 3.0 preview icon is built independently from stable 2.0 artwork.
 .build-venv\Scripts\python.exe tools\render_v21_icon.py
 if errorlevel 1 exit /b 1
-.build-venv\Scripts\python.exe -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays --icon build\v21-icon\anything_plays.ico --add-data "assets\anything_plays.png;assets" --add-data "assets\anything_plays_v21.webp;assets" --collect-all cv2 --collect-all PIL app.py
+set "V31_IDENTITY_ARG="
+if "%AP_V31_PREVIEW%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
+if "%AP_V31_RC%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
+if defined V31_IDENTITY_ARG (
+  .build-venv\Scripts\python.exe -m tools.write_v31_identity build\v31_build_identity.json
+  if errorlevel 1 exit /b 1
+)
+if errorlevel 1 exit /b 1
+.build-venv\Scripts\python.exe -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays %V31_IDENTITY_ARG% --icon build\v21-icon\anything_plays.ico --add-data "assets\anything_plays.png;assets" --add-data "assets\anything_plays_v21.webp;assets" --collect-all cv2 --collect-all PIL app.py
 if errorlevel 1 exit /b 1
 if not exist dist\AnythingPlays\cores mkdir dist\AnythingPlays\cores
 set "CORE_LIST=mgba snes9x"
@@ -242,7 +260,9 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-if "%AP_V31_PREVIEW%"=="1" (
+if "%AP_V31_RC%"=="1" (
+  "%ISCC%" /DV31RCBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else if "%AP_V31_PREVIEW%"=="1" (
   "%ISCC%" /DV31PreviewBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
 ) else if "%AP_V30_APPROVED_RELEASE%"=="1" (
   "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
