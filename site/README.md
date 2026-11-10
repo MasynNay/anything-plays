@@ -13,7 +13,7 @@ The `site/` folder is a complete, static HTML/CSS/JavaScript portfolio showcase.
 - `CNAME` and `.nojekyll` are included. Keep the custom domain configured under GitHub Pages, and enable HTTPS when the certificate is available.
 - The original fish logo is a Git-object-exact copy of `assets/anything_plays_v21.webp` from the 3.0 development branch; the site must **not regenerate or redraw** the fish.
 - The interactive control grid is a clearly labeled **illustrative concept**, not a playable browser ROM or a screenshot of the app.
-- **Stable release** links lead to v2.0. 3.0 is described as an active developer preview with unresolved testing and distribution requirements.
+- **Stable release:** [Anything Plays 3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) is public on Windows, Linux, Apple Silicon and Intel Mac, with all 18 console profiles. The [11 pinned original emulator source archives](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) and exact SHA256 checksums are available separately. Stable 2.0 remains available under previous releases.
 
 To add this project to the main `masynnay.com` portfolio, add a project tile linking to **https://anythingplays.masynnay.com/** with the caption: **Anything Plays — a cross-platform camera-controlled gaming studio built with Python, OpenCV, Tkinter, Libretro and GitHub Actions**. This portfolio repository does **not** modify the separate main personal website.
 
@@ -28,4 +28,4 @@ The desktop app's source, runtime, installation and release workflows are unchan
 
 ## Screenshot provenance
 
-`assets/anything-plays-desktop-preview.webp` is a real capture of the **packaged 3.0 Linux preview** running in a clean virtual X11 display, cropped to the Tk app window. No commercial ROM, personal webcam data or synthetic game footage appears in it. It is a UI reference, not a compatibility guarantee for 3.0.
+`assets/anything-plays-desktop-preview.webp` is a real capture of the **packaged 3.0 Linux development UI** running in a clean virtual X11 display, cropped to the Tk app window. The README also displays two reproducible, attribution-labeled detail crops generated from this same image with `tools/prepare_readme_screenshots.py`, not additional simulated gameplay sessions. No commercial ROM, personal webcam data or synthetic game footage appears in it. It is a UI reference, not a compatibility guarantee for 3.0.
