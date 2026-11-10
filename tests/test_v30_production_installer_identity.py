@@ -23,7 +23,11 @@ class V30ProductionIdentityTests(unittest.TestCase):
         self.assertIn("load_approved_lock()", bat)
         self.assertIn('set "VERSION=3.0.0"', bat)
         self.assertIn("/DProductionBuild=1", bat)
-        self.assertIn("#ifdef ProductionBuild", iss)
+        # Both preprocessor forms guard the real 3.0 production block.
+        # Inno Setup successfully compiled the 3.1 preview using #elif.
+        self.assertTrue(
+            "#ifdef ProductionBuild" in iss or "#elif defined(ProductionBuild)" in iss
+        )
         self.assertIn('#define AppName "Anything Plays"', iss)
         self.assertIn('#define AppName "Anything Plays 3.0 Preview"', iss)
         self.assertIn("DefaultDirName={autopf}\\Anything Plays", iss)
