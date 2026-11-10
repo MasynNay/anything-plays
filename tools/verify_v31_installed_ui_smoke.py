@@ -14,7 +14,7 @@ from pathlib import Path
 
 from tools.verify_v31_rc import validate_staged_identity
 
-SOURCE_COMMIT = "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+SOURCE_COMMIT = "26de1e1ad1b701d0735e085158347f8c213ce437"
 TARGETS = {
     "linux-x64": ("UNRELEASED_3_1_FULL_LINUX_RC1_QA",
                   "anything-plays-31-rc1_3.1.0~rc1full_amd64.deb"),

@@ -118,7 +118,7 @@ class InstalledFrozeGUIContracts(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / ".github/workflows/v31-rc1-installed-gui-smoke.yml"
         ).read_text("utf-8")
-        self.assertIn("42894172881", text)
+        self.assertIn("42905694504", text)
         self.assertIn("qa_v31_installed_settings_migration seed", text)
         self.assertIn("qa_v31_installed_settings_migration verify", text)
         self.assertIn("RC1_INSTALLED_SETTINGS_RECEIPT.json", text)
