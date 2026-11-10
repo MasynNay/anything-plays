@@ -86,8 +86,8 @@ class SignedVirtualJoystickTests(unittest.TestCase):
     def test_workflow_does_not_publish_and_pins_refreshed_qa(self):
         path=Path(__file__).resolve().parents[1] / ".github/workflows/v31-rc1-macos-virtual-joystick.yml"
         flow=path.read_text("utf-8")
-        self.assertIn("42886791394",flow)
-        self.assertIn("42888996877",flow)
+        self.assertIn("42905694504",flow)
+        self.assertIn("42906227613",flow)
         self.assertIn("actions/upload-artifact@v4",flow)
         self.assertNotIn("contents: write",flow)
         self.assertNotIn("gh release create",flow)

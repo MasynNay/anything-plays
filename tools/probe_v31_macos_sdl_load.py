@@ -16,7 +16,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-SOURCE_COMMIT = "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
+SOURCE_COMMIT = "26de1e1ad1b701d0735e085158347f8c213ce437"
 EXPECTED = {"macos-arm64": {"cv2": "2.32.8", "pygame": "2.32.10"},
             "macos-x64": {"pygame": "2.32.10"}}
 PYTHON_PROBE = r'''

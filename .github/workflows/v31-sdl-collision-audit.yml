@@ -26,8 +26,8 @@ jobs:
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: '42888996877'
-      SOURCE_SHA: '72d29385c290742f85fa7c8ee3087611efcf2994'
+      SOURCE_RUN: '42906227613'
+      SOURCE_SHA: '01123565029f1397cbd472538b95d8f8173a2a97'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
