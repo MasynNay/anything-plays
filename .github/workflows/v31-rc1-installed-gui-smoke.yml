@@ -1,0 +1,178 @@
+name: 3.1 RC1 | Actual installed 18-console Tk desktop smoke (unreleased)
+
+# Launch the *exact installed full 18-console* RC1 application on each OS.
+# Its existing frozen --ap-v30-ui-smoke flag is an intentional CI diagnostic
+# that constructs the actual Tk App and runs the GUI loop before exiting.
+# No camera, gamepad, ROM, source compliance or public release is claimed.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-rc1-installed-gui-smoke.yml'
+      - 'tools/verify_v31_installed_ui_smoke.py'
+      - 'tests/test_v31_installed_ui_smoke.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-rc1-installed-gui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot-unreleased-full-rc:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Installed RC1 GUI startup · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, arch: none, file: 'anything-plays-31-rc1_3.1.0~rc1full_amd64.deb', receipt: 'FULL_LIBRARY_QA_RECEIPT.json'}
+          - {runner: windows-latest, target: windows-x64, arch: none, file: 'AnythingPlaysSetup-3.1.0-rc1-full.exe', receipt: 'FULL_WINDOWS_QA_RECEIPT.json'}
+          - {runner: macos-15, target: macos-arm64, arch: arm64, file: 'AnythingPlays-3.1.0-rc1-full-macos-arm64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+          - {runner: macos-15-intel, target: macos-x64, arch: x64, file: 'AnythingPlays-3.1.0-rc1-full-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42865608433'
+      QA_SHA: '29d0f9bced7b19952e70b12567c292c470b6b44f'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate that startup reports cannot impersonate hardware acceptance
+        run: python -m unittest discover -s tests -p 'test_v31_installed_ui_smoke.py' -v
+      - name: Require exact original four-platform successful RC1 job
+        shell: bash
+        run: |
+          set -euo pipefail
+          original_sha="$(gh run view "$QA_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          original_status="$(gh run view "$QA_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          [[ "$original_sha" == "$QA_SHA" && "$original_status" == success ]] || {
+            echo "::error::Refusing unverified installer source"; exit 1;
+          }
+      - name: Obtain exact 18-console RC1 installer and original QA receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir qa
+          test -s "qa/${{ matrix.file }}"
+          test -s "qa/${{ matrix.receipt }}"
+          mkdir -p evidence
+      - name: Install needed Linux GUI shared libraries and virtual display
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+      - name: Launch actual extracted Linux RC1 GUI under Xvfb and complete Tk loop
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'qa/${{ matrix.file }}' full-install
+          app="$PWD/full-install/opt/anything-plays-31-rc1/AnythingPlays"
+          test -x "$app"
+          home="$(mktemp -d)"
+          mkdir -p "$home/.config"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$home" XDG_CONFIG_HOME="$home/.config" \
+              AP_V30_UI_SMOKE_CHECK=1 \
+              AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_UI_SMOKE.json" \
+              SDL_AUDIODRIVER=dummy \
+              "$app" --ap-v30-ui-smoke
+          test -s evidence/FROZEN_UI_SMOKE.json
+      - name: Silently install Windows RC1 into isolated disposable directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = (Resolve-Path 'qa/${{ matrix.file }}').Path
+          $destination = Join-Path $env:RUNNER_TEMP 'AnythingPlays31RC-Smoke'
+          python -c "from pathlib import Path; import sys; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $destination
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup RC1 isolated install failed" }
+          "RC_FULL_INSTALL=$destination" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Launch installed Windows RC1 and wait for real Tk smoke result
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = Join-Path $env:RC_FULL_INSTALL "AnythingPlays.exe"
+          if (-not (Test-Path $exe)) { throw "Installed RC1 executable missing" }
+          $env:AP_V30_UI_SMOKE_CHECK = "1"
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $PWD "evidence/FROZEN_UI_SMOKE.json"
+          $env:SDL_AUDIODRIVER = "dummy"
+          $proc = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -PassThru -Wait -ErrorAction Stop
+          if ($proc.ExitCode -ne 0) { throw "Installed Windows Tk UI smoke failed with exit $($proc.ExitCode)" }
+          if (-not (Test-Path $env:AP_V30_UI_SMOKE_REPORT)) { throw "Frozen UI report missing" }
+      - name: Mount and launch signed Apple/Intel RC1 app without changing the DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dmg="$PWD/qa/${{ matrix.file }}"
+          mountdir="$(mktemp -d /tmp/ap31-guismoke.XXXXXX)"
+          trap 'hdiutil detach "$mountdir" >/dev/null 2>&1 || true; rmdir "$mountdir" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$source_dmg"
+          app="$mountdir/AnythingPlays31RC.app"
+          test -x "$app/Contents/MacOS/AnythingPlays"
+          codesign --verify --verbose=2 "$app"
+          mkdir -p "$RUNNER_TEMP/ap31-smoke-home/.config"
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_UI_SMOKE.json" \
+          HOME="$RUNNER_TEMP/ap31-smoke-home" \
+          XDG_CONFIG_HOME="$RUNNER_TEMP/ap31-smoke-home/.config" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
+          import os, subprocess, sys
+          completed=subprocess.run([sys.argv[1], "--ap-v30-ui-smoke"],
+                    env=os.environ.copy(), timeout=120,
+                    text=True, capture_output=True)
+          print("Frozen app return code:", completed.returncode)
+          print("Frozen app stderr tail:", completed.stderr[-3000:])
+          if completed.returncode != 0:
+              raise SystemExit(1)
+          PY
+          test -s evidence/FROZEN_UI_SMOKE.json
+          # Validate while the verified readonly DMG is mounted.
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target "${{ matrix.target }}" \
+            --installer "$source_dmg" \
+            --bundle "$app" \
+            --receipt 'qa/${{ matrix.receipt }}' \
+            --smoke evidence/FROZEN_UI_SMOKE.json \
+            --output evidence/RC1_INSTALLED_UI_RECEIPT.json
+      - name: Independently validate Windows/Linux installed UI and RC identity
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.target }}" == linux-x64 ]]; then
+            frozen="$PWD/full-install/opt/anything-plays-31-rc1"
+          else
+            frozen="$RC_FULL_INSTALL"
+          fi
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target "${{ matrix.target }}" \
+            --installer "qa/${{ matrix.file }}" \
+            --bundle "$frozen" \
+            --receipt 'qa/${{ matrix.receipt }}' \
+            --smoke evidence/FROZEN_UI_SMOKE.json \
+            --output evidence/RC1_INSTALLED_UI_RECEIPT.json
+      - name: Retain frozen GUI startup evidence, not a stable release
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.1-RC1-FROZEN-UI-${{ matrix.target }}-UNRELEASED
+          path: |
+            evidence/FROZEN_UI_SMOKE.json
+            evidence/RC1_INSTALLED_UI_RECEIPT.json
+          if-no-files-found: warn
+          retention-days: 14
