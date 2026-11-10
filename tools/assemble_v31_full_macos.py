@@ -114,6 +114,9 @@ def build(arch, stable, preview, checksums, receipt, output):
                     shutil.copy2(item, current_licenses/item.name)
             if not (current_licenses/"python-distribution-notices").is_dir():
                 raise ValueError("Preview runtime license receipts missing")
+            shutil.copy2(Path(__file__).resolve().parents[1] /
+                         "licenses/Pygame-CE-LGPL-2.1.txt",
+                         current_licenses/"Pygame-CE-LGPL-2.1.txt")
         info = app/"Contents/Info.plist"
         with info.open("rb") as stream:
             plist = plistlib.load(stream)
