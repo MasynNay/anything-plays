@@ -1,6 +1,7 @@
 """Gamepad polling and UI commands, owned entirely by Tk's main thread."""
 from __future__ import annotations
 
+import json
 import tkinter as tk
 from tkinter import ttk
 
@@ -159,6 +160,39 @@ class GamepadMixin:
             if label.get() != message:
                 label.set(message)
 
+    def copy_gamepad_diagnostics(self):
+        """Copy a sanitized controller snapshot. Never open a network connection.
+
+        Useful even with no controller attached; the user explicitly chooses
+        to share the clipboard contents. Avoid ROM paths and Bluetooth names.
+        """
+        from anything_plays.controller_diagnostics import make_controller_report
+
+        try:
+            focused = self.root.focus_get() is not None
+            system = self.system_key.get()
+            report = make_controller_report(
+                self._gamepad,
+                system=system,
+                mappings=self._gamepad_bindings.get(system),
+                enabled=self.gamepad_enabled.get(),
+                focused=focused,
+                emulator_running=bool(self.emu.running),
+                camera_armed=bool(self.armed),
+            )
+            self.root.clipboard_clear()
+            self.root.clipboard_append(json.dumps(report, indent=2) + "\n")
+            self.root.update_idletasks()
+        except (tk.TclError, RuntimeError, ValueError, OSError) as exc:
+            self.gamepad_status.set(
+                "Could not copy diagnostics: " + str(exc)[:105]
+            )
+            return False
+        self.gamepad_status.set(
+            "Controller diagnostics copied. No ROMs, file paths or camera images."
+        )
+        return True
+
     def gamepad_tick(self):
         """Keep manual control independent of camera arming and keyboard focus.
 
@@ -269,6 +303,11 @@ class GamepadMixin:
             state, text="Rescan", command=self.refresh_gamepad,
             style="Compact.TButton"
         ).pack(side="right")
+        ttk.Button(
+            state, text="Copy diagnostics",
+            command=self.copy_gamepad_diagnostics,
+            style="Compact.TButton"
+        ).pack(side="right", padx=(0, 6))
         ttk.Label(content, textvariable=self.gamepad_status,
                   style="Helper.TLabel", wraplength=515).pack(
                       fill="x", pady=(0, 9))
