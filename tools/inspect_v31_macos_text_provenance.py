@@ -228,11 +228,19 @@ def audit_bundle(bundle, installer, receipt, runtime_audit, wheel, target):
             raise ValueError("Unsafe installed native path or digest")
         visited.add(relative)
         actual = bundle / relative
-        if (actual.is_symlink() or not actual.is_file()
-                or not actual.resolve().is_relative_to(root)
-                or not 1 <= actual.stat().st_size <= MAX_NATIVE_BYTES
-                or sha256_file(actual) != expected_hash):
-            raise ValueError("Installed native file differs from frozen RC1 audit")
+        # PyInstaller may preserve a trusted in-bundle symlink alias for a
+        # dylib. It is valid only when its resolved target stays INSIDE the
+        # authenticated mounted application and has the expected SHA-256.
+        # Reject aliases to disk paths elsewhere and forged digests.
+        if not actual.is_file():
+            raise ValueError("RC1 native candidate missing: " + relative)
+        resolved = actual.resolve()
+        if not resolved.is_relative_to(root):
+            raise ValueError("RC1 native symlink escapes the app: " + relative)
+        if not 1 <= actual.stat().st_size <= MAX_NATIVE_BYTES:
+            raise ValueError("Unexpected RC1 native size: " + relative)
+        if sha256_file(actual) != expected_hash:
+            raise ValueError("Frozen RC1 native SHA-256 mismatch: " + relative)
         fingerprint = executable_text_fingerprint(
             actual.read_bytes(), ARCHES[target])
         row = {"path": relative, "sha256": expected_hash}
