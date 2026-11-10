@@ -10,6 +10,45 @@ all passed against the *refreshed current RC1*.
 Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
+
+## Latest source-built 3.1 RC1 acceptance — November 10, 2026
+
+- **Fresh source-built 3.1 application 4/4 PASS:**
+  [42904937464](https://github.com/MasynNay/anything-plays/actions/runs/42904937464), from exact controller-recovery
+  revision `26de1e1ad1b701d0735e085158347f8c213ce437`.
+- **Fresh 18-console, 11-original-core full QA installers 4/4 PASS:**
+  [42905694504](https://github.com/MasynNay/anything-plays/actions/runs/42905694504), with all four nonrelease installers,
+  verified native 3.0 source-built core hashes and SDL audits retained.
+  The four-platform assembly configuration commit is
+  `c67fab048d7e44f371f2589a6d73b9d556de84d0`.
+- **Real frozen installed Tk startup and stable-preference migration
+  4/4 PASS:** [42906122307](https://github.com/MasynNay/anything-plays/actions/runs/42906122307); original test-file
+  SHA-256 digests remained unchanged, and RC settings were created in a
+  different namespace.
+- **Controller source regression and native mGBA PASS 4/4:**
+  [42905694745](https://github.com/MasynNay/anything-plays/actions/runs/42905694745), including new SDL failure, hotplug
+  retry, missing-name and safe-shutdown tests.
+- **Exact latest upstream pygame-ce/SDL source/wheel candidate review PASS:**
+  [42906334464](https://github.com/MasynNay/anything-plays/actions/runs/42906334464).
+- **Exact latest signed macOS native linkage PASS 2/2:**
+  [42906227613](https://github.com/MasynNay/anything-plays/actions/runs/42906227613).
+  Dual SDL2 library collision detection
+  [42906533420](https://github.com/MasynNay/anything-plays/actions/runs/42906533420),
+  actual signed SDL2 loader checks
+  [42906533407](https://github.com/MasynNay/anything-plays/actions/runs/42906533407) and
+  native **virtual** joystick press/release
+  [42906533323](https://github.com/MasynNay/anything-plays/actions/runs/42906533323) passed their technical
+  checks on the current binaries.
+
+**Unresolved release responsibilities:** physical USB/Bluetooth controller
+hotplug and physical camera/gameplay/audio/save/long-session acceptance;
+complete native runtime corresponding-source identification and
+LGPL notices/relinking/replacement review; true stable 3.1.0 installer
+identity and final stable asset checksums; public documentation and
+explicit approval. Historical 3.1 milestones below remain valid for
+their *own* pinned older binaries only. **All six stable release gates
+stay FALSE, and stable public 3.0.0 is untouched.**
+
 ## Latest four-platform upgrade safety milestone — VERIFIED 4/4
 
 A new atomic, create-only 3.1 settings importer prevents incomplete

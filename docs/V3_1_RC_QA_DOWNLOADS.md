@@ -1,18 +1,38 @@
 # Anything Plays 3.1 RC1 — Full 18-console QA downloads
 
+**Latest four-target QA: November 10, 2026.** The current full-console
+unreleased artifacts were compiled from the updated controller-recovery app
+(`26de1e1ad1b701d0735e085158347f8c213ce437`) on all four OS hosts.
+Four full installers and their SHA-256 receipts were verified in
+[run 42905694504](https://github.com/MasynNay/anything-plays/actions/runs/42905694504), and **all four actual installed GUI
+and stable-settings migration tests passed** in
+[run 42906122307](https://github.com/MasynNay/anything-plays/actions/runs/42906122307). The latest signed macOS SDL linkage,
+load-order and virtual native joystick checks also passed in
+[runs 42906227613](https://github.com/MasynNay/anything-plays/actions/runs/42906227613),
+[42906533407](https://github.com/MasynNay/anything-plays/actions/runs/42906533407) and
+[42906533323](https://github.com/MasynNay/anything-plays/actions/runs/42906533323). The pygame source/wheel audit
+[42906334464](https://github.com/MasynNay/anything-plays/actions/runs/42906334464) passed technical verification,
+**not complete LGPL source correspondence or redistribution authorization**.
+
+All four current full RC artifacts are retained through **November 17,
+2026, approximately 21:31–21:33 UTC**. These are private/owner
+development QA ZIPs, not publicly released stable 3.1.0 installers.
+No real USB/Bluetooth gamepad or commercial gameplay was tested in CI.
+
+
 **Temporary owner QA, not the public 3.1.0 release.** Latest exact native source app revision
-`cdbd647fa8ef3f3db0a8d419f0396f6b191599d6` includes atomic candidate preference migration.
-The [four-platform installed migration run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)
+`26de1e1ad1b701d0735e085158347f8c213ce437` includes atomic candidate preference migration.
+The [four-platform installed migration run 42906122307](https://github.com/MasynNay/anything-plays/actions/runs/42906122307)
 **PASSED**: RC settings were created from a disposable 3.0-style
-profile and the original files remained byte-identical. The current packages contain the new Copy diagnostics controller action and have passed actual installed GUI startup on all four platforms in run 42895538165. Unlike earlier
+profile and the original files remained byte-identical. The current packages contain the new Copy diagnostics controller action and have passed actual installed GUI startup on all four platforms in run 42906122307. Unlike earlier
 Preview 2 installers, these RC1 packages use **fresh platform-native
-3.1 application builds**, [verified at source run 42892417937](https://github.com/MasynNay/anything-plays/actions/runs/42892417937),
+3.1 application builds**, [verified at source run 42904937464](https://github.com/MasynNay/anything-plays/actions/runs/42904937464),
 plus eleven **original-source emulator core binaries** whose exact byte
 hashes come from the existing public stable 3.0.0. No ROMs or firmware.
 
 ## Where the RC1 full installers are built
 
-The [full RC1 QA Actions run 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881)
+The [full RC1 QA Actions run 42905694504](https://github.com/MasynNay/anything-plays/actions/runs/42905694504)
 builds the packages separately. For each **green** platform job, open
 its Actions run and use the **Artifacts** section to download the
 appropriately named ZIP. GitHub sign-in may be required.

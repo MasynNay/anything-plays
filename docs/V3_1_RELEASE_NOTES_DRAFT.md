@@ -6,6 +6,11 @@ Do not mark 3.1 as stable until the acceptance criteria in
 
 ## What's new
 
+- **Automatic controller recovery:** Momentary SDL device enumeration
+  and event-queue failures safely release held controller input and
+  retry without silently disabling a saved gamepad preference. Driver
+  shutdown attempts to close all SDL subsystems even if a device was
+  unplugged, and a missing device name no longer blocks controller use.
 - **Physical controllers:** Optional, SDL-backed standard gamepad support for
   manual play in embedded emulator sessions, alongside camera input and
   keyboard controls. No system-wide keyboard injection or network dependency.
@@ -37,6 +42,19 @@ Do not mark 3.1 as stable until the acceptance criteria in
   eleven original-source native emulator cores from 3.0.
 
 ## QA evidence already available
+
+**Latest refreshed controller-recovery source and full-console QA:**
+[4/4 source apps](https://github.com/MasynNay/anything-plays/actions/runs/42904937464),
+[4/4 full 18-console native packages](https://github.com/MasynNay/anything-plays/actions/runs/42905694504),
+[4/4 actual installed GUI and settings preservation](https://github.com/MasynNay/anything-plays/actions/runs/42906122307),
+[exact pygame-ce source review](https://github.com/MasynNay/anything-plays/actions/runs/42906334464),
+[2/2 macOS signed-library inspections](https://github.com/MasynNay/anything-plays/actions/runs/42906227613),
+[signed SDL2 load-order checks](https://github.com/MasynNay/anything-plays/actions/runs/42906533407) and
+[virtual native joystick tests](https://github.com/MasynNay/anything-plays/actions/runs/42906533323).
+No corresponding-source compliance approval, physical HID/camera gameplay
+acceptance or stable package rebuild follows from these results.
+Source app revision: `26de1e1ad1b701d0735e085158347f8c213ce437`.
+
 
 **Newest verified development candidate (November 10, 2026):** The
 updated 3.1 source app includes local Copy diagnostics, full

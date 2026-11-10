@@ -36,35 +36,35 @@
   "verified_qa_builds": {
     "linux-x64": {
       "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-      "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437"
     },
     "windows-x64": {
       "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-      "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437"
     },
     "macos-arm64": {
       "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-      "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437"
     },
     "macos-x64": {
       "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-      "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437"
     }
   },
   "verified_source_app_builds": {
     "status": "PASSED_FOUR_PLATFORM_FRESH_SOURCE_RC1_STAGE_ONLY",
-    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42892417937",
-    "source_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42904937464",
+    "source_revision": "26de1e1ad1b701d0735e085158347f8c213ce437",
     "final_release_approved": false
   },
   "verified_full_rc1_qa": {
     "status": "PASSED_FOUR_PLATFORM_FULL_EIGHTEEN_CONSOLE_QA_ONLY",
-    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-    "source_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+    "source_revision": "26de1e1ad1b701d0735e085158347f8c213ce437",
     "core_count": 11,
     "console_profiles": 18,
     "approval": false,
@@ -151,14 +151,14 @@
       "corresponding_source_complete": false,
       "redistribution_approved": false
     },
-    "most_recent_full_installer_with_atomic_settings": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-    "current_atomic_settings_app_source_sha": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6",
+    "most_recent_full_installer_with_atomic_settings": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+    "current_atomic_settings_app_source_sha": "26de1e1ad1b701d0735e085158347f8c213ce437",
     "exact_atomic_settings_rc_native_sdl_binary_correspondence_independently_verified": false
   },
   "verified_installed_gui_qa": {
     "status": "PASSED_FOUR_PLATFORM_FROZEN_TK_DESKTOP_STARTUP_ONLY",
-    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42895538165",
-    "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906122307",
+    "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437",
     "expected_console_profiles": 18,
     "expected_native_cores": 11,
     "passed_targets": [
@@ -198,9 +198,9 @@
   },
   "verified_installed_settings_migration": {
     "status": "VERIFIED_ATOMIC_SETTINGS_IMPORT_FOUR_INSTALLED_QA_HOSTS_ONLY",
-    "installed_full_rc1_run": "https://github.com/MasynNay/anything-plays/actions/runs/42895538165",
-    "full_installer_source_run": "https://github.com/MasynNay/anything-plays/actions/runs/42894172881",
-    "source_app_revision": "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6",
+    "installed_full_rc1_run": "https://github.com/MasynNay/anything-plays/actions/runs/42906122307",
+    "full_installer_source_run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+    "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437",
     "source_privacy_and_race_test_run": "https://github.com/MasynNay/anything-plays/actions/runs/42893632730",
     "targets": [
       "windows-x64",
@@ -218,6 +218,59 @@
     "tested_physical_controller_or_camera": false,
     "tested_real_gameplay_saves_audio": false,
     "stable_3_1_upgrade_installer_approved": false,
+    "public_release_approved": false
+  },
+  "verified_current_rc1": {
+    "status": "TECHNICAL_QA_PASSED_ALL_FOUR_UNRELEASED_ONLY",
+    "source_app_revision": "26de1e1ad1b701d0735e085158347f8c213ce437",
+    "full_qa_configuration_revision": "c67fab048d7e44f371f2589a6d73b9d556de84d0",
+    "source_app_builds": {
+      "status": "PASSED_FOUR_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42904937464"
+    },
+    "full_eighteen_console_qa": {
+      "status": "PASSED_FOUR_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "profiles": 18,
+      "native_cores": 11,
+      "installer_artifacts": 4,
+      "expires_at_utc": "2026-11-17T21:33:00Z"
+    },
+    "installed_gui_and_stable_preferences_migration": {
+      "status": "PASSED_FOUR_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906122307",
+      "stable_settings_unchanged": true
+    },
+    "source_and_virtual_controller_regression": {
+      "status": "PASSED_FOUR_OS_SOURCE_CHECKS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694745"
+    },
+    "pygame_source_wheel_audit": {
+      "status": "PASSED_TECHNICAL_ONLY",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906334464",
+      "lgpl_redistribution_approved": false
+    },
+    "macos_native_linkage": {
+      "status": "PASSED_TWO_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906227613"
+    },
+    "macos_sdl_collision": {
+      "status": "PASSED_TECHNICAL_REVIEW_ONLY",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906533420"
+    },
+    "macos_sdl_load": {
+      "status": "PASSED_TWO_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906533407"
+    },
+    "macos_virtual_native_joystick": {
+      "status": "PASSED_TWO_TARGETS",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42906533323",
+      "physical_hardware_tested": false
+    },
+    "physical_usb_bluetooth_gamepad_verified": false,
+    "physical_webcam_and_real_gameplay_verified": false,
+    "complete_corresponding_source_and_lgpl_relinking_verified": false,
+    "stable_public_installer_identity_verified": false,
     "public_release_approved": false
   }
 }
