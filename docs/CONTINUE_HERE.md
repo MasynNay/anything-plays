@@ -16,6 +16,18 @@ Verified November 10, 2026. Read this before continuing release or controller en
   https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1 (source companion ZIP).
 - Latest stable remains public 3.0.0; 2.0 and 1.5 still public.
 
+## Verified signed macOS wheel code provenance — November 10, 2026
+
+The original signed 3.1 RC1 Mac installers were independently compared
+against official pinned pygame-ce and OpenCV wheels: **241/241** compiled
+native `__TEXT,__text` sections matched. Apple Silicon: pygame **120/121**,
+OpenCV SDL **1/1**; Intel: pygame **120/120**. These are *code section*
+matches, not whole-file binary, corresponding-source or LGPL relinking
+approval. [Two-Mac audit](https://github.com/MasynNay/anything-plays/actions/runs/42925583942) · [OpenCV follow-up](https://github.com/MasynNay/anything-plays/actions/runs/42926295393) ·
+[Technical details](V3_1_SIGNED_MACOS_WHEEL_CORRESPONDENCE.md).
+
+All six stable 3.1.0 gates and public final-release approval remain false.
+
 ## Release issue resolved
 
 GitHub's Actions release creation 403 arose because a workflow token could

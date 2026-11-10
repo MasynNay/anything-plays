@@ -1,0 +1,87 @@
+name: 3.1 | Resolve Apple Silicon OpenCV SDL wheel provenance
+
+# Independent PyPI wheel comparison to the single signed Mac code section
+# left unresolved by pygame-ce. Read-only; cannot approve LGPL compliance.
+on:
+  push:
+    branches: [feature/v31-native-source-audit]
+    paths:
+      - ".github/workflows/v31-opencv-sdl-wheel-origin.yml"
+      - "tools/inspect_v31_opencv_wheel_origin.py"
+      - "tests/test_v31_opencv_wheel_origin.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  check-open-cv-native:
+    if: github.ref == 'refs/heads/feature/v31-native-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRIOR_RUN: '42925583942'
+      PRIOR_SHA: 16bdf929ae56b7728552c5ea4a70f07035f971d7
+      WHEEL: opencv_python_headless-4.14.0.94-cp37-abi3-macosx_13_0_arm64.whl
+      WHEEL_SHA: bc7db37dc234f7bb3190a158fd9dd750357246fc7d8adb23698843ef721a993b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Adversarial tests for exact OpenCV wheel and signed Mac comparison
+        run: python -m unittest discover -s tests -p 'test_v31_opencv_wheel_origin.py' -v
+      - name: Require pinned successful Mac source candidate audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$PRIOR_RUN" --json headSha --jq '.headSha')" = "$PRIOR_SHA"
+          test "$(gh run view "$PRIOR_RUN" --json conclusion --jq '.conclusion')" = success
+          gh release view v3.1.0-rc1 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==true' | grep -qx true
+          gh run download "$PRIOR_RUN" \
+            --name AnythingPlays-3.1-RC1-MACOS-arm64-SIGNED-WHEEL-TEXT-AUDIT \
+            --dir previous-evidence
+          test -s previous-evidence/macos-arm64-TEXT-WHEEL-CORRESPONDENCE.json
+      - name: Obtain official exactly versioned macOS ARM OpenCV headless wheel from PyPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p official-wheel
+          python -m pip download --no-deps --only-binary=:all: \
+            --platform macosx_13_0_arm64 --python-version 3.13 \
+            --implementation cp --abi abi3 \
+            --dest official-wheel 'opencv-python-headless==4.14.0.94'
+          test -f "official-wheel/$WHEEL"
+          echo "$WHEEL_SHA  official-wheel/$WHEEL" | sha256sum --check
+      - name: Verify all previously unpaired signed SDL machine-code bytes against PyPI wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.inspect_v31_opencv_wheel_origin \
+            --signed-report previous-evidence/macos-arm64-TEXT-WHEEL-CORRESPONDENCE.json \
+            --wheel "official-wheel/$WHEEL" \
+            --output results/MACOS_ARM64_OPENCV_SDL_WHEEL_CODE_COMPARISON.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          record=json.loads(Path('results/MACOS_ARM64_OPENCV_SDL_WHEEL_CODE_COMPARISON.json').read_text())
+          assert record["installed_native_candidates"] == 121
+          assert record["original_pygame_code_section_matches"] == 120
+          assert record["native_corresponding_source_complete"] is False if "native_corresponding_source_complete" in record else True
+          assert record["lgpl_relinking_verified"] is False
+          assert record["redistribution_approved"] is False
+          assert record["stable_3_1_release_approved"] is False
+          if not record["additional_opencv_code_section_match"]:
+              print("EXTRA SDL CODE SECTION DOES NOT MATCH EXPECTED OPENCV WHEEL")
+          PY
+      - name: Preserve exact result and original official wheel pin (review only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-ARM64-OpenCV-Original-Wheel-Correspondence
+          path: results/
+          if-no-files-found: warn
+          retention-days: 90
