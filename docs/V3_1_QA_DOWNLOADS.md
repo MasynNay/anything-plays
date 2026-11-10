@@ -40,14 +40,22 @@ controls if warned. Never disable system security globally.
 1. Confirm stable 3.0 still launches separately.
 2. Launch the 3.1 QA app without a webcam or controller. Open the right-hand
    controller settings card and verify that its graphic, rescan and mapping
-   dialogue work without throwing an exception.
+   dialogue work without throwing an exception. On a development build with
+   **Live Controller Test**, confirm that the tester first asks you to enable
+   input or connect a controller. The earlier frozen Preview 2 QA installers
+   may not contain this newer diagnostic.
 3. Map a few keyboard controls, select GB/GBC/GBA and load a game you have
    the right to use. Verify that camera and keyboard input do not interfere.
 4. Confirm full console selection, including N64 and GameCube. This verifies
    package availability, *not* that every commercial game will load.
-5. If you have a controller, test connecting it after app launch, map A/B,
-   D-pad, both analog sticks, triggers, and disconnect/reconnect while a
-   game is loaded. Confirm held buttons stop after disconnect or focus loss.
+5. If you have a controller, open **Configure…** and enable the gamepad.
+   In development builds with **Live Controller Test**, press A/B, the D-pad,
+   each stick, shoulders, and triggers. Confirm the *physical* names respond
+   even before loading a ROM, independently of the mapped in-game actions.
+   Then load a game, test remapping, disconnect/reconnect, **Rescan**, and
+   focus loss. Confirm no held game buttons remain stuck after any transition.
+   A frozen preview artifact must be assessed against the features it actually
+   contains rather than being treated as the latest source revision.
 6. Check a save/reload cycle and switching between two games on one console.
    Note exactly which OS/console/game was tested if reporting a failure.
 
