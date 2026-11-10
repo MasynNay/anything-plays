@@ -33,7 +33,15 @@ Do not mark 3.1 as stable until the acceptance criteria in
   tests on Linux x64, Windows x64, Intel macOS and Apple Silicon.
 - Four minimal 3.1 Preview 1 test installers with checksum receipts, containing
   *only* GB/GBC/GBA support: [Preview 1](https://github.com/MasynNay/anything-plays/actions/runs/42822217817).
-- Four verified complete 18-console **QA packages** using exactly the
+- Four **freshly compiled 3.1 RC1 application-stage builds** with isolated
+  identities, verified on Windows, Linux and both macOS architectures:
+  [native OS source-build run](https://github.com/MasynNay/anything-plays/actions/runs/42863846059).
+- Four **full 18-profile/11-original-source-core RC1 QA installers** rebuilt
+  around those freshly compiled apps (not frozen Preview 1), with exact
+  core SHA-256 verification, frozen SDL audits and unapproved QA receipts:
+  [full RC1 success 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42865608433).
+  [RC1 download/test instructions](V3_1_RC_QA_DOWNLOADS.md).
+- Four verified older complete 18-console **QA packages** using exactly the
   published 3.0 original-source emulator binaries plus the frozen 3.1
   controller-enabled application:
   [Linux](https://github.com/MasynNay/anything-plays/actions/runs/42842903097),
