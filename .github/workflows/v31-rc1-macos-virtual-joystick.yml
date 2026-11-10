@@ -1,0 +1,104 @@
+name: 3.1 | Signed SDL2 virtual joystick button roundtrip (unreleased)
+
+# Actual native libSDL2 in signed/read-only current 18-console RC DMGs,
+# but virtual controller created and driven through SDL's own ABI.
+# No USB/Bluetooth controller, webcam, commercial ROM or public release.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - ".github/workflows/v31-rc1-macos-virtual-joystick.yml"
+      - "tools/probe_v31_macos_virtual_joystick.py"
+      - "tests/test_v31_macos_virtual_joystick.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-sdl-native-virtual-pad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-sdl-virtual-pad:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Signed SDL2 joystick roundtrip · ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: arm64, target: macos-arm64, runner: macos-15}
+          - {arch: x64, target: macos-x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42886791394'
+      QA_SHA: '2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d'
+      LINK_RUN: '42888996877'
+      LINK_SHA: '72d29385c290742f85fa7c8ee3087611efcf2994'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Assert false hardware claims and malformed button results are rejected
+        run: python -m unittest discover -s tests -p 'test_v31_macos_virtual_joystick.py' -v
+      - name: Require successful exact verified refreshed full DMG and native reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          for line in "$QA_RUN:$QA_SHA" "$LINK_RUN:$LINK_SHA"; do
+            id="${line%%:*}"
+            sha="${line#*:}"
+            actual="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+            status="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            [[ "$status" == success && "$sha" == "$actual" ]] || {
+              echo "::error::Refusing unverifiable signed SDL package inputs"
+              exit 1
+            }
+          done
+      - name: Download untouched signed DMG plus SHA-verified SDL native inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original
+          gh run download "$LINK_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SDL-LINKAGE-REVIEW-UNAPPROVED" \
+            --dir signed
+          test -s "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json"
+          test -s "original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+      - name: Mount verified DMG read-only and exercise virtual SDL button roundtrip
+        shell: bash
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          dmg="$PWD/original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-virtualpad.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"
+          app="$mountdir/AnythingPlays31RC.app"
+          codesign --verify --verbose=2 "$app"
+          python -m tools.probe_v31_macos_virtual_joystick \
+            --bundle "$app" \
+            --linkage "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json" \
+            --target "${{ matrix.target }}" \
+            --output "evidence/SDL_VIRTUAL_PAD_${{ matrix.arch }}.json"
+      - name: Keep native joystick proof without treating it as physical HID acceptance
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AnythingPlays-3.1-RC1-SDL-NATIVE-VIRTUAL-PAD-${{ matrix.arch }}-UNRELEASED
+          path: evidence/SDL_VIRTUAL_PAD_${{ matrix.arch }}.json
+          if-no-files-found: warn
+          retention-days: 14
