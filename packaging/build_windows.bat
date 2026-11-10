@@ -29,6 +29,14 @@ if "%AP_V30_STABLE_CANDIDATE%"=="1" (
   if not "%AP_V30_TIA_TRIAL%"=="1" exit /b 1
   set "VERSION=3.0.0"
 )
+REM 3.1 Preview 1 is an isolated, owner-review test build, never a release.
+if "%AP_V31_PREVIEW%"=="1" (
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  if "%AP_V30_STABLE_CANDIDATE%"=="1" exit /b 1
+  if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
+  set "VERSION=3.1.0-preview1"
+)
 REM Both CI preview and fully approved 3.0 builds include all 11 cores.
 REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
 set "AP_FULL_CORE_BUILD=0"
@@ -129,7 +137,7 @@ REM Include project and third-party licensing documentation.
 if not exist dist\AnythingPlays\licenses mkdir dist\AnythingPlays\licenses
 copy /Y LICENSE dist\AnythingPlays\licenses\AnythingPlays-MIT.txt >nul
 if errorlevel 1 exit /b 1
-copy /Y CODE_OF_CONDUCT.md dist\AnythingPlays\licenses\ >nul
+copy /Y .github\CODE_OF_CONDUCT.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
 copy /Y docs\THIRD_PARTY_NOTICES.md dist\AnythingPlays\licenses\ >nul
 if errorlevel 1 exit /b 1
@@ -234,7 +242,9 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-if "%AP_V30_APPROVED_RELEASE%"=="1" (
+if "%AP_V31_PREVIEW%"=="1" (
+  "%ISCC%" /DV31PreviewBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else if "%AP_V30_APPROVED_RELEASE%"=="1" (
   "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
 ) else if "%AP_V30_STABLE_CANDIDATE%"=="1" (
   "%ISCC%" /DProductionBuild=1 /DAppVersion=%VERSION% packaging\installer.iss

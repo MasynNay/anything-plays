@@ -26,6 +26,17 @@ if [[ "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
   PACKAGE_NAME="anything-plays"
   INSTALL_ID="anything-plays"
 fi
+# 3.1 owner-review installers use a unique package identity and directory.
+# This never enables either 3.0 production flag or the stable package name.
+if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" != "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_STABLE_CANDIDATE:-0}" != "1" && "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.1 preview requires separate, minimal non-release core set" >&2; exit 1;
+  }
+  VERSION="3.1.0~preview1"
+  PACKAGE_NAME="anything-plays-31-preview"
+  INSTALL_ID="anything-plays-31-preview"
+fi
 OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -103,7 +114,7 @@ fi
 # Include project and third-party licensing documentation.
 mkdir -p dist/AnythingPlays/licenses
 cp LICENSE dist/AnythingPlays/licenses/AnythingPlays-MIT.txt
-cp CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
+cp .github/CODE_OF_CONDUCT.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_NOTICES.md dist/AnythingPlays/licenses/
 cp docs/THIRD_PARTY_COMPONENTS.md dist/AnythingPlays/licenses/
 cp licenses/*.txt dist/AnythingPlays/licenses/
@@ -174,12 +185,12 @@ fi
 
 PKG="build/deb/${PACKAGE_NAME}_${VERSION}_${ARCH}"
 rm -rf "$PKG"
-mkdir -p "$PKG/DEBIAN" "$PKG/opt/anything-plays-30-preview" "$PKG/usr/bin" "$PKG/usr/share/applications"
-cp -a dist/AnythingPlays/. "$PKG/opt/anything-plays-30-preview/"
+mkdir -p "$PKG/DEBIAN" "$PKG/opt/$INSTALL_ID" "$PKG/usr/bin" "$PKG/usr/share/applications"
+cp -a dist/AnythingPlays/. "$PKG/opt/$INSTALL_ID/"
 mkdir -p "$PKG/usr/share/icons/hicolor/256x256/apps"
 cp build/v21-icon/anything_plays_small.png "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png"
 cat > "$PKG/DEBIAN/control" <<CONTROL
-Package: anything-plays-preview
+Package: $PACKAGE_NAME
 Version: $VERSION
 Section: games
 Priority: optional
@@ -189,7 +200,7 @@ Depends: libc6, libgl1, libegl1, libglib2.0-0, libportaudio2
 Description: Anything Plays camera-controlled multi-system gaming studio
  Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores.
 CONTROL
-cat > "$PKG/usr/bin/anything-plays-30-preview" <<'LAUNCH'
+cat > "$PKG/usr/bin/$INSTALL_ID" <<'LAUNCH'
 #!/bin/sh
 # Linux desktop launchers otherwise swallow Python/native startup tracebacks.
 # Preserve a private, bounded log and show a visible error when the app exits
@@ -226,7 +237,7 @@ Your settings, saved games and ROMs were not deleted."
 fi
 exit "$status"
 LAUNCH
-chmod +x "$PKG/usr/bin/anything-plays-30-preview"
+chmod +x "$PKG/usr/bin/$INSTALL_ID"
 cat > "$PKG/usr/share/applications/anything-plays-preview.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
@@ -237,6 +248,23 @@ Icon=anything-plays-preview
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
+# 3.1 gets a third distinct Linux installation and launcher.
+if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays-31-preview@g' \
+    -e 's@anything-plays-preview@anything-plays-31-preview@g' \
+    -e 's@Anything Plays 3.0@Anything Plays 3.1@g' \
+    "$PKG/usr/bin/$INSTALL_ID"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays 3.1 Preview 1@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays-31-preview@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays-31-preview@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays-31-preview.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-31-preview.png"
+fi
 # Preview installs side by side with 2.0. The stable Linux package identity
 # is selected only after exact 3.0 source/rights/real-device checks pass.
 if [[ "${AP_V30_APPROVED_RELEASE:-0}" == "1" || "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
