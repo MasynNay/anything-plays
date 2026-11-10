@@ -242,3 +242,7 @@ PR #154 merged into v3 development at `4533b785` after Python 3.12, Python 3.13 
 ### November 10, 2026 — candidate source-evidence integrity
 
 - A focused, not-yet-merged change rejects Unix FIFO, socket and device entries masquerading as native libraries inside candidate ZIP inputs. Regression tests are committed; CI and full release acceptance are still pending. This is input validation, not Dolphin source correspondence or license clearance.
+
+### November 10, 2026 — Unix special-file ZIP guard verified
+
+PR #155 passed Python 3.12, Python 3.13 and native mGBA compatibility in source checks 42822892858, and unapproved source review 42822892906 succeeded. The tested validator rejects FIFO, socket, character and block device ZIP members masquerading as a native library, retains existing symlink rejection and permits ordinary regular files. Squash merged as `50e4c042`. Packaging was skipped; this does not resolve Dolphin exact corresponding source, combined license obligations, immutable production lock approval or four-platform final installer acceptance. Public 3.0 remains unpublished; stable 2.0 is preserved.
