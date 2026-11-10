@@ -2,7 +2,7 @@
 
 **If it moves, it plays.** Anything Plays turns camera-detected motion into local video-game controls. This roadmap describes shipped work, the **active 3.0 development preview**, and the evidence required before the next public release.
 
-**Last reviewed:** November 9, 2026  
+**Last reviewed:** November 10, 2026  
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
 **Current focus:** Complete exact 44-native source review evidence, third-party GPL compatibility and source obligations, and final four-platform release acceptance  
@@ -238,3 +238,7 @@ A focused development change rejects additional unverified files and directories
 ### November 10, 2026 — native ZIP single-member enforcement verified
 
 PR #154 merged into v3 development at `4533b785` after Python 3.12, Python 3.13 and native mGBA compatibility succeeded in source checks 42782067323, with unapproved source review 42782066937 successful. Four synthetic regressions reject extra native ZIP files, directories and duplicate entries while accepting the exact expected library. Packaging jobs were skipped. The remaining publication path requires exact source-built Dolphin production correspondence, complete combined license/notice verification, an approved immutable lock and final four-platform installer acceptance. No release flags were changed; public 3.0 is not published and stable 2.0 remains intact.
+
+### November 10, 2026 — candidate source-evidence integrity
+
+- A focused, not-yet-merged change rejects Unix FIFO, socket and device entries masquerading as native libraries inside candidate ZIP inputs. Regression tests are committed; CI and full release acceptance are still pending. This is input validation, not Dolphin source correspondence or license clearance.
