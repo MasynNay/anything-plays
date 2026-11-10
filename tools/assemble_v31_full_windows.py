@@ -143,8 +143,22 @@ def build(stable, preview, sums, receipt, output):
         # to the exact byte-verified original-source core payload too.
         unpack(produced, scratch/"reinstalled")
         installed = source_app(scratch/"reinstalled", "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json")
-        enable_windows_trial_runtime(installed/"cores")
-        verify_bundle(installed, "windows", check_native=True)
+        # Windows locks ctypes-loaded DLLs for the lifetime of the process.
+        # Verify actual native initialization in a disposable child process,
+        # so Python can clean up the temporary Inno installation on success.
+        # Do NOT weaken the installed native check to a manifest-only check.
+        subprocess.run(
+            [os.sys.executable, "-c",
+             ("import sys; from pathlib import Path; "
+              "from anything_plays.v30_gpl_trial import enable_windows_trial_runtime; "
+              "from verify_bundle import verify_bundle; "
+              "app = Path(sys.argv[1]); "
+              "enable_windows_trial_runtime(app / 'cores'); "
+              "verify_bundle(app, 'windows', check_native=True)"),
+             str(installed)],
+            check=True, cwd=root, timeout=120,
+        )
+        verify_bundle(installed, "windows", check_native=False)
         if validate_trial_core_directory(installed/"cores", ".dll") != first:
             raise ValueError("Final Setup installer altered original source-built cores")
         output.mkdir(parents=True, exist_ok=True)
