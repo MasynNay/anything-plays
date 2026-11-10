@@ -14,12 +14,13 @@ import subprocess
 import tempfile
 
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
+from tools.audit_v31_sdl_runtime import inspect_bundle
 from verify_bundle import verify_bundle
 
 STABLE = "anything-plays_3.0.0_amd64.deb"
 PREVIEW = "anything-plays-31-preview_3.1.0~preview1_amd64.deb"
 FULL = "anything-plays-31-preview_3.1.0~preview2_amd64.deb"
-SOURCE_REVISION = "ffee5dcdf0415440c9f5bffc7f9049a07c094ff3"
+SOURCE_REVISION = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 
 
 def sha(path):
@@ -100,11 +101,16 @@ def build(stable, preview, sums, receipt, output_dir):
         verify_bundle(payload, "linux", check_native=True)
         if validate_trial_core_directory(payload/"cores", ".so") != original:
             raise ValueError("Repackaging modified 3.0 original binaries")
+        audit = inspect_bundle(payload, "linux-x64")
+        (output_dir/"SDL_RUNTIME_AUDIT.json").write_text(
+            json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         result = {
             "status": "UNRELEASED_3_1_FULL_LINUX_QA",
             "public_release_approved": False,
             "source_stable_sha256": stable_sha,
             "source_preview_sha256": sha(preview),
+            "source_preview_revision": SOURCE_REVISION,
+            "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": deb.name,
             "sha256": sha(deb),
             "size_bytes": deb.stat().st_size,
