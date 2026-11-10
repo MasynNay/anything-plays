@@ -1,4 +1,4 @@
-name: Verify and update actual Anything Plays README screenshots
+name: Verify authentic Anything Plays README screenshots
 
 # Only screenshots of an existing, genuine packaged 3.0 Linux UI are used.
 # Never invent gameplay, camera activity, ROMs or altered emulator controls.
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   capture-actual-app-details:
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -69,18 +69,8 @@ jobs:
                       assert validated.format == "PNG"
               print(f"Verified GitHub PNG image: {exported}")
           PY
-      - name: Commit genuine screenshots and GitHub-compatible PNG exports on main
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        shell: bash
+      - name: Check screenshots remain reproducible, without bot commits
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF" = refs/heads/main
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- docs/screenshots/current/camera-controls.webp docs/screenshots/current/game-library-and-audio.webp docs/screenshots/current/desktop-overview.png docs/screenshots/current/camera-controls.png docs/screenshots/current/game-library-and-audio.png
-          if git diff --cached --quiet; then
-            echo "Verified README captures already current"
-            exit 0
-          fi
-          git commit -m "docs: refresh authentic 3.0 camera and game-library README screenshot details"
-          git push origin HEAD:main
+          # Capture assets must be intentionally reviewed and committed by a human.
+          # GitHub Actions verifies them but never writes to the repository.
+          git diff --exit-code -- docs/screenshots/current/
