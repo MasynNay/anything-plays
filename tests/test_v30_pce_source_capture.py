@@ -96,7 +96,7 @@ class PCEOriginalSourceLabTests(unittest.TestCase):
 
     def test_workflow_never_publishes_binaries_and_requires_real_original_psg(self):
         root = Path(__file__).resolve().parents[1]
-        workflow = (root/".github/workflows/v30-pce-pinned-source.yml").read_text("utf-8")
+        workflow = (root/"docs/history/workflows/v30-pce-pinned-source.yml").read_text("utf-8")
         self.assertIn(PINNED_COMMIT, workflow)
         self.assertIn("repository: libretro/beetle-pce-fast-libretro", workflow)
         self.assertIn("msys2/setup-msys2@v2", workflow)

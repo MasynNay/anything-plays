@@ -115,7 +115,7 @@ class SupafaustSourceTests(unittest.TestCase):
 
     def test_research_ci_pins_real_source_and_runs_original_snes_audio_video(self):
         root=Path(__file__).resolve().parents[1]
-        workflow=(root/".github/workflows/v30-supafaust-gpl2-source.yml").read_text("utf-8")
+        workflow=(root/"docs/history/workflows/v30-supafaust-gpl2-source.yml").read_text("utf-8")
         self.assertIn("pull_request:", workflow)
         self.assertIn("repository: libretro/supafaust", workflow)
         self.assertIn(s.COMMIT, workflow)

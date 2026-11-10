@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SourceReviewWorkflowContracts(unittest.TestCase):
     def test_joins_existing_successful_runs_without_publishing(self):
-        workflow = (ROOT / ".github/workflows/v30-source-review-matrix.yml").read_text("utf-8")
+        workflow = (ROOT / "docs/history/workflows/v30-source-review-matrix.yml").read_text("utf-8")
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("\n  pull_request:", workflow)
         self.assertIn("\n  push:", workflow)

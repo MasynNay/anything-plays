@@ -159,7 +159,7 @@ class AuthenticMonoAVTests(unittest.TestCase):
 
     def test_workflow_does_not_distribute_roms_or_approve_public_release(self):
         base = Path(__file__).resolve().parents[1]
-        yml = (base/".github/workflows/v30-ngp-mono-native-av.yml").read_text("utf-8")
+        yml = (base/"docs/history/workflows/v30-ngp-mono-native-av.yml").read_text("utf-8")
         self.assertIn("probe_v30_ngp_mono_native_av", yml)
         self.assertIn("fail-fast: false", yml)
         for target in ("linux-x64", "windows-x64",

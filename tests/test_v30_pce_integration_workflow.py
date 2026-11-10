@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class PCESourceBuiltOfflineWorkflowTests(unittest.TestCase):
     def test_four_full_test_only_installers_use_original_preserved_archives(self):
-        flow = (ROOT/".github/workflows/v30-pce-offline-integration.yml").read_text("utf-8")
+        flow = (ROOT/"docs/history/workflows/v30-pce-offline-integration.yml").read_text("utf-8")
         self.assertIn("42437133733", flow)
         self.assertIn("42444367068", flow)
         self.assertIn("Anything Plays 3.0 | Complete offline installer lab", flow)

@@ -166,7 +166,7 @@ class OriginalMonoAudioResearchTests(unittest.TestCase):
 
     def test_workflow_only_probes_not_bundles_audio_or_publishes(self):
         root = Path(__file__).resolve().parents[1]
-        workflow = (root / ".github/workflows/v30-ngp-mono-mit-matrix.yml").read_text("utf-8")
+        workflow = (root / "docs/history/workflows/v30-ngp-mono-mit-matrix.yml").read_text("utf-8")
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("probe_v30_ngp_mono_candidates", workflow)
         self.assertIn("NGP_MONO_NATIVE_AUDIO_RESEARCH_UNAPPROVED.json", workflow)

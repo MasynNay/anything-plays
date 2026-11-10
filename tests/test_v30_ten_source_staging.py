@@ -146,7 +146,7 @@ class TenOriginalNativeStaging(unittest.TestCase):
             self.assertFalse((folder/"out").exists())
 
     def test_four_platform_real_offline_app_never_uploads_unapproved_n64(self):
-        path=Path(__file__).resolve().parents[1]/".github/workflows/v30-ten-source-offline-integration.yml"
+        path=Path(__file__).resolve().parents[1]/"docs/history/workflows/v30-ten-source-offline-integration.yml"
         yml=path.read_text("utf-8")
         for target in ("windows-x64","linux-x64","macos-arm64","macos-x64"):
             self.assertIn("target: "+target,yml)

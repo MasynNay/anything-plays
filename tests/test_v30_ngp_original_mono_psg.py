@@ -120,7 +120,7 @@ class OriginalMonoPSGResearchContracts(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         builder = (root / "tools/build_v30_ngp_original_mono_psg.py").read_text()
         runner = (root / "tools/probe_v30_ngp_original_mono_psg.py").read_text()
-        workflow = (root / ".github/workflows/v30-ngp-original-mono-psg.yml").read_text()
+        workflow = (root / "docs/history/workflows/v30-ngp-original-mono-psg.yml").read_text()
         self.assertIn("--child", runner)
         self.assertIn("_check_native_child", runner)
         self.assertIn("real_native_audio_gate_passed", runner)
