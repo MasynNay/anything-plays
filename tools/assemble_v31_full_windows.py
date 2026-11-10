@@ -66,10 +66,14 @@ def unpack(installer, target):
 
 
 def source_app(folder, marker_name):
+    """Resolve actual Inno install root, not the parent of its EXE folder."""
     matches = list(folder.rglob(marker_name))
     if len(matches) != 1:
         raise ValueError("Expected exactly one source app marker: " + marker_name)
-    return matches[0].parent.parent
+    marker = matches[0]
+    # A native provenance marker lives in {app}/cores/; the executable
+    # lives directly in {app}/. Both paths must resolve to the same root.
+    return marker.parent.parent if marker_name == "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json" else marker.parent
 
 
 def iscc():
