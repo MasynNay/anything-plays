@@ -37,6 +37,7 @@ def main():
                     assert app._gamepad_setup_window.winfo_exists()
                     assert app.gamepad_setup_canvas.winfo_exists()
                     assert len(app.gamepad_setup_canvas.find_all()) > 15
+                    assert app.gamepad_live_input.get().startswith("Enable gamepad")
                     # The right-side shortcut and the setup window must
                     # survive a theme change without duplicating canvas art.
                     original_icon_count = len(app.gamepad_quick_canvas.find_all())
