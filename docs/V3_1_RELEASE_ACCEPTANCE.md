@@ -112,6 +112,37 @@ license/physical hardware acceptance or a final stable-identity build.
 See the [RC1 source-build runbook](V3_1_RC_SOURCE_BUILD.md)
 and [latest owner QA downloads](V3_1_RC_QA_DOWNLOADS.md).
 
+## New pygame-ce source and macOS linkage evidence — technical checks PASS
+
+The
+[SDL upstream source review 42874882808](https://github.com/MasynNay/anything-plays/actions/runs/42874882808)
+has successfully preserved the precise pygame-ce 2.5.8 tagged source
+commit, verified its official 3.13 release wheel SHA-256 hashes and
+compared all four installed full RC1 native-library audit reports. The
+exact audited native file sets match wheel bytes on Linux (74) and
+Windows (62). Both Mac architectures still have zero exact original
+wheel-byte matches, including universal2 single-architecture slices.
+
+The
+[macOS signed-native inspection 42875616776](https://github.com/MasynNay/anything-plays/actions/runs/42875616776)
+then independently verified the 121 Apple Silicon and 120 Intel
+packaged native hashes and obtained their actual `otool`, `lipo`
+and `codesign` evidence. All 241 examined Mac files are
+architecture-specific and report ad hoc signatures. The matching SDL2
+dylibs have Mach-O `current version 3201.10.0`.
+This **documents** signing and architecture transformations but does
+not yet prove wheel-to-installed source correspondence or LGPL
+replacement compliance.
+
+The source and dependency review ZIPs are temporary 14-day GitHub
+Actions artifacts, available through approximately November 24, 2026.
+[Review details](V3_1_SDL_SOURCE_REVIEW.md).
+
+**Licensing/relinking and corresponding-source release gates remain
+OPEN.** The upstream pygame-ce source tree by itself does not prove
+that every packaged SDL2, image, mixer, TTF and transitive dependency
+is covered by the correct original-source inputs and notices.
+
 ## What is still required before a full 3.1 stable release
 
 - [x] **Build full-library QA candidates:** all 18 profiles with the exact
