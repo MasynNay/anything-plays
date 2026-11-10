@@ -83,6 +83,7 @@ jobs:
           python -m tools.stage_v31_rc_draft \
             --installers inputs/installers --source inputs/source --output draft-assets
           (cd draft-assets && sha256sum --check SHA256SUMS.txt)
+          test -s draft-assets/RC1_DRAFT_QA_RECEIPT.json
           test "$(find draft-assets -maxdepth 1 -type f | wc -l)" = 7
       - name: Explicitly preserve still-open redistribution and hardware limitations
         shell: bash
