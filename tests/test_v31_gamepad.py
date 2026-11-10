@@ -304,6 +304,32 @@ class GamepadLifecycleTests(unittest.TestCase):
         self.assertEqual(self.reader.poll("gba")[1], "Test Xbox controller connected")
 
 
+    def test_shutdown_attempts_all_sdl_subsystems_even_when_quit_fails(self):
+        self.reader.start()
+        self.reader.poll("gba")
+        called = []
+
+        def bad_controller_quit():
+            called.append("controller")
+            raise RuntimeError("USB device gone")
+
+        def bad_joystick_quit():
+            called.append("joystick")
+            raise OSError("joystick already removed")
+
+        def good_display_quit():
+            called.append("display")
+
+        self.api.quit = bad_controller_quit
+        self.pg.joystick.quit = bad_joystick_quit
+        self.pg.display.quit = good_display_quit
+        self.reader.stop()
+        self.assertEqual(called, ["controller", "joystick", "display"])
+        self.assertIsNone(self.reader.api)
+        self.assertIsNone(self.reader.pygame)
+        self.assertIsNone(self.reader.controller)
+
+
 class SDLBackendSmokeTests(unittest.TestCase):
     def test_real_sdl_controller_api_without_physical_hardware(self):
         """Exercise actual pygame-ce initialization and poll in dummy video mode."""
