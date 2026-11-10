@@ -142,7 +142,7 @@ jobs:
             --name AnythingPlays-3.1-RC1-SDL2-CANDIDATE-SOURCES-UNAPPROVED \
             --dir original-sdl-sources
           python - <<'PY'
-          import hashlib, json, shutil
+          import hashlib, json, shutil, tarfile
           from pathlib import Path
           from tools.verify_v31_sdl_component_sources import COMPONENTS, verify_archive
           from tools.prepare_v31_sdl_source_review import RC_APP_COMMIT, RC_RUN, SOURCE_ARCHIVE, PYGAME_COMMIT
@@ -188,6 +188,20 @@ jobs:
                       or original_hash.get("archive") != archive.name):
                   raise ValueError("Original SDL source archive checksum mismatch")
               shutil.copyfile(archive, destination / archive.name)
+              # Preserve each upstream top-level LICENSE.txt verbatim as a
+              # standalone notice for future attribution review. A source
+              # tarball containing a path is not by itself proof of final
+              # native linked dependency license compliance.
+              with tarfile.open(archive, "r:gz") as original_tar:
+                  license_name = key + "/LICENSE.txt"
+                  member = original_tar.getmember(license_name)
+                  if (not member.isfile() or not 1 <= member.size <= 256_000):
+                      raise ValueError("Missing or unsafe upstream SDL LICENSE.txt")
+                  with original_tar.extractfile(member) as stream:
+                      license_bytes = stream.read(256_001)
+                  if len(license_bytes) != member.size:
+                      raise ValueError("Incomplete upstream SDL original license")
+              (destination / (key + "-ORIGINAL-LICENSE.txt")).write_bytes(license_bytes)
           if names != set(COMPONENTS):
               raise ValueError("Incomplete SDL component inventory")
           pygame = Path("sdl-source-evidence") / SOURCE_ARCHIVE
@@ -224,6 +238,7 @@ jobs:
               json.dumps(report, indent=2) + "\n", "utf-8")
           (Path("sdl-source-evidence") / "README_SOURCE_CANDIDATES.txt").write_text(
               "Six original upstream tagged SDL and pygame source archives.\n"
+              "Five verbatim SDL tag-root LICENSE.txt notices included.\n"
               "UNRELEASED QA ONLY: Not proven complete corresponding source;\n"
               "macOS signed binary provenance and LGPL replacement/relinking\n"
               "review are still open. No stable 3.1 release authorization.\n"
