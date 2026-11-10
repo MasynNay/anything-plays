@@ -116,8 +116,12 @@ No 3.1 installers or release tags have been published; 3.0 remains stable.
   SDL2_image, SDL2_mixer and SDL2_ttf are now pinned and archived from
   authentic Git commits
   ([source QA run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179)).
-  Verify actual simultaneous camera/controller loader behavior and
-  original binary-to-source correspondence before claiming clearance.
+  The next [signed native macOS dynamic-loader test](https://github.com/MasynNay/anything-plays/actions/runs/42881412802)
+  **PASSED both architectures**. On Apple Silicon the actual 2.32.8
+  and 2.32.10 dylibs loaded in both orders and reported the expected
+  versions; Intel's 2.32.10 also loaded. Keep simultaneous actual
+  OpenCV camera/controller gameplay and exact binary-to-source
+  correspondence OPEN until measured independently.
 - **Release gates:** unit and UI tests; packaging smoke on Windows, Linux and both Mac architectures; physical Xbox/PlayStation gamepad hotplug, save/reload, focus loss, shutdown and long-session tests; and third-party LGPL/SDL redistribution review.
 - 3.1 should not be promoted to a stable public release until hardware acceptance and packaging checks are complete.
 
