@@ -119,10 +119,23 @@ def inspect_bundle(bundle, target):
     for path in sorted(bundle.rglob("*")):
         if not _native_candidate(path):
             continue
-        if path.is_symlink() or not path.is_file():
-            raise ValueError("Unexpected linked/invalid pygame or SDL runtime file")
-        binaries.append({"path": path.relative_to(bundle).as_posix(),
-                         "sha256": file_hash(path), "size_bytes": path.stat().st_size})
+        # ELF libraries often use legitimate relative SONAME symlinks.
+        # Accept those only when the target is inside the extracted app.
+        # Never dereference a link into the CI host's system directories.
+        link = path.is_symlink()
+        try:
+            resolved = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise ValueError("Broken native runtime link: " + str(path)) from exc
+        if (not resolved.is_file()
+                or not resolved.is_relative_to(bundle.resolve())):
+            raise ValueError("Native runtime link escapes bundle: " + str(path))
+        entry = {"path": path.relative_to(bundle).as_posix(),
+                 "sha256": file_hash(resolved),
+                 "size_bytes": resolved.stat().st_size}
+        if link:
+            entry["symlink_target"] = resolved.relative_to(bundle.resolve()).as_posix()
+        binaries.append(entry)
     if not binaries:
         raise ValueError("No pygame or SDL native runtime found in frozen application")
     return {
