@@ -10,11 +10,21 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Portfolio website](https://anythingplays.masynnay.com/) · [Download 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Portfolio website](https://anythingplays.masynnay.com/) · [Try 3.1 RC1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1) · [Download stable 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
 ---
+
+## Anything Plays 3.1 RC1 — public prerelease
+
+**[Download Anything Plays 3.1 RC1 for Windows, Linux or macOS](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1)**
+
+The new public 3.1 release candidate adds **optional physical gamepad support** alongside camera and keyboard controls: a dedicated Game Controls panel, console-specific button mapping, a live controller test, reconnect and focus safety, clearer diagnostics, and isolated settings migration.
+
+All four RC1 installers include the **18 console profiles and 11 native emulator-core families** from 3.0. The compiled application and packaging source were checked against this repository's merged 3.1 code. The authentic RC1 installer files, source candidate companion, and SHA-256 checksums are available directly from the release page.
+
+**RC1 is for testing, not final 3.1.0.** Virtual-controller and GUI tests passed on four operating systems, but physical controllers, extended real-world gameplay, and complete SDL/LGPL native source correspondence review still have open items. Read the release notes before redistributing native binaries. **3.0.0 remains the latest stable release**, and 2.0 is still available.
 
 ## Screenshots
 
@@ -119,6 +129,9 @@ The desktop software is built with Python, Tkinter, OpenCV, NumPy and native Lib
 ## Get started
 
 ### Download the desktop app
+
+**[Try the publicly available 3.1 RC1 release candidate](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1)** for the new controller features. It is a prerelease with four platform installers and checksum/source receipts. Stable 3.0 remains the recommended proven version until final 3.1.0 testing and compliance work are complete.
+
 
 **[Download Anything Plays 3.0 from GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest)**
 

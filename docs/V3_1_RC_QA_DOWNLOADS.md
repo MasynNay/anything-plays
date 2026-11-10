@@ -1,5 +1,13 @@
 # Anything Plays 3.1 RC1 — Full 18-console QA downloads
 
+## Public 3.1 RC1 prerelease published — November 10, 2026
+
+**[Download four genuine 3.1 RC1 installers from GitHub Releases](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1).** This is a publicly accessible **prerelease**, not a final stable 3.1.0 build. The source-candidate ZIP and verified SHA256SUMS.txt are included on the same page. The Linux download filename has a dot where the original Debian package name used a tilde, because GitHub normalized the asset name; the SHA-256 digest and internal package version are unchanged.
+
+The historic issue and 90-day workflow artifact below are preserved for provenance. The GitHub 403 release-creation problem was resolved by first targeting the default branch for a private draft, then merging the identical source and promoting the RC1 release. Do not use the old temporary-artifact links as the primary public download.
+
+
+
 ## Persistent four-OS owner QA collection — November 10, 2026
 
 **[Download the complete 3.1 RC1 owner QA collection](https://github.com/MasynNay/anything-plays/actions/runs/42911996640)**
@@ -19,7 +27,7 @@ redistribution authorization are claimed. The SHA-256 manifest checks
 the installer bytes before use. Opening a GitHub Actions download
 may require signing in to GitHub.
 
-### Why this is an Actions download instead of a GitHub release
+### Historical 403 investigation (resolved November 10, 2026)
 
 A complete verified release-draft preparation pipeline ran, but the
 GitHub Releases API returned **HTTP 403 Resource not accessible by

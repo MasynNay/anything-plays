@@ -11,15 +11,14 @@
 | **1.5** — Original desktop application | Released | Camera-driven controls and local emulation |
 | **2.0** — Expanded studio | Released | Game Boy, Game Boy Color, GBA, SNES; ROM libraries, themes and configurable zones |
 | **3.0** — Unified offline console library | **Released · November 9, 2026** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
-| **3.1** — Optional physical gamepad input | **Unreleased RC · QA passed** | Controller remapping, live tester and diagnostics; four-platform 18-console test builds; native source review pending |
+| **3.1** — Optional gamepad input | **Public RC1 prerelease · November 10, 2026** | [Four-platform RC1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1); controller mapping, live tester and diagnostics; hardware and native licensing review pending |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
 **3.1 current verification:** The 3.1 RC1 application, 18-console QA
 installers and installed GUI checks passed on all four OS targets;
 [six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42909893531)
 were also preserved. The hardware gameplay, full LGPL source/relinking and
-final stable release requirements remain open. The public download
-remains 3.0.0 until a separate reviewed 3.1 release.
+final stable release requirements remain open. The public [3.1 RC1 prerelease](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1) is downloadable now; 3.0.0 remains the latest stable release until final 3.1.0 acceptance.
 **3.1 endurance QA:** [Three-minute Linux source soak](https://github.com/MasynNay/anything-plays/actions/runs/42909405091) passed with 10,371 synthetic game frames, active SDL input polling, and 0.05 MB
 measured RSS growth. This does not certify a physical gamepad or
 retail ROM endurance. Five original SDL license texts were also preserved

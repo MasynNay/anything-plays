@@ -1,6 +1,6 @@
 # Anything Plays 3.1 — Release acceptance
 
-**Status: NOT READY FOR A STABLE RELEASE.** This document tracks evidence,
+**Status: RC1 PUBLIC PRERELEASE, NOT READY FOR FINAL STABLE 3.1.0.** This document tracks evidence,
 not a promise of a release date. Stable 3.0 stays public and untouched.
 
 **New verified native RC1 audits:** SDL source/wheel checks, signed Mac
@@ -10,6 +10,14 @@ all passed against the *refreshed current RC1*.
 Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
+
+## Public RC1 release completed, stable acceptance remains open
+
+**[Anything Plays 3.1 RC1 is publicly downloadable](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1)** as a prerelease with authentic Windows x64, Linux x64, Mac ARM and Mac Intel packages, original SDL/pygame source candidates and matching asset SHA-256 checksums. The controller-enabled app and packaging files on main were independently checked to match the exact source used for RC1 builds. Public release workflow [42920357069](https://github.com/MasynNay/anything-plays/actions/runs/42920357069) PASSED.
+
+The original GitHub 403 was caused by targeting a development commit containing workflow changes not yet present on the default branch. Creating a *private draft* targeted at main resolved the write-permission failure; the full 3.1 source was then merged and publication succeeded. Stable 3.0/2.0 releases were untouched.
+
+**Do not confuse RC1 publication with stable 3.1.0 approval.** Physical hardware, real gameplay and complete LGPL source/relinking certification remain open. The six stable gates and the owner stable-release approval flag remain false.
 
 ## Current owner QA handoff: all four real packages preserved
 
