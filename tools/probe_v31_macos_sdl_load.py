@@ -26,6 +26,10 @@ import sys
 class SDLVersion(C.Structure):
     _fields_ = [("major", C.c_uint8), ("minor", C.c_uint8), ("patch", C.c_uint8)]
 out=[]
+loaded=[]
+SDL_INIT_JOYSTICK=0x00000200
+SDL_INIT_GAMECONTROLLER=0x00002000
+flags=SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER
 for path in sys.argv[1:]:
     lib=C.CDLL(path)
     func=lib.SDL_GetVersion
@@ -33,8 +37,27 @@ for path in sys.argv[1:]:
     func.restype=None
     info=SDLVersion()
     func(C.byref(info))
+    lib.SDL_InitSubSystem.argtypes=[C.c_uint32]
+    lib.SDL_InitSubSystem.restype=C.c_int
+    lib.SDL_NumJoysticks.argtypes=[]
+    lib.SDL_NumJoysticks.restype=C.c_int
+    lib.SDL_GetError.argtypes=[]
+    lib.SDL_GetError.restype=C.c_char_p
+    init_rc=lib.SDL_InitSubSystem(flags)
+    if init_rc != 0:
+        error=lib.SDL_GetError()
+        raise RuntimeError(f"Cannot initialize SDL joystick/controller: {error!r}")
+    count=lib.SDL_NumJoysticks()
+    if count < 0:
+        raise RuntimeError("SDL_NumJoysticks reported an error")
+    loaded.append(lib)
     out.append({"path": path, "runtime_version":
-                f"{info.major}.{info.minor}.{info.patch}"})
+                f"{info.major}.{info.minor}.{info.patch}",
+                "joystick_controller_initialized": True,
+                "enumerated_joystick_count": count})
+for lib in reversed(loaded):
+    lib.SDL_QuitSubSystem.argtypes=[C.c_uint32]
+    lib.SDL_QuitSubSystem(flags)
 print(json.dumps(out))
 '''
 
@@ -125,6 +148,9 @@ def probe(app, linkage, target, runner=subprocess.run):
         valid = result["passed"] and all(
             ent.get("path")==selected[slot]["path"] and
             ent.get("runtime_version")==selected[slot]["expected_runtime_version"]
+            and ent.get("joystick_controller_initialized") is True
+            and isinstance(ent.get("enumerated_joystick_count"), int)
+            and ent["enumerated_joystick_count"] >= 0
             for ent,slot in zip(result["loaded"],order)
         )
         records.append({"order":order, "reported":result["loaded"],
@@ -140,6 +166,7 @@ def probe(app, linkage, target, runner=subprocess.run):
         "all_native_load_orders_passed":all(x["both_runtime_versions_match_expected"]
                                             for x in records),
         "real_camera_controller_coexistence_tested":False,
+        "hardware_free_joystick_and_controller_subsystems_exercised":True,
         "commercial_gameplay_tested":False,
         "original_source_correspondence_verified":False,
         "lgpl_relinking_reviewed":False,
@@ -161,7 +188,8 @@ def main():
         print(args.target, "load order",entry["order"],
               "version matched",entry["both_runtime_versions_match_expected"],
               "error",entry["error"])
-    print("Dynamic SDL2 only; hardware, original source and LGPL approval stay false.")
+    print("SDL2 native loading + hardware-free joystick/controller initialization only; "
+          "camera/gameplay, original source and LGPL approval stay false.")
     # A recorded native-load mismatch is a real test failure, but retain
     # the diagnostic JSON in CI for analysis.
     if not result["all_native_load_orders_passed"]:
