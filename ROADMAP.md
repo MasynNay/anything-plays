@@ -208,3 +208,8 @@ PR #150 merged into the v3 development branch after Python 3.12, Python 3.13, na
 ### November 10, 2026 — bounded native payload extraction (pending CI)
 
 Candidate-lock verification now caps native core ZIP decompression at 512 MiB, rejecting oversized declared members before extraction and limiting actual bytes read. Three synthetic regressions cover normal, oversized compressed, and exact-limit inputs. This is source-evidence parser hardening, not corresponding-source approval or release acceptance. Merge only after required CI passes; public 3.0 and redistribution rights remain unapproved, stable v2.0 preserved.
+
+
+### November 10, 2026 — bounded payload verification merged
+
+PR #151 was squash merged into the v3 development branch after Python 3.12, Python 3.13, native mGBA compatibility (run 42743372447) and unapproved source-review (run 42743372436) succeeded. Three regression tests cover ordinary, oversized compressed and exact-limit ZIP native payloads. Packaging jobs were skipped; this does not approve four-platform production installers, exact Dolphin binary/source correspondence, combined licensing or distribution. Public 3.0 remains blocked and stable 2.0 is preserved.
