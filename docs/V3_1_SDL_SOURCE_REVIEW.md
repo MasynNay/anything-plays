@@ -75,10 +75,37 @@ installed-package audit hash and records:
 - `lipo -archs` CPU architecture metadata
 - `codesign -dv` signing information on each library
 
-It retains unapproved `MACOS_NATIVE_LINKAGE_*.json` review files,
-without modifying or re-signing the packages. Those records help
-locate the exact mismatched native libraries and may clarify which
-upstream SDL2 sources must be preserved.
+The [macOS signed-native review run 42875616776](https://github.com/MasynNay/anything-plays/actions/runs/42875616776)
+**PASSED on both architectures**. Its actual mounted-DMG reports give
+these concrete facts:
+
+| Measurement | Apple Silicon | Intel Mac |
+| --- | ---: | ---: |
+| Native SDL/pygame candidates independently re-hashed | 121 | 120 |
+| Successful `otool -L` inspections | 121 | 120 |
+| Files reporting `Signature=adhoc` | 121 | 120 |
+| Files reporting only the target architecture via `lipo` | 121 ARM64 | 120 x86_64 |
+
+The main `libSDL2-2.0.0.dylib` records the same Mach-O
+`current version 3201.10.0` in both native builds. This is an
+**observed dylib version string**, not by itself a certified upstream
+source tag. Other linked libraries include SDL2 image, mixer, TTF,
+FLAC, Ogg, JPEG, PNG, TIFF and WebP components; the full version,
+dylib path and signature evidence is in the two JSON artifacts.
+
+These results demonstrate architecture-specific, ad hoc signed
+compiled libraries in the installed RC packages. **They do not yet
+prove** that signing/thinning is the only difference from the published
+universal2 wheel bytes; the original wheel-to-final-transformation
+must still be independently established. No Mac source correspondence
+or LGPL replacement permission was declared complete.
+
+Open the successful run's **Artifacts** section for
+`AnythingPlays-3.1-RC1-MACOS-arm64-SDL-LINKAGE-REVIEW-UNAPPROVED`
+and
+`AnythingPlays-3.1-RC1-MACOS-x64-SDL-LINKAGE-REVIEW-UNAPPROVED`.
+These JSON evidence archives are available for about **14 days**,
+through November 24, 2026, not public stable releases.
 
 ## How to obtain source-review artifacts
 
