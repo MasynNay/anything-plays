@@ -7,6 +7,7 @@ on:
       - '.github/workflows/v31-full-windows-qa.yml'
       - 'tools/assemble_v31_full_windows.py'
       - 'verify_bundle.py'
+      - 'tools/audit_v31_sdl_runtime.py'
       - 'fetch_mgba_core.py'
   workflow_dispatch:
 
@@ -47,7 +48,7 @@ jobs:
       - name: Download verified controller-enabled 3.1 Preview 1 Setup
         shell: pwsh
         run: |
-          gh run download 42822217817 --repo "$env:GITHUB_REPOSITORY" --name AnythingPlays-3.1-Preview1-windows-x64-UNRELEASED --dir preview31
+          gh run download 42853582632 --repo "$env:GITHUB_REPOSITORY" --name AnythingPlays-3.1-Preview1-windows-x64-UNRELEASED --dir preview31
           if ($LASTEXITCODE -ne 0) { throw 'Original 3.1 Preview 1 download failed' }
       - name: Build and audit the complete 18-console 3.1 Windows test installer
         shell: pwsh
@@ -61,6 +62,7 @@ jobs:
           path: |
             full31/AnythingPlaysSetup-3.1.0-preview2.exe
             full31/FULL_WINDOWS_QA_RECEIPT.json
+            full31/SDL_RUNTIME_AUDIT.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
