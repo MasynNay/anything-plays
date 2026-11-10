@@ -12,7 +12,7 @@ remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 ## Current six-source upstream companion: verified November 10, 2026
 
-The [new source-companion audit run](https://github.com/MasynNay/anything-plays/actions/runs/42908687061) **PASSED**.
+The [new source-companion audit run](https://github.com/MasynNay/anything-plays/actions/runs/42909893531) **PASSED**.
 It preserves **six original upstream Git-tag source archives** in one
 retained, SHA-256-checked, UNAPPROVED workflow artifact: pygame-ce 2.5.8,
 SDL2 2.32.8, SDL2 2.32.10, SDL2_image 2.8.12, SDL2_mixer 2.8.2,
@@ -30,6 +30,13 @@ relinking/replacement, full notices and complete LGPL compliance have not
 been independently established. This companion is NOT a complete
 corresponding-source package and NOT a public release authorization.
 The existing emulator source release for 3.0 remains separate.
+
+**Upstream notices retained:** The latest successful source-companion
+[run 42909893531](https://github.com/MasynNay/anything-plays/actions/runs/42909893531) also extracted and checked each of the
+five tagged SDL components' original root LICENSE.txt files, retaining
+them verbatim alongside the original source tarballs. That improves
+attribution evidence but does not prove license coverage of every
+transitive linked library or compliance with LGPL relinking requirements.
 
 ## Verified pygame-ce source evidence
 

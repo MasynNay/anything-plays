@@ -16,10 +16,15 @@
 
 **3.1 current verification:** The 3.1 RC1 application, 18-console QA
 installers and installed GUI checks passed on all four OS targets;
-[six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42908687061)
+[six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42909893531)
 were also preserved. The hardware gameplay, full LGPL source/relinking and
 final stable release requirements remain open. The public download
 remains 3.0.0 until a separate reviewed 3.1 release.
+**3.1 endurance QA:** [Three-minute Linux source soak](https://github.com/MasynNay/anything-plays/actions/runs/42909405091) passed with 10,371 synthetic game frames, active SDL input polling, and 0.05 MB
+measured RSS growth. This does not certify a physical gamepad or
+retail ROM endurance. Five original SDL license texts were also preserved
+in the [six-source upstream companion](https://github.com/MasynNay/anything-plays/actions/runs/42909893531).
+
 **Download status:** [Anything Plays 3.0.0 is publicly released](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with four genuine offline installers and [original emulator sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Stable 2.0 and 1.5 remain available in previous releases.
 
 ## Version 3.0 — Shipped features

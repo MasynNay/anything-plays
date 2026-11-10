@@ -13,7 +13,7 @@ remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 ### Current original-source candidate bundle (technical QA only)
 
-[Six-source archive and checksum companion](https://github.com/MasynNay/anything-plays/actions/runs/42908687061) **PASS**.
+[Six-source archive and checksum companion](https://github.com/MasynNay/anything-plays/actions/runs/42909893531) **PASS**.
 All five pinned SDL upstream source candidates plus the pinned pygame-ce
 Git-tag source are retained with an SHA-256 list and the current frozen
 runtime audit. Source-to-compiled-binary and LGPL relinking review remain
@@ -56,6 +56,18 @@ identity and final stable asset checksums; public documentation and
 explicit approval. Historical 3.1 milestones below remain valid for
 their *own* pinned older binaries only. **All six stable release gates
 stay FALSE, and stable public 3.0.0 is untouched.**
+
+### Sustained real Tk/SDL controller and synthetic-camera session
+
+The [180-second source endurance run 42909405091](https://github.com/MasynNay/anything-plays/actions/runs/42909405091) **PASSED**
+on Linux x64. It ran the actual Tk UI, pygame SDL polling, synthetic camera
+and changing game frames together for 180 seconds, producing **10,371
+synthetic frames** and **0.05 MB measured post-warmup RSS growth**.
+Controller initialization/polling remained active; canvas/cache and
+pending-timer resource bounds passed. The report explicitly states
+that no physical controller, camera, retail game or native emulator
+save/audio endurance was tested. This is useful engineering evidence
+but **does not close physical or final-stable gameplay acceptance**.
 
 ## Latest four-platform upgrade safety milestone — VERIFIED 4/4
 

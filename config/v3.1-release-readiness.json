@@ -274,13 +274,27 @@
     "public_release_approved": false,
     "source_companion": {
       "status": "PASSED_SIX_UPSTREAM_SOURCE_CANDIDATES_UNAPPROVED",
-      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42908687061",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42909893531",
       "source_archive_count": 6,
       "pygame_source_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
       "full_rc_qa_run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
       "complete_native_corresponding_source_verified": false,
       "lgpl_relinking_reviewed": false,
       "redistribution_approved": false,
+      "public_release_approved": false,
+      "original_sdl_top_level_license_texts_preserved": 5
+    },
+    "controller_sdl_endurance": {
+      "status": "PASSED_REAL_TK_SDL_3_MINUTES_SYNTHETIC_ONLY",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42909405091",
+      "tested_platform": "linux-x64",
+      "seconds": 180,
+      "synthetic_game_frames": 10371,
+      "observed_post_warmup_rss_growth_mb": 0.05,
+      "actual_sdl_backend_polling_tested": true,
+      "physical_usb_bluetooth_gamepad_tested": false,
+      "physical_camera_tested": false,
+      "retail_rom_gameplay_or_native_audio_save_tested": false,
       "public_release_approved": false
     }
   }

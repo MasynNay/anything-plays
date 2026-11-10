@@ -43,6 +43,14 @@ Do not mark 3.1 as stable until the acceptance criteria in
 
 ## QA evidence already available
 
+- **Sustained 3.1 camera+controller source QA:** [run 42909405091](https://github.com/MasynNay/anything-plays/actions/runs/42909405091) passed 180 seconds of actual desktop Tk event loop, SDL polling and
+synthetic video with 10,371 generated frames and 0.05 MB measured
+post-warmup resident growth. No physical devices or real-game saves tested.
+- **Six original upstream source candidates and five SDL notices:** [run 42909893531](https://github.com/MasynNay/anything-plays/actions/runs/42909893531) passed immutable upstream tag and SHA-256 verification and preserved
+verbatim SDL root LICENSE.txt texts. Native source correspondence and LGPL
+relinking/distribution remain unapproved.
+
+
 **Latest refreshed controller-recovery source and full-console QA:**
 [4/4 source apps](https://github.com/MasynNay/anything-plays/actions/runs/42904937464),
 [4/4 full 18-console native packages](https://github.com/MasynNay/anything-plays/actions/runs/42905694504),
