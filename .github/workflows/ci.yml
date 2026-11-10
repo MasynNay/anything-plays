@@ -2,7 +2,7 @@ name: Source checks
 
 on:
   push:
-    branches: [main, develop/v2.0]
+    branches: [main, develop/v2.0, feature/v3.1-controls-usability]
   pull_request:
   workflow_dispatch:
 
@@ -158,3 +158,47 @@ jobs:
           name: evidence-linux-x86_64
           path: release-evidence/linux-x86_64.json
           if-no-files-found: error
+
+  # Development branch only: no installers, ROMs, HID access or publish actions.
+  # Real pygame SDL loads on every host; a synthetic controller supplies
+  # buttons, axes and disconnects through the real app input pipeline.
+  virtual-controller:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Virtual controller · ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: linux-x64, runner: ubuntu-24.04}
+          - {label: windows-x64, runner: windows-latest}
+          - {label: macos-apple-silicon, runner: macos-15}
+          - {label: macos-intel, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install SDL controller runtime
+        run: python -m pip install pygame-ce==2.5.8
+      - name: Verify platform SDL version
+        env:
+          SDL_VIDEODRIVER: dummy
+          PYGAME_HIDE_SUPPORT_PROMPT: '1'
+        run: python -c "import platform, pygame; print(platform.platform(), platform.machine(), pygame.version.ver, pygame.get_sdl_version())"
+      - name: Run synthetic controller and real SDL initialization tests
+        env:
+          SDL_VIDEODRIVER: dummy
+          PYGAME_HIDE_SUPPORT_PROMPT: '1'
+        run: python -m unittest discover -s tests -p "test_v31_gamepad*.py" -v
+      - name: Verify visual controller settings without a display
+        run: python -m unittest discover -s tests -p "test_v31_controller_gui.py" -v
+      - name: Verify live controller diagnostics and immediate rescan safety
+        run: python -m unittest discover -s tests -p "test_v31_live_controller.py" -v
+      - name: Verify private-free copyable controller reports on native host
+        run: python -m unittest discover -s tests -p "test_v31_controller_diagnostics.py" -v
+      - name: Prove RC settings copy is atomic, private and race safe
+        run: python -m unittest discover -s tests -p "test_v31_preferences_atomic.py" -v
+      - name: Prove installed-build settings test fixture rejects touching stable user data
+        run: python -m unittest discover -s tests -p "test_v31_installed_settings_migration.py" -v

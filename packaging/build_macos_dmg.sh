@@ -39,6 +39,37 @@ if [[ "${AP_V30_STABLE_CANDIDATE:-0}" == "1" ]]; then
     *) echo "Unsupported macOS source-built candidate architecture"; exit 1 ;;
   esac
 fi
+# A fully independent QA installation, not the old 3.0 preview or release.
+if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
+  [[ "${AP_RELEASE_BUILD:-0}" != "1" && "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_STABLE_CANDIDATE:-0}" != "1" && "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.1 preview must use only the non-release minimal build" >&2; exit 1;
+  }
+  BUNDLE_FILE="AnythingPlays31Preview.app"
+  DMG_VOLUME="Anything Plays 3.1 Preview 1"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.1.0-preview1-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.1.0-preview1-macos-x64.dmg" ;;
+    *) echo "Unsupported 3.1 preview macOS architecture" >&2; exit 1 ;;
+  esac
+fi
+# Independent nonproduction 3.1 RC1 app build, with dedicated .app identity.
+# Until full-core assembly this is an mGBA-only source-build acceptance stage.
+if [[ "${AP_V31_RC:-0}" == "1" ]]; then
+  [[ "${AP_V31_PREVIEW:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" &&
+     "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_STABLE_CANDIDATE:-0}" != "1" &&
+     "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.1 RC1 app build requires isolated source-only candidate flags"; exit 1;
+  }
+  BUNDLE_FILE="AnythingPlays31RC.app"
+  DMG_VOLUME="Anything Plays 3.1 Release Candidate 1"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.1.0-rc1-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.1.0-rc1-macos-x64.dmg" ;;
+    *) echo "Unsupported 3.1 candidate macOS architecture"; exit 1 ;;
+  esac
+fi
 APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
@@ -70,11 +101,16 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 # Generate platform icons from the corrected v3.0 source, not the v2.0 PNG.
 .build-venv/bin/python tools/render_v21_icon.py
-.build-venv/bin/python -m PyInstaller --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
+V31_IDENTITY_ARGS=()
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" ]]; then
+  .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
+  V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
+fi
+.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays "${V31_IDENTITY_ARGS[@]}" --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
 # Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
 if [[ "$AP_V30_PRODUCTION" != "1" ]]; then
-  mv dist/AnythingPlays.app dist/AnythingPlays30Preview.app
+  mv dist/AnythingPlays.app "$APP_BUNDLE"
 fi
 # Generate a native macOS icon from the branded PNG.
 ICONSET="build/AnythingPlays.iconset"
@@ -141,15 +177,31 @@ if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.0.0" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
 else
-  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
-  /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.0 Preview" "$PLIST" || true
+  if [[ "${AP_V31_RC:-0}" == "1" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.rc31" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.1.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.1.0.10" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.1.0.10" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.1 Release Candidate 1" "$PLIST" || true
+  elif [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview31" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.1.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.1.0.1" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.1.0.1" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.1 Preview 1" "$PLIST" || true
+  else
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.preview30" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.0 Preview" "$PLIST" || true
+  fi
 fi
 # Include project and third-party licensing documentation.
 LICENSE_DIR="${APP_BUNDLE}/Contents/Resources/licenses"
 mkdir -p "$LICENSE_DIR"
 
 cp LICENSE "$LICENSE_DIR/AnythingPlays-MIT.txt"
-cp CODE_OF_CONDUCT.md "$LICENSE_DIR/"
+cp .github/CODE_OF_CONDUCT.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_NOTICES.md "$LICENSE_DIR/"
 cp docs/THIRD_PARTY_COMPONENTS.md "$LICENSE_DIR/"
 cp licenses/*.txt "$LICENSE_DIR/"

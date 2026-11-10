@@ -92,6 +92,7 @@ class AuxiliaryPanelsMixin:
         self.arm_button.pack(fill='x')
         ttk.Button(controls, text='STOP ALL OBJECT CONTROLS  (Esc)', command=self.stop_controls, style='Danger.TButton').pack(fill='x', pady=5)
         ttk.Label(controls, text='F11 fullscreen · F10 borderless · Esc exit fullscreen and stop controls · Ctrl+Alt+F11 start/stop camera controls. No global keyboard injection.', wraplength=315).pack(anchor='w')
+        ttk.Button(controls, text='Keyboard Shortcuts', command=self.configure_shortcuts).pack(fill='x', pady=(8, 2))
         profiles = ttk.Frame(right)
         profiles.pack(fill='x', padx=(12, 2), pady=(0, 16))
         ttk.Button(profiles, text='Save profile', command=self.save_profile).pack(side='left')

@@ -42,7 +42,7 @@ class GameplayMixin:
         self.manual_active = True
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
         canvas.focus_set()
-        self.manual_label.set('MANUAL PLAY ACTIVE · Open Keyboard shortcuts to view or edit keys')
+        self.manual_label.set('MANUAL PLAY ACTIVE · Open Game Controls to view or edit keys')
 
     def deactivate_manual(self, event=None):
         self.manual_active = False

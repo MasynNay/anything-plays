@@ -505,3 +505,517 @@ Last verified November 7, 2026. This is the durable handoff/checkpoint if a conv
 
 239. **2026-11-09 — PUBLIC 3.0.0 SHIPPED AND VERIFIED; STOP USING OLD "PENDING" CHECKPOINTS AS CURRENT STATE.** [Original four-OS authentic 3.0.0 build run 42718569352](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) finished **SUCCESS all FOUR**: Windows x64, Linux x64, macOS Apple Silicon, macOS Intel. [Source-first public publisher run 42724633466](https://github.com/MasynNay/anything-plays/actions/runs/42724633466) **SUCCESS**. Verified GitHub Releases API shows [PUBLIC stable v3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with `draft=false`, `prerelease=false` and exactly FIVE uploaded assets: genuine `AnythingPlaysSetup-3.0.0.exe` 64,539,768 bytes; `anything-plays_3.0.0_amd64.deb` 101,004,536 bytes; `AnythingPlays-3.0.0-macos-arm64.dmg` 105,899,391 bytes; `AnythingPlays-3.0.0-macos-x64.dmg` 91,036,214 bytes; `SHA256SUMS.txt`. GitHub native SHA256 digest metadata checked for all, matching approved artifact receipts. Public [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) has original 11 pinned Git emulator source tree ZIP 238,132,878 bytes and SHA256 manifest. App binaries are genuine 3.0.0 package versions, not renamed alpha files. Public [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) and v1.5.0 remain untouched; historical `v3.0.0-rc.1` owner-only draft is no longer relevant. Release known limitations and third-party source grants are documented without inventing blanket independent legal/game QA.
 240. **2026-11-09 — PROFESSIONAL README/PORTFOLIO SHOWCASE COMPLETED WITH REAL APP IMAGES.** Compared design and screenshot organization in actual `MasynNay/Keystoria` and `MasynNay/aftertone` READMEs, then merged [PR #149](https://github.com/MasynNay/anything-plays/pull/149) to main squash `c784380a5be3d43fcfbbda9e55e7d114ff0c03f8`. The public [README](https://github.com/MasynNay/anything-plays#readme) now leads with original fish art, actual packaged Linux 3.0 desktop screenshot (NOT a mockup), two separately labeled authentic screenshot detail crops of camera and ROM/audio UI, polished feature/18 console chart, genuine direct Windows/Linux/Intel/ARM stable 3.0.0 downloads, SHA checksums, simple start steps, real architecture, clean repository tree, roadmap/technical source links. `tools/prepare_readme_screenshots.py` deterministically crops the unchanged original 1342×846 WebP; [.github/workflows/readme-screenshots.yml](https://github.com/MasynNay/anything-plays/actions/runs/42726680894) **SUCCESS**, generated and committed `docs/screenshots/current/camera-controls.webp` and `game-library-and-audio.webp` by github-actions bot to main SHA `82cf23adbf0411c04663946eb71c9d6ad5036c2c`. Their actual Git blobs, dimensions and contents verified; these are crops of ONE real captured app UI, not fake gameplay or extra camera sessions. Static portfolio `site/index.html` now advertises truly public 3.0 stable and sources directly, correct roadmap/facts and section numbers; no client-side GitHub polling in `site/main.js`. [GitHub Pages deployment run 42726680827](https://github.com/MasynNay/anything-plays/actions/runs/42726680827) **SUCCESS**; static website updated at `https://anythingplays.masynnay.com/`. Root `ROADMAP.md`, `SECURITY.md`, `CONTRIBUTING.md`, site and original-source assessment docs corrected from obsolete "3.0 pending/1.5 current" claims. [PR #149 source checks](https://github.com/MasynNay/anything-plays/actions/runs/42726457687) and [main source checks](https://github.com/MasynNay/anything-plays/actions/runs/42726680633) passed Python 3.12 and 3.13 plus native mGBA. **Zero open PRs at last check.** Do NOT restart stable release research or ask user to retest N64/GameCube. Keep 2.0 unchanged. Future work: targeted 3.x fixes, verified UI/screenshots and clean code. The 3.0.0 release tag is immutable; a code fix in main does not retroactively patch published installers.
+
+## 3.1 continuation checkpoint — November 10, 2026
+
+**Current truth overrides historical pre-release entries above:** public stable
+3.0.0 shipped November 9, 2026. Leave 3.0 and 2.0 untouched. Active 3.1
+development is isolated on `feature/v3.1-controls-usability`, with
+[draft PR #156](https://github.com/MasynNay/anything-plays/pull/156).
+No 3.1 public stable release or tag has been created.
+
+- Existing 3.1 work: optional pygame-ce/SDL manual gamepad input, per-console
+  controller bindings, theme-aware right-side setup card, Game Controls and
+  keyboard shortcut separation, duplicate slider removal, safe focus/hotplug,
+  and four-platform Preview 2 full 18-profile/11-core QA packages.
+  [Download and evidence guide](../V3_1_QA_DOWNLOADS.md).
+- This continuation added a **read-only live controller tester** in the setup
+  dialogue. It identifies raw face buttons, D-pad, stick directions, and
+  triggers without loading a ROM, independent of in-game button mapping.
+  It suppresses the visual readout on focus loss.
+- The **Rescan** command now immediately releases emulated controller input
+  and clears raw diagnostic state. Malformed/non-string saved mapping targets
+  are safely ignored, preserving controller operation.
+- Regression file `tests/test_v31_live_controller.py` covers raw input,
+  mapping separation, no-ROM diagnostic, focus loss, disconnected device,
+  Rescan release, malformed preferences and bounded text display.
+  The four-platform virtual-controller CI now includes this file, and the
+  real Tk smoke asserts that the tester exists.
+- Commits in this continuation (ordered): `31d4a032`, `d176ff54`,
+  `d31a610a`, `0deacf98`, `d1bcd2f6`, `81a163ed`,
+  `41dc84d4`, `cfada2f5`. PR #156's draft review now mentions
+  these changes.
+- Latest source checks as started:
+  [run 42854121378](https://github.com/MasynNay/anything-plays/actions/runs/42854121378).
+  **Consult the finished GitHub run before claiming every job passed.**
+  Package jobs in the source workflow are intentionally skipped on this
+  feature branch; earlier complete four-platform QA packages remain
+  Preview 2 and DO NOT include these newly edited source files.
+
+**Still open, without substituting simulation for hardware:** full stable
+3.1.0 application rebundles with eleven original-source cores and verified
+four-platform checksums; original matching source for newly bundled pygame-ce
+and native SDL libraries, legal notices/relinking review; physical USB or
+Bluetooth controller hotplug/remap/focus acceptance; real-game/save/audio/
+long-session final installer checks. The public 3.0 build remains available
+and unchanged. Do not tag or merge a stable 3.1 release until those gates
+are explicitly satisfied. The next productive direction is actual SDL
+component inventory and final 3.1 native-source release packaging.
+
+## 3.1 release-engineering continuation — frozen SDL runtime audit
+
+**Context:** Stable 3.0.0 is public and unchanged; current work remains on
+`feature/v3.1-controls-usability` and draft PR #156. No 3.1 release,
+stable installer identities, or license approval yet.
+
+1. Four real 3.1 Preview 1 artifacts with the **new live controller
+   tester** were verified in
+   [run 42853582632](https://github.com/MasynNay/anything-plays/actions/runs/42853582632),
+   application commit `d176ff54de90a3cc5e585c6fc6ffd4f68388c104`.
+   The Linux, Windows, Mac ARM and Mac Intel full-library QA assemblers
+   now require exact receipt hashes **and this specific source commit**.
+   CI downloads run 42853582632, not the older 42822217817.
+2. Added `tools/audit_v31_sdl_runtime.py` and
+   `tests/test_v31_sdl_runtime_audit.py`. The former audits the
+   **installed/re-extracted final QA application** on each OS, hashes
+   pygame/SDL native library candidates and license notices, and emits
+   `SDL_RUNTIME_AUDIT.json` beside the QA installer. It never grants
+   redistribution approval, and guards against unsafe traversal,
+   tampering and external native symlinks.
+3. The initial Linux audit exposed a **real packaging shortfall**:
+   pygame-ce 2.5.8's frozen Python distribution inventory recorded
+   zero wheel-provided license files. Added the verbatim, pinned upstream
+   `docs/LGPL.txt` from pygame-ce 2.5.8 as
+   `licenses/Pygame-CE-LGPL-2.1.txt`, with exact SHA-256
+   `a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7`.
+   All three full-library QA assemblers install this pinned notice
+   *into their final packages*; the audit explicitly records the wheel
+   notice gap and the upstream fallback. This is attribution evidence,
+   not completed SDL native source/relinking review.
+4. A subsequent Linux audit identified ordinary in-package shared-library
+   SONAME symlinks. The tool now hashes resolved in-bundle target bytes
+   while **rejecting broken or out-of-package symlinks**; adversarial
+   tests cover this distinction.
+5. Workflows now upload `SDL_RUNTIME_AUDIT.json` together with existing
+   Preview 2 full-library installer checksums/receipts. Exact workflows:
+   `v31-full-linux-qa.yml`, `v31-full-windows-qa.yml`,
+   `v31-full-macos-qa.yml`. Documented at
+   [V3_1_SDL_RUNTIME_AUDIT.md](../V3_1_SDL_RUNTIME_AUDIT.md).
+6. The latest CI runs after the native-symlink fix began as
+   [Linux 42856511632](https://github.com/MasynNay/anything-plays/actions/runs/42856511632),
+   [Windows 42856511934](https://github.com/MasynNay/anything-plays/actions/runs/42856511934),
+   [macOS 42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639)
+   and [source 42856522778](https://github.com/MasynNay/anything-plays/actions/runs/42856522778).
+   **These results were pending at checkpoint creation: retrieve final
+   results and debug any failure before describing them as passed.**
+   Older intermediate failed jobs include intentionally strict checks
+   against old source receipts and missing wheel notices; do not confuse
+   those jobs with final QA verdicts.
+
+**Next:** verify all four latest installer QA artifacts/SDL inventories
+and full Python 3.12/3.13 source regression; update release acceptance and
+QA download instructions only for confirmed successes. Do not release stable
+3.1 until separate physical controller testing, real-game long-session,
+LGPL native linkage/corresponding source review, and real stable-identity
+rebuilds are complete. Do not ask for repeated 3.0 N64/Dolphin gameplay
+tests: maintainer already verified those.
+
+## Updated 3.1 full-console QA verification — November 10, 2026
+
+**The latest four updated 18-console / 11 original-source-core QA installers
+have all PASSED on their actual target runners** with the read-only live
+controller UI and SDL audit now included:
+
+- Linux x64: [run 42856511632](https://github.com/MasynNay/anything-plays/actions/runs/42856511632), successful installed DEB and SDL audit.
+- Windows x64: [run 42857106220](https://github.com/MasynNay/anything-plays/actions/runs/42857106220), successful installed Inno Setup and SDL audit after enforcing LF checkout of the upstream LGPL document in `.gitattributes`.
+- macOS arm64 and x64: [run 42856511639](https://github.com/MasynNay/anything-plays/actions/runs/42856511639), both successful signed DMGs, 11 source-built cores and mounted-final-DMG SDL audit.
+- [Source run 42857231009](https://github.com/MasynNay/anything-plays/actions/runs/42857231009) passed Python 3.12/3.13, native mGBA and added regression tests. (Source-only documentation commits later may trigger additional non-release checks.)
+
+All four ZIP artifacts contain a **Preview 2 QA installer** with a package
+receipt and `SDL_RUNTIME_AUDIT.json`. Artifacts are retained for seven days
+and expire about November 17, 2026. The 3.1 controller app used for each
+package came from verified Preview 1 source
+`d176ff54de90a3cc5e585c6fc6ffd4f68388c104` / run 42853582632;
+the exact original 3.0 source-built native emulators were copied and checked.
+No newly authored application binary changes occurred after that source
+revision; the subsequent changes were build-engineering, tests, notices
+and docs. The pinned upstream pygame LGPL text SHA-256 is
+`a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7`.
+
+**Release gates still OPEN:** true stable-identity 3.1 builds from fresh
+source, native pygame/SDL linkage and complete LGPL corresponding-source /
+replacement review, physical controller testing, and installed live ROM
+save/reload, N64/GameCube game switching, graphics/audio and endurance.
+There is **no public 3.1 release** and no reason to modify 3.0.0 or 2.0.
+Draft PR #156 remains open for review. The
+[QA download guide](../V3_1_QA_DOWNLOADS.md) now names the successful
+four latest runs and the corresponding installer files.
+
+## New Anything Plays 3.1 RC1 source-build and 18-console QA milestone — November 10, 2026
+
+The 3.1 branch `feature/v3.1-controls-usability` and draft PR #156 now
+contain a NEW independently source-built RC1 application path. Do not
+confuse it with the older Preview 1/Preview 2 preserved binaries. No stable
+3.1.0 tag or release has been published. Public stable 3.0.0 and 2.0
+are untouched.
+
+**New source-code work:**
+
+- `anything_plays/build_identity.py` defines strictly validated
+  frozen application metadata for preview1 and rc1. `app.py` now
+  reads the actual embedded RC app title; `anything_plays/test_preferences.py`
+  keeps RC settings under `~/.config/anything-plays-31-rc1/`,
+  safely separate from the 3.0 and 3.1 Preview settings.
+- `tools/write_v31_identity.py` writes a reviewed build-time
+  identity marker and rejects mixed production/preview/RC flags.
+  Linux, Windows and macOS packaging scripts embed this metadata
+  in PyInstaller and expose new RC1 versions, distinct installer and
+  app identifiers, with no production authorization.
+- `tools/verify_v31_rc.py` records source SHA, installer SHA-256,
+  RC identity and source-stage mGBA-only limitation.
+  `tests/test_v31_candidate_identity.py` enforces app title, settings
+  isolation, tamper rejection and nonrelease flags.
+- [Fresh RC1 source-app builds 42863846059](https://github.com/MasynNay/anything-plays/actions/runs/42863846059)
+  **SUCCESS 4/4** on Windows, Linux, Apple Silicon and Intel Mac, with
+  source commit `86baa6972ed923540f6ab49b636652a0f499d45c`.
+  These first-stage standalone app packages include only GB/GBC/GBA.
+- Extended existing `tools/assemble_v31_full_linux.py`,
+  `tools/assemble_v31_full_windows.py` and
+  `tools/assemble_v31_full_macos.py` with explicit `--rc1` mode.
+  They continue to preserve the original Preview 2 behavior while
+  demanding EXACT RC source receipts and public 3.0 stable core hashes
+  in the new mode. Their full QA packages use the new source-built
+  RC app with all 11 original-source native emulators and 18 profiles.
+  Distinct Windows Inno AppId, macOS bundle ID and Linux Debian package
+  protect the stable app. No promotion, approval or release actions.
+- `fetch_mgba_core.py` now permits exactly one of the two
+  nonrelease 3.1 channels (Preview or RC) when selecting full
+  verified original-source cores, but rejects mixed channels or
+  any release approval flag. `tests/test_v31_rc_full.py` includes
+  cross-platform original-byte and source-receipt failures plus
+  adversarial flags.
+- [FULL RC1 QA workflow 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433)
+  **SUCCESS 4/4** (Windows x64, Linux x64, macOS ARM64 and Intel).
+  SHA-256-verified, installed full 18-console/11-native QA packages
+  and `SDL_RUNTIME_AUDIT.json` are retained as four temporary
+  GitHub Actions artifacts, expiring around November 17, 2026.
+  Full RC1 build source-assembler commit:
+  `29d0f9bced7b19952e70b12567c292c470b6b44f`.
+- [Owner full RC1 QA downloads/test plan](../V3_1_RC_QA_DOWNLOADS.md)
+  records exact artifact names, install commands, SHA-256 checks
+  and physical/real-game acceptance. The readiness manifest logs
+  the successful new RC source-app and full-package QA separately
+  and deliberately leaves all six release gates and
+  `public_release_approved` **FALSE**.
+
+**Remaining blockers:** source correspondence and runtime/LGPL
+relinking review for exact packaged pygame-ce/SDL native binaries,
+physical USB/Bluetooth gamepad acceptance, installed real-ROM tests
+including saves/N64/GameCube/audio/camera/endurance on new RC packages,
+and separate final stable 3.1.0 upgrade/install identity, release
+documentation and explicit owner release acceptance. These are
+not fixed by 4/4 CI or renamed installers. Keep PR #156 in draft.
+
+**Next concrete engineering priority:** inspect pinned SDL/pygame wheel
+original source and native linked libraries from the four RC audit
+JSON receipts, preserve matching source/attribution as a separate
+corresponding-source package, and keep an independent legal review
+rather than marking distribution approved prematurely.
+
+## Pinned SDL pygame source and signed macOS runtime follow-up — November 10, 2026
+
+**Scope:** GitHub `MasynNay/anything-plays`,
+`feature/v3.1-controls-usability`, open/draft PR #156. Public
+v3.0.0 and v2.0 remain untouched. **No 3.1 public release**.
+
+- New `tools/prepare_v31_sdl_source_review.py` and
+  `tests/test_v31_sdl_source_evidence.py` verify the exact official
+  pygame-ce **2.5.8 source commit**
+  `c8200a9eaa530f884a0a4c3384cefc48006e58be` and
+  its LGPL file digest, official CPython 3.13 wheel-release SHA-256
+  metadata, and all four genuine RC1 installed-package native audit
+  reports. Creates a temporary pinned tagged source archive, a complete
+  `SDL_SOURCE_REVIEW.json`, and checksums, but **never** grants rights.
+- `tools/macho_wheel_slices.py`,
+  `tests/test_v31_macho_slices.py` and the upstream review workflow
+  also compare exact arm64/x86_64 slices of macOS universal wheels.
+- [SDL upstream source evidence run 42874882808](https://github.com/MasynNay/anything-plays/actions/runs/42874882808)
+  **SUCCESS**. Exact installed-native candidate matches: Linux **74/74**,
+  Windows **62/62**; macOS ARM **0/121**, Intel **0/120** even with
+  universal2 architecture-slice comparisons.
+  Unmatched native code is not attested; it must NOT pass a source gate.
+- Added `tools/inspect_v31_macos_linkage.py` plus
+  `tests/test_v31_macos_linkage_review.py`, verifying each already
+  installed signed RC1 native library hash and preserving read-only
+  `otool -L`, `lipo` architecture, and `codesign -dv` evidence.
+  [Mac native linkage review 42875616776](https://github.com/MasynNay/anything-plays/actions/runs/42875616776)
+  **SUCCESS both platforms**. All 121 ARM64 and 120 Intel candidates
+  have passing `otool` inspections, `lipo` reports solely their
+  respective CPU architectures and `Signature=adhoc` metadata.
+  The native SDL2 Mach-O current version is recorded as
+  `3201.10.0` on both Macs (this is NOT verified SDL2 original-source
+  correspondence). Input DMG was mounted read-only and never modified.
+- All new workflows are **read-only** and retain independent 14-day
+  nonrelease source and JSON audit ZIP artifacts, expiring around
+  **November 24, 2026**. Full investigation and source SHA values:
+  [V3_1_SDL_SOURCE_REVIEW.md](../V3_1_SDL_SOURCE_REVIEW.md).
+- Updated `docs/ROADMAP.md`, release acceptance, and
+  `config/v3.1-release-readiness.json` with these technical facts.
+  All six release gates and `public_release_approved` remain FALSE.
+
+**Recommended next development:**
+1. Identify exact bundled SDL2, SDL2_image, SDL2_mixer and SDL2_ttf
+   upstream source releases and their other native transitive
+   dependencies; prove the source-to-**final signed Mac library**
+   chain including wheel/native postprocessing or leave explicitly
+   unmatched. Avoid claiming that a version string is proof of source.
+2. Complete any required corresponding-source, attribution and
+   LGPL end-user replacement/relinking review independently.
+3. Capture physical USB/Bluetooth controller QA and installed
+   real-game/save/reload/game switching/audio/camera/endurance tests.
+4. After both rights and device gates, prepare genuine final stable
+   3.1.0 installer upgrade identities, release notes and explicit
+   owner approval. Keep PR #156 draft and stable 3.0 unchanged.
+
+## Fresh RC1 installed desktop GUI, SDL loader and five original source candidate milestones — November 10, 2026
+
+All work below was performed and **committed** to
+`feature/v3.1-controls-usability` with draft PR #156. Stable public
+`v3.0.0` and v2.0 remain unchanged, no release approval or public 3.1
+was issued. The verified full 18-console/11-original-source-core
+RC1 QA installers remain the pinned 4/4 successful source build
+[42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433),
+built from app source revision
+`86baa6972ed923540f6ab49b636652a0f499d45c`.
+
+**New concrete work with verified results:**
+
+- New `tools/audit_v31_sdl_collision.py` and tests, plus
+  read-only [SDL loader collision run 42879312220](https://github.com/MasynNay/anything-plays/actions/runs/42879312220),
+  **PASSED**. The real Apple Silicon 3.1 RC1 signed .app has
+  OpenCV `cv2/__dot__dylibs/libSDL2-2.0.0.dylib` version
+  `3201.8.0` and pygame's separate
+  `pygame/__dot__dylibs/libSDL2-2.0.0.dylib` version
+  `3201.10.0`, with additional same-digest framework paths. One
+  same-basename different-version collision was reported on ARM64,
+  none on Intel. This is a potential loader ambiguity, not evidence
+  of crash, camera compatibility, malicious exploit or legal approval.
+  Machine-readable `SDL_LIBRARY_COLLISIONS.json` was uploaded.
+- New `tools/verify_v31_sdl_component_sources.py`,
+  `tests/test_v31_sdl_component_sources.py` and
+  [source-tag QA run 42879614179](https://github.com/MasynNay/anything-plays/actions/runs/42879614179),
+  **PASSED**. A five-tree original upstream SDL source archive was
+  prepared and sha256-verified: SDL2 2.32.8
+  (`98d1f3a45aae568ccd6ed5fec179330f47d4d356`),
+  SDL2 2.32.10
+  (`5d249570393f7a37e037abf22cd6012a4cc56a71`),
+  SDL2_image 2.8.12
+  (`12cb2e40330d256d9b1329647be8f366546d715c`),
+  SDL2_mixer 2.8.2
+  (`b208916aed9250fe434360e6c6a95f0697bb7b01`) and
+  SDL2_ttf 2.24.0
+  (`2a891473eaf05ba1707a4b7913e6c4db7de7458a`).
+  The versions were identified by actual Mach-O strings/filenames.
+  These are **source candidates**, not certified exact binary build
+  inputs or a complete corresponding-source LGPL package.
+- New `tools/verify_v31_installed_ui_smoke.py`, adversarial tests
+  and [actual installed desktop GUI run 42880420023](https://github.com/MasynNay/anything-plays/actions/runs/42880420023),
+  **PASSED all 4/4** on Linux x64, Windows x64, Apple Silicon and
+  Intel macOS. This extracted/installed the actual complete QA
+  installers on native hosts and launched each real frozen Tk
+  application using embedded `--ap-v30-ui-smoke`, initialized
+  `App`, ran the Tk event loop and verified 18 console profiles
+  and exact RC identity/source hash. Only desktop GUI startup is
+  proved, not real game or camera/controller hardware acceptance.
+  Report archives: `FROZEN_UI_SMOKE.json` and
+  `RC1_INSTALLED_UI_RECEIPT.json` for each target.
+- New `tools/probe_v31_macos_sdl_load.py` and tests, plus
+  [native SDL2 dyld coexistence run 42881412802](https://github.com/MasynNay/anything-plays/actions/runs/42881412802),
+  **PASSED both Mac OS targets**. Actual signed original
+  `libSDL2-2.0.0.dylib` file SHA-256s were checked against
+  source-linked original native inspection, then loaded from the
+  readonly mounted RC1 DMG with native `ctypes.CDLL`.
+  Apple Silicon returns SDL versions `2.32.8` (cv2) and
+  `2.32.10` (pygame) in **both library load orders**, no error.
+  Intel pygame SDL2 `2.32.10` loaded and returned its version
+  without error. Does not exercise real camera+USB gamepad
+  concurrency or every possible host loader path.
+- All new workflows use **read-only** permissions and upload
+  temporary 14-day QA reports/source references expiring around
+  **November 24, 2026**. Open docs:
+  [V3_1_INSTALLED_UI_QA.md](../V3_1_INSTALLED_UI_QA.md) and
+  [V3_1_SDL_SOURCE_REVIEW.md](../V3_1_SDL_SOURCE_REVIEW.md).
+  Source checks passed on the recent development commits.
+
+**Still open:** no physical USB/Bluetooth gamepad/camera combination
+test, no retail game/saves/audio/graphics switching or extended
+runtime on new RC hardware, no complete source-to-exact-native-binary
+build evidence for SDL deps or explicit LGPL replacement/relinking
+verification, no final stable 3.1.0 installer identity/upgrade
+verification, and no explicit public release approval. Keep all
+`config/v3.1-release-readiness.json` release gates false and PR #156
+draft. Never overwrite public stable 3.0.0 or stable 2.0.
+
+**Next:** attempt more direct (safe, hardware-free) SDL controller
+subsystem initialization from the exact signed Mac DMGs, then plan
+real hardware camera/controller and commercial-game/manual tests.
+Do not treat synthetic observations as real hardware acceptance.
+
+## Signed Mac SDL joystick subsystem initialization — verified both targets (November 10, 2026)
+
+New `tools/probe_v31_macos_sdl_load.py` and
+`tests/test_v31_macos_dyld.py` now go beyond the earlier native
+`SDL_GetVersion` experiment: in each checked signed SDL2 dylib,
+the isolated real native process calls
+`SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER)`,
+then `SDL_NumJoysticks` and `SDL_QuitSubSystem`. Both Apple Silicon
+SDL2 2.32.8 and 2.32.10 are initialized in each loading order
+and their versions confirmed. Intel SDL2 2.32.10 is also initialized.
+All code enforces the immutable 3.1 RC1 source SHA and signed native
+library SHA-256s before testing.
+
+**[Verified extended native SDL controller run 42882184466](https://github.com/MasynNay/anything-plays/actions/runs/42882184466)
+SUCCEEDED BOTH Mac jobs**. Two fresh QA evidence JSON ZIPs are
+available through approximately **November 24, 2026**.
+
+This only verifies *hardware-free* native SDL joystick/controller
+initialization in the real signed RC1 DMGs. It is NOT physical
+USB/Bluetooth hardware acceptance, does NOT open an actual camera
+or game ROM, and does NOT prove all `@rpath` resolution cases or
+LGPL source/relinking compliance. Release flags remain false.
+Updated `docs/V3_1_SDL_SOURCE_REVIEW.md`, 3.1 acceptance,
+readiness JSON and PR #156 (still draft). Public 3.0 stays untouched.
+
+Next priority: actual paired camera and controller tests, gameplay/
+save/load/audio/endurance checks on each OS, corresponding-source
+and LGPL reviews, then version-correct stable 3.1.0 builds and an
+explicit release acceptance decision.
+
+## Refreshed 3.1 camera/controller coexistence, private diagnostics and four-platform RC QA — November 10, 2026
+
+**Current branch:** `feature/v3.1-controls-usability`, draft/open
+PR #156. Stable public `v3.0.0` and stable 2.0 are untouched.
+No public 3.1 release has been created.
+
+**Actual new code:**
+- `tests/test_v31_camera_gamepad_coexistence.py` exercises real
+  OpenCV color segmentation of generated video frames through
+  `CameraMixin.draw_camera`, real `GamepadReader.poll` on synthetic
+  SDL HID, `GamepadMixin.gamepad_tick` and `InputBuffer` callbacks.
+  It verifies 18 console mappings (including N64/GameCube native
+  input tuple decoding), simultaneous P1/P2, keyboard/gamepad
+  overlap, loss of focus, disarm, disconnect/rescan, pulse mode
+  and 1,000 bounded frames. All four OS CI jobs PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42884824976
+  Source first run initially failed only because the **new test**
+  incorrectly passed internal 3D input tuples as native IDs.
+  The test harness was corrected; product game input was not changed.
+- `anything_plays/controller_diagnostics.py` provides
+  `make_controller_report()`, a deliberately local support JSON
+  with app/channel, OS architecture, pygame/SDL versions,
+  recognized SDL controls, mapped actions and game/camera state.
+  The report omits local ROM names, paths, personal device names
+  and camera images; no network upload. In `ui_gamepad.py`, the
+  **Copy diagnostics** button is now shown in Controller setup
+  with dedicated `gamepad_diagnostics_status`, avoiding the
+  65 ms controller status poll overwriting copy confirmation.
+  Tests `tests/test_v31_controller_diagnostics.py` cover
+  malicious/sensitive device strings, invalid data, disconnected
+  controllers, successful clipboard copy and failure feedback.
+  All four native virtual-controller CI jobs PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42885687277
+- Added the dedicated four-platform `v31-camera-controller-integration`
+  workflow. It uses real OpenCV pixels but virtual SDL/HID
+  events, not real cameras or physical gamepads.
+
+**Newer current-source build and install evidence:**
+- Refreshed 3.1 RC1 source-built GUI commit is
+  `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+  Exact 4/4 source-build run: https://github.com/MasynNay/anything-plays/actions/runs/42885525444
+  Each platform has a genuine bundled 3.1 RC1 app-stage QA artifact.
+- Atomic pinned source update to 3 complete eleven-core assemblers,
+  strict test and workflow at commit
+  `2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d`.
+  New full 18-console, 11 original-source emulator core QA:
+  https://github.com/MasynNay/anything-plays/actions/runs/42886791394
+  **PASSED all four** (Linux x64, Windows x64, macOS ARM64/Intel).
+  Includes four complete version-isolated candidate installers
+  (not stable!), original-source native hashes, SDL runtime audit
+  and installer SHA receipts. ZIP artifacts expire about
+  November 17, 2026 at 19:38 UTC.
+- Retargeted actual installed frozen Tk smoke to the refreshed
+  full packages (run and commit pinned, RC identity verified).
+  Windows, Linux, Intel Mac and Apple Silicon 4/4 actual
+  installed desktop GUI startup PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42887470580
+  It opens actual Tk `App` and runs event loop; it does not
+  simulate real games, controllers, camera hardware, sound or saves.
+- Refreshed release readiness JSON and QA downloads guide;
+  current docs `V3_1_RC_QA_DOWNLOADS.md`,
+  `V3_1_CONTROLLER_DIAGNOSTICS.md`,
+  `V3_1_INSTALLED_UI_QA.md`, `V3_1_RELEASE_ACCEPTANCE.md`,
+  `V3_1_RELEASE_NOTES_DRAFT.md` and `ROADMAP.md`.
+
+**Still BLOCKED:** real camera+controller compatibility on
+actual hardware and installed real-game/endurance/save checks;
+LGPL/SDL exact updated binary-to-corresponding-source, notices
+and replacement/relinking review; final stable 3.1.0 installer
+identities/upgrade behavior and public release authorization.
+Old source/Mach-O SDL evidence applies to the earlier RC1
+build 42865608433; do not silently equate it to the new
+run 42886791394. Every public release gate remains FALSE.
+
+**Next:** independently re-run SDL source audits against refreshed
+full 3.1 RC1 packages, inspect same-name SDL2 loader and
+physical camera/controller and gameplay once real devices
+are available. Keep PR #156 draft; never change released 3.0.
+
+## Refreshed signed SDL and virtual joystick QA — November 10, 2026
+
+Four refreshed RC1 installers: https://github.com/MasynNay/anything-plays/actions/runs/42886791394, source `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+Original-source/wheel audit https://github.com/MasynNay/anything-plays/actions/runs/42888996921 PASSED: Linux 74/74, Windows 62/62, ARM Mac 0/121, Intel Mac 0/120 byte matches. Signed Mac native linkage https://github.com/MasynNay/anything-plays/actions/runs/42888996877 PASSED both 121/120 files. Current collision audit https://github.com/MasynNay/anything-plays/actions/runs/42889343414 PASS: ARM one SDL2 version collision, Intel none. Real signed SDL dylib load + joystick/controller init https://github.com/MasynNay/anything-plays/actions/runs/42889343645 PASSED both Macs and both ARM load orders. New actual signed native SDL virtual joystick attach/pressed/released/removed test https://github.com/MasynNay/anything-plays/actions/runs/42889944381 PASSED both Macs, both ARM load orders. Added `tools/probe_v31_macos_virtual_joystick.py`, adversarial `tests/test_v31_macos_virtual_joystick.py` and `.github/workflows/v31-rc1-macos-virtual-joystick.yml`. All statuses were confirmed green through GitHub Actions. Physical USB/Bluetooth controllers and camera/gameplay are unverified; Mac signed library corresponding source and LGPL relink/replacement review remain unresolved. All 6 release gates FALSE, PR #156 DRAFT, public 3.0 unchanged. See `docs/V3_1_REFRESHED_SDL_NATIVE_QA.md`.
+
+## Atomic candidate settings migration + real frozen installed acceptance — November 10, 2026
+
+**BRANCH:** `feature/v3.1-controls-usability`, draft PR #156.
+**NO public 3.1 release**; public stable 3.0 and v2 remain intact.
+All six public 3.1 readiness gates remain FALSE.
+
+- Built `anything_plays/test_preferences.py` create-only atomic
+  temporary-file + hard-link settings migration, with size limit,
+  exclusive publication, safe temp cleanup, and rejection of source,
+  directory and destination symlink redirects/races. Stable settings
+  are read-only; existing RC settings are never replaced.
+- Added `tests/test_v31_preferences_atomic.py` (32 parallel starts,
+  legacy data preservation, interrupted copies, source limits,
+  symlink attacks and concurrent symlink injection) and
+  `tests/test_v31_installed_settings_migration.py` (disposable HOME,
+  tamper-checks, candidate migration and stable SHA receipt).
+  [Windows/Linux/ARM Mac/Intel Mac source QA 42893632730](https://github.com/MasynNay/anything-plays/actions/runs/42893632730)
+  **SUCCESS 4/4**, plus Python 3.12/3.13 source regression green.
+- Added `tools/qa_v31_installed_settings_migration.py`:
+  refuses a real/current or nonempty HOME, seeds controlled
+  3.0-style `preferences.json` (Plum Dark theme) and
+  `system_profiles.json` with SHA receipts, and after app
+  launch requires migrated separate RC settings + original
+  stable files byte-for-byte unchanged.
+- **Source-built app commit** `cdbd647fa8ef3f3db0a8d419f0396f6b191599d6` passed
+  [run 42892417937](https://github.com/MasynNay/anything-plays/actions/runs/42892417937) **4/4**.
+- Atomically repinned 3 complete 18-console / 11-original-native-core
+  RC1 installers to this newer app source. [Full QA 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881)
+  **SUCCESS 4/4**, with four 7-day Actions artifact ZIPs.
+- Installed QA workflow `.github/workflows/v31-rc1-installed-gui-smoke.yml`
+  now seeds/validates the stable user settings fixture while invoking the
+  actual frozen 3.1 RC1 GUI from each completed installer. The
+  PowerShell variable was corrected to `$qaHome` rather than
+  read-only `$HOME`; it never writes a real user home.
+  [Installed real desktop and settings run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)
+  **SUCCESS 4/4**. All jobs emitted
+  `UNRELEASED_3_1_INSTALLED_RC_SETTINGS_COPIED_STABLE_UNCHANGED`,
+  `FROZEN_UI_SMOKE.json`, `RC1_INSTALLED_UI_RECEIPT.json`,
+  `SETTINGS_QA_FIXTURE.json`, and
+  `RC1_INSTALLED_SETTINGS_RECEIPT.json`. Temporary 14-day receipts.
+- Documentation `docs/V3_1_ATOMIC_SETTINGS_MIGRATION.md`,
+  RC QA downloads, installed GUI QA, release acceptance, roadmap
+  and draft notes updated with these **actual verified** outcomes.
+
+**Still OPEN:** A passed fake-home import does not prove all real
+user upgrades; do not silently adopt the RC settings directory for a
+future stable build. Actual Xbox/PlayStation USB/Bluetooth,
+webcam+controller coexistence, game saves/audio/video/endurance,
+exact current SDL/pygame binary corresponding source and LGPL
+replacement/relinking review, separately approved stable installer
+upgrade IDs, and manual release authorization are unresolved.
+Native SDL audits from older 3.1 RC1 builds are historical evidence,
+not new corresponding-source approval for this candidate.
+The stable v3.0.0 release and v2 code were not touched.

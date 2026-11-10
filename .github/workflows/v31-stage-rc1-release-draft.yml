@@ -1,0 +1,167 @@
+name: 3.1 | Preserve QA assets and create private RC1 release draft
+
+# The GitHub GITHUB_TOKEN cannot create releases targeting commits whose
+# workflow files differ from main. Stage a private draft against main ONLY;
+# before any publication move to 3.1's actual source when merged and reviewed.
+# All files remain owner-only draft QA. NO public distribution is approved.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - ".github/workflows/v31-stage-rc1-release-draft.yml"
+      - "tools/stage_v31_rc_draft.py"
+      - "tests/test_v31_rc_release_draft.py"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: v31-owner-qa-private-draft
+  cancel-in-progress: false
+
+jobs:
+  stage-exact-owner-only-rc1-draft:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: "42905694504"
+      QA_COMMIT: c67fab048d7e44f371f2589a6d73b9d556de84d0
+      SOURCE_RUN: "42909893531"
+      SOURCE_COMMIT: 8f39b19300394ff3585c8968e3178c3ae70a4bfb
+      APP_COMMIT: 26de1e1ad1b701d0735e085158347f8c213ce437
+      TAG: v3.1.0-rc1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Require draft source/installer integrity and adversarial tampering tests
+        run: python -m unittest discover -s tests -p "test_v31_rc_release_draft.py" -v
+      - name: Prove exact completed four-OS binaries and upstream source QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          for record in "$QA_RUN:$QA_COMMIT" "$SOURCE_RUN:$SOURCE_COMMIT"; do
+            run="${record%%:*}"
+            expected="${record#*:}"
+            actual="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+            conclusion="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            [[ "$actual" == "$expected" && "$conclusion" == success ]] || {
+              echo "::error::Pinned installer/native source QA failed provenance check"
+              exit 1
+            }
+          done
+          [[ "$(gh run view "$QA_RUN" --repo "$GITHUB_REPOSITORY" --json name --jq .name)" == '3.1 RC1 | Full 18-console source-app QA (unreleased)' ]]
+          [[ "$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json name --jq .name)" == '3.1 | SDL pygame source evidence (unreleased review)' ]]
+          gh release view v3.0.0 --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+          gh release view v3.0.0-sources --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==true' | grep -qx true
+      - name: Download full RC1 installer assets plus independently audited source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in windows-x64 linux-x64 macos-arm64 macos-x64; do
+            gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1-RC1-FULL-18-$target-UNRELEASED" \
+              --dir "inputs/installers/$target"
+          done
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1-RC1-SDL-UPSTREAM-SOURCE-REVIEW-UNAPPROVED \
+            --dir inputs/source
+          test -s inputs/source/SIX_SOURCE_COMPANION_READINESS.json
+      - name: Stage four exact native installers with full source-companion checksum ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v31_rc_draft \
+            --installers inputs/installers --source inputs/source --output draft-assets
+          (cd draft-assets && sha256sum --check SHA256SUMS.txt)
+          test -s draft-assets/RC1_DRAFT_QA_RECEIPT.json
+          test "$(find draft-assets -maxdepth 1 -type f | wc -l)" = 7
+      - name: Explicitly preserve still-open redistribution and hardware limitations
+        shell: bash
+        run: |
+          cat > RC1_DRAFT_NOTES.md <<'NOTES'
+          # Anything Plays 3.1 RC1 — PRIVATE DRAFT, NOT PUBLISHED
+
+          **Owner-only draft containing verified QA installers. Do not publish
+          until third-party native source correspondence, LGPL relinking and
+          redistribution requirements have been reviewed.**
+
+          Windows x64, Linux x64, macOS Intel and Apple Silicon RC1 full
+          offline test installers. Each has 18 console profiles and 11
+          original-source emulator-core families. Application source commit:
+          26de1e1ad1b701d0735e085158347f8c213ce437.
+
+          Four-platform exact installed QA:
+          https://github.com/MasynNay/anything-plays/actions/runs/42905694504
+          Four-platform actual Tk GUI and settings safety:
+          https://github.com/MasynNay/anything-plays/actions/runs/42906122307
+          Upstream pygame/SDL source and notice candidate evidence:
+          https://github.com/MasynNay/anything-plays/actions/runs/42909893531
+
+          Draft currently targets default branch 'main' ONLY to pass
+          GitHub workflow-file permissions; it MUST NOT be published until
+          the real 3.1 source commit is present on main and retargeted.
+          The assets have REAL RC1 filenames and SHA256SUMS.txt. The
+          original-source candidate ZIP is not certified complete LGPL
+          corresponding source. No rename of a preview/alpha binary into
+          a fake stable installer has been performed.
+
+          Still open: exact macOS native-source and binary provenance,
+          LGPL end-user library replacement/relinking, notices for
+          all runtime dependencies, physical controller/camera and retail
+          game save/audio acceptance, and production 3.1.0 installer identity.
+          Do not remove DRAFT; this does not authorize public redistribution.
+          Existing public 3.0.0 and 2.0.0 releases remain unchanged.
+          NOTES
+      - name: Preserve authenticated source and four installer QA assets for extended review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-FOUR-OS-FULL-INSTALLERS-AND-SOURCE-OWNER-QA
+          path: |
+            draft-assets/
+            RC1_DRAFT_NOTES.md
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+      - name: Open exact verified 3.1 RC1 GitHub Release as an UNPUBLISHED draft
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub refuses releases targeted at an unmerged commit which
+          # changes .github/workflows, even with contents:write. The draft
+          # target MUST be main until the matching 3.1 code is on main.
+          # Never publish this provisional target as a public prerelease.
+          [[ "$(gh repo view "$GITHUB_REPOSITORY" --json defaultBranchRef --jq '.defaultBranchRef.name')" == main ]]
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,isPrerelease,assets \
+              --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+            mkdir -p previous
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern SHA256SUMS.txt --dir previous
+            cmp draft-assets/SHA256SUMS.txt previous/SHA256SUMS.txt
+            echo 'Existing RC1 private draft verified byte-for-byte, no overwrite'
+          else
+            gh release create "$TAG" draft-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target main \
+              --draft --prerelease \
+              --title 'Anything Plays 3.1 RC1 | Four verified installers (PRIVATE DRAFT)' \
+              --notes-file RC1_DRAFT_NOTES.md
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          echo 'Verified 7 candidate assets in UNPUBLISHED draft, production acceptance still open'

@@ -154,3 +154,17 @@ that unrelated native dependencies or all source/license obligations are met.
   included verbatim with frozen application notices)
 - The module uses system graphics drivers. It supplies OpenGL contexts, **not**
   Dolphin code, firmware, ROMs, or the standalone RetroArch application.
+
+### pygame-ce and SDL controller runtime (3.1 preview)
+
+The unreleased 3.1 controller implementation uses **pygame-ce 2.5.8**,
+licensed **LGPL-2.1-or-later**, to read SDL2-compatible joysticks without
+system-wide keyboard injection. Source: https://github.com/pygame-community/pygame-ce
+and https://pypi.org/project/pygame-ce/2.5.8/.
+
+The build inventories already collect notices for Python dependencies.
+Before a public 3.1 release, review whether the installed Python wheels
+bundle SDL2 or other shared libraries; preserve their specific license
+texts, original-source access, and applicable reverse-engineering/relinking
+conditions. Including the LGPL notice is necessary but not sufficient
+proof of complete binary redistribution compliance.

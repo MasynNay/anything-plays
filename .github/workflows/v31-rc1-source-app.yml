@@ -1,0 +1,109 @@
+name: 3.1 RC1 | Fresh source-built app QA (unreleased)
+
+# Source-build a NEW frozen application on all four hosts. Unlike the older
+# Preview 2 assembly, the app binary is compiled from THIS branch revision.
+# This first stage contains only mGBA (GB/GBC/GBA), NOT the full 18 consoles.
+# Its installer ID and settings are separate from public stable 3.0.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-rc1-source-app.yml'
+      - 'app.py'
+      - 'anything_plays/**'
+      - 'packaging/**'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v31_rc.py'
+      - 'requirements-build.txt'
+      - 'fetch_mgba_core.py'
+      - 'verify_bundle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-rc1-source-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-source-app:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Fresh RC1 shell · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'release/anything-plays-31-rc1_3.1.0~rc1_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'release/AnythingPlaysSetup-3.1.0-rc1.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'release/AnythingPlays-3.1.0-rc1-macos-arm64.dmg', bundle: 'dist/AnythingPlays31RC.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'release/AnythingPlays-3.1.0-rc1-macos-x64.dmg', bundle: 'dist/AnythingPlays31RC.app'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    env:
+      AP_V31_RC: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify source-only candidate safety and identity
+        run: python -m unittest discover -s tests -p 'test_v31_candidate_identity.py' -v
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Inno Setup for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build Linux fresh RC app
+        if: runner.os == 'Linux'
+        run: bash packaging/build_linux_deb.sh
+      - name: Build Windows fresh RC app
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Build Mac fresh RC app
+        if: runner.os == 'macOS'
+        run: bash packaging/build_macos_dmg.sh
+      - name: Inspect candidate's actual frozen identity and hash installer
+        run: python -m tools.verify_v31_rc --target "${{ matrix.target }}" --installer "${{ matrix.installer }}" --bundle "${{ matrix.bundle }}" --output release/RC1_APP_STAGE_RECEIPT.json
+      - name: Explicitly disclose that this is not full-console RC
+        shell: bash
+        run: |
+          cat > release/README_RC1_APP_STAGE.txt <<'EOF'
+          Anything Plays 3.1 RC1 application shell — UNRELEASED QA, not full
+
+          This new executable is built from this branch's current Python
+          source on your target operating system. Its UI and isolated install
+          identity are RC1. It contains ONLY mGBA (GB, GBC, GBA), not the
+          complete eighteen-console library or eleven original-source cores.
+          Do not use this artifact to replace Anything Plays 3.0 stable.
+          The pending full-library RC assembly is a separate milestone.
+
+          The receipt stores the exact source revision and installer SHA-256.
+          No release, hardware gamepad acceptance, or redistribution decision
+          is implied by this source-only QA job. The QA ZIP expires in 7 days.
+          EOF
+      - name: Retain nonrelease source-build test artifacts for seven days
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-SOURCE-APP-${{ matrix.target }}-UNRELEASED
+          path: |
+            ${{ matrix.installer }}
+            release/RC1_APP_STAGE_RECEIPT.json
+            release/README_RC1_APP_STAGE.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

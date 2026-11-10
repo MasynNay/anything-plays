@@ -65,6 +65,9 @@ class InputBuffer:
         self.system = "gba"
         self.commands = Queue(maxsize=32)
         self.manual_buttons = set()
+        # A controller's held state must never release a simultaneously held
+        # keyboard button. Both are merged only at frame-snapshot time.
+        self.gamepad_buttons = set()
         self.manual_lock = Lock()
         # The Tk thread can disarm while the Libretro worker advances a frame.
         self.state_lock = Lock()
@@ -128,6 +131,17 @@ class InputBuffer:
         with self.manual_lock:
             self.manual_buttons.clear()
 
+    def set_gamepad_buttons(self, buttons):
+        """Replace a controller snapshot atomically, independent of keyboard."""
+        accepted = {name for name in tuple(buttons)[:32]
+                    if self.id_for(name) is not None}
+        with self.manual_lock:
+            self.gamepad_buttons = accepted
+
+    def release_gamepad(self):
+        with self.manual_lock:
+            self.gamepad_buttons.clear()
+
     def disarm(self):
         # Clear queued presses under the same lock as before_frame: a pending
         # camera command cannot be applied AFTER the user presses Stop.
@@ -168,7 +182,7 @@ class InputBuffer:
                 self.pressed_p2.update(self.remaining_p2)
                 self.pressed_p2.update(self._camera_held[1])
         with self.manual_lock:
-            manual = {self.id_for(name) for name in self.manual_buttons}
+            manual = {self.id_for(name) for name in self.manual_buttons | self.gamepad_buttons}
         with self.state_lock:
             self.pressed.update(item for item in manual if item is not None)
             if self.system in ("n64", "gamecube"):

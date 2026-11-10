@@ -68,13 +68,16 @@ class SyntheticCamera:
         self.opened = False
 
 
-def soak(seconds, max_growth_mb, report_path):
+def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
     if seconds < 8:
         raise ValueError("Soak must run at least 8 seconds")
     tracemalloc.start()
     report = {"seconds_requested": seconds,
               "test_type": "synthetic Tk + OpenCV UI, not native emulator",
-              "samples": [], "passed": False}
+              "samples": [], "passed": False,
+              "real_controller_hardware_tested": False,
+              "physical_camera_tested": False,
+              "gamepad_sdl_polling_requested": bool(enable_gamepad)}
     started = time.monotonic()
     warmup = min(15, max(3, seconds // 5))
     failures = []
@@ -86,6 +89,10 @@ def soak(seconds, max_growth_mb, report_path):
                            lambda self, automatic=False: None)):
             root = tk.Tk()
             app = App(root)
+            # Exercise the real 3.1 SDL poll timer with synthetic video.
+            # No USB/Bluetooth hardware, controller window or ROM is needed.
+            if enable_gamepad:
+                app.gamepad_enabled.set(True)
             camera = SyntheticCamera()
             app.cap = camera
             app.reference_image = False
@@ -123,8 +130,17 @@ def soak(seconds, max_growth_mb, report_path):
                     "game_items": items_game,
                     "pending_tk_jobs": after_jobs,
                     "cached_zone_art": cache,
+                    "gamepad_enabled": bool(app.gamepad_enabled.get()),
+                    "sdl_backend_initialized": app._gamepad.api is not None,
+                    "gamepad_connected": app._gamepad.controller is not None,
                 }
                 report["samples"].append(sample_data)
+                if (enable_gamepad and sample_data["seconds"] >= warmup
+                        and (not sample_data["gamepad_enabled"]
+                             or not sample_data["sdl_backend_initialized"])):
+                    failures.append("SDL controller polling stopped unexpectedly")
+                    app.close()
+                    return
                 if (items_camera > 1 or items_game > 1 or
                         after_jobs > 32 or cache > 12 or
                         len(app.library_images) > 300):
@@ -149,6 +165,10 @@ def soak(seconds, max_growth_mb, report_path):
             report["camera_frames"] = camera.frame_number
 
     samples = report["samples"]
+    report["sdl_initialized_samples"] = sum(
+        1 for sample in samples if sample["sdl_backend_initialized"])
+    if enable_gamepad and report["sdl_initialized_samples"] < 2:
+        failures.append("SDL controller backend did not sustain polling")
     baseline = next((s for s in samples if s["seconds"] >= warmup), None)
     if baseline is None and samples:
         baseline = samples[0]
@@ -183,6 +203,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seconds", type=int, default=60)
     parser.add_argument("--max-growth-mb", type=float, default=96.0)
+    parser.add_argument("--enable-gamepad", action="store_true",
+                        help="Exercise SDL polling without physical HID hardware")
     parser.add_argument("--report", default="soak-report.json")
     args = parser.parse_args()
-    sys.exit(0 if soak(args.seconds, args.max_growth_mb, args.report) else 1)
+    sys.exit(0 if soak(args.seconds, args.max_growth_mb, args.report,
+                       enable_gamepad=args.enable_gamepad) else 1)

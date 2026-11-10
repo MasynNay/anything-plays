@@ -1,0 +1,104 @@
+name: 3.1 Preview 1 · Unreleased test installers
+
+# Only build-only QA artifacts. Never create GitHub releases or tags.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-preview1-test-installers.yml'
+      - 'packaging/**'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'requirements-build.txt'
+      - 'fetch_mgba_core.py'
+      - 'verify_bundle.py'
+      - 'tools/verify_v31_preview.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-preview1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-preview:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Preview 1 · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'release/anything-plays-31-preview_3.1.0~preview1_amd64.deb'}
+          - {target: windows-x64, runner: windows-latest, installer: 'release/AnythingPlaysSetup-3.1.0-preview1.exe'}
+          - {target: macos-arm64, runner: macos-15, installer: 'release/AnythingPlays-3.1.0-preview1-macos-arm64.dmg'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'release/AnythingPlays-3.1.0-preview1-macos-x64.dmg'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      AP_V31_PREVIEW: '1'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build Linux Debian QA package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build Windows Setup QA package
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Build macOS disk-image QA package
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify installer identity and calculate SHA-256
+        run: python tools/verify_v31_preview.py --target "${{ matrix.target }}" --file "${{ matrix.installer }}" --output release/PREVIEW1_RECEIPT.json
+      - name: Include accurate preview limitations
+        shell: bash
+        run: |
+          cat > release/README_PREVIEW1.txt <<'EOF'
+          Anything Plays 3.1 Preview 1 · UNRELEASED QA ONLY
+
+          This is not a public release and does not replace stable 3.0.
+          This minimal starter build contains only mGBA (GB, GBC and GBA).
+          Other console profiles are visible but their cores are NOT bundled.
+          Use only your own legally obtained game ROMs; none are included.
+
+          Controller features: right-side controller setup panel, editable
+          per-console mappings, USB/Bluetooth detection via SDL, separate
+          camera/keyboard/controller input, and automatic disconnect handling.
+          Actual hardware connections and full-system builds are NOT yet
+          verified. The macOS apps are ad-hoc signed, not notarized.
+
+          Compare your installer SHA-256 to PREVIEW1_RECEIPT.json.
+          GitHub Actions QA artifacts expire after seven days.
+          EOF
+      - name: Retain QA binaries as seven-day Actions artifacts, never a release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-Preview1-${{ matrix.target }}-UNRELEASED
+          path: |
+            ${{ matrix.installer }}
+            release/PREVIEW1_RECEIPT.json
+            release/README_PREVIEW1.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

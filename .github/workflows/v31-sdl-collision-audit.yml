@@ -1,0 +1,80 @@
+name: 3.1 | macOS dual SDL loader collision review (unreleased)
+
+# Compare the previous *real* signed native linkage inventories. Do not
+# modify binaries, create public release assets, or claim a runtime crash.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-sdl-collision-audit.yml'
+      - 'tools/audit_v31_sdl_collision.py'
+      - 'tests/test_v31_sdl_collision.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-sdl-collision-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-macos-library-collisions:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '42906227613'
+      SOURCE_SHA: '01123565029f1397cbd472538b95d8f8173a2a97'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run adversarial dual-dylib collision tests
+        run: python -m unittest discover -s tests -p 'test_v31_sdl_collision.py' -v
+      - name: Require exact successful native linkage run
+        shell: bash
+        run: |
+          set -euo pipefail
+          got_sha="$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          got_status="$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          [[ "$got_sha" == "$SOURCE_SHA" && "$got_status" == success ]] || {
+            echo "::error::Wrong signed SDL source evidence"; exit 1;
+          }
+      - name: Retrieve both real Mac RC1 native inspection reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in arm64 x64; do
+            gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1-RC1-MACOS-$arch-SDL-LINKAGE-REVIEW-UNAPPROVED" \
+              --dir "signed/$arch"
+            test -s "signed/$arch/MACOS_NATIVE_LINKAGE_$arch.json"
+          done
+      - name: Analyze SDL2 install-name and version collisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.audit_v31_sdl_collision \
+            --arm signed/arm64/MACOS_NATIVE_LINKAGE_arm64.json \
+            --intel signed/x64/MACOS_NATIVE_LINKAGE_x64.json \
+            --output review/SDL_LIBRARY_COLLISIONS.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("review/SDL_LIBRARY_COLLISIONS.json").read_text())
+          assert report["redistribution_approved"] is False
+          assert report["hardware_coexistence_verified"] is False
+          assert {x["target"] for x in report["macos"]} == {"macos-arm64", "macos-x64"}
+          print("Potential loader conflicts are review items, not test failures.")
+          PY
+      - name: Retain read-only conflict report for human review
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-SDL-LOADER-COLLISION-REVIEW-UNAPPROVED
+          path: review/SDL_LIBRARY_COLLISIONS.json
+          if-no-files-found: error
+          retention-days: 14

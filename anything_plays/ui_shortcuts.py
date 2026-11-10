@@ -23,9 +23,9 @@ class ShortcutsMixin:
                 return
         window = tk.Toplevel(self.root)
         self._shortcut_window = window
-        window.title("Keyboard shortcuts · " + SYSTEMS[self.system_key.get()].title)
+        window.title("Game Controls · " + SYSTEMS[self.system_key.get()].title)
         window.transient(self.root)
-        window.geometry("430x520")
+        window.geometry("450x620")
         window.minsize(360, 400)
         window.protocol("WM_DELETE_WINDOW", window.destroy)
 
@@ -36,6 +36,24 @@ class ShortcutsMixin:
                   "Shortcuts apply to Anything Plays' embedded emulators only.\n"
                   "F11 = fullscreen • F10 = borderless • Esc = exit/stop",
                   justify="left").pack(anchor="w", padx=15, pady=(0, 12))
+        # The right-hand game panel is the primary controller setup location.
+        # This link gives keyboard-only users the same discoverable path
+        # without duplicating connection switches and status indicators.
+        controller_link = ttk.Frame(window)
+        controller_link.pack(fill="x", padx=12, pady=(0, 10))
+        ttk.Label(
+            controller_link, text="Use a controller? Configure it in the game panel.",
+            style="Helper.TLabel", wraplength=270
+        ).pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            controller_link, text="Controller setup…",
+            command=self.open_controller_settings,
+            style="Compact.TButton"
+        ).pack(side="right", padx=(8, 0))
+        ttk.Separator(window, orient="horizontal").pack(fill="x", padx=12)
+
+        ttk.Label(window, text="Keyboard shortcuts",
+                  font=("DejaVu Sans", 11, "bold")).pack(anchor="w", padx=13, pady=(3, 2))
         list_frame = ttk.Frame(window)
         list_frame.pack(fill="both", expand=True, padx=12)
         canvas = tk.Canvas(list_frame, borderwidth=0, highlightthickness=0)

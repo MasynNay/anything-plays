@@ -81,3 +81,27 @@ packaging versions are pinned in `../requirements-build.txt`.
 - [x] Approve the exact reviewed free/nonpromotional v2.0.0 release separately from source integration; [scoped distribution decision](RELEASE_DISTRIBUTION_REVIEW.md).
 
 **Status: [v2.0.0 is published](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)** under a narrowly reviewed free/noncommercial distribution scope, with exact byte hashes and source/notice files attached. Independent upstream buildbot *reproducibility* remains an explicitly documented technical limitation, not a claim of unverified commercial rights. A successful `verify_bundle.py` only proves integrity, not copyright ownership.
+
+## Anything Plays 3.1: optional SDL gamepad support (unreleased)
+
+The 3.1 development branch introduces **pygame-ce 2.5.8**, which provides
+standardized SDL2 gamepad input. pygame-ce uses **LGPL-2.1-or-later** licensing;
+its upstream source is https://github.com/pygame-community/pygame-ce and the
+release source package is available from the upstream 2.5.8 distribution.
+
+- The exact pinned package version is in \`requirements-build.txt\`. The
+  frozen installers retain the dependency's packaged notice files under
+  \`licenses/python-distribution-notices/\`.
+- pygame-ce uses SDL and linked multimedia/native libraries that carry
+  **their own** licensing and replacement/relinking conditions. Inspect
+  the **actual frozen binaries** on all four targets, not just a package
+  metadata field, before approving public binary distribution.
+- Include the relevant corresponding source, attribution, and any required
+  LGPL shared-library replacement information in the final release's
+  companion material. Do not assume this is satisfied merely because the
+  application's own Python code is on GitHub.
+- 3.1 Preview 1 contains only the mGBA emulator binary for GB/GBC/GBA
+  testing. It is **not** equivalent to the 3.0 full offline 18-profile
+  bundle. No stable 3.1 release approval has been made.
+
+See [3.1 release acceptance](V3_1_RELEASE_ACCEPTANCE.md).

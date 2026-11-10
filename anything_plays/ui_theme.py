@@ -120,3 +120,5 @@ class ThemeMixin:
             canvas = getattr(self, attr, None)
             if canvas is not None:
                 canvas.configure(bg=outer)
+        if hasattr(self, 'refresh_controller_artwork'):
+            self.refresh_controller_artwork()

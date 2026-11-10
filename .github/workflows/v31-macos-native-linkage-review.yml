@@ -1,0 +1,105 @@
+name: 3.1 | Installed macOS SDL linkage review (unreleased)
+
+# Inspect the previously verified signed full RC1 DMGs, never re-sign them.
+# Records exact otool dylib paths, architecture and signing metadata; it
+# cannot grant source correspondence or LGPL redistribution permission.
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-macos-native-linkage-review.yml'
+      - 'tools/inspect_v31_macos_linkage.py'
+      - 'tests/test_v31_macos_linkage_review.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-macos-native-linkage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-linked-libs:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    name: Signed RC1 native SDL · ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: arm64, target: macos-arm64, runner: macos-15}
+          - {arch: x64, target: macos-x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42905694504'
+      QA_SHA: 'c67fab048d7e44f371f2589a6d73b9d556de84d0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check code cannot accept modified RC1 dylibs or approve rights
+        run: python -m unittest discover -s tests -p 'test_v31_macos_linkage_review.py' -v
+      - name: Require exact successful frozen 18-console RC1 QA run
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh run view "$QA_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          verdict="$(gh run view "$QA_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          if [[ "$actual" != "$QA_SHA" || "$verdict" != success ]]; then
+            echo "::error::Not the pinned, successful full RC1 candidate"
+            exit 1
+          fi
+      - name: Download exact published internal QA candidate, receipt and native audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir candidate
+          test -s candidate/SDL_RUNTIME_AUDIT.json
+          test -s candidate/FULL_MACOS_QA_RECEIPT.json
+          test -s "candidate/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+      - name: Mount original signed DMG read-only and inspect every pygame/SDL native file
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="candidate/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-maclink.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mounted=0
+          for retry in 1 2 3 4 5 6 7 8 9 10; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            sleep 8
+          done
+          if [[ "$mounted" != 1 ]]; then
+            echo "::error::Could not mount verified RC DMG read-only"
+            exit 1
+          fi
+          codesign --verify --verbose=2 "$mountdir/AnythingPlays31RC.app"
+          python -m tools.inspect_v31_macos_linkage \
+            --bundle "$mountdir/AnythingPlays31RC.app" \
+            --audit candidate/SDL_RUNTIME_AUDIT.json \
+            --receipt candidate/FULL_MACOS_QA_RECEIPT.json \
+            --installer "$dmg" \
+            --target "${{ matrix.target }}" \
+            --output "review/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json"
+      - name: Retain source-linkage evidence as temporary review only
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SDL-LINKAGE-REVIEW-UNAPPROVED
+          path: review/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9

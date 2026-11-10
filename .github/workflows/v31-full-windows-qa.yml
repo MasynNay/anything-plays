@@ -1,0 +1,68 @@
+name: 3.1 | Full 18-console Windows QA
+
+on:
+  push:
+    branches: [feature/v3.1-controls-usability]
+    paths:
+      - '.github/workflows/v31-full-windows-qa.yml'
+      - 'tools/assemble_v31_full_windows.py'
+      - 'verify_bundle.py'
+      - 'tools/audit_v31_sdl_runtime.py'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  full-windows:
+    if: github.ref == 'refs/heads/feature/v3.1-controls-usability'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      AP_V31_PREVIEW: '1'
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install Windows Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Install pinned Pillow, NumPy and OpenCV to render original application icon
+        run: python -m pip install Pillow==12.3.0 numpy==2.5.4 opencv-python-headless==4.14.0.94
+      - name: Download exact public 3.0 installer and original SHA256 manifest
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory original30 -Force | Out-Null
+          gh release download v3.0.0 --repo "$env:GITHUB_REPOSITORY" --pattern 'AnythingPlaysSetup-3.0.0.exe' --dir original30
+          if ($LASTEXITCODE -ne 0) { throw 'Stable public 3.0 Setup download failed' }
+          gh release download v3.0.0 --repo "$env:GITHUB_REPOSITORY" --pattern 'SHA256SUMS.txt' --dir original30
+          if ($LASTEXITCODE -ne 0) { throw 'Stable release SHA256 download failed' }
+      - name: Download verified controller-enabled 3.1 Preview 1 Setup
+        shell: pwsh
+        run: |
+          gh run download 42853582632 --repo "$env:GITHUB_REPOSITORY" --name AnythingPlays-3.1-Preview1-windows-x64-UNRELEASED --dir preview31
+          if ($LASTEXITCODE -ne 0) { throw 'Original 3.1 Preview 1 download failed' }
+      - name: Build and audit the complete 18-console 3.1 Windows test installer
+        shell: pwsh
+        run: |
+          python -m tools.assemble_v31_full_windows --stable original30/AnythingPlaysSetup-3.0.0.exe --preview preview31/AnythingPlaysSetup-3.1.0-preview1.exe --sums original30/SHA256SUMS.txt --receipt preview31/PREVIEW1_RECEIPT.json --output full31
+          if ($LASTEXITCODE -ne 0) { throw 'Full 3.1 Windows candidate verification failed' }
+      - name: Retain QA installer only, never publish a release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-FULL-18-windows-x64-QA-UNRELEASED
+          path: |
+            full31/AnythingPlaysSetup-3.1.0-preview2.exe
+            full31/FULL_WINDOWS_QA_RECEIPT.json
+            full31/SDL_RUNTIME_AUDIT.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

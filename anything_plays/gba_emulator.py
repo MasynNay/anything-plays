@@ -494,6 +494,13 @@ class Emulator:
     def release_manual(self):
         self.inputs.release_manual()
 
+    def set_gamepad_buttons(self, buttons):
+        """Controller input is isolated from Tk keyboard and camera holds."""
+        self.inputs.set_gamepad_buttons(buttons)
+
+    def release_gamepad(self):
+        self.inputs.release_gamepad()
+
     def disarm(self):
         self.armed = False
         # Stop must clear P1/P2 camera holds and queued pulses immediately,
@@ -503,6 +510,7 @@ class Emulator:
     def stop(self):
         """Request worker shutdown, keeping it tracked if it does not exit."""
         self.release_manual()
+        self.release_gamepad()
         self.disarm()
         self.stop_event.set()
         worker = self.thread
@@ -541,4 +549,5 @@ class Emulator:
             self.running = False
             self.inputs.disarm()
             self.inputs.release_manual()
+            self.inputs.release_gamepad()
             # Do not race Tk's UI thread by clearing the video frame here.
