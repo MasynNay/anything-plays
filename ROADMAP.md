@@ -222,3 +222,7 @@ A focused 3.0 development PR now caps decompression of original native archive a
 ### November 10, 2026 — preserved archive bounds verified
 
 PR #152 merged into the v3 development branch after Python 3.12, Python 3.13, native compatibility (run 42755797848), and unapproved source-review (run 42755796217) passed. Original native archives and Dolphin Sys outer members now have declared-size and bounded extraction checks, covered by three synthetic regressions. Packaging jobs were skipped. This does not establish final installer acceptance, Dolphin binary/source correspondence, combined licensing clearance or distribution rights. Public 3.0 remains blocked; stable 2.0 is preserved.
+
+### November 10, 2026 — provenance extraction limit (pending CI)
+
+A focused development fix closes the remaining unbounded read of preserved native provenance JSON, enforcing both declared and actual 1 MiB limits and rejecting non-object JSON. Four synthetic regression tests accompany the change. This is unapproved source-evidence input hardening, not a release gate approval; Dolphin source correspondence, combined license rights and final four-platform production acceptance remain outstanding. Stable v2.0 remains unchanged.
