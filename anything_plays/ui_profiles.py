@@ -48,6 +48,8 @@ class ProfilesMixin:
         prefs['rom_directories'] = dict(self.rom_directories)
         prefs['rom_directory'] = self.rom_directories.get('gba', '')  # legacy compatibility
         prefs['key_bindings'] = dict(self._shortcut_bindings)
+        prefs['gamepad_enabled'] = bool(self.gamepad_enabled.get())
+        prefs['gamepad_bindings'] = dict(self._gamepad_bindings)
         prefs['external_emulators'] = dict(self.external_emulators)
         prefs['n64_core_path'] = self.n64_core_override
         prefs['n64_embedded'] = bool(self.n64_embedded.get())

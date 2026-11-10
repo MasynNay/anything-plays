@@ -25,6 +25,8 @@ from anything_plays.ui_theme import ThemeMixin
 from anything_plays.ui_zones import ZonesMixin
 from anything_plays.ui_view import ViewMixin
 from anything_plays.ui_shortcuts import ShortcutsMixin
+from anything_plays.ui_gamepad import GamepadMixin
+from anything_plays.gamepad import GamepadReader
 from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 from anything_plays.ui_icon import IconMixin
@@ -32,7 +34,7 @@ from anything_plays.ui_icon import IconMixin
 
 class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
           VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
-          ShortcutsMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
+          ShortcutsMixin, GamepadMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
     def __init__(self, root):
         self.root = root
@@ -67,6 +69,14 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.preferences_path = prepare_test_preferences()
         self.profile_store = ProfileStore(self.preferences_path.with_name('system_profiles.json'), DEFAULT)
         preferences = self.read_preferences()
+        self._gamepad = GamepadReader()
+        self.gamepad_enabled = tk.BooleanVar(
+            value=preferences.get("gamepad_enabled", False) is True
+        )
+        self.gamepad_status = tk.StringVar(value="Controller disabled")
+        self._gamepad_bindings = preferences.get("gamepad_bindings", {})
+        if not isinstance(self._gamepad_bindings, dict):
+            self._gamepad_bindings = {}
         self._shortcut_bindings = preferences.get('key_bindings', {})
         if not isinstance(self._shortcut_bindings, dict):
             self._shortcut_bindings = {}
@@ -161,6 +171,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         # identifiers so all pending callbacks can be cancelled on shutdown.
         self._camera_tick_job = root.after(45, self.tick)
         self._game_tick_job = root.after(16, self.game_render_tick)
+        self._gamepad_tick_job = root.after(65, self.gamepad_tick)
         self._updates_start_job = root.after(
             8000, self.schedule_emulator_update_checks
         )
@@ -184,7 +195,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         # A long-lived window may have several pending after() callbacks.
         # Cancel the periodic loops before destroying Tk widgets.
         for job_name in ("_camera_tick_job", "_game_tick_job",
-                         "_updates_start_job", "_updates_repeat_job"):
+                         "_gamepad_tick_job", "_updates_start_job", "_updates_repeat_job"):
             job = getattr(self, job_name, None)
             if job is not None:
                 try:
@@ -212,6 +223,8 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
             if job is not None:
                 cleanup(job_name, lambda job=job: self.root.after_cancel(job))
         cleanup("manual input", self.deactivate_manual)
+        cleanup("gamepad input", self.emu.release_gamepad)
+        cleanup("SDL controller", self._gamepad.stop)
         cleanup("camera controls", self.stop_controls)
         capture, self.cap = self.cap, None
         if capture is not None:

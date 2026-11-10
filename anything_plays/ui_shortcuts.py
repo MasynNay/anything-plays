@@ -23,9 +23,9 @@ class ShortcutsMixin:
                 return
         window = tk.Toplevel(self.root)
         self._shortcut_window = window
-        window.title("Keyboard shortcuts · " + SYSTEMS[self.system_key.get()].title)
+        window.title("Game Controls · " + SYSTEMS[self.system_key.get()].title)
         window.transient(self.root)
-        window.geometry("430x520")
+        window.geometry("450x620")
         window.minsize(360, 400)
         window.protocol("WM_DELETE_WINDOW", window.destroy)
 
@@ -36,6 +36,24 @@ class ShortcutsMixin:
                   "Shortcuts apply to Anything Plays' embedded emulators only.\n"
                   "F11 = fullscreen • F10 = borderless • Esc = exit/stop",
                   justify="left").pack(anchor="w", padx=15, pady=(0, 12))
+        # Controller controls remain accessible above the scrollable list of
+        # keyboard shortcuts. SDL is not initialized until the player opts in.
+        controller_frame = ttk.LabelFrame(window, text="Manual controller", padding=9)
+        controller_frame.pack(fill="x", padx=12, pady=(0, 9))
+        ttk.Checkbutton(
+            controller_frame, text="Enable connected gamepad",
+            variable=self.gamepad_enabled, command=self.toggle_gamepad
+        ).pack(anchor="w")
+        ttk.Label(controller_frame, textvariable=self.gamepad_status,
+                  wraplength=375).pack(anchor="w", pady=4)
+        pad_buttons = ttk.Frame(controller_frame)
+        pad_buttons.pack(fill="x")
+        ttk.Button(pad_buttons, text="Rescan", command=self.refresh_gamepad).pack(side="left")
+        ttk.Button(pad_buttons, text="Controller mappings",
+                   command=lambda: self.configure_gamepad_mappings(system, window)
+                   ).pack(side="left", padx=(8, 0))
+        ttk.Label(window, text="Keyboard shortcuts",
+                  font=("DejaVu Sans", 11, "bold")).pack(anchor="w", padx=13, pady=(3, 2))
         list_frame = ttk.Frame(window)
         list_frame.pack(fill="both", expand=True, padx=12)
         canvas = tk.Canvas(list_frame, borderwidth=0, highlightthickness=0)

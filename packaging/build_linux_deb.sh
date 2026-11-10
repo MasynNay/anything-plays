@@ -41,7 +41,7 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 # Preserve stable source art and generate corrected test-only Linux icons.
 .build-venv/bin/python tools/render_v21_icon.py
-.build-venv/bin/python -m PyInstaller --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
+.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The DEB depends on OS libportaudio2. Do not redistribute frozen copies of
 # PortAudio, JACK, ALSA, Berkeley DB, or the unused GPL Readline extension.
 python3 tools/prune_linux_system_libs.py dist/AnythingPlays
