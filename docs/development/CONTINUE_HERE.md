@@ -640,3 +640,74 @@ There is **no public 3.1 release** and no reason to modify 3.0.0 or 2.0.
 Draft PR #156 remains open for review. The
 [QA download guide](../V3_1_QA_DOWNLOADS.md) now names the successful
 four latest runs and the corresponding installer files.
+
+## New Anything Plays 3.1 RC1 source-build and 18-console QA milestone — November 10, 2026
+
+The 3.1 branch `feature/v3.1-controls-usability` and draft PR #156 now
+contain a NEW independently source-built RC1 application path. Do not
+confuse it with the older Preview 1/Preview 2 preserved binaries. No stable
+3.1.0 tag or release has been published. Public stable 3.0.0 and 2.0
+are untouched.
+
+**New source-code work:**
+
+- `anything_plays/build_identity.py` defines strictly validated
+  frozen application metadata for preview1 and rc1. `app.py` now
+  reads the actual embedded RC app title; `anything_plays/test_preferences.py`
+  keeps RC settings under `~/.config/anything-plays-31-rc1/`,
+  safely separate from the 3.0 and 3.1 Preview settings.
+- `tools/write_v31_identity.py` writes a reviewed build-time
+  identity marker and rejects mixed production/preview/RC flags.
+  Linux, Windows and macOS packaging scripts embed this metadata
+  in PyInstaller and expose new RC1 versions, distinct installer and
+  app identifiers, with no production authorization.
+- `tools/verify_v31_rc.py` records source SHA, installer SHA-256,
+  RC identity and source-stage mGBA-only limitation.
+  `tests/test_v31_candidate_identity.py` enforces app title, settings
+  isolation, tamper rejection and nonrelease flags.
+- [Fresh RC1 source-app builds 42863846059](https://github.com/MasynNay/anything-plays/actions/runs/42863846059)
+  **SUCCESS 4/4** on Windows, Linux, Apple Silicon and Intel Mac, with
+  source commit `86baa6972ed923540f6ab49b636652a0f499d45c`.
+  These first-stage standalone app packages include only GB/GBC/GBA.
+- Extended existing `tools/assemble_v31_full_linux.py`,
+  `tools/assemble_v31_full_windows.py` and
+  `tools/assemble_v31_full_macos.py` with explicit `--rc1` mode.
+  They continue to preserve the original Preview 2 behavior while
+  demanding EXACT RC source receipts and public 3.0 stable core hashes
+  in the new mode. Their full QA packages use the new source-built
+  RC app with all 11 original-source native emulators and 18 profiles.
+  Distinct Windows Inno AppId, macOS bundle ID and Linux Debian package
+  protect the stable app. No promotion, approval or release actions.
+- `fetch_mgba_core.py` now permits exactly one of the two
+  nonrelease 3.1 channels (Preview or RC) when selecting full
+  verified original-source cores, but rejects mixed channels or
+  any release approval flag. `tests/test_v31_rc_full.py` includes
+  cross-platform original-byte and source-receipt failures plus
+  adversarial flags.
+- [FULL RC1 QA workflow 42865608433](https://github.com/MasynNay/anything-plays/actions/runs/42865608433)
+  **SUCCESS 4/4** (Windows x64, Linux x64, macOS ARM64 and Intel).
+  SHA-256-verified, installed full 18-console/11-native QA packages
+  and `SDL_RUNTIME_AUDIT.json` are retained as four temporary
+  GitHub Actions artifacts, expiring around November 17, 2026.
+  Full RC1 build source-assembler commit:
+  `29d0f9bced7b19952e70b12567c292c470b6b44f`.
+- [Owner full RC1 QA downloads/test plan](../V3_1_RC_QA_DOWNLOADS.md)
+  records exact artifact names, install commands, SHA-256 checks
+  and physical/real-game acceptance. The readiness manifest logs
+  the successful new RC source-app and full-package QA separately
+  and deliberately leaves all six release gates and
+  `public_release_approved` **FALSE**.
+
+**Remaining blockers:** source correspondence and runtime/LGPL
+relinking review for exact packaged pygame-ce/SDL native binaries,
+physical USB/Bluetooth gamepad acceptance, installed real-ROM tests
+including saves/N64/GameCube/audio/camera/endurance on new RC packages,
+and separate final stable 3.1.0 upgrade/install identity, release
+documentation and explicit owner release acceptance. These are
+not fixed by 4/4 CI or renamed installers. Keep PR #156 in draft.
+
+**Next concrete engineering priority:** inspect pinned SDL/pygame wheel
+original source and native linked libraries from the four RC audit
+JSON receipts, preserve matching source/attribution as a separate
+corresponding-source package, and keep an independent legal review
+rather than marking distribution approved prematurely.
