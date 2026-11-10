@@ -5,19 +5,29 @@ A later production 3.0 release should use the explicit upgrade/migration
 path rather than treating this test-only location as the stable default.
 """
 from pathlib import Path
+from anything_plays.build_identity import current_identity, make_identity
 
 
 LEGACY_DIR = Path(".config") / "fish-plays-pokemon-studio"
 TEST_DIR = Path(".config") / "anything-plays-31-preview"
 PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-30-preview"
+CANDIDATE_DIR = Path(".config") / "anything-plays-31-rc1"
 
 
-def prepare_test_preferences(home=None):
-    """Seed a separate alpha settings directory once, without editing 2.0."""
+def prepare_test_preferences(home=None, *, channel=None):
+    """Seed only the chosen 3.1 identity's private settings directory."""
     home = Path.home() if home is None else Path(home)
+    if channel is None:
+        channel = current_identity()["channel"]
+    # Do not trust a malformed channel or permit a write into stable settings.
+    make_identity(channel)
     previous_preview = home / PREVIOUS_PREVIEW_DIR
-    source = previous_preview if previous_preview.is_dir() else home / LEGACY_DIR
-    destination = home / TEST_DIR
+    preview = home / TEST_DIR
+    if channel == "rc1" and preview.is_dir():
+        source = preview
+    else:
+        source = previous_preview if previous_preview.is_dir() else home / LEGACY_DIR
+    destination = home / (CANDIDATE_DIR if channel == "rc1" else TEST_DIR)
     destination.mkdir(parents=True, exist_ok=True)
     for filename in ("preferences.json", "system_profiles.json"):
         previous = source / filename
