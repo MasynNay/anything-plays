@@ -36,22 +36,22 @@ class ShortcutsMixin:
                   "Shortcuts apply to Anything Plays' embedded emulators only.\n"
                   "F11 = fullscreen • F10 = borderless • Esc = exit/stop",
                   justify="left").pack(anchor="w", padx=15, pady=(0, 12))
-        # Controller controls remain accessible above the scrollable list of
-        # keyboard shortcuts. SDL is not initialized until the player opts in.
-        controller_frame = ttk.LabelFrame(window, text="Manual controller", padding=9)
-        controller_frame.pack(fill="x", padx=12, pady=(0, 9))
-        ttk.Checkbutton(
-            controller_frame, text="Enable connected gamepad",
-            variable=self.gamepad_enabled, command=self.toggle_gamepad
-        ).pack(anchor="w")
-        ttk.Label(controller_frame, textvariable=self.gamepad_status,
-                  wraplength=375).pack(anchor="w", pady=4)
-        pad_buttons = ttk.Frame(controller_frame)
-        pad_buttons.pack(fill="x")
-        ttk.Button(pad_buttons, text="Rescan", command=self.refresh_gamepad).pack(side="left")
-        ttk.Button(pad_buttons, text="Controller mappings",
-                   command=lambda: self.configure_gamepad_mappings(system, window)
-                   ).pack(side="left", padx=(8, 0))
+        # The right-hand game panel is the primary controller setup location.
+        # This link gives keyboard-only users the same discoverable path
+        # without duplicating connection switches and status indicators.
+        controller_link = ttk.Frame(window)
+        controller_link.pack(fill="x", padx=12, pady=(0, 10))
+        ttk.Label(
+            controller_link, text="Use a controller? Configure it in the game panel.",
+            style="Helper.TLabel", wraplength=270
+        ).pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            controller_link, text="Controller setup…",
+            command=self.open_controller_settings,
+            style="Compact.TButton"
+        ).pack(side="right", padx=(8, 0))
+        ttk.Separator(window, orient="horizontal").pack(fill="x", padx=12)
+
         ttk.Label(window, text="Keyboard shortcuts",
                   font=("DejaVu Sans", 11, "bold")).pack(anchor="w", padx=13, pady=(3, 2))
         list_frame = ttk.Frame(window)

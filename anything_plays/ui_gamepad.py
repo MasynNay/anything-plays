@@ -169,58 +169,181 @@ class GamepadMixin:
             if not self._closing:
                 self._gamepad_tick_job = self.root.after(65, self.gamepad_tick)
 
-    def configure_gamepad_mappings(self, system, parent):
-        """Editable per-console map of SDL's normalized physical controls."""
-        window = tk.Toplevel(parent)
-        window.title("Controller buttons · " + system.upper())
-        window.transient(parent)
-        window.geometry("450x570")
-        window.minsize(350, 400)
-        ttk.Label(window, text="Controller button mapping",
-                  font=("DejaVu Sans", 14, "bold")).pack(
-                      anchor="w", padx=14, pady=(12, 4))
-        ttk.Label(window, text="Choose which in-game button each physical control presses.\n"
-                  "Changes are saved for this console only.",
-                  justify="left").pack(anchor="w", padx=14, pady=(0, 9))
+    def open_controller_settings(self, system=None, parent=None):
+        """Show a visual controller setup for one console.
 
-        frame = ttk.Frame(window)
-        frame.pack(fill="both", expand=True, padx=12)
-        canvas = tk.Canvas(frame, borderwidth=0, highlightthickness=0)
-        scroll = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        The right-hand controller card is the primary entrance; the Game
+        Controls / Step 8 keyboard dialog links here as a secondary route.
+        Configurations are independent of whether a controller is connected.
+        """
+        previous = getattr(self, "_gamepad_setup_window", None)
+        if previous is not None:
+            try:
+                if previous.winfo_exists():
+                    previous.lift()
+                    previous.focus_set()
+                    return
+            except tk.TclError:
+                pass
+
+        system = system if system in BUTTONS_BY_SYSTEM else self.system_key.get()
+        window = tk.Toplevel(self.root)
+        self._gamepad_setup_window = window
+        window.title("Controller setup · " + system.upper())
+        window.transient(parent or self.root)
+        window.geometry("560x700")
+        window.minsize(455, 485)
+
+        def close():
+            self.gamepad_setup_canvas = None
+            self._gamepad_setup_window = None
+            window.destroy()
+
+        window.protocol("WM_DELETE_WINDOW", close)
+        content = ttk.Frame(window, padding=(14, 12))
+        content.pack(fill="both", expand=True)
+        ttk.Label(content, text="Controller setup",
+                  font=("TkDefaultFont", 16, "bold")).pack(anchor="w")
+        ttk.Label(
+            content,
+            text="Standard gamepad layout · mappings for " + system.upper(),
+            style="Helper.TLabel"
+        ).pack(anchor="w", pady=(2, 10))
+
+        visual = ttk.LabelFrame(content, text="YOUR CONTROLLER", padding=(9, 7))
+        visual.pack(fill="x")
+        self.gamepad_setup_canvas = tk.Canvas(
+            visual, width=278, height=150,
+            highlightthickness=0, borderwidth=0
+        )
+        self.gamepad_setup_canvas.pack(anchor="center")
+        self.refresh_controller_artwork()
+        ttk.Label(
+            visual,
+            text="D-pad   ·   Twin sticks   ·   Face buttons   ·   Triggers",
+            style="Helper.TLabel"
+        ).pack(pady=(0, 5))
+
+        state = ttk.Frame(content)
+        state.pack(fill="x", pady=(10, 8))
+        ttk.Checkbutton(
+            state, text="Enable gamepad",
+            variable=self.gamepad_enabled, command=self.toggle_gamepad
+        ).pack(side="left")
+        ttk.Button(
+            state, text="Rescan", command=self.refresh_gamepad,
+            style="Compact.TButton"
+        ).pack(side="right")
+        ttk.Label(content, textvariable=self.gamepad_status,
+                  style="Helper.TLabel", wraplength=515).pack(
+                      fill="x", pady=(0, 9))
+
+        group = ttk.LabelFrame(
+            content, text="BUTTON MAPPING · " + system.upper(), padding=(8, 7)
+        )
+        group.pack(fill="both", expand=True)
+        ttk.Label(
+            group,
+            text="Physical controller input                   In-game action",
+            style="Helper.TLabel"
+        ).pack(anchor="w", pady=(0, 5))
+        holder = ttk.Frame(group)
+        holder.pack(fill="both", expand=True)
+        canvas = tk.Canvas(holder, borderwidth=0, highlightthickness=0)
+        scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scroll.set)
         scroll.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
-        inner = ttk.Frame(canvas)
-        item = canvas.create_window((0, 0), window=inner, anchor="nw")
-        inner.bind("<Configure>", lambda _: canvas.configure(
+        rows = ttk.Frame(canvas)
+        window_id = canvas.create_window((0, 0), window=rows, anchor="nw")
+        rows.bind("<Configure>", lambda _e: canvas.configure(
             scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(
-            item, width=e.width))
+            window_id, width=e.width))
 
-        saved = self._gamepad_bindings.get(system)
-        values = (DISABLED, *BUTTONS_BY_SYSTEM[system])
-        active = normalize_bindings(system, saved)
-        for physical in SOURCES:
-            row = ttk.Frame(inner)
-            row.pack(fill="x", pady=3)
-            ttk.Label(row, text=physical.replace("_", " ").title(),
-                      width=20).pack(side="left")
-            value = tk.StringVar(value=active.get(physical, DISABLED))
-            choice = ttk.Combobox(row, textvariable=value, values=values,
-                                  state="readonly", width=16)
-            choice.pack(side="right", fill="x", expand=True)
-            choice.bind("<<ComboboxSelected>>", lambda _event,
-                        source=physical, v=value:
-                        self._save_gamepad_binding(system, source, v.get()))
+        # Separate physical buttons into recognizable regions of the graphic,
+        # instead of an undifferentiated 22-control vertical list.
+        sections = (
+            ("D-PAD", ("DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT")),
+            ("FACE BUTTONS", ("A", "B", "X", "Y")),
+            ("MENU BUTTONS", ("BACK", "START")),
+            ("ANALOG STICKS", (
+                "LEFT_STICK_UP", "LEFT_STICK_DOWN",
+                "LEFT_STICK_LEFT", "LEFT_STICK_RIGHT",
+                "RIGHT_STICK_UP", "RIGHT_STICK_DOWN",
+                "RIGHT_STICK_LEFT", "RIGHT_STICK_RIGHT"
+            )),
+            ("SHOULDERS & TRIGGERS", (
+                "LEFT_SHOULDER", "RIGHT_SHOULDER",
+                "LEFT_TRIGGER", "RIGHT_TRIGGER"
+            )),
+        )
+        descriptions = {
+            "BACK": "Back / Select", "START": "Start / Menu",
+            "LEFT_SHOULDER": "Left bumper", "RIGHT_SHOULDER": "Right bumper",
+            "LEFT_TRIGGER": "Left trigger", "RIGHT_TRIGGER": "Right trigger",
+        }
+        arrows = {"UP": "↑", "DOWN": "↓", "LEFT": "←", "RIGHT": "→"}
+        available = (DISABLED, *BUTTONS_BY_SYSTEM[system])
+        selected = normalize_bindings(
+            system, self._gamepad_bindings.get(system)
+        )
+        for heading, physical_controls in sections:
+            section = ttk.LabelFrame(rows, text=heading, padding=(7, 4))
+            section.pack(fill="x", pady=(3, 7), padx=(2, 5))
+            for physical in physical_controls:
+                row = ttk.Frame(section)
+                row.pack(fill="x", pady=3)
+                name = descriptions.get(physical)
+                if name is None:
+                    fragments = physical.split("_")
+                    if physical.startswith("DPAD_"):
+                        name = "D-pad " + arrows[fragments[-1]]
+                    elif physical.startswith(("LEFT_STICK_", "RIGHT_STICK_")):
+                        name = fragments[0].title() + " stick " + arrows[fragments[-1]]
+                    else:
+                        name = physical
+                ttk.Label(row, text=name, width=19).pack(side="left")
+                value = tk.StringVar(
+                    master=window, value=selected.get(physical, DISABLED)
+                )
+                choice = ttk.Combobox(
+                    row, textvariable=value, state="readonly",
+                    values=available, width=18
+                )
+                choice.pack(side="right", fill="x", expand=True)
+                choice.bind(
+                    "<<ComboboxSelected>>",
+                    lambda _event, source=physical, v=value:
+                    self._save_gamepad_binding(system, source, v.get())
+                )
 
-        def reset():
-            self._gamepad_bindings.pop(system, None)
-            self.save_preferences()
-            window.destroy()
-            self.configure_gamepad_mappings(system, parent)
+        footer = ttk.Frame(content)
+        footer.pack(fill="x", pady=(9, 0))
+        ttk.Button(
+            footer, text="Restore defaults",
+            style="Compact.TButton",
+            command=lambda: self._reset_gamepad_mappings(system, close)
+        ).pack(side="left")
+        ttk.Button(
+            footer, text="Done", command=close,
+            style="Accent.TButton"
+        ).pack(side="right")
+        ttk.Label(
+            content, text="Changes are saved immediately for this console.",
+            style="Helper.TLabel"
+        ).pack(anchor="w", pady=(5, 0))
 
-        ttk.Button(window, text="Restore defaults for this console",
-                   command=reset).pack(fill="x", padx=12, pady=12)
+    def _reset_gamepad_mappings(self, system, close):
+        """Reset just the selected console; leave other console maps alone."""
+        self._gamepad_bindings.pop(system, None)
+        self.save_preferences()
+        close()
+        self.open_controller_settings(system)
+
+    def configure_gamepad_mappings(self, system, parent):
+        """Compatibility alias for existing controller-map entry points."""
+        return self.open_controller_settings(system, parent)
 
     def _save_gamepad_binding(self, system, source, button):
         if source not in SOURCES or button not in (DISABLED, *BUTTONS_BY_SYSTEM[system]):
