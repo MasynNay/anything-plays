@@ -8,6 +8,8 @@
 *.exe binary
 
 # Release compliance texts remain visible and reviewable in Git diffs.
+# Keep the verbatim pygame LGPL license byte-for-byte identical on Windows.
+licenses/Pygame-CE-LGPL-2.1.txt text eol=lf
 *.md text
 *.py text
 *.yml text
