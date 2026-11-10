@@ -36,6 +36,19 @@ def hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str) -> bytes:
+    """Read the single matching native file, rejecting ZIP symlink impersonation."""
+    with zipfile.ZipFile(io.BytesIO(raw)) as inner:
+        members = [member for member in inner.infolist()
+                   if member.filename == expected_file and not member.is_dir()]
+        if len(members) != 1:
+            raise ValueError(f"{platform}: invalid core ZIP payload: {name}")
+        member = members[0]
+        if member.create_system == 3 and stat.S_ISLNK(member.external_attr >> 16):
+            raise ValueError(f"{platform}: symlinked core ZIP payload: {name}")
+        return inner.read(member)
+
+
 def build_candidate(artifact_paths):
     if set(artifact_paths) != set(PLATFORMS):
         raise ValueError("Require preserved artifacts for exactly four platforms")
@@ -114,14 +127,7 @@ def build_candidate(artifact_paths):
                         or len(raw) != core.get("archive_size_bytes")
                         or len(raw) != zip_record.get("size_bytes")):
                     raise ValueError(f"{platform}: changed original archive: {name}")
-                with zipfile.ZipFile(io.BytesIO(raw)) as inner:
-                    members = [
-                        member for member in inner.infolist()
-                        if member.filename == expected_file and not member.is_dir()
-                    ]
-                    if len(members) != 1:
-                        raise ValueError(f"{platform}: invalid core ZIP payload: {name}")
-                    payload = inner.read(members[0])
+                payload = read_native_payload(raw, expected_file, platform, name)
                 if len(payload) != core.get("size_bytes") or hash_bytes(payload) != core.get("sha256"):
                     raise ValueError(f"{platform}: changed native library: {name}")
                 locked[name] = {
