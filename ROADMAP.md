@@ -256,3 +256,6 @@ PR #155 passed Python 3.12, Python 3.13 and native mGBA compatibility in source 
 ### November 10, 2026 — Dolphin submodule working-tree integrity (pending CI)
 
 PR #158 adds verification that all 34 direct and 3 nested pinned Dolphin submodule working trees have no tracked modifications, rather than trusting Gitlink HEAD hashes alone. Two regression tests cover modified and clean checkouts. Original source-build CI and Python checks are pending; this is not proof of final production corresponding source, mixed GPL license clearance, installer acceptance or public distribution rights. Stable v2.0 remains unchanged.
+
+
+**Follow-up correction (November 10):** PR #158's initial implementation guarded the parent and three nested checkouts but missed the 34 direct submodules. Commits `81cf457b` and `283bec2d` add the direct guard and an integration regression exercising the full verification loop with a dirty pinned direct checkout. Fresh CI is required; prior successful workflows cannot certify these commits. Public release gates remain closed.
