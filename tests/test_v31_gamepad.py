@@ -224,6 +224,86 @@ class GamepadLifecycleTests(unittest.TestCase):
         self.assertIsNone(self.reader.api)
 
 
+    def test_transient_sdl_enumeration_error_retries_without_disabling(self):
+        self.reader.start()
+        self.pad.buttons = {"A"}
+        original_count = self.api.get_count
+        attempts = []
+
+        def flaky_count():
+            attempts.append(self.clock)
+            if len(attempts) == 1:
+                raise OSError("controller unplugged while SDL enumerated")
+            return original_count()
+
+        self.api.get_count = flaky_count
+        held, message = self.reader.poll("gba")
+        self.assertEqual(held, frozenset())
+        self.assertIn("Retrying", message)
+        self.assertIsNotNone(self.reader.api)
+        self.assertEqual(self.reader.physical_buttons, frozenset())
+
+        self.clock = 0.5
+        held, _ = self.reader.poll("gba")
+        self.assertEqual(held, frozenset())
+        self.assertEqual(len(attempts), 1, "Backoff prevents a 65 ms error loop")
+
+        self.clock = 2.0
+        held, message = self.reader.poll("gba")
+        self.assertEqual(held, {"A"})
+        self.assertIn("connected", message)
+        self.assertEqual(len(attempts), 2)
+
+    def test_sdl_event_pump_failure_clears_held_input_then_recovers(self):
+        self.reader.start()
+        self.pad.buttons = {"A"}
+        self.assertEqual(self.reader.poll("gba")[0], {"A"})
+        previous_pump = self.pg.event.pump
+
+        def failed_pump():
+            raise RuntimeError("temporary SDL event subsystem failure")
+
+        self.pg.event.pump = failed_pump
+        self.clock = 1.0
+        held, message = self.reader.poll("gba")
+        self.assertEqual(held, frozenset())
+        self.assertEqual(self.reader.physical_buttons, frozenset())
+        self.assertIn("Retrying", message)
+        self.assertTrue(self.pad.closed)
+
+        self.clock = 1.2
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+        self.pg.event.pump = previous_pump
+        self.api.pad = FakePad()
+        self.api.pad.buttons = {"B"}
+        self.clock = 3.0
+        held, message = self.reader.poll("gba")
+        self.assertEqual(held, {"B"})
+        self.assertIn("connected", message)
+
+    def test_lost_friendly_name_during_hotplug_does_not_drop_pad(self):
+        self.reader.start()
+
+        def lost_name(index):
+            raise OSError("name vanished during hotplug")
+
+        self.api.name_forindex = lost_name
+        self.pad.buttons = {"A"}
+        held, status = self.reader.poll("gba")
+        self.assertEqual(held, {"A"})
+        self.assertEqual(status, "Gamepad connected")
+
+    def test_refresh_resets_scan_error_backoff_immediately(self):
+        self.reader.start()
+        self.api.get_count = lambda: (_ for _ in ()).throw(OSError("scan"))
+        self.assertIn("Retrying", self.reader.poll("gba")[1])
+        self.assertGreater(self.reader.retry_after, 0)
+        self.reader.refresh()
+        self.assertEqual(self.reader.retry_after, float("-inf"))
+        self.api.get_count = lambda: 1
+        self.assertEqual(self.reader.poll("gba")[1], "Test Xbox controller connected")
+
+
 class SDLBackendSmokeTests(unittest.TestCase):
     def test_real_sdl_controller_api_without_physical_hardware(self):
         """Exercise actual pygame-ce initialization and poll in dummy video mode."""
