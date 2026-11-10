@@ -22,6 +22,10 @@ Anything Plays makes a different kind of game controller possible. Point a webca
 
 Customize the control zones, choose a console, and play in the same desktop application. Don't have a camera handy? Keyboard controls work too.
 
+**The idea:** Anything Plays started with a simple experiment: could a fish swimming in a tank play a video game? It has grown into a customizable, multi-console desktop application where movement, color tracking, and traditional keyboard inputs can all become controls.
+
+**Explore the project:** [View the app screenshots](#screenshots) · [See all supported consoles](#console-support) · [Download the desktop application](#download-the-application) · [Explore the engineering](#how-it-works)
+
 **Version 3.0 is now publicly available** with Nintendo 64, GameCube, and 16 more console profiles. The four platform installers contain the native emulator cores; you don't have to install RetroArch or Dolphin separately.
 
 ## Screenshots
@@ -91,7 +95,14 @@ Emulator compatibility varies with the title and hardware. Anything Plays does *
 | **macOS Intel** | [AnythingPlays-3.0.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-x64.dmg) |
 | **Ubuntu / Debian 64-bit** | [anything-plays_3.0.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/anything-plays_3.0.0_amd64.deb) |
 
-After installing, open Anything Plays, select your console and local ROM directory, then choose your preferred camera or keyboard control setup. A webcam is optional.
+### First launch
+
+1. **Choose a console.** Select one of the supported systems in the desktop studio.
+2. **Add your games.** Point the ROM library to a local folder containing games you have the right to use.
+3. **Set up controls.** Select a webcam and a trackable color, adjust the input zones, or choose keyboard input instead.
+4. **Play and customize.** Launch a game, fine-tune the zone layout and button labels, and adjust audio and display preferences.
+
+A webcam is optional, and the application does not bundle commercial games or proprietary BIOS files.
 
 **Verify your download:** [SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/SHA256SUMS.txt). Windows builds may be unsigned and macOS apps use ad hoc signatures rather than Apple notarization, so your operating system may display a security warning. Verify the release and checksum before proceeding.
 
@@ -175,6 +186,8 @@ Actual retail-game, camera, GPU, save compatibility, and very long sessions vary
 [**Read the development roadmap**](ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues) · [Contributing](CONTRIBUTING.md)
 
 ## Portfolio website
+
+Looking at Anything Plays as a portfolio project? The README screenshots show the actual desktop interface, while the [portfolio website](https://anythingplays.masynnay.com/) introduces the concept, design, and development journey. For technical reviewers, the [architecture notes](docs/ARCHITECTURE.md), [automated tests](tests/), and [release workflows](.github/workflows/) show how the application is built and maintained.
 
 The public [Anything Plays portfolio](https://anythingplays.masynnay.com/) showcases the original artwork, a real desktop capture, an interactive camera-zone *concept*, the engineering approach, and the development roadmap. The browser concept is illustrative; **the playable emulator is the downloadable desktop application**, not a hosted web game.
 
