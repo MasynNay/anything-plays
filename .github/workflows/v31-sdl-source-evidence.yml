@@ -10,7 +10,9 @@ on:
     paths:
       - '.github/workflows/v31-sdl-source-evidence.yml'
       - 'tools/prepare_v31_sdl_source_review.py'
+      - 'tools/macho_wheel_slices.py'
       - 'tests/test_v31_sdl_source_evidence.py'
+      - 'tests/test_v31_macho_slices.py'
   workflow_dispatch:
 
 permissions:
@@ -37,7 +39,11 @@ jobs:
         with:
           python-version: '3.13'
       - name: Prove source-review code cannot approve a public release
-        run: python -m unittest discover -s tests -p 'test_v31_sdl_source_evidence.py' -v
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_sdl_source_evidence.py' -v
+          python -m unittest discover -s tests -p 'test_v31_macho_slices.py' -v
       - name: Require exact four-platform green QA run on pinned application source
         shell: bash
         run: |
@@ -110,8 +116,14 @@ jobs:
           assert r["bundled_sdl_sources_matched"] is False
           for entry in r["targets"]:
               print(entry["target"], "upstream wheel byte matches:",
-                    entry["wheel_match_count"], "unresolved candidates:",
+                    entry["wheel_match_count"], "including exact Mach-O arch slices:",
+                    entry["exact_architecture_slice_matches"],
+                    "unresolved candidates:",
                     len(entry["unmatched_native_candidates"]))
+              if entry["unmatched_native_candidates"]:
+                  print("  unmatched path examples:",
+                        [v["installed_path"] for v in
+                         entry["unmatched_native_candidates"][:5]])
           PY
       - name: Retain unapproved source/provenance evidence, never a public release
         uses: actions/upload-artifact@v4
