@@ -37,6 +37,19 @@ if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
   PACKAGE_NAME="anything-plays-31-preview"
   INSTALL_ID="anything-plays-31-preview"
 fi
+# Source-built, isolated RC1 application stage (mGBA only until full
+# eleven-native-core QA assembly). Never replace stable 3.0.
+if [[ "${AP_V31_RC:-0}" == "1" ]]; then
+  [[ "${AP_V31_PREVIEW:-0}" != "1" && "${AP_RELEASE_BUILD:-0}" != "1" &&
+     "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_STABLE_CANDIDATE:-0}" != "1" &&
+     "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.1 RC application stage requires isolated non-release mode" >&2; exit 1;
+  }
+  VERSION="3.1.0~rc1"
+  PACKAGE_NAME="anything-plays-31-rc1"
+  INSTALL_ID="anything-plays-31-rc1"
+fi
 OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -52,7 +65,12 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 # Preserve stable source art and generate corrected test-only Linux icons.
 .build-venv/bin/python tools/render_v21_icon.py
-.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
+V31_IDENTITY_ARGS=()
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" ]]; then
+  .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
+  V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
+fi
+.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --onedir --windowed --name AnythingPlays "${V31_IDENTITY_ARGS[@]}" --collect-all cv2 --collect-all PIL --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The DEB depends on OS libportaudio2. Do not redistribute frozen copies of
 # PortAudio, JACK, ALSA, Berkeley DB, or the unused GPL Readline extension.
 python3 tools/prune_linux_system_libs.py dist/AnythingPlays
@@ -264,6 +282,23 @@ if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
      "$PKG/usr/share/applications/anything-plays-31-preview.desktop"
   mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
      "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-31-preview.png"
+fi
+# RC1 installs beside stable and both previous previews.
+if [[ "${AP_V31_RC:-0}" == "1" ]]; then
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays-31-rc1@g' \
+    -e 's@anything-plays-preview@anything-plays-31-rc1@g' \
+    -e 's@Anything Plays 3.0@Anything Plays 3.1@g' \
+    "$PKG/usr/bin/$INSTALL_ID"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays 3.1 Release Candidate 1@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays-31-rc1@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays-31-rc1@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays-31-rc1.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-31-rc1.png"
 fi
 # Preview installs side by side with 2.0. The stable Linux package identity
 # is selected only after exact 3.0 source/rights/real-device checks pass.
