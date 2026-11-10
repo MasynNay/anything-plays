@@ -131,6 +131,14 @@ class GamepadReader:
                 pass
             raise
 
+    def _sdl_constant(self, name):
+        """SDL GameController constants live in pygame, not always _sdl2."""
+        try:
+            return getattr(self.pygame, name)
+        except AttributeError:
+            # Keep compatibility with SDL wrappers exposing constants locally.
+            return getattr(self.api, name)
+
     def _close_device(self):
         device, self.controller = self.controller, None
         self.name = ""
@@ -147,7 +155,11 @@ class GamepadReader:
     def _connect(self):
         now = self.clock()
         if self.controller is not None:
-            if self.controller.attached():
+            try:
+                attached = self.controller.attached()
+            except Exception:
+                attached = False
+            if attached:
                 return
             self._close_device()
         if now - self.last_scan < SCAN_INTERVAL:
@@ -179,16 +191,25 @@ class GamepadReader:
             return frozenset(), "No compatible controller connected"
         physical = set()
         pad = self.controller
-        for source, name in BUTTON_CONST.items():
-            if pad.get_button(getattr(self.api, "CONTROLLER_BUTTON_" + name)):
-                physical.add(source)
-        for source, (axis, direction) in AXES.items():
-            value = pad.get_axis(getattr(self.api, "CONTROLLER_AXIS_" + axis))
-            if direction * value >= DEADZONE:
-                physical.add(source)
-        for name in ("LEFT", "RIGHT"):
-            if pad.get_axis(getattr(self.api, "CONTROLLER_AXIS_TRIGGER" + name)) >= TRIGGER_THRESHOLD:
-                physical.add(name + "_TRIGGER")
+        try:
+            for source, name in BUTTON_CONST.items():
+                code = self._sdl_constant("CONTROLLER_BUTTON_" + name)
+                if pad.get_button(code):
+                    physical.add(source)
+            for source, (axis, direction) in AXES.items():
+                code = self._sdl_constant("CONTROLLER_AXIS_" + axis)
+                if direction * pad.get_axis(code) >= DEADZONE:
+                    physical.add(source)
+            for name in ("LEFT", "RIGHT"):
+                code = self._sdl_constant("CONTROLLER_AXIS_TRIGGER" + name)
+                if pad.get_axis(code) >= TRIGGER_THRESHOLD:
+                    physical.add(name + "_TRIGGER")
+        except Exception:
+            # A device can disappear between attached() and a button read.
+            # Clear the snapshot now; rescan automatically on the next poll.
+            self._close_device()
+            self.last_scan = float("-inf")
+            return frozenset(), "Controller disconnected · Scanning again"
         return mapped_buttons(system, physical, bindings), self.name + " connected"
 
     def stop(self):

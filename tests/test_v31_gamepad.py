@@ -232,8 +232,8 @@ class SDLBackendSmokeTests(unittest.TestCase):
             try:
                 reader.start()
                 self.assertIsNotNone(reader.api)
-                self.assertTrue(hasattr(reader.api, "CONTROLLER_BUTTON_A"))
-                self.assertTrue(hasattr(reader.api, "CONTROLLER_AXIS_LEFTX"))
+                self.assertIsInstance(reader._sdl_constant("CONTROLLER_BUTTON_A"), int)
+                self.assertIsInstance(reader._sdl_constant("CONTROLLER_AXIS_LEFTX"), int)
                 held, status = reader.poll("gba")
                 self.assertIsInstance(held, frozenset)
                 self.assertIsInstance(status, str)
