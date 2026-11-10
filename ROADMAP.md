@@ -230,3 +230,7 @@ A focused development fix closes the remaining unbounded read of preserved nativ
 ### November 10, 2026 — provenance extraction bounds verified
 
 PR #153 was squash merged into the v3 development branch at `7435123d` after Python 3.12, Python 3.13, native mGBA compatibility (source checks 42770311186) and unapproved source review (42770311182) succeeded. Four synthetic regressions cover bounded actual provenance ZIP reads and invalid JSON. Packaging jobs were skipped; this is not production installer acceptance or a resolution of Dolphin exact corresponding source, combined licensing rights, or public distribution gates. Stable v2.0 remains preserved.
+
+### November 10, 2026 — native ZIP extra-member rejection (pending CI)
+
+A focused development change rejects additional unverified files and directories inside native core ZIPs, requiring exactly one expected regular native library. Four synthetic regression tests cover valid and invalid archive structures. Await Python 3.12/3.13 and native compatibility CI before merge. Dolphin source correspondence, combined license rights, final production acceptance and public release remain blocked. Stable 2.0 unchanged.

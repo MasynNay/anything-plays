@@ -41,9 +41,11 @@ def hash_bytes(data: bytes) -> str:
 def read_native_payload(raw: bytes, expected_file: str, platform: str, name: str) -> bytes:
     """Read the single matching native file, rejecting ZIP symlink impersonation."""
     with zipfile.ZipFile(io.BytesIO(raw)) as inner:
-        members = [member for member in inner.infolist()
-                   if member.filename == expected_file and not member.is_dir()]
-        if len(members) != 1:
+        # A native core archive must contain exactly one regular payload.
+        # Reject unexpected files, directories and duplicate entries rather
+        # than silently blessing an archive with unverified extra content.
+        members = inner.infolist()
+        if len(members) != 1 or members[0].filename != expected_file or members[0].is_dir():
             raise ValueError(f"{platform}: invalid core ZIP payload: {name}")
         member = members[0]
         if member.create_system == 3 and stat.S_ISLNK(member.external_attr >> 16):
