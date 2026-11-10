@@ -964,3 +964,58 @@ are available. Keep PR #156 draft; never change released 3.0.
 
 Four refreshed RC1 installers: https://github.com/MasynNay/anything-plays/actions/runs/42886791394, source `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
 Original-source/wheel audit https://github.com/MasynNay/anything-plays/actions/runs/42888996921 PASSED: Linux 74/74, Windows 62/62, ARM Mac 0/121, Intel Mac 0/120 byte matches. Signed Mac native linkage https://github.com/MasynNay/anything-plays/actions/runs/42888996877 PASSED both 121/120 files. Current collision audit https://github.com/MasynNay/anything-plays/actions/runs/42889343414 PASS: ARM one SDL2 version collision, Intel none. Real signed SDL dylib load + joystick/controller init https://github.com/MasynNay/anything-plays/actions/runs/42889343645 PASSED both Macs and both ARM load orders. New actual signed native SDL virtual joystick attach/pressed/released/removed test https://github.com/MasynNay/anything-plays/actions/runs/42889944381 PASSED both Macs, both ARM load orders. Added `tools/probe_v31_macos_virtual_joystick.py`, adversarial `tests/test_v31_macos_virtual_joystick.py` and `.github/workflows/v31-rc1-macos-virtual-joystick.yml`. All statuses were confirmed green through GitHub Actions. Physical USB/Bluetooth controllers and camera/gameplay are unverified; Mac signed library corresponding source and LGPL relink/replacement review remain unresolved. All 6 release gates FALSE, PR #156 DRAFT, public 3.0 unchanged. See `docs/V3_1_REFRESHED_SDL_NATIVE_QA.md`.
+
+## Atomic candidate settings migration + real frozen installed acceptance — November 10, 2026
+
+**BRANCH:** `feature/v3.1-controls-usability`, draft PR #156.
+**NO public 3.1 release**; public stable 3.0 and v2 remain intact.
+All six public 3.1 readiness gates remain FALSE.
+
+- Built `anything_plays/test_preferences.py` create-only atomic
+  temporary-file + hard-link settings migration, with size limit,
+  exclusive publication, safe temp cleanup, and rejection of source,
+  directory and destination symlink redirects/races. Stable settings
+  are read-only; existing RC settings are never replaced.
+- Added `tests/test_v31_preferences_atomic.py` (32 parallel starts,
+  legacy data preservation, interrupted copies, source limits,
+  symlink attacks and concurrent symlink injection) and
+  `tests/test_v31_installed_settings_migration.py` (disposable HOME,
+  tamper-checks, candidate migration and stable SHA receipt).
+  [Windows/Linux/ARM Mac/Intel Mac source QA 42893632730](https://github.com/MasynNay/anything-plays/actions/runs/42893632730)
+  **SUCCESS 4/4**, plus Python 3.12/3.13 source regression green.
+- Added `tools/qa_v31_installed_settings_migration.py`:
+  refuses a real/current or nonempty HOME, seeds controlled
+  3.0-style `preferences.json` (Plum Dark theme) and
+  `system_profiles.json` with SHA receipts, and after app
+  launch requires migrated separate RC settings + original
+  stable files byte-for-byte unchanged.
+- **Source-built app commit** `cdbd647fa8ef3f3db0a8d419f0396f6b191599d6` passed
+  [run 42892417937](https://github.com/MasynNay/anything-plays/actions/runs/42892417937) **4/4**.
+- Atomically repinned 3 complete 18-console / 11-original-native-core
+  RC1 installers to this newer app source. [Full QA 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881)
+  **SUCCESS 4/4**, with four 7-day Actions artifact ZIPs.
+- Installed QA workflow `.github/workflows/v31-rc1-installed-gui-smoke.yml`
+  now seeds/validates the stable user settings fixture while invoking the
+  actual frozen 3.1 RC1 GUI from each completed installer. The
+  PowerShell variable was corrected to `$qaHome` rather than
+  read-only `$HOME`; it never writes a real user home.
+  [Installed real desktop and settings run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)
+  **SUCCESS 4/4**. All jobs emitted
+  `UNRELEASED_3_1_INSTALLED_RC_SETTINGS_COPIED_STABLE_UNCHANGED`,
+  `FROZEN_UI_SMOKE.json`, `RC1_INSTALLED_UI_RECEIPT.json`,
+  `SETTINGS_QA_FIXTURE.json`, and
+  `RC1_INSTALLED_SETTINGS_RECEIPT.json`. Temporary 14-day receipts.
+- Documentation `docs/V3_1_ATOMIC_SETTINGS_MIGRATION.md`,
+  RC QA downloads, installed GUI QA, release acceptance, roadmap
+  and draft notes updated with these **actual verified** outcomes.
+
+**Still OPEN:** A passed fake-home import does not prove all real
+user upgrades; do not silently adopt the RC settings directory for a
+future stable build. Actual Xbox/PlayStation USB/Bluetooth,
+webcam+controller coexistence, game saves/audio/video/endurance,
+exact current SDL/pygame binary corresponding source and LGPL
+replacement/relinking review, separately approved stable installer
+upgrade IDs, and manual release authorization are unresolved.
+Native SDL audits from older 3.1 RC1 builds are historical evidence,
+not new corresponding-source approval for this candidate.
+The stable v3.0.0 release and v2 code were not touched.

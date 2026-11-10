@@ -10,6 +10,31 @@ all passed against the *refreshed current RC1*.
 Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
+## Latest four-platform upgrade safety milestone — VERIFIED 4/4
+
+A new atomic, create-only 3.1 settings importer prevents incomplete
+copy files and concurrent overwrites. It rejects malicious symlinks
+and leaves existing RC settings intact. The real frozen 18-console
+RC1 apps, built from `cdbd647fa8ef3f3db0a8d419f0396f6b191599d6`, have been independently
+packaged on all four hosts
+([run 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881)) and then launched using a disposable
+home seeded with known stable settings
+([run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)).
+**All four installed GUI + settings-copy jobs PASSED.**
+
+Each tested host imported the known `Plum Dark` theme into a separate
+RC namespace while original stable preference and profile SHA-256
+digests stayed unchanged; no actual user's home was modified.
+The [new atomic/race/symlink source tests](https://github.com/MasynNay/anything-plays/actions/runs/42893632730) also PASSED
+4/4 on Windows, Linux, Apple Silicon and Intel.
+[Read detailed migration acceptance](V3_1_ATOMIC_SETTINGS_MIGRATION.md).
+
+**Still OPEN:** physical USB/Bluetooth/camera/gameplay/save/endurance
+acceptance, exact *current* SDL native corresponding source and LGPL
+replacement/relinking review, reviewed stable 3.1.0 upgrade identity
+and explicit release authorization. Never use the success above
+to flip any of the six public release gates.
+
 ## Current reviewed source and full RC1 milestone — 4/4 PASS
 
 **Newest verified development candidate (November 10, 2026):** The

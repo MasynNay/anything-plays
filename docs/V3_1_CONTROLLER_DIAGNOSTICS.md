@@ -35,6 +35,17 @@ pygame or SDL version fields are recorded as null, not invented.
 `redistribution_approved` are always false in these unreviewed
 local snapshots.
 
+## Current packaged application
+
+The newest controller diagnostics-enabled 3.1 RC1 source build also
+includes **atomic isolated settings import**. Four complete
+18-console packages [PASSED](https://github.com/MasynNay/anything-plays/actions/runs/42894172881) and the actual
+installed Tk GUI plus imported-settings checks
+[PASSED 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42895538165) using temporary test homes.
+Original 3.0-style files were unchanged after startup.
+[Atomic settings QA](V3_1_ATOMIC_SETTINGS_MIGRATION.md).
+Physical controller acceptance remains separate.
+
 ## Current reproducible test evidence
 
 - [Four-platform synthetic OpenCV camera and SDL controller

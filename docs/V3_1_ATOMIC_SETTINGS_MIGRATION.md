@@ -72,15 +72,32 @@ prove that a frozen installer used this newer copy logic.
 
 ## Frozen installed-application acceptance
 
-The planned final hardware-free acceptance uses the above fixture
-with the **actual 18-console RC1 Windows, Linux and two Mac packages**.
-The test must override HOME (or USERPROFILE on Windows), boot the
-frozen app's real Tk UI in a disposable environment, and then verify
-that stable files have not changed and RC settings were created.
+**VERIFIED 4/4** in [installed-app run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165),
+using **the actual freshly rebuilt full 18-console RC1 installers**
+from [run 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881). All four native hosts ran the
+frozen Tk application in a disposable user profile seeded with
+known 3.0-style stable settings (theme: `Plum Dark`). The
+workflow then independently verified:
 
-Do not claim this final installed-product migration result until a
-specific GitHub Actions run has completed on all four platforms.
-A compiler success or a unit test is a weaker level of evidence.
+- RC1's separate `anything-plays-31-rc1` settings namespace exists,
+  with the migrated preference theme and profiles file;
+- The original stable `fish-plays-pokemon-studio` preferences and
+  system profiles still match their **exact before-start SHA-256**;
+- The actual frozen application initialized its Tk window and ran its
+  event loop without startup errors, and all 18 console profiles
+  and 11 native core families remained packaged;
+- No physical camera, controller, licensed game ROM or user's real
+  home directory was required or modified.
+
+Each successful platform job uploaded
+`FROZEN_UI_SMOKE.json`, `RC1_INSTALLED_UI_RECEIPT.json`,
+`SETTINGS_QA_FIXTURE.json` and
+`RC1_INSTALLED_SETTINGS_RECEIPT.json` as independently retained
+QA artifacts. These report temporary test-home scenarios, not
+every possible installed-user upgrade condition or a public stable
+3.1.0 migration approval. The
+[four-platform concurrent-copy and adversarial source tests](https://github.com/MasynNay/anything-plays/actions/runs/42893632730)
+also **PASSED 4/4**.
 
 This migration work is not physical USB/Bluetooth controller,
 camera, real-game/save, LGPL, relinking or redistributable source

@@ -52,6 +52,20 @@ See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before co
 
 ## 3.1 — Controls and usability (development branch, unreleased)
 
+**Newest verified 3.1 RC1 (November 10, 2026):**
+four platform-native application builds with the atomic settings fix
+[passed 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42892417937); complete original-source 18-console
+installers [passed 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42894172881); **actual installed Tk
+startup and 3.0-to-RC preference copy** [passed 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42895538165).
+The seeded disposable-home tests prove the original stable
+preferences and profiles remained byte-for-byte unchanged.
+Four-platform concurrency, symlink and interrupted-copy tests
+[passed 4/4](https://github.com/MasynNay/anything-plays/actions/runs/42893632730).
+[Atomic settings migration details](V3_1_ATOMIC_SETTINGS_MIGRATION.md).
+Physical gamepad/camera integration and new SDL/LGPL rights review
+remain **OPEN**; this is not a stable 3.1 release.
+
+
 **New verified native RC1 audits:** SDL source/wheel checks, signed Mac
 library inspection, duplicate SDL2 detection, two-architecture
 dynamic loading and native SDL virtual joystick button press/release

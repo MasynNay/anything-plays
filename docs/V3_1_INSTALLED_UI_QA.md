@@ -1,15 +1,15 @@
 # Anything Plays 3.1 RC1 — Installed desktop UI startup checks
 
-**Result: PASS on all four native operating system targets.** The refreshed packages include the new controller Copy diagnostics interface from source revision `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+**Result: PASS on all four native operating system targets.** The refreshed packages include the new controller Copy diagnostics interface from source revision `cdbd647fa8ef3f3db0a8d419f0396f6b191599d6`.
 This is real frozen application startup validation, not an emulation,
 physical USB/Bluetooth controller, real-camera or license approval.
 
-[Four-platform installed RC1 UI smoke run 42887470580](https://github.com/MasynNay/anything-plays/actions/runs/42887470580)
+[Four-platform installed RC1 UI smoke run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)
 completed successfully on November 10, 2026.
 The input installer set is the unchanged
-[full 18-console RC1 QA run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394);
+[full 18-console RC1 QA run 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881);
 its original source-app revision was pinned to
-`fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+`cdbd647fa8ef3f3db0a8d419f0396f6b191599d6`.
 
 | Test host | Full RC1 installed desktop GUI | CI result |
 | --- | --- | --- |
@@ -36,6 +36,18 @@ verifies:
 - single reviewed, embedded 3.1 RC1 window-build identity in the
   installed app, distinct from old stable or preview settings;
 - all real hardware and distribution approval fields remain **FALSE**.
+
+The most recent verified run **also tested real candidate settings
+migration**. On all four systems, an isolated user home was seeded with
+two stable 3.0-style JSON files before launching the frozen RC1
+application. After Tk startup, the independent
+`tools/qa_v31_installed_settings_migration.py` verifier required
+the migrated `Plum Dark` theme in 3.1's private settings and
+unchanged SHA-256 hashes for **both** stable preference/profile files.
+Each host reported
+`UNRELEASED_3_1_INSTALLED_RC_SETTINGS_COPIED_STABLE_UNCHANGED`.
+This uses a disposable fake account, not the operator's real settings.
+[Complete migration safety details](V3_1_ATOMIC_SETTINGS_MIGRATION.md).
 
 Only an installed package passing these checks receives a separate
 `RC1_INSTALLED_UI_RECEIPT.json`. All results are retained as four

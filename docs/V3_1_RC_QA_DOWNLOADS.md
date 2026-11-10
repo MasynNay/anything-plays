@@ -1,14 +1,18 @@
 # Anything Plays 3.1 RC1 — Full 18-console QA downloads
 
-**Temporary owner QA, not the public 3.1.0 release.** The current packages contain the new Copy diagnostics controller action and have passed actual installed GUI startup on all four platforms in run 42887470580. Unlike earlier
+**Temporary owner QA, not the public 3.1.0 release.** Latest exact native source app revision
+`cdbd647fa8ef3f3db0a8d419f0396f6b191599d6` includes atomic candidate preference migration.
+The [four-platform installed migration run 42895538165](https://github.com/MasynNay/anything-plays/actions/runs/42895538165)
+**PASSED**: RC settings were created from a disposable 3.0-style
+profile and the original files remained byte-identical. The current packages contain the new Copy diagnostics controller action and have passed actual installed GUI startup on all four platforms in run 42895538165. Unlike earlier
 Preview 2 installers, these RC1 packages use **fresh platform-native
-3.1 application builds**, [verified at source run 42885525444](https://github.com/MasynNay/anything-plays/actions/runs/42885525444),
+3.1 application builds**, [verified at source run 42892417937](https://github.com/MasynNay/anything-plays/actions/runs/42892417937),
 plus eleven **original-source emulator core binaries** whose exact byte
 hashes come from the existing public stable 3.0.0. No ROMs or firmware.
 
 ## Where the RC1 full installers are built
 
-The [full RC1 QA Actions run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394)
+The [full RC1 QA Actions run 42894172881](https://github.com/MasynNay/anything-plays/actions/runs/42894172881)
 builds the packages separately. For each **green** platform job, open
 its Actions run and use the **Artifacts** section to download the
 appropriately named ZIP. GitHub sign-in may be required.

@@ -19,6 +19,12 @@ Do not mark 3.1 as stable until the acceptance criteria in
   controller setup window without ROM filenames, personal paths,
   Bluetooth names or camera images. A separate feedback line confirms
   success without being overwritten by rapid gamepad status polling.
+- **Atomic settings import:** The 3.1 candidate creates a
+  complete private copy of existing preferences without overwriting
+  stable 3.0 or a customized RC profile. Concurrent startup and
+  symlink redirection are explicitly rejected or safely handled;
+  verified both in [four-platform unit QA](https://github.com/MasynNay/anything-plays/actions/runs/42893632730) and
+  [four-platform real installed-app QA](https://github.com/MasynNay/anything-plays/actions/runs/42895538165).
 - **Rescan safety:** Immediately release held controller buttons on Rescan;
   malformed saved mappings are ignored instead of interrupting controller play.
 - **Per-console remapping:** Choose face buttons, D-pad, both analog sticks,
