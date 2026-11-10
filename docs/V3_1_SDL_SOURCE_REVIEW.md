@@ -154,6 +154,26 @@ pygame's full camera/controller subsystems have been exercised together,
 nor that all possible `@rpath` resolution scenarios in the compiled app
 are safe. It does not establish corresponding-source or LGPL rights.
 
+## Deeper hardware-free joystick/controller backend initialization
+
+The existing signed native-loader workflow was extended to call
+`SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER)` and
+`SDL_NumJoysticks` against the actual 3.1 RC1 SDL libraries. It
+checks the returned runtime SDL version and successful initialization,
+then releases the subsystems. This tests SDL controller backend
+initialization without claiming a physical gamepad exists.
+
+[Extended native joystick/controller run 42882184466](https://github.com/MasynNay/anything-plays/actions/runs/42882184466)
+has **PASSED Apple Silicon**: both SDL2 2.32.8 and SDL2 2.32.10
+initialize those subsystems successfully in either library loading
+order. The Intel Mac job was **queued as of the last verification**;
+check the Actions job conclusion before claiming both are green.
+
+The full GUI startup and physical device acceptance are **separate**:
+a passing backend initialization in CI still does not prove an actual
+USB/Bluetooth controller works concurrently with an active camera.
+Source correspondence and LGPL rights are also still open.
+
 ## Five original SDL source trees preserved for comparison
 
 The
