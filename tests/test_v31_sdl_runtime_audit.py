@@ -101,6 +101,27 @@ class SDLRuntimeAuditTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 inspect_bundle(d, "linux-x64")
 
+    def test_frozen_app_receipt_source_pin_matches_all_four_qa_jobs(self):
+        from tools.assemble_v31_full_linux import SOURCE_REVISION as linux_sha
+        from tools.assemble_v31_full_windows import SOURCE_REVISION as windows_sha
+        from tools.assemble_v31_full_macos import PREVIEW_RUN_SHA as mac_sha
+
+        # The older full-console QA input had a different source SHA.
+        # Every installer must now derive its GUI from the same verified
+        # four-platform preview build; never silently combine revisions.
+        source = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
+        run_id = "42853582632"
+        self.assertEqual((linux_sha, windows_sha, mac_sha),
+                         (source, source, source))
+        root = Path(__file__).resolve().parents[1]
+        for path in (".github/workflows/v31-full-linux-qa.yml",
+                     ".github/workflows/v31-full-windows-qa.yml",
+                     ".github/workflows/v31-full-macos-qa.yml"):
+            with self.subTest(path=path):
+                workflow = (root / path).read_text("utf-8")
+                self.assertIn("gh run download " + run_id, workflow)
+                self.assertNotIn("gh run download 42822217817", workflow)
+
     def test_source_workflow_fails_closed_and_does_not_publish(self):
         root = Path(__file__).resolve().parents[1]
         for path in (".github/workflows/v31-full-linux-qa.yml",
