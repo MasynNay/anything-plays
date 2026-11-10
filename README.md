@@ -95,7 +95,7 @@ After installing, open Anything Plays, select your console and local ROM directo
 
 **Verify your download:** [SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/SHA256SUMS.txt). Windows builds may be unsigned and macOS apps use ad hoc signatures rather than Apple notarization, so your operating system may display a security warning. Verify the release and checksum before proceeding.
 
-[Previous stable 2.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Original emulator sources for 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) · [All releases](https://github.com/MasynNay/anything-plays/releases)
+[Latest public release](https://github.com/MasynNay/anything-plays/releases/latest) · [Previous stable 2.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0) · [Original emulator sources for 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources) · [All releases](https://github.com/MasynNay/anything-plays/releases)
 
 ### Run from source
 
