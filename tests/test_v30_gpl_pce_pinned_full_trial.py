@@ -117,7 +117,7 @@ class PinnedPCEInCompleteAlternativeTrial(unittest.TestCase):
 
     def test_genuine_pce_native_and_source_ci_mandatory_on_four_os(self):
         root = Path(__file__).resolve().parents[1]
-        s = (root / ".github/workflows/v30-gpl-offline-installer-trial.yml").read_text("utf-8")
+        s = (root / "docs/history/workflows/v30-gpl-offline-installer-trial.yml").read_text("utf-8")
         self.assertIn("AP_V30_PINNED_PCE: '1'", s)
         self.assertIn("PINNED_PCE_RUN_ID: '42444367068'", s)
         self.assertIn("--pce-artifact original-source-built-pce.zip", s)

@@ -37,7 +37,7 @@ class BlastEmGenesisTMSSDiagnosticTests(unittest.TestCase):
     def test_no_retail_game_patching_or_public_core_promotion(self):
         root=Path(__file__).resolve().parents[1]
         tool=(root/"tools/probe_v30_blastem_genesis_variant.py").read_text("utf-8")
-        workflow=(root/".github/workflows/v30-gpl-alternative-research.yml").read_text("utf-8")
+        workflow=(root/"docs/history/workflows/v30-gpl-alternative-research.yml").read_text("utf-8")
         self.assertIn("UNAPPROVED-BLASTEM-GENESIS-NON-TMSS",tool)
         self.assertIn("retail_genesis_compatibility_verified",tool)
         self.assertIn("public_release_approved",tool)

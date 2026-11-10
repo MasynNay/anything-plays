@@ -82,7 +82,7 @@ class GPLAlternativeCandidateTests(unittest.TestCase):
 
     def test_workflow_runs_real_isolated_homebrew_for_every_replacement_profile(self):
         root=Path(__file__).resolve().parents[1]
-        y=(root/".github/workflows/v30-gpl-alternative-research.yml").read_text("utf-8")
+        y=(root/"docs/history/workflows/v30-gpl-alternative-research.yml").read_text("utf-8")
         self.assertIn("pull_request:", y)
         self.assertIn("tools/probe_snes_homebrew.py", y)
         self.assertIn("tools/probe_genesis_homebrew.py", y)

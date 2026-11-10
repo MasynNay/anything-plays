@@ -131,7 +131,7 @@ class InstalledCoreSwitchContracts(unittest.TestCase):
 
     def test_workflow_keeps_all_approval_flags_false_and_never_uploads_app(self):
         work = Path(__file__).resolve().parents[1]
-        workflow = (work / ".github/workflows/v30-gpl-offline-installer-trial.yml").read_text("utf-8")
+        workflow = (work / "docs/history/workflows/v30-gpl-offline-installer-trial.yml").read_text("utf-8")
         self.assertIn("probe_v30_installed_switch.py", workflow)
         self.assertIn("ACTUAL_INSTALLED_7_CYCLE_SWITCH_UNAPPROVED.json", workflow)
         self.assertIn("AP_RELEASE_BUILD: '0'", workflow)

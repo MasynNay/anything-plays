@@ -116,7 +116,7 @@ class GPLSwitchEvidenceContracts(unittest.TestCase):
         self.assertIn('"genesis_plus_gx"', data)
         self.assertNotIn('System("snes", "Super Nintendo", "mednafen_supafaust"', data)
         self.assertNotIn('System("genesis", "Sega Genesis / Mega Drive", "blastem"', data)
-        workflow = (repo / ".github/workflows/v30-gpl-native-switch.yml").read_text("utf-8")
+        workflow = (repo / "docs/history/workflows/v30-gpl-native-switch.yml").read_text("utf-8")
         self.assertIn("gh run download", workflow)
         self.assertIn("sha256sum -c", workflow)
         self.assertIn("AP_RELEASE_BUILD: '0'", workflow)

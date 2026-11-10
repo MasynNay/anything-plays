@@ -88,7 +88,7 @@ class PinnedGPLSourceBuildContracts(unittest.TestCase):
 
     def test_linux_source_build_workflow_never_releases_or_fakes_approval(self):
         root=Path(__file__).resolve().parents[1]
-        workflow=(root/".github/workflows/v30-gpl-pinned-source-build.yml").read_text("utf-8")
+        workflow=(root/"docs/history/workflows/v30-gpl-pinned-source-build.yml").read_text("utf-8")
         self.assertIn("pull_request:",workflow)
         self.assertIn("libretro/bsnes",workflow)
         self.assertIn("libretro/blastem",workflow)

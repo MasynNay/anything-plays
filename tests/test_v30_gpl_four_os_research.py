@@ -14,7 +14,7 @@ from tools.capture_v30_gpl_alternative_source_build import SOURCE, EXT, _git
 class FourPlatformGPLSourceContracts(unittest.TestCase):
     def test_complete_eight_native_build_matrix_and_source_pins(self):
         root=Path(__file__).resolve().parents[1]
-        text=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        text=(root/"docs/history/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         self.assertIn("pull_request:",text)
         for candidate,source in SOURCE.items():
             self.assertIn(source["repository"].removeprefix("https://github.com/"),text)
@@ -32,7 +32,7 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
 
     def test_all_five_real_a_v_probes_are_required_and_no_runtime_substitution(self):
         root=Path(__file__).resolve().parents[1]
-        text=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        text=(root/"docs/history/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         self.assertIn("probe_snes_homebrew.py",text)
         self.assertIn("probe_v30_blastem_genesis_variant.py",text)
         self.assertIn("probe_sega8_homebrew.py",text)
@@ -50,7 +50,7 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
 
     def test_cross_platform_build_compatibility_does_not_edit_pinned_upstream_tree(self):
         root=Path(__file__).resolve().parents[1]
-        workflow=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        workflow=(root/"docs/history/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         header=(root/"tools/bsnes_mingw_vasprintf_compat.h").read_text("utf-8")
         self.assertIn("mingw-w64-x86_64-python",workflow)
         self.assertIn("cygpath -w /mingw64/bin",workflow)
@@ -80,7 +80,7 @@ class FourPlatformGPLSourceContracts(unittest.TestCase):
 
     def test_all_four_original_sega_results_must_be_reconciled(self):
         root=Path(__file__).resolve().parents[1]
-        workflow=(root/".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        workflow=(root/"docs/history/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         for name in (
             "GENESIS_AV_UNAPPROVED.json",
             "mastersystem-AV_UNAPPROVED.json",

@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".github/workflows/v30-tia-gpl2plus-candidate.yml"
+WORKFLOW = ROOT / "docs/history/workflows/v30-tia-gpl2plus-candidate.yml"
 
 
 class TiaAlternativeContracts(unittest.TestCase):

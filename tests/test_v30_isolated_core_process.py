@@ -95,7 +95,7 @@ class ExperimentalCoreProcessContracts(TestCase):
         facade = (root / "anything_plays/gba_emulator.py").read_text("utf-8")
         self.assertIn("MacN64ProcessSession(self, self.rom, self.core_path).run()", facade)
         self.assertNotIn("ExperimentalSoftwareCoreProcessSession", facade)
-        workflow = (root / ".github/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
+        workflow = (root / "docs/history/workflows/v30-gpl-four-os-source-build.yml").read_text("utf-8")
         self.assertIn("tools/probe_v30_isolated_sega_process.py", workflow)
         self.assertIn("matrix.candidate == 'blastem'", workflow)
         self.assertIn("ISOLATED_SEGA_PROCESS_UNAPPROVED.json", workflow)
