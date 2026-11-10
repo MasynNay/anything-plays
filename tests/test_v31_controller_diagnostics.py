@@ -104,14 +104,17 @@ class ControllerPrivacyContracts(unittest.TestCase):
         app.system_key=Variable("gba")
         app._gamepad_bindings={"gba":{"A":"B"}}
         app.gamepad_enabled=Variable(True)
-        app.gamepad_status=Variable("")
+        app.gamepad_status=Variable("Controller connected")
+        app.gamepad_diagnostics_status=Variable("")
         app.emu=SimpleNamespace(running=True)
         app.armed=True
         self.assertTrue(app.copy_gamepad_diagnostics())
         report=json.loads(root.content)
         self.assertEqual(report["selected_console"],"gba")
         self.assertEqual(report["mapped_emulator_buttons"],["B","Start","Up"])
-        self.assertIn("Controller diagnostics copied",app.gamepad_status.get())
+        self.assertIn("Controller diagnostics copied",app.gamepad_diagnostics_status.get())
+        self.assertEqual(app.gamepad_status.get(),"Controller connected",
+                         "Clipboard confirmation must not disturb live connection")
         self.assertEqual(root.events,["clear","append","idle"])
         self.assertNotIn("/home/user",root.content)
         self.assertNotIn("Developer",root.content)
@@ -124,16 +127,18 @@ class ControllerPrivacyContracts(unittest.TestCase):
         app._gamepad_bindings={}
         app.gamepad_enabled=Variable(False)
         app.gamepad_status=Variable("")
+        app.gamepad_diagnostics_status=Variable("")
         app.emu=SimpleNamespace(running=False)
         app.armed=False
         self.assertFalse(app.copy_gamepad_diagnostics())
-        self.assertIn("Could not copy",app.gamepad_status.get())
+        self.assertIn("Could not copy",app.gamepad_diagnostics_status.get())
 
     def test_right_hand_controller_settings_have_real_copy_control(self):
         source=(Path(__file__).resolve().parents[1] /
                 "anything_plays/ui_gamepad.py").read_text("utf-8")
         self.assertIn('text="Copy diagnostics"',source)
         self.assertIn("command=self.copy_gamepad_diagnostics",source)
+        self.assertIn("textvariable=self.gamepad_diagnostics_status",source)
         self.assertIn("self.root.clipboard_append",source)
         self.assertNotIn("requests.post",source)
 
