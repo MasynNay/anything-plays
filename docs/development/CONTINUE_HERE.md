@@ -880,3 +880,82 @@ Next priority: actual paired camera and controller tests, gameplay/
 save/load/audio/endurance checks on each OS, corresponding-source
 and LGPL reviews, then version-correct stable 3.1.0 builds and an
 explicit release acceptance decision.
+
+## Refreshed 3.1 camera/controller coexistence, private diagnostics and four-platform RC QA — November 10, 2026
+
+**Current branch:** `feature/v3.1-controls-usability`, draft/open
+PR #156. Stable public `v3.0.0` and stable 2.0 are untouched.
+No public 3.1 release has been created.
+
+**Actual new code:**
+- `tests/test_v31_camera_gamepad_coexistence.py` exercises real
+  OpenCV color segmentation of generated video frames through
+  `CameraMixin.draw_camera`, real `GamepadReader.poll` on synthetic
+  SDL HID, `GamepadMixin.gamepad_tick` and `InputBuffer` callbacks.
+  It verifies 18 console mappings (including N64/GameCube native
+  input tuple decoding), simultaneous P1/P2, keyboard/gamepad
+  overlap, loss of focus, disarm, disconnect/rescan, pulse mode
+  and 1,000 bounded frames. All four OS CI jobs PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42884824976
+  Source first run initially failed only because the **new test**
+  incorrectly passed internal 3D input tuples as native IDs.
+  The test harness was corrected; product game input was not changed.
+- `anything_plays/controller_diagnostics.py` provides
+  `make_controller_report()`, a deliberately local support JSON
+  with app/channel, OS architecture, pygame/SDL versions,
+  recognized SDL controls, mapped actions and game/camera state.
+  The report omits local ROM names, paths, personal device names
+  and camera images; no network upload. In `ui_gamepad.py`, the
+  **Copy diagnostics** button is now shown in Controller setup
+  with dedicated `gamepad_diagnostics_status`, avoiding the
+  65 ms controller status poll overwriting copy confirmation.
+  Tests `tests/test_v31_controller_diagnostics.py` cover
+  malicious/sensitive device strings, invalid data, disconnected
+  controllers, successful clipboard copy and failure feedback.
+  All four native virtual-controller CI jobs PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42885687277
+- Added the dedicated four-platform `v31-camera-controller-integration`
+  workflow. It uses real OpenCV pixels but virtual SDL/HID
+  events, not real cameras or physical gamepads.
+
+**Newer current-source build and install evidence:**
+- Refreshed 3.1 RC1 source-built GUI commit is
+  `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
+  Exact 4/4 source-build run: https://github.com/MasynNay/anything-plays/actions/runs/42885525444
+  Each platform has a genuine bundled 3.1 RC1 app-stage QA artifact.
+- Atomic pinned source update to 3 complete eleven-core assemblers,
+  strict test and workflow at commit
+  `2e59c7c46c6d7700ef5d98523d96d4ab2a5db39d`.
+  New full 18-console, 11 original-source emulator core QA:
+  https://github.com/MasynNay/anything-plays/actions/runs/42886791394
+  **PASSED all four** (Linux x64, Windows x64, macOS ARM64/Intel).
+  Includes four complete version-isolated candidate installers
+  (not stable!), original-source native hashes, SDL runtime audit
+  and installer SHA receipts. ZIP artifacts expire about
+  November 17, 2026 at 19:38 UTC.
+- Retargeted actual installed frozen Tk smoke to the refreshed
+  full packages (run and commit pinned, RC identity verified).
+  Windows, Linux, Intel Mac and Apple Silicon 4/4 actual
+  installed desktop GUI startup PASSED:
+  https://github.com/MasynNay/anything-plays/actions/runs/42887470580
+  It opens actual Tk `App` and runs event loop; it does not
+  simulate real games, controllers, camera hardware, sound or saves.
+- Refreshed release readiness JSON and QA downloads guide;
+  current docs `V3_1_RC_QA_DOWNLOADS.md`,
+  `V3_1_CONTROLLER_DIAGNOSTICS.md`,
+  `V3_1_INSTALLED_UI_QA.md`, `V3_1_RELEASE_ACCEPTANCE.md`,
+  `V3_1_RELEASE_NOTES_DRAFT.md` and `ROADMAP.md`.
+
+**Still BLOCKED:** real camera+controller compatibility on
+actual hardware and installed real-game/endurance/save checks;
+LGPL/SDL exact updated binary-to-corresponding-source, notices
+and replacement/relinking review; final stable 3.1.0 installer
+identities/upgrade behavior and public release authorization.
+Old source/Mach-O SDL evidence applies to the earlier RC1
+build 42865608433; do not silently equate it to the new
+run 42886791394. Every public release gate remains FALSE.
+
+**Next:** independently re-run SDL source audits against refreshed
+full 3.1 RC1 packages, inspect same-name SDL2 loader and
+physical camera/controller and gameplay once real devices
+are available. Keep PR #156 draft; never change released 3.0.
