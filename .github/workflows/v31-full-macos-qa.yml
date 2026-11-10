@@ -7,6 +7,7 @@ on:
       - '.github/workflows/v31-full-macos-qa.yml'
       - 'tools/assemble_v31_full_macos.py'
       - 'verify_bundle.py'
+      - 'tools/audit_v31_sdl_runtime.py'
       - 'fetch_mgba_core.py'
   workflow_dispatch:
 
@@ -48,7 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run download 42822217817 --repo "$GITHUB_REPOSITORY" \
+          gh run download 42853582632 --repo "$GITHUB_REPOSITORY" \
             --name "AnythingPlays-3.1-Preview1-macos-${{ matrix.arch }}-UNRELEASED" --dir preview31
           test -s "preview31/AnythingPlays-3.1.0-preview1-macos-${{ matrix.arch }}.dmg"
           test -s preview31/PREVIEW1_RECEIPT.json
@@ -68,6 +69,7 @@ jobs:
           path: |
             full31/AnythingPlays-3.1.0-preview2-macos-${{ matrix.arch }}.dmg
             full31/FULL_MACOS_QA_RECEIPT.json
+            full31/SDL_RUNTIME_AUDIT.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
