@@ -121,7 +121,14 @@ def build_candidate(artifact_paths):
                     ]
                     if len(members) != 1:
                         raise ValueError(f"{platform}: invalid core ZIP payload: {name}")
-                    payload = inner.read(members[0])
+                    # An archive member can have the expected filename yet be a
+                    # Unix symlink rather than the native library being locked.
+                    # Reject it before reading bytes into a production evidence lock.
+                    member = members[0]
+                    if (member.create_system == 3 and
+                            stat.S_ISLNK(member.external_attr >> 16)):
+                        raise ValueError(f"{platform}: symlinked core ZIP payload: {name}")
+                    payload = inner.read(member)
                 if len(payload) != core.get("size_bytes") or hash_bytes(payload) != core.get("sha256"):
                     raise ValueError(f"{platform}: changed native library: {name}")
                 locked[name] = {
