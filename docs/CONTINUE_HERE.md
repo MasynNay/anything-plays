@@ -73,7 +73,7 @@ public release gate remains FALSE. This is intentional while rights,
 hardware and stable identity are open. Do not modify stable 3.0/2.0
 branches, tags, downloads, or existing settings.
 
-Detailed links: [release acceptance](docs/V3_1_RELEASE_ACCEPTANCE.md),
-[RC1 owner QA downloads](docs/V3_1_RC_QA_DOWNLOADS.md),
-[SDL source review](docs/V3_1_SDL_SOURCE_REVIEW.md),
-[source companion](docs/V3_1_SOURCE_COMPANION.md).
+Detailed links: [release acceptance](V3_1_RELEASE_ACCEPTANCE.md),
+[RC1 owner QA downloads](V3_1_RC_QA_DOWNLOADS.md),
+[SDL source review](V3_1_SDL_SOURCE_REVIEW.md),
+[source companion](V3_1_SOURCE_COMPANION.md).
