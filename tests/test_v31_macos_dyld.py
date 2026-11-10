@@ -100,8 +100,8 @@ class ActualSDLLoadContracts(unittest.TestCase):
     def test_workflow_only_reads_exact_signed_qa(self):
         workflow=(Path(__file__).resolve().parents[1] /
                   ".github/workflows/v31-rc1-macos-dyld-load-probe.yml").read_text("utf-8")
-        self.assertIn("42875616776",workflow)
-        self.assertIn("42865608433",workflow)
+        self.assertIn("42888996877",workflow)
+        self.assertIn("42886791394",workflow)
         self.assertIn("actions/upload-artifact@v4",workflow)
         self.assertNotIn("contents: write",workflow)
         self.assertNotIn("gh release create",workflow)

@@ -1,7 +1,7 @@
 """Detect duplicate SDL install-name identities in signed 3.1 macOS RC1.
 
 Consumes the *previously verified*, read-only native linker JSON reports
-from run 42875616776. Same-basename libraries with distinct hashes or
+from run 42888996877. Same-basename libraries with distinct hashes or
 Mach-O current versions can bind differently depending on @rpath order.
 This is a diagnostic, not proof of a crash or permission to redistribute.
 """
@@ -13,7 +13,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 
-SOURCE_COMMIT = "86baa6972ed923540f6ab49b636652a0f499d45c"
+SOURCE_COMMIT = "fe0da0b8b5f478cf1172734ef38546c4f1e86229"
 EXPECTED_COUNTS = {"macos-arm64": 121, "macos-x64": 120}
 EXPECTED_ARCH = {"macos-arm64": "arm64", "macos-x64": "x86_64"}
 SHA = re.compile(r"^[0-9a-f]{64}$")

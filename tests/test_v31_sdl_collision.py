@@ -103,7 +103,7 @@ class SDLCollisionReviewTests(unittest.TestCase):
     def test_readonly_source_collision_workflow(self):
         flow = (Path(__file__).resolve().parents[1]
                 / ".github/workflows/v31-sdl-collision-audit.yml").read_text("utf-8")
-        self.assertIn("42875616776", flow)
+        self.assertIn("42888996877", flow)
         self.assertIn("actions/upload-artifact@v4", flow)
         self.assertNotIn("contents: write", flow)
         self.assertNotIn("gh release create", flow)
