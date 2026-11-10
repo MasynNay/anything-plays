@@ -160,6 +160,9 @@ class LayoutMixin:
         self.gamecube_preview_combo.bind(
             '<<ComboboxSelected>>', self.set_gamecube_preview_mode,
         )
+        # A compact gamepad graphic and status belong beside other manual
+        # play controls, before maintenance and the large game preview.
+        self.build_gamepad_quick_panel(game)
         # Emulator maintenance remains available but no longer crowds out
         # regular game/audio/tracking controls in the main scroll column.
         self.maintenance_expanded = tk.BooleanVar(value=False)

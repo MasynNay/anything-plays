@@ -8,9 +8,76 @@ from anything_plays.gamepad import (
     DISABLED, SOURCES, GamepadReader, normalize_bindings,
 )
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
+from anything_plays.ui_controller_art import draw_gamepad
 
 
 class GamepadMixin:
+    def _controller_palette(self):
+        name = self.theme_name.get()
+        return self.THEMES.get(name, self.THEMES["Dark"])
+
+    def refresh_controller_artwork(self):
+        """Redraw small and large icons on theme or connection changes."""
+        reader = getattr(self, "_gamepad", None)
+        connected = (reader is not None and reader.controller is not None
+                     and self.gamepad_enabled.get())
+        for attr, large in (("gamepad_quick_canvas", False),
+                            ("gamepad_setup_canvas", True)):
+            canvas = getattr(self, attr, None)
+            if canvas is not None:
+                try:
+                    if canvas.winfo_exists():
+                        draw_gamepad(canvas, self._controller_palette(),
+                                     connected=connected, expanded=large)
+                except tk.TclError:
+                    pass
+
+    def build_gamepad_quick_panel(self, parent):
+        """Compact manual-play controls beside display and volume settings.
+
+        Keep status, enable switch and configuration visible on the right.
+        The pictogram is art, not a hidden click target; every action is a
+        clearly named native Tk button/checkbutton.
+        """
+        panel = ttk.LabelFrame(
+            parent, text="CONTROLLER · MANUAL PLAY", padding=(11, 9)
+        )
+        panel.pack(fill="x", pady=(0, 10))
+        summary = ttk.Frame(panel)
+        summary.pack(fill="x")
+        self.gamepad_quick_canvas = tk.Canvas(
+            summary, width=105, height=68, highlightthickness=0,
+            borderwidth=0
+        )
+        self.gamepad_quick_canvas.pack(side="left", padx=(0, 10))
+        description = ttk.Frame(summary)
+        description.pack(side="left", fill="x", expand=True)
+        ttk.Label(
+            description, text="Play with a game controller",
+            style="Value.TLabel"
+        ).pack(anchor="w")
+        ttk.Label(
+            description, textvariable=self.gamepad_status,
+            style="Helper.TLabel", wraplength=345
+        ).pack(anchor="w", pady=(4, 0))
+
+        actions = ttk.Frame(panel)
+        actions.pack(fill="x", pady=(6, 0))
+        ttk.Checkbutton(
+            actions, text="Enable gamepad",
+            variable=self.gamepad_enabled, command=self.toggle_gamepad
+        ).pack(side="left")
+        ttk.Button(
+            actions, text="Configure…",
+            command=self.open_controller_settings, style="Compact.TButton"
+        ).pack(side="right")
+        ttk.Button(
+            actions, text="Rescan", command=self.refresh_gamepad,
+            style="Compact.TButton"
+        ).pack(side="right", padx=(0, 6))
+        self.refresh_controller_artwork()
+        return panel
+
     def initialize_gamepad_preferences(self, preferences):
         """Load optional controller preferences without initializing SDL."""
         self._gamepad = GamepadReader()
@@ -49,6 +116,7 @@ class GamepadMixin:
             self._gamepad.stop()
             self.gamepad_status.set("Controller disabled")
         self.save_preferences()
+        self.refresh_controller_artwork()
 
     def refresh_gamepad(self):
         if self.gamepad_enabled.get():
@@ -56,6 +124,7 @@ class GamepadMixin:
             self.gamepad_status.set("Looking for a controller…")
         else:
             self.gamepad_status.set("Enable controller input to scan")
+        self.refresh_controller_artwork()
 
     def gamepad_tick(self):
         """Keep manual control independent of camera arming and keyboard focus.
@@ -84,6 +153,7 @@ class GamepadMixin:
                 self.emu.set_gamepad_buttons(buttons)
                 if status != self.gamepad_status.get():
                     self.gamepad_status.set(status)
+                    self.refresh_controller_artwork()
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception as exc:
@@ -94,6 +164,7 @@ class GamepadMixin:
                 "Controller disconnected or unavailable: " + str(exc)[:130]
             )
             self.save_preferences()
+            self.refresh_controller_artwork()
         finally:
             if not self._closing:
                 self._gamepad_tick_job = self.root.after(65, self.gamepad_tick)
