@@ -42,7 +42,19 @@ def mount(dmg, location):
     try:
         yield location
     finally:
-        command("hdiutil", "detach", location)
+        # The hosted macOS DiskImages service can briefly hold the verified
+        # mount. Do not pretend a failed detach is a successful QA check.
+        # Retry only this temporary CI volume, never an actual user disk.
+        for attempt in range(8):
+            detached = subprocess.run(
+                ["hdiutil", "detach", str(location)],
+                capture_output=True, text=True,
+            )
+            if detached.returncode == 0:
+                break
+            time.sleep(min(2 * (attempt + 1), 10))
+        else:
+            command("hdiutil", "detach", "-force", location)
 
 
 def verify_inputs(arch, stable, preview, checksums, receipt):
@@ -118,7 +130,11 @@ def build(arch, stable, preview, checksums, receipt, output):
                 "-srcfolder", app, "-ov", "-format", "UDZO", dmg)
         with mount(dmg, tmp/"final-dmg"):
             final = tmp/"final-dmg/AnythingPlays31Preview.app"
-            verify_bundle(final, "macos", check_native=True)
+            # Native loading from an attached read-only DMG leaves a library
+            # mapped into this process, which blocks DiskImages unmount.
+            # We already did actual native checks on the extracted .app
+            # before DMG creation; here verify *the final mounted bytes*.
+            verify_bundle(final, "macos", check_native=False)
             if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
         report = {
