@@ -80,7 +80,10 @@ def normalize_bindings(system, saved=None):
         return result
     allowed = set(BUTTONS_BY_SYSTEM[system])
     for source, target in saved.items():
-        if source in SOURCES and (target in allowed or target == DISABLED):
+        # Preferences are user-editable JSON. Invalid types must never crash
+        # polling or disable an otherwise healthy physical controller.
+        if (source in SOURCES and isinstance(target, str)
+                and (target in allowed or target == DISABLED)):
             result[source] = target
     return result
 
@@ -107,6 +110,9 @@ class GamepadReader:
         self.api = None
         self.controller = None
         self.name = ""
+        # Raw input is for the settings dialog only, independent of mappings
+        # and whether an emulator is currently running.
+        self.physical_buttons = frozenset()
         self.last_scan = float("-inf")
 
     def start(self):
@@ -142,6 +148,7 @@ class GamepadReader:
     def _close_device(self):
         device, self.controller = self.controller, None
         self.name = ""
+        self.physical_buttons = frozenset()
         if device is not None:
             try:
                 device.quit()
@@ -181,6 +188,7 @@ class GamepadReader:
     def poll(self, system, bindings=None):
         """Return (held emulated buttons, human-readable connection status)."""
         if self.api is None:
+            self.physical_buttons = frozenset()
             return frozenset(), "Controller disabled"
         # SDL requires the video event queue to be pumped/drained for fresh
         # controller states. Avoid accumulating an unbounded event backlog.
@@ -210,6 +218,7 @@ class GamepadReader:
             self._close_device()
             self.last_scan = float("-inf")
             return frozenset(), "Controller disconnected · Scanning again"
+        self.physical_buttons = frozenset(physical)
         return mapped_buttons(system, physical, bindings), self.name + " connected"
 
     def stop(self):
