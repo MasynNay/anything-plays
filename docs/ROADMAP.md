@@ -14,6 +14,11 @@
 | **3.1** — Optional gamepad input | **Public RC1 prerelease · November 10, 2026** | [Four-platform RC1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1); controller mapping, live tester and diagnostics; hardware and native licensing review pending |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
+**3.1 signed Mac provenance:** [Read-only genuine RC1 Mac audit](https://github.com/MasynNay/anything-plays/actions/runs/42925583942)
+and [official OpenCV follow-up](https://github.com/MasynNay/anything-plays/actions/runs/42926295393) mapped **241/241**
+pygame/SDL native executable text sections to pinned upstream wheels.
+The complete source and LGPL relinking reviews remain open.
+
 **3.1 current verification:** The 3.1 RC1 application, 18-console QA
 installers and installed GUI checks passed on all four OS targets;
 [six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42909893531)

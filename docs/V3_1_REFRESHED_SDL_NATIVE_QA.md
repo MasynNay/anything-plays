@@ -1,6 +1,6 @@
 # Anything Plays 3.1 — Refreshed native SDL evidence
 
-**Unreleased engineering QA, verified November 10, 2026.**
+**Historical engineering QA, verified November 10, 2026; 3.1 RC1 is now a public prerelease.**
 These checks consume the exact latest four-platform full 18-console
 RC1 packages from [run 42886791394](https://github.com/MasynNay/anything-plays/actions/runs/42886791394), containing
 controller diagnostics and application source `fe0da0b8b5f478cf1172734ef38546c4f1e86229`.
@@ -8,7 +8,8 @@ They do not authorize a public stable 3.1 release.
 
 | Native verification | Outcome | Run |
 | --- | --- | --- |
-| Four-platform original tagged pygame-ce 2.5.8 source / official wheel comparison | PASS audit; Linux **74/74** and Windows **62/62** candidates match exactly; Apple Silicon **0/121**, Intel **0/120** match | [42888996921](https://github.com/MasynNay/anything-plays/actions/runs/42888996921) |
+| Earlier *whole installed-file hash* original tagged pygame-ce 2.5.8 source / official wheel comparison | PASS audit; Linux **74/74** and Windows **62/62** candidates match exactly; Apple Silicon **0/121**, Intel **0/120** match | [42888996921](https://github.com/MasynNay/anything-plays/actions/runs/42888996921) |
+| New signed-Mac original wheel **code-section** audit | **241/241**: 120 ARM and 120 Intel pygame wheel matches, plus ARM OpenCV SDL match. Full binary hashes and legal review remain open. | [Pygame Mac](https://github.com/MasynNay/anything-plays/actions/runs/42925583942) · [OpenCV SDL](https://github.com/MasynNay/anything-plays/actions/runs/42926295393) |
 | Signed Mac native-linkage, `codesign`, `otool`, `lipo` and complete SHA-256 inventory | PASS both Mac targets, **121** ARM and **120** Intel signed library files | [42888996877](https://github.com/MasynNay/anything-plays/actions/runs/42888996877) |
 | Duplicate-name SDL2 dylib collision audit | PASS detection: Apple Silicon **one** mismatched `libSDL2-2.0.0.dylib` basename with runtime versions 2.32.8 and 2.32.10; Intel **zero** | [42889343414](https://github.com/MasynNay/anything-plays/actions/runs/42889343414) |
 | Actual signed native SDL2 library loading + joystick/game-controller subsystem init | PASS both Macs, including Apple Silicon's two libraries loaded in **either order** | [42889343645](https://github.com/MasynNay/anything-plays/actions/runs/42889343645) |

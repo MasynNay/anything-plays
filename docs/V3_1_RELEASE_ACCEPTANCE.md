@@ -11,6 +11,18 @@ Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 
+## Verified signed macOS wheel code provenance — November 10, 2026
+
+The original signed 3.1 RC1 Mac installers were independently compared
+against official pinned pygame-ce and OpenCV wheels: **241/241** compiled
+native `__TEXT,__text` sections matched. Apple Silicon: pygame **120/121**,
+OpenCV SDL **1/1**; Intel: pygame **120/120**. These are *code section*
+matches, not whole-file binary, corresponding-source or LGPL relinking
+approval. [Two-Mac audit](https://github.com/MasynNay/anything-plays/actions/runs/42925583942) · [OpenCV follow-up](https://github.com/MasynNay/anything-plays/actions/runs/42926295393) ·
+[Technical details](V3_1_SIGNED_MACOS_WHEEL_CORRESPONDENCE.md).
+
+All six stable 3.1.0 gates and public final-release approval remain false.
+
 ## Public RC1 release completed, stable acceptance remains open
 
 **[Anything Plays 3.1 RC1 is publicly downloadable](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1)** as a prerelease with authentic Windows x64, Linux x64, Mac ARM and Mac Intel packages, original SDL/pygame source candidates and matching asset SHA-256 checksums. The controller-enabled app and packaging files on main were independently checked to match the exact source used for RC1 builds. Public release workflow [42920357069](https://github.com/MasynNay/anything-plays/actions/runs/42920357069) PASSED.

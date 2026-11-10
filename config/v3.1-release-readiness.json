@@ -333,6 +333,22 @@
       "physical_controller_verified": false,
       "complete_lgpl_relinking_review": false,
       "stable_release_approved": false
+    },
+    "macos_signed_wheel_code_match": {
+      "status": "PASSED_MACHINE_CODE_SECTION_WHEEL_ASSOCIATION_ONLY",
+      "two_architectures_run": "https://github.com/MasynNay/anything-plays/actions/runs/42925583942",
+      "opencv_extra_arm_library_run": "https://github.com/MasynNay/anything-plays/actions/runs/42926295393",
+      "total_installed_native_files": 241,
+      "code_sections_matched_to_pygame_wheel": 240,
+      "code_sections_matched_to_opencv_wheel": 1,
+      "unmatched_native_code_sections": 0,
+      "source_pygame_wheel_sha256": "56441a9bb75c2461750dc0e6e4a46e3833b3cf6339bfbaf16f93ecac037510f3",
+      "source_opencv_arm_wheel_sha256": "bc7db37dc234f7bb3190a158fd9dd750357246fc7d8adb23698843ef721a993b",
+      "whole_installed_wheel_binary_identity_verified": false,
+      "complete_compiled_corresponding_sources_verified": false,
+      "lgpl_relinking_reviewed": false,
+      "redistribution_approved": false,
+      "stable_3_1_release_approved": false
     }
   }
 }

@@ -82,9 +82,9 @@ packaging versions are pinned in `../requirements-build.txt`.
 
 **Status: [v2.0.0 is published](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)** under a narrowly reviewed free/noncommercial distribution scope, with exact byte hashes and source/notice files attached. Independent upstream buildbot *reproducibility* remains an explicitly documented technical limitation, not a claim of unverified commercial rights. A successful `verify_bundle.py` only proves integrity, not copyright ownership.
 
-## Anything Plays 3.1: optional SDL gamepad support (unreleased)
+## Anything Plays 3.1: optional SDL gamepad support (public RC1, stable acceptance ongoing)
 
-The 3.1 development branch introduces **pygame-ce 2.5.8**, which provides
+The publicly available 3.1 RC1 includes **pygame-ce 2.5.8**, which provides
 standardized SDL2 gamepad input. pygame-ce uses **LGPL-2.1-or-later** licensing;
 its upstream source is https://github.com/pygame-community/pygame-ce and the
 release source package is available from the upstream 2.5.8 distribution.
@@ -102,6 +102,8 @@ release source package is available from the upstream 2.5.8 distribution.
   application's own Python code is on GitHub.
 - 3.1 Preview 1 contains only the mGBA emulator binary for GB/GBC/GBA
   testing. It is **not** equivalent to the 3.0 full offline 18-profile
-  bundle. No stable 3.1 release approval has been made.
+  bundle. No final stable 3.1.0 release approval has been made.
 
 See [3.1 release acceptance](V3_1_RELEASE_ACCEPTANCE.md).
+
+**New macOS code provenance:** [signed wheel audit](https://github.com/MasynNay/anything-plays/actions/runs/42925583942) and [OpenCV source wheel audit](https://github.com/MasynNay/anything-plays/actions/runs/42926295393) demonstrate **241/241** exact machine-code section matches to authentic official distribution wheels, but do not settle full corresponding-source/relinking obligations. [Details](V3_1_SIGNED_MACOS_WHEEL_CORRESPONDENCE.md).
