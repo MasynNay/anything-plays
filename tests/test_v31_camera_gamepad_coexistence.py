@@ -172,6 +172,14 @@ class VirtualEmulator:
         identity = self.inputs.id_for(button)
         if identity is None:
             raise AssertionError("Unknown console button: " + str(button))
+        # N64 and GameCube use distinct *internal identity* tuples
+        # before_frame() translates into native (device,index,id) polls.
+        # Query the actual Libretro callback arguments rather than passing
+        # the tuple itself as a native id (which would always read zero).
+        if isinstance(identity, tuple):
+            if identity[0] not in ("joypad", "digital"):
+                raise AssertionError("held() only checks digital buttons")
+            return bool(self.inputs.state(port, 1, 0, identity[1]))
         return bool(self.inputs.state(port, 1, 0, identity))
 
 
