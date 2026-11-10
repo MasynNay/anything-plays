@@ -139,7 +139,7 @@ add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
                             lines.append(f"add_library({target} {kind}{source})")
                         lines.append('add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")')
                         (root / "CMakeLists.txt").write_text(
-                            "\\n".join(lines) + "\\n", encoding="utf-8"
+                            "\n".join(lines) + "\n", encoding="utf-8"
                         )
                         result = subprocess.run(
                             ["cmake", "-S", str(root), "-B", str(root / "build"),
