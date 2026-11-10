@@ -24,7 +24,7 @@ FULL = "anything-plays-31-preview_3.1.0~preview2_amd64.deb"
 SOURCE_REVISION = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 RC_PREVIEW = "anything-plays-31-rc1_3.1.0~rc1_amd64.deb"
 RC_FULL = "anything-plays-31-rc1_3.1.0~rc1full_amd64.deb"
-RC_SOURCE_REVISION = "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+RC_SOURCE_REVISION = "26de1e1ad1b701d0735e085158347f8c213ce437"
 
 
 def sha(path):

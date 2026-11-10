@@ -1,6 +1,6 @@
 name: 3.1 RC1 | Full 18-console source-app QA (unreleased)
 
-# A source-built atomic-preferences and controller-diagnostics RC1 executable from run 42892417937, plus exact
+# A source-built controller-recovery, atomic-preferences and diagnostics RC1 executable from run 42904937464, plus exact
 # original-source native 3.0 emulator binaries verified byte-for-byte.
 # Never use preview binaries or approve licensing / publish a GitHub Release.
 on:
@@ -46,8 +46,8 @@ jobs:
       AP_V30_APPROVED_RELEASE: '0'
       AP_V30_STABLE_CANDIDATE: '0'
       GH_TOKEN: ${{ github.token }}
-      RC_APP_RUN_ID: '42892417937'
-      RC_APP_SOURCE_SHA: 'cdbd647fa8ef3f3db0a8d419f0396f6b191599d6'
+      RC_APP_RUN_ID: '42904937464'
+      RC_APP_SOURCE_SHA: '26de1e1ad1b701d0735e085158347f8c213ce437'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

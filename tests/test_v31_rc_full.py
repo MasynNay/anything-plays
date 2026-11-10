@@ -18,7 +18,7 @@ from tools import (
     assemble_v31_full_macos as mac,
 )
 
-RC_SHA = "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+RC_SHA = "26de1e1ad1b701d0735e085158347f8c213ce437"
 
 
 class FullReleaseCandidateInputs(unittest.TestCase):
@@ -139,7 +139,7 @@ class FullReleaseCandidateInputs(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         workflow = root/".github/workflows/v31-full-rc1-qa.yml"
         contents = workflow.read_text("utf-8")
-        self.assertIn("42892417937", contents)
+        self.assertIn("42904937464", contents)
         self.assertIn("AP_V31_RC: '1'", contents)
         self.assertIn("AP_V31_FULL_TEST_CORES: '1'", contents)
         self.assertIn("--rc1", contents)

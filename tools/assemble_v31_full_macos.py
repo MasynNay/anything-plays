@@ -22,7 +22,7 @@ from tools.audit_v31_sdl_runtime import inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
 
 PREVIEW_RUN_SHA = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
-RC_SOURCE_REVISION = "cdbd647fa8ef3f3db0a8d419f0396f6b191599d6"
+RC_SOURCE_REVISION = "26de1e1ad1b701d0735e085158347f8c213ce437"
 
 
 def digest(path):
