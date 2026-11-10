@@ -50,11 +50,19 @@ def check_inputs(stable, preview, sums, receipt):
 
 
 def unpack(installer, target):
-    exe = shutil.which("7z") or shutil.which("7z.exe")
-    if exe is None:
-        raise RuntimeError("7-Zip executable required for Inno Setup proof")
+    """Actually install Inno Setup in a disposable runner directory.
+
+    Inno 7 compressed installers cannot necessarily be read by 7-Zip.
+    Inno's own /DIR flag is the authoritative, testable extraction method.
+    /VERYSILENT and /NOICONS avoid a GUI, shortcuts and postinstall launch.
+    This runs only on an ephemeral Windows CI host, never on the user's PC.
+    """
     target.mkdir(parents=True, exist_ok=True)
-    subprocess.run([exe, "x", "-y", "-o"+str(target), str(installer)], check=True)
+    subprocess.run(
+        [str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES",
+         "/NORESTART", "/NOICONS", "/SP-", "/DIR="+str(target)],
+        check=True, timeout=600,
+    )
 
 
 def source_app(folder, marker_name):
@@ -99,7 +107,7 @@ def build(stable, preview, sums, receipt, output):
         dest = root/"dist/AnythingPlays"
         if dest.exists():
             shutil.rmtree(dest)
-        shutil.copytree(now, dest)
+        shutil.copytree(now, dest, ignore=shutil.ignore_patterns('unins000.*'))
         shutil.rmtree(dest/"cores")
         shutil.copytree(originals, dest/"cores")
         if validate_trial_core_directory(dest/"cores", ".dll") != first:
