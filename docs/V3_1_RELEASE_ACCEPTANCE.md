@@ -90,6 +90,24 @@ endurance on the new artifacts, full LGPL native dependency/source/relinking
 review, and a new genuine stable-identity installer rebuild remain open.
 Stable public 3.0.0 is unchanged.
 
+## New source-built 3.1 RC1 application and full-library QA lane
+
+Unlike the frozen Preview 1 application used in earlier 3.1 QA packages,
+the [new RC1 source-app workflow](https://github.com/MasynNay/anything-plays/actions/runs/42863846059)
+builds fresh 3.1 executables on each native host with reviewed RC1
+window titles, app identifiers, own settings namespaces and installer IDs.
+The first source-built stage contains only mGBA and **is not** a full
+release candidate.
+
+The [full RC1 QA workflow](../.github/workflows/v31-full-rc1-qa.yml)
+combines those precisely hashed applications with the independently
+verified eleven original-source emulator binaries from public 3.0.0.
+It revalidates the resulting installed full packages, original core
+manifest and SDL runtime. Its results are **pending acceptance** until
+all Windows, Linux, ARM Mac and Intel Mac jobs pass. This workflow cannot
+publish a GitHub Release or substitute preview-only binaries for current
+source. See the [RC1 source-build runbook](V3_1_RC_SOURCE_BUILD.md).
+
 ## What is still required before a full 3.1 stable release
 
 - [x] **Build full-library QA candidates:** all 18 profiles with the exact
