@@ -1,7 +1,8 @@
 """3.1 gamepad input contracts: mapping, hotplug and keyboard isolation.
 
-No real hardware or SDL display is required. Integration runs on macOS,
-Windows and Linux still need hands-on controller acceptance before release.
+Synthetic gamepad events and actual SDL initialization are tested in CI on
+Linux, Windows and both Mac architectures. Physical HID/USB/Bluetooth testing
+remains a separate release gate.
 """
 import ast
 import os
@@ -224,7 +225,6 @@ class GamepadLifecycleTests(unittest.TestCase):
 
 
 class SDLBackendSmokeTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform.startswith("linux"), "Headless SDL smoke runs in Linux CI")
     def test_real_sdl_controller_api_without_physical_hardware(self):
         """Exercise actual pygame-ce initialization and poll in dummy video mode."""
         with patch.dict(os.environ, {"SDL_VIDEODRIVER": "dummy"}):
