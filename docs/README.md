@@ -30,6 +30,6 @@ The old Stella2014, Snes9x, Genesis Plus GX, and early ten-source experiments ar
 
 ## Development references
 
-The complete [workflow catalog](../.github/README.md), [requirements](../requirements.txt), [packaging scripts](../packaging), [source-oriented tools](../tools), and [tests](../tests) are in the repository. Generated build output, commercial ROMs and proprietary console firmware must not be committed.
+The complete [workflow catalog](CI_WORKFLOW_CATALOG.md), [requirements](../requirements.txt), [packaging scripts](../packaging), [source-oriented tools](../tools), and [tests](../tests) are in the repository. Generated build output, commercial ROMs and proprietary console firmware must not be committed.
 
 For the latest publicly downloadable version, use [GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest). A workflow's green checks and a private release draft are not equivalent to a published release.
