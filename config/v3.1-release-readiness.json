@@ -271,6 +271,17 @@
     "physical_webcam_and_real_gameplay_verified": false,
     "complete_corresponding_source_and_lgpl_relinking_verified": false,
     "stable_public_installer_identity_verified": false,
-    "public_release_approved": false
+    "public_release_approved": false,
+    "source_companion": {
+      "status": "PASSED_SIX_UPSTREAM_SOURCE_CANDIDATES_UNAPPROVED",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42908687061",
+      "source_archive_count": 6,
+      "pygame_source_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
+      "full_rc_qa_run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "complete_native_corresponding_source_verified": false,
+      "lgpl_relinking_reviewed": false,
+      "redistribution_approved": false,
+      "public_release_approved": false
+    }
   }
 }

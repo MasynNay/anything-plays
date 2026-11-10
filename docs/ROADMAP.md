@@ -11,8 +11,15 @@
 | **1.5** — Original desktop application | Released | Camera-driven controls and local emulation |
 | **2.0** — Expanded studio | Released | Game Boy, Game Boy Color, GBA, SNES; ROM libraries, themes and configurable zones |
 | **3.0** — Unified offline console library | **Released · November 9, 2026** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
+| **3.1** — Optional physical gamepad input | **Unreleased RC · QA passed** | Controller remapping, live tester and diagnostics; four-platform 18-console test builds; native source review pending |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
+**3.1 current verification:** The 3.1 RC1 application, 18-console QA
+installers and installed GUI checks passed on all four OS targets;
+[six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42908687061)
+were also preserved. The hardware gameplay, full LGPL source/relinking and
+final stable release requirements remain open. The public download
+remains 3.0.0 until a separate reviewed 3.1 release.
 **Download status:** [Anything Plays 3.0.0 is publicly released](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) with four genuine offline installers and [original emulator sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Stable 2.0 and 1.5 remain available in previous releases.
 
 ## Version 3.0 — Shipped features

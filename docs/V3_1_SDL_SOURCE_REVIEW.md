@@ -10,6 +10,27 @@ all passed against the *refreshed current RC1*.
 Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
+## Current six-source upstream companion: verified November 10, 2026
+
+The [new source-companion audit run](https://github.com/MasynNay/anything-plays/actions/runs/42908687061) **PASSED**.
+It preserves **six original upstream Git-tag source archives** in one
+retained, SHA-256-checked, UNAPPROVED workflow artifact: pygame-ce 2.5.8,
+SDL2 2.32.8, SDL2 2.32.10, SDL2_image 2.8.12, SDL2_mixer 2.8.2,
+and SDL2_ttf 2.24.0. The five SDL tags and archive digests were
+independently compared with the earlier pinned SDL candidate source report,
+and the pygame-ce source was checked against the **current full RC1**
+source/wheel audit from run 42905694504. The new bundle includes
+both original source manifests, an all-six SHA-256 list, the original
+pygame LGPL 2.1 license, and an explicit non-approval JSON receipt.
+
+**Remaining blocker:** observed dylib versions are hints, not demonstrated
+source build lineage. macOS signed/thinned binaries did not match published
+wheel bytes, and original native compile flags, transitive dependencies,
+relinking/replacement, full notices and complete LGPL compliance have not
+been independently established. This companion is NOT a complete
+corresponding-source package and NOT a public release authorization.
+The existing emulator source release for 3.0 remains separate.
+
 ## Verified pygame-ce source evidence
 
 The [successful 3.1 SDL source-review run

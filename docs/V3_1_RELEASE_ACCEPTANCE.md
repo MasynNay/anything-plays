@@ -11,6 +11,14 @@ Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 
+### Current original-source candidate bundle (technical QA only)
+
+[Six-source archive and checksum companion](https://github.com/MasynNay/anything-plays/actions/runs/42908687061) **PASS**.
+All five pinned SDL upstream source candidates plus the pinned pygame-ce
+Git-tag source are retained with an SHA-256 list and the current frozen
+runtime audit. Source-to-compiled-binary and LGPL relinking review remain
+**OPEN**; this result does not close the third-party source release gate.
+
 ## Latest source-built 3.1 RC1 acceptance — November 10, 2026
 
 - **Fresh source-built 3.1 application 4/4 PASS:**
