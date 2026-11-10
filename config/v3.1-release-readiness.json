@@ -35,20 +35,39 @@
   },
   "verified_qa_builds": {
     "linux-x64": {
-      "status": "PASSED_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42842903097"
+      "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
+      "source_app_revision": "86baa6972ed923540f6ab49b636652a0f499d45c"
     },
     "windows-x64": {
-      "status": "PASSED_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42847847307"
+      "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
+      "source_app_revision": "86baa6972ed923540f6ab49b636652a0f499d45c"
     },
     "macos-arm64": {
-      "status": "PASSED_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42843346985"
+      "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
+      "source_app_revision": "86baa6972ed923540f6ab49b636652a0f499d45c"
     },
     "macos-x64": {
-      "status": "PASSED_QA_ONLY",
-      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42843346985"
+      "status": "PASSED_FRESH_SOURCE_FULL_RC1_QA_ONLY",
+      "url": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
+      "source_app_revision": "86baa6972ed923540f6ab49b636652a0f499d45c"
     }
+  },
+  "verified_source_app_builds": {
+    "status": "PASSED_FOUR_PLATFORM_FRESH_SOURCE_RC1_STAGE_ONLY",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42863846059",
+    "source_revision": "86baa6972ed923540f6ab49b636652a0f499d45c",
+    "final_release_approved": false
+  },
+  "verified_full_rc1_qa": {
+    "status": "PASSED_FOUR_PLATFORM_FULL_EIGHTEEN_CONSOLE_QA_ONLY",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/42865608433",
+    "source_revision": "86baa6972ed923540f6ab49b636652a0f499d45c",
+    "core_count": 11,
+    "console_profiles": 18,
+    "approval": false,
+    "expires": "2026-11-17"
   }
 }
