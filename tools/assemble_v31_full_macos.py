@@ -20,6 +20,9 @@ from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
 from tools.audit_v31_sdl_runtime import inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v31_rc2_source import (
+    checked_rc2_source_revision, require_rc2_receipt, FULL_STATUS,
+)
 
 PREVIEW_RUN_SHA = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 RC_SOURCE_REVISION = "26de1e1ad1b701d0735e085158347f8c213ce437"
@@ -60,13 +63,18 @@ def mount(dmg, location):
             command("hdiutil", "detach", "-force", location)
 
 
-def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False):
+def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False, *, rc2=False,
+                  expected_source_revision=None):
     if arch not in ("arm64", "x64"):
         raise ValueError("Only reviewed Apple Silicon or Intel architecture")
     stable_name = "AnythingPlays-3.0.0-macos-" + arch + ".dmg"
-    preview_name = ("AnythingPlays-3.1.0-rc1-macos-" if rc1
-                    else "AnythingPlays-3.1.0-preview1-macos-") + arch + ".dmg"
-    expected_sha = RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA
+    if rc1 and rc2:
+        raise ValueError("Cannot mix RC1 and RC2 source revisions")
+    preview_name = ("AnythingPlays-3.1.0-rc2-macos-" if rc2 else
+                    "AnythingPlays-3.1.0-rc1-macos-" if rc1 else
+                    "AnythingPlays-3.1.0-preview1-macos-") + arch + ".dmg"
+    expected_sha = (checked_rc2_source_revision(expected_source_revision)
+                    if rc2 else RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA)
     if (stable.name != stable_name or preview.name != preview_name
             or not stable.is_file() or not preview.is_file()):
         raise ValueError("Missing exact named original/3.1 preview disk image")
@@ -77,26 +85,37 @@ def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False):
     if (meta.get("target") != "macos-" + arch or meta.get("installer") != preview_name
             or meta.get("source_revision") != expected_sha
             or meta.get("sha256") != digest(preview)):
-        raise ValueError("3.1 app does not match independently verified Preview 1")
+        raise ValueError("Source-stage 3.1 app does not match its original receipt")
+    if rc2:
+        require_rc2_receipt(meta, source=expected_sha, target="macos-" + arch,
+                            installer=preview_name, digest=digest(preview))
     return stable_sha
 
 
-def build(arch, stable, preview, checksums, receipt, output, rc1=False):
+def build(arch, stable, preview, checksums, receipt, output, rc1=False, *,
+          rc2=False, expected_source_revision=None):
     if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Private QA flags not set")
-    if rc1:
+    if rc1 and rc2:
+        raise ValueError("Two candidate channels cannot share a native build")
+    if rc2:
+        checked_rc2_source_revision(expected_source_revision)
+    elif rc1:
         if os.getenv("AP_V31_RC") != "1" or os.getenv("AP_V31_PREVIEW") == "1":
             raise ValueError("RC1 source assembly requires isolated candidate flags")
     elif os.getenv("AP_V31_PREVIEW") != "1":
         raise ValueError("Original full preview requires preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("Cannot treat preview as approved stable release")
-    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt, rc1=rc1)
+    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt,
+                               rc1=rc1, rc2=rc2,
+                               expected_source_revision=expected_source_revision)
     with tempfile.TemporaryDirectory(prefix="ap31-mac-full-") as temp:
         tmp = Path(temp)
         with mount(stable, tmp/"stable"), mount(preview, tmp/"preview"):
             old = tmp/"stable/AnythingPlays.app/Contents/Resources"
-            app_name = "AnythingPlays31RC.app" if rc1 else "AnythingPlays31Preview.app"
+            app_name = ("AnythingPlays31RC2.app" if rc2 else
+                        "AnythingPlays31RC.app" if rc1 else "AnythingPlays31Preview.app")
             src = tmp/"preview"/app_name
             app = tmp/app_name
             shutil.copytree(src, app, symlinks=True)
@@ -130,7 +149,8 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False):
         info = app/"Contents/Info.plist"
         with info.open("rb") as stream:
             plist = plistlib.load(stream)
-        expected_id = "com.anythingplays.rc31" if rc1 else "com.anythingplays.preview31"
+        expected_id = ("com.anythingplays.rc31v2" if rc2 else
+                       "com.anythingplays.rc31" if rc1 else "com.anythingplays.preview31")
         if plist.get("CFBundleIdentifier") != expected_id:
             raise ValueError("3.1 candidate could overwrite stable 3.0 app")
         verify_bundle(app, "macos", check_native=True)
@@ -139,8 +159,9 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False):
         verify_bundle(app, "macos", check_native=True)
 
         output.mkdir(parents=True, exist_ok=True)
-        filename = ("AnythingPlays-3.1.0-rc1-full-macos-" if rc1
-                    else "AnythingPlays-3.1.0-preview2-macos-") + arch + ".dmg"
+        filename = ("AnythingPlays-3.1.0-rc2-full-macos-" if rc2 else
+                    "AnythingPlays-3.1.0-rc1-full-macos-" if rc1 else
+                    "AnythingPlays-3.1.0-preview2-macos-") + arch + ".dmg"
         dmg = output/filename
         command("hdiutil", "create", "-volname", "Anything Plays 3.1 Full QA",
                 "-srcfolder", app, "-ov", "-format", "UDZO", dmg)
@@ -154,19 +175,25 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False):
             if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
             # Inventory the *mounted final signed DMG*, not the unsigned app.
-            if rc1:
+            if rc2:
+                validate_staged_identity(final, channel="rc2")
+            elif rc1:
                 validate_staged_identity(final)
             audit = inspect_bundle(final, "macos-" + arch)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         report = {
-            "status": ("UNRELEASED_3_1_FULL_MACOS_RC1_QA" if rc1
-                       else "UNRELEASED_3_1_FULL_MACOS_QA"),
+            "status": (FULL_STATUS if rc2 else
+                       "UNRELEASED_3_1_FULL_MACOS_RC1_QA" if rc1 else
+                       "UNRELEASED_3_1_FULL_MACOS_QA"),
             "public_release_approved": False,
             "target": "macos-" + arch,
             "original_stable_sha256": stable_sha,
             "original_preview_sha256": digest(preview),
-            "source_preview_revision": RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA,
+            "source_preview_revision": (expected_source_revision if rc2 else
+                                        RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA),
+            "identity_channel": "rc2" if rc2 else "rc1" if rc1 else "preview1",
+            "settings_namespace": "anything-plays-31-rc2" if rc2 else None,
             "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": filename, "sha256": digest(dmg),
@@ -189,9 +216,12 @@ def main():
         p.add_argument("--"+name, type=Path, required=True)
     p.add_argument("--rc1", action="store_true",
                    help="Assemble full 18-console QA from source-built RC1 app")
+    p.add_argument("--rc2", action="store_true", help="Build independent unreleased RC2 full DMG")
+    p.add_argument("--expected-source-revision", metavar="EXACT_PR_SHA")
     a = p.parse_args()
     build(a.arch, *(getattr(a, x).resolve() for x in (
-        "stable", "preview", "checksums", "receipt", "output")), rc1=a.rc1)
+        "stable", "preview", "checksums", "receipt", "output")), rc1=a.rc1,
+          rc2=a.rc2, expected_source_revision=a.expected_source_revision)
 
 
 if __name__ == "__main__":
