@@ -67,6 +67,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$AP_V31_RC2_SOURCE_SHA"
           python -m unittest discover -s tests -p 'test_v31_rc2_identity.py' -v
           python -m unittest discover -s tests -p 'test_v31_candidate_identity.py' -v
+      - name: Recover official Canonical mirrors if Azure mirror DNS is unavailable
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
       - name: Install Linux native dependencies with bounded DNS retry
         if: runner.os == 'Linux'
         shell: bash
