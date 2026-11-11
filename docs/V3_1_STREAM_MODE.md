@@ -33,4 +33,18 @@ Closing Stream Mode cancels its timer, saves final style changes, destroys both 
 
 `tests/test_v31_stream_mode.py` covers both layouts, 16 themes, custom border colors, swapped live sources, accurate camera/game-off placeholders, untrusted settings, and cached rendering resources. `tests/smoke_gui.py` opens the actual two Toplevel windows under Tk, changes its customization widgets, renders synthetic annotated camera data, verifies single-Canvas-image reuse, closes them safely, and confirms the settings were saved.
 
-Stream Mode is a post-RC1 **3.1 development feature**. It is not included in the currently published RC1 installer. A refreshed RC2 build must compile this exact code, pass the full four-platform QA and installed GUI acceptance, and still satisfy physical camera/game and native redistribution/relinking requirements before any public stable 3.1 release.
+Stream Mode is included in the **public [3.1 RC2 prerelease](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2)**, not in the earlier RC1 installer. The full 18-console RC2 installers and actual installed GUI/Stream Mode acceptance passed on Windows x64, Linux x64, macOS Apple Silicon and macOS Intel in [CI run 43079085633](https://github.com/MasynNay/anything-plays/actions/runs/43079085633). Those automated checks do **not** establish compatibility with every physical webcam, controller or retail game, or complete the pygame/SDL corresponding-source and LGPL relinking review. **Stable 3.1.0 is not yet published**; [3.0.0](https://github.com/MasynNay/anything-plays/releases/latest) remains the stable release.
+
+## RC2 owner test checklist
+
+Use a disposable ROM and camera setup where practical. Never upload private webcam footage or commercial ROM files to issue reports.
+
+1. Install RC2 on a supported OS and confirm that stable 3.0 launches separately and retains its own ROM folders, profiles and preferences.
+2. Open **Stream Mode** with **Ctrl+Shift+S**. In OBS, use **Window Capture** on **Stream Output**, not **Stream Settings**.
+3. Change between **DS stacked** and **Side by side**; swap screen positions; adjust border color, thickness, theme, screen ratio and labels. Confirm the output remains legible after resizing and that the settings window never appears in the captured content.
+4. With a real camera, confirm live tracked outlines appear only in the intended camera pane. Stop or unplug the camera and verify stale camera imagery and the live indicator disappear.
+5. Load and unload a legally obtained game in the embedded emulator. Confirm game video and the console activity indicator follow the session accurately. Check controller mapping and reconnect only when real compatible hardware is available.
+6. Leave Stream Mode open during a longer play session, change layouts during gameplay, then close and reopen it. Verify no duplicate camera acquisition, game restart, persistent resource growth or saved-setting corruption.
+7. Check actual gameplay, audio routing in OBS, save/reload, camera input and controller input independently. Report OS version, app version, console/core, reproduction steps and whether the issue affects RC2 only. Never treat these manual checks as passed until run on real hardware.
+
+**Stable-release gates still open:** physical camera/gamepad and gameplay acceptance, extended real-device sessions, complete corresponding-source identification and legal relinking review, and final stable-installer verification.
