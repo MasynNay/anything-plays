@@ -1,0 +1,157 @@
+name: 3.1.0 | Private four-platform FINAL identity build QA
+
+# Exact new 3.1.0 package and embedded app identities, not renamed RC2
+# binaries. Builds mGBA source shells only. No publication or rights approval.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-final-identity-private-qa.yml'
+      - 'anything_plays/build_identity.py'
+      - 'anything_plays/test_preferences.py'
+      - 'tools/write_v31_identity.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+      - 'tests/test_v31_final_candidate_identity.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-final-identity-private-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build-private-final-identity:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Genuine 3.1.0 source identity | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31_3.1.0_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-macos-arm64.dmg', bundle: 'dist/AnythingPlays31.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-macos-x64.dmg', bundle: 'dist/AnythingPlays31.app'}
+    env:
+      AP_V31_FINAL_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_FINAL_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify actual checked-out SHA and fail-closed final identity contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V31_FINAL_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v31_final_candidate_identity.py' -v
+      - name: Repair native Ubuntu package mirrors if runner Azure DNS fails
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+      - name: Install Linux native packaging dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=20 install -y --no-install-recommends \
+                python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1
+              break
+            fi
+            sleep "$((attempt * 10))"
+          done
+          test "$ok" = 1
+      - name: Install Windows Inno Setup compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
+      - name: Build real final-version Linux package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build real final-version Windows installer
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Build real final-version macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Inspect exact embedded stable-version identity and package on native OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from anything_plays.build_identity import make_identity,validate_identity
+          from hashlib import sha256
+          import json,os,plistlib,subprocess
+          target="${{ matrix.target }}"
+          app=Path("${{ matrix.bundle }}")
+          expected=Path("release")/"${{ matrix.installer }}"
+          assert expected.is_file() and expected.stat().st_size>1024*1024,expected
+          markers=list(app.rglob("v31_build_identity.json"))
+          assert len(markers)==1,markers
+          marker=validate_identity(json.loads(markers[0].read_text("utf-8")))
+          assert marker==make_identity("final_candidate")
+          assert marker["version"]=="3.1.0" and marker["settings_namespace"]=="anything-plays-31"
+          assert marker["public_release_approved"] is False
+          assert marker["channel"] not in ("rc1","rc2")
+          if target=="linux-x64":
+              fields=subprocess.check_output(["dpkg-deb","-f",str(expected),"Package","Version"],text=True).splitlines()
+              assert fields==["anything-plays-31","3.1.0"],fields
+          if target.startswith("macos"):
+              p=plistlib.loads((app/"Contents/Info.plist").read_bytes())
+              assert p["CFBundleIdentifier"]=="com.anythingplays.release31",p
+              assert p["CFBundleShortVersionString"]=="3.1.0",p
+              assert p["CFBundleVersion"]=="3.1.0",p
+          digest=sha256(expected.read_bytes()).hexdigest()
+          r={"schema_version":1,"status":"PRIVATE_SOURCE_STAGE_FINAL_IDENTITY_QA_ONLY",
+             "source_revision":os.environ["AP_V31_FINAL_SOURCE_SHA"],
+             "target":target,"installer":expected.name,"sha256":digest,
+             "size_bytes":expected.stat().st_size,"version":"3.1.0",
+             "identity_channel":"final_candidate",
+             "settings_namespace":"anything-plays-31",
+             "only_mgba_source_stage":True,"native_core_count":1,
+             "full_18_console_release_ready":False,
+             "public_release_approved":False,
+             "relinking_approved":False,
+             "physical_hardware_verified":False}
+          Path("release/FINAL_IDENTITY_SOURCE_QA.json").write_text(json.dumps(r,indent=2)+"\n","utf-8")
+          print("Version-correct independent 3.1 candidate built:",target,digest)
+          PY
+      - name: Keep private final-identity binaries and checksum proofs for full-core review
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-FINAL-IDENTITY-${{ matrix.target }}-QA-ONLY
+          path: |
+            release/${{ matrix.installer }}
+            release/FINAL_IDENTITY_SOURCE_QA.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
