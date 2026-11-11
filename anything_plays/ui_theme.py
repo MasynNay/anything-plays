@@ -120,5 +120,14 @@ class ThemeMixin:
             canvas = getattr(self, attr, None)
             if canvas is not None:
                 canvas.configure(bg=outer)
+        # Chrome is composed of small native frames around the existing
+        # display widgets; update its palette without touching video pixels.
+        for attr in ('camera_bezel', 'game_bezel'):
+            bezel = getattr(self, attr, None)
+            if bezel is not None:
+                bezel.apply_palette((outer, surface, text, accent, button, field))
+        game = getattr(self, 'game_canvas', None)
+        if game is not None:
+            game.configure(highlightbackground=button, highlightcolor=accent)
         if hasattr(self, 'refresh_controller_artwork'):
             self.refresh_controller_artwork()
