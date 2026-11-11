@@ -25,6 +25,7 @@ from anything_plays.ui_profiles import ProfilesMixin
 from anything_plays.ui_theme import ThemeMixin
 from anything_plays.ui_zones import ZonesMixin
 from anything_plays.ui_view import ViewMixin
+from anything_plays.ui_stream import StreamMixin
 from anything_plays.ui_shortcuts import ShortcutsMixin
 from anything_plays.ui_gamepad import GamepadMixin
 from anything_plays.ui_external import ExternalBackendMixin
@@ -33,7 +34,7 @@ from anything_plays.ui_icon import IconMixin
 
 
 class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
-          VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin,
+          VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin, StreamMixin,
           ShortcutsMixin, GamepadMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
     def __init__(self, root):
@@ -102,6 +103,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         saved_view_mode = preferences.get('view_mode', 'Windowed')
         self.view_mode = tk.StringVar(value=saved_view_mode if saved_view_mode in ('Windowed', 'Borderless', 'Fullscreen') else 'Windowed')
         self.theme_name = tk.StringVar(value=self.read_theme_preference())
+        self.initialize_stream_mode(preferences)
         self.apply_theme(self.theme_name.get())
         self.system_key = tk.StringVar(value=self.read_selected_system())
         self.rom_directories = self.read_rom_directories()
@@ -156,6 +158,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.bind('<F10>', self.toggle_borderless)
         root.bind('<F11>', self.toggle_fullscreen)
         root.bind('<Control-Shift-m>', self.toggle_game_mute)
+        root.bind('<Control-Shift-s>', lambda _: self.open_stream_mode())
         root.protocol('WM_DELETE_WINDOW', self.close)
         if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":
             root.after(100, self.scan_cameras)
@@ -211,6 +214,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
             job = getattr(self, job_name, None)
             if job is not None:
                 cleanup(job_name, lambda job=job: self.root.after_cancel(job))
+        cleanup("stream output", self.close_stream_mode)
         cleanup("manual input", self.deactivate_manual)
         cleanup("gamepad", self.close_gamepad)
         cleanup("camera controls", self.stop_controls)
