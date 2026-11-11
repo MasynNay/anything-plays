@@ -324,3 +324,8 @@ A focused Linux original-source Dolphin verifier improvement rejects malformed E
 ### November 11, 2026 — Dolphin ELF loadable-segment integrity (CI pending)
 
 A focused Linux source-build verifier change now requires real file-backed PT_LOAD and PT_DYNAMIC segments with valid per-segment file/memory bounds, rather than accepting an otherwise structurally valid but empty ELF program-header table. Four negative fixtures and a positive fixture were added. Await source checks and original pinned Linux compilation before merging. This does not replace the priority release gates: source-built Dolphin in four production candidates, exact corresponding source, combined licensing review, and final installer acceptance. Public 3.0 remains gated; v2.0 untouched.
+
+
+### November 11, 2026 — Dolphin ELF loadable-segment verification passed and merged
+
+[PR #182](https://github.com/MasynNay/anything-plays/pull/182) merged as `0becbd42` after [source checks 43008783038](https://github.com/MasynNay/anything-plays/actions/runs/43008783038) passed Python 3.12/3.13 and native mGBA compatibility; [pinned original Dolphin Linux compilation 43008782954](https://github.com/MasynNay/anything-plays/actions/runs/43008782954), Windows research 43008782947 and macOS ARM/Intel research 43008783034 succeeded. Four negative and one positive ELF segment fixtures test PT_LOAD/PT_DYNAMIC and file/memory bounds. Production packaging jobs were skipped. This is not production Dolphin source/binary correspondence or license clearance. Next release-critical engineering is source-built Dolphin in four production candidates, then exact corresponding source, combined licensing review and final installer acceptance. Public 3.0 gated; stable 2.0 preserved.
