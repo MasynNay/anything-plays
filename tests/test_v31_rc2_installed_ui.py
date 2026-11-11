@@ -22,6 +22,11 @@ SMOKE = {
     "actual_tk_mainloop_ran": True,
     "frozen_binary": True,
     "console_profile_count": 18,
+    "stream_output_window_opened": True,
+    "stream_settings_separate": True,
+    "stream_appearance_configured": True,
+    "stream_camera_reference_rendered": True,
+    "stream_closed_cleanly": True,
     "top_level_widgets": 1,
     "initialized_system": "gba",
     "error": None,
@@ -88,6 +93,11 @@ class InstalledRc2Tests(unittest.TestCase):
                 ("frozen_binary", False), ("console_profile_count", 3),
                 ("public_distribution_approved", True),
                 ("physical_qa_approved", True),
+                ("stream_output_window_opened", False),
+                ("stream_settings_separate", False),
+                ("stream_appearance_configured", False),
+                ("stream_camera_reference_rendered", False),
+                ("stream_closed_cleanly", False),
                 ("error", "fake error"), ("top_level_widgets", 0),
             ):
                 with self.subTest(smoke=field), self.assertRaises(ValueError):
