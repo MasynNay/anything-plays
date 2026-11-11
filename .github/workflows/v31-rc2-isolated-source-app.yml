@@ -21,10 +21,15 @@ on:
       - 'tools/assemble_v31_full_windows.py'
       - 'tools/assemble_v31_full_macos.py'
       - 'tools/ci_use_canonical_ubuntu_mirror.sh'
+      - '.github/workflows/v31-rc2-installed-desktop.yml'
+      - 'tools/verify_v31_rc2_installed_ui.py'
+      - 'tools/qa_v31_rc2_installed_preferences.py'
+      - 'tests/test_v31_rc2_installed_ui.py'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 # A superseded run can remain 'queued' while a macOS runner is unavailable.
 # Include the exact source SHA so the newest verified PR head can start
@@ -325,3 +330,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
+
+  installed-rc2-four-os:
+    # Reusable read-only workflow executes only after ALL four original-core
+    # packages are verified and uploaded. It runs their REAL installed GUI
+    # in disposable settings homes and cannot authorize public distribution.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.full-rc2-18-console.result == 'success' }}
+    needs: full-rc2-18-console
+    name: Installed RC2 GUI and preferences | all four native hosts
+    uses: ./.github/workflows/v31-rc2-installed-desktop.yml
+    with:
+      qa_run_id: ${{ github.run_id }}
+      source_sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      contents: read
+      actions: read
