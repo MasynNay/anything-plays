@@ -123,8 +123,23 @@ def main():
         p.error("Explicit RC application-stage flags are required")
     if os.environ.get("AP_RELEASE_BUILD") == "1":
         p.error("RC application stage must never enable public release mode")
+    if args.channel == "rc2":
+        # pull_request runs use a synthetic merge revision in GITHUB_SHA.
+        # Authorize only the exact head checkout baked into the QA workflow.
+        source_sha = os.environ.get("AP_V31_RC2_SOURCE_SHA", "")
+        try:
+            checkout = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], text=True, timeout=15,
+            ).strip()
+        except (OSError, subprocess.CalledProcessError,
+                subprocess.TimeoutExpired) as exc:
+            p.error("Cannot verify RC2 source checkout: " + str(exc))
+        if not re.fullmatch(r"[a-f0-9]{40}", source_sha) or checkout != source_sha:
+            p.error("RC2 source identity does not match exact checked-out commit")
+    else:
+        source_sha = os.environ.get("GITHUB_SHA", "")
     record = verify(args.target, args.installer, args.bundle,
-                    os.environ.get("GITHUB_SHA", ""), channel=args.channel)
+                    source_sha, channel=args.channel)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(record, indent=2) + "\n",
                            encoding="utf-8")
