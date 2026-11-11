@@ -49,10 +49,16 @@ def core_names_for_build():
     if os.environ.get("AP_V31_FULL_TEST_CORES") == "1":
         preview = os.environ.get("AP_V31_PREVIEW") == "1"
         candidate = os.environ.get("AP_V31_RC") == "1"
-        if (preview == candidate
+        candidate2 = os.environ.get("AP_V31_RC2") == "1"
+        if (sum((preview, candidate, candidate2)) != 1
                 or os.environ.get("AP_RELEASE_BUILD") == "1"
                 or os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
-                or os.environ.get("AP_V30_STABLE_CANDIDATE") == "1"):
+                or os.environ.get("AP_V30_STABLE_CANDIDATE") == "1"
+                or (candidate2 and (
+                    os.environ.get("AP_V31_NEXT_QA") != "1"
+                    or not re.fullmatch(r"[a-f0-9]{40}",
+                                        os.environ.get("AP_V31_QA_CHECKOUT_SHA", ""))
+                ))):
             raise ValueError(
                 "3.1 full original-source core reuse requires exactly one "
                 "unreleased preview or isolated RC candidate channel"
