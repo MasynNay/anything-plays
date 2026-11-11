@@ -30,6 +30,12 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 - PR #199's final workflow then builds **eleven original 3.0 source-core families** into each fresh actual-3.1.0 installer, audits original native hashes, launches the **actually installed** Tk/Stream Mode GUI on every native host and verifies three older user-setting namespaces unchanged. **These four full final candidate/installed jobs had NOT yet completed at this checkpoint.** No final QA success claim is authorized until all receipts pass.
 - The `final_candidate` identity and private staging receipts deliberately have `public_release_approved=false`, `final_release_approved=false` and/or `stable_3_1_0_published=false`. Those are truthful technical QA markers, **not** a distribution grant. Do not change or ignore flags just to publish.
 
+## Additional exact-head source verification, 11 November 2026
+
+**Latest PR #199 source-check suite 43120583722 is GREEN 7/7 non-skipped jobs:** Python 3.12 and 3.13 unit/regression suites, native mGBA, Windows/Linux packaging and both Intel/Apple Silicon macOS package checks all completed successfully. The virtual-controller matrix entry was deliberately skipped. This verifies source and minimal packages, **not** the final 11-core full installers.
+
+**Latest full 3.1.0 private identity run 43120583726:** genuine 3.1.0 Windows and Linux source-stage installers **passed**. At last check Intel macOS source build was in progress and Apple Silicon queued. Full original-core assembly and final installed desktop jobs are **not yet verified** in this run. Never merge PR #199 based only on source stage or this checkpoint. [Run](https://github.com/MasynNay/anything-plays/actions/runs/43120583726).
+
 ## Exact next actions
 
 1. Inspect PR #199's current head and [the native full workflow](https://github.com/MasynNay/anything-plays/actions/workflows/v31-final-identity-private-qa.yml). If a job fails, read its exact GitHub job logs, fix source/test bugs and run exact-head checks again. A previous macOS error was an intermittent `upload-artifact@v4` backend failure (invalid HTML); retry only failed jobs after checking it is infrastructure, not application failure.
