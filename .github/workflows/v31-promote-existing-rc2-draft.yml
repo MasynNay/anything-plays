@@ -1,0 +1,147 @@
+name: 3.1 RC2 | Publish exact verified owner-requested test prerelease
+
+# One-time recovery publisher for the exact seven assets preserved by run
+# 43081742669. The original release stage verified the full/installed
+# receipts and uploaded a private DRAFT; only a too-strict capitalization
+# assertion in release-note wording prevented the public promotion.
+# This workflow never reuploads, replaces, rebuilds, or republishes binaries.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v31-promote-existing-rc2-draft.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-v31-rc2-exact-public-promotion
+  cancel-in-progress: false
+
+jobs:
+  publish-existing-reviewed-rc2:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '43079085633'
+      QA_SOURCE_SHA: 'adfb782d1b65a41f3b2684393b1f75f4997f169f'
+      STAGE_RUN: '43081742669'
+      RELEASE_ID: '442088573'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require exact signed-off owner request and completed 4-platform installed RC2 QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          expected={
+              "source_sha": os.environ["QA_SOURCE_SHA"],
+              "qa_run_id": int(os.environ["QA_RUN"]),
+              "status": "OWNER_REQUESTED_PUBLIC_RC2_PREVIEW",
+              "public_release_approved": False,
+              "public_rc2_prerelease_requested": True,
+          }
+          record=json.loads(Path('config/v3.1-rc2-publication-candidate.json').read_text('utf-8'))
+          assert record==expected, 'No exact user-requested RC2 public preview approval'
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > exact-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN/jobs?per_page=100" > exact-jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$STAGE_RUN/jobs?per_page=100" > stage-jobs.json
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path('exact-run.json').read_text('utf-8'))
+          assert r['id']==int(os.environ['QA_RUN'])
+          assert r['head_sha']==os.environ['QA_SOURCE_SHA']
+          assert r['status']=='completed' and r['conclusion']=='success'
+          assert r['name']=='3.1 RC2 | Distinct four-platform source app identities (unreleased)'
+          j=json.loads(Path('exact-jobs.json').read_text('utf-8'))['jobs']
+          for target in ('linux-x64','windows-x64','macos-arm64','macos-x64'):
+              for prefix in ('Original-core full RC2 | ', 'Installed frozen 18-console RC2 | '):
+                  matches=[job for job in j if prefix+target in job['name']]
+                  assert len(matches)==1 and matches[0]['conclusion']=='success', (target,prefix)
+          stage=json.loads(Path('stage-jobs.json').read_text('utf-8'))['jobs']
+          assert len(stage)==1
+          steps={step['name']:step['conclusion'] for step in stage[0]['steps']}
+          for name in (
+              'Confirm exact successful original RC2 source and installed QA on all four platforms',
+              'Download original full and installed QA evidence only from pinned run',
+              'Revalidate binary-by-binary source checksums and 4 genuine Stream Mode installations',
+              'Preserve candidate artifacts for independent source and distribution review',
+              'Stage exact RC2 release draft on main, not stable',
+          ):
+              assert steps.get(name)=='success', (name,steps.get(name))
+          assert steps.get('Publish only explicitly owner-requested RC2 TEST PRERELEASE, never stable')=='failure'
+          print('Original 4-OS build, four installed GUIs and exact seven-asset staging passed')
+          PY
+      - name: Verify each untouched GitHub release asset against immutable stage SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > exact-draft.json
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path('exact-draft.json').read_text('utf-8'))
+          assert r['id']==int(os.environ['RELEASE_ID'])
+          assert r['tag_name']=='v3.1.0-rc2'
+          assert r['draft'] is True and r['prerelease'] is True
+          expected={
+              'anything-plays-31-rc2_3.1.0.rc2full_amd64.deb': 'ec5ae576073beb923c5866492569b56f4a3a183ead20e9b822aaac00f6550344',
+              'AnythingPlays-3.1.0-rc2-full-macos-arm64.dmg': 'cfee012390e0d477b0d2734a669a48390eb404924499a7fe583eef6a774ad9fa',
+              'AnythingPlays-3.1.0-rc2-full-macos-x64.dmg': '7d9d07d9ef64956b35ba49873e44d9702bfe798bcad8d87503a239fbe8c36ae6',
+              'AnythingPlaysSetup-3.1.0-rc2-full.exe': '59218ce20691801b46a0b8954c279b52934f5e3f8830f4ec52fec5678c62dba3',
+              'RC2_QA_MANIFEST.json': '46a8ccca1d4e7d692fcc5e2955cc852a776ccfe6be2bb33cb5f1ccadbf7ffed7',
+              'RC2_SOURCE_ACCESS.md': '39c3993bb46e92f329dbf237e1d7e374aa2ce4b6bd5c468085587dd7045d66cc',
+              'SHA256SUMS.txt': '55eb9790afc7b3cc838d0464444c7ca0e5d9d5588a5abb9eecb4268a936bbfed',
+          }
+          actual={item['name']: item.get('digest') for item in r['assets']}
+          assert actual=={name:'sha256:'+sha for name,sha in expected.items()}, 'Draft release bytes changed'
+          assert all(a['size']>200 for a in r['assets'])
+          assert len(r['assets'])==7
+          print('Every exact RC2 installer and QA/source/manifest asset is immutable and verified')
+          PY
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+      - name: Publish only RC2 TEST prerelease after accurate source/limitations checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          notes=Path('docs/V3_1_RC2_PRERELEASE_NOTES.md').read_text('utf-8')
+          lowered=notes.lower()
+          assert 'not stable 3.1.0' in lowered
+          assert 'complete corresponding source' in lowered
+          assert all(platform in lowered for platform in ('macos','windows','linux'))
+          assert 'physical' in lowered and 'not notarized' in lowered
+          payload={
+              'draft': False,
+              'prerelease': True,
+              'make_latest': 'false',
+              'target_commitish': os.environ['GITHUB_SHA'],
+              'name': 'Anything Plays 3.1 RC2 | Stream Mode and themed bezels',
+              'body': notes,
+          }
+          Path('promote-existing-rc2.json').write_text(json.dumps(payload)+'\n','utf-8')
+          PY
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            --input promote-existing-rc2.json \
+            --jq '{tag:.tag_name,draft:.draft,prerelease:.prerelease,assets:(.assets|length)}'
+          gh release view v3.1.0-rc2 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+          echo "RC2 public test prerelease published with all original verified files; 3.0 remains latest stable."
