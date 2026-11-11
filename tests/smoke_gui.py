@@ -54,12 +54,14 @@ def main():
                     original_stream_item = tuple(app._stream_canvas.find_all())
                     app._stream_vars["layout"].set("Side by side")
                     app._stream_vars["theme"].set("Ocean Dark")
+                    app._stream_vars["frame_rate"].set("30 FPS")
                     app._stream_vars["game_size"].set(60.5)
                     app._stream_vars["border_width"].set(9.2)
                     app._stream_vars["swap_screens"].set(True)
                     assert app._stream_options["game_size"] == 60
                     assert app._stream_options["border_width"] == 9
                     assert app._stream_options["theme"] == "Ocean Dark"
+                    assert app._stream_options["frame_rate"] == "30 FPS"
                     app._render_stream_frame()
                     assert tuple(app._stream_canvas.find_all()) == original_stream_item
                     # Simulated annotated camera frame comes from the existing
