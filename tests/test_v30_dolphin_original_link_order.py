@@ -120,5 +120,41 @@ add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
                           result.stdout + result.stderr)
 
 
+    def test_original_archive_targets_must_be_static(self):
+        """A name-matching INTERFACE or SHARED target is not pinned source archive."""
+        self.assertTrue(FIX.is_file())
+        for replaced_target in ("common", "dolphin_libretro_videocontexts"):
+            for wrong_kind in ("INTERFACE", "SHARED"):
+                with self.subTest(target=replaced_target, kind=wrong_kind):
+                    with TemporaryDirectory() as temp:
+                        root = Path(temp)
+                        lines = [
+                            "cmake_minimum_required(VERSION 3.25)",
+                            "project(wrong_original_archive_kind CXX)",
+                            'file(WRITE "${CMAKE_BINARY_DIR}/stub.cpp" "int stub(){return 1;}\\n")',
+                        ]
+                        for target in ("common", "dolphin_libretro_videocontexts"):
+                            kind = wrong_kind if target == replaced_target else "STATIC"
+                            source = "" if kind == "INTERFACE" else ' "${CMAKE_BINARY_DIR}/stub.cpp"'
+                            lines.append(f"add_library({target} {kind}{source})")
+                        lines.append('add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")')
+                        (root / "CMakeLists.txt").write_text(
+                            "\n".join(lines) + "\n", encoding="utf-8"
+                        )
+                        result = subprocess.run(
+                            ["cmake", "-S", str(root), "-B", str(root / "build"),
+                             "-G", "Ninja", f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={FIX}"],
+                            capture_output=True, text=True, timeout=35,
+                        )
+                        self.assertNotEqual(result.returncode, 0, result.stdout)
+                        # CMake wraps long diagnostics at terminal width.
+                        import re
+                        diagnostic = re.sub(r"\s+", " ", result.stdout + result.stderr)
+                        self.assertIn(
+                            f"Original Dolphin archive target is not STATIC_LIBRARY: {replaced_target}",
+                            diagnostic,
+                        )
+
+
 if __name__ == "__main__":
     unittest.main()
