@@ -17,6 +17,32 @@ Ocean, Retro and every other saved palette update immediately when
 the user switches themes. The existing game Canvas also uses the active
 theme's focus accent rather than a fixed blue highlight.
 
+## Distinct visual identities and real activity cues
+
+The next polishing pass gives each bezel its own identity while retaining
+a common design language. The camera receives a restrained lens-like
+header instrument; the game screen has three narrow console vent details.
+They are rendered with native Tk widgets, not heavy images or game overlays.
+
+The adjacent quiet dot and label are driven by real lifecycle events,
+never a looping or simulated recording animation:
+
+- **CAMERA / TRACKING:** `STANDBY` until the camera driver actually
+  reports an opened capture, then `CAMERA ON`. Stop, failed open and
+  disconnected/retry paths clear the active indicator. The label does
+  not imply video is saved, recorded or transmitted.
+- **GAME / OUTPUT:** `NO GAME` until a game session has been accepted
+  by the embedded or explicitly selected external backend, then
+  `SESSION`. Unload, restart preparation or failed launch clears it.
+  This is not a promise that a retail ROM has rendered correctly.
+
+State changes update the small header widgets only. The video canvases,
+tracking coordinates, focus, emulator frame pacing and capture frame
+contents remain entirely outside the chrome. Activity state is neither
+stored in preferences nor advanced by a periodic Tk timer. Changing
+themes preserves the current state and recolors both instruments,
+indicators and housings together.
+
 ## Behavior preserved
 
 These are *small native Tk frames around* the original Canvas widgets.
