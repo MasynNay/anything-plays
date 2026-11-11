@@ -155,6 +155,97 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(sample(reference, second), (34, 216, 117))
         self.assertNotEqual(sample(reference, first), (233, 43, 56))
 
+    def test_failed_camera_probe_clears_private_snapshot_without_stopping_game(self):
+        """A broken/closed webcam must not freeze its last image in OBS."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        import cv2
+
+        for problem in ("closed", "opencv", "os", "runtime"):
+            with self.subTest(problem=problem):
+                class Harness(StreamMixin):
+                    THEMES = THEMES
+
+                    def uses_embedded_emulator(self):
+                        return False
+
+                app = Harness()
+                app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+                app.initialize_stream_mode({})
+                app.emu = SimpleNamespace(running=False)
+                app.cap = MagicMock()
+                if problem == "closed":
+                    app.cap.isOpened.return_value = False
+                else:
+                    app.cap.isOpened.side_effect = {
+                        "opencv": cv2.error("webcam disconnected"),
+                        "os": OSError("device removed"),
+                        "runtime": RuntimeError("driver failure"),
+                    }[problem]
+                app.reference_image = False
+                app.frame = None
+                app._stream_output_window = object()
+                app._stream_canvas = MagicMock()
+                app._stream_canvas.winfo_exists.return_value = True
+                app._stream_canvas.winfo_width.return_value = 760
+                app._stream_canvas.winfo_height.return_value = 980
+                app._stream_canvas.create_image.return_value = 11
+                app._stream_camera_frame = Image.new("RGB", (32, 32), "#ff00ff")
+                app._stream_camera_serial = 4
+
+                with (
+                    patch("anything_plays.ui_stream.compose_stream_output",
+                          return_value=Image.new("RGB", (760, 980))) as compose,
+                    patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+                ):
+                    app._render_stream_frame()
+
+                self.assertIsNone(app._stream_camera_frame)
+                self.assertEqual(app._stream_camera_serial, 5)
+                self.assertFalse(compose.call_args.kwargs["camera_active"])
+                self.assertIsNone(compose.call_args.args[1])
+                self.assertEqual(tuple(app._stream_canvas.find_all()), ())
+                self.assertEqual(app._stream_canvas.create_image.call_count, 1)
+
+    def test_reference_image_remains_visible_when_no_camera_is_connected(self):
+        """An intentionally selected reference image is not a stale webcam."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app.emu = SimpleNamespace(running=False)
+        app.cap = None
+        app.reference_image = True
+        app.frame = object()
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 9
+        reference = Image.new("RGB", (32, 32), "#32cc66")
+        app._stream_camera_frame = reference
+        app._stream_camera_serial = 4
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            app._render_stream_frame()
+        self.assertIs(app._stream_camera_frame, reference)
+        self.assertEqual(app._stream_camera_serial, 4)
+        self.assertTrue(compose.call_args.kwargs["camera_reference"])
+        self.assertFalse(compose.call_args.kwargs["camera_active"])
+        self.assertIs(compose.call_args.args[1], reference)
+
     def test_stream_does_not_open_new_devices_or_redirect_manual_input(self):
         source = inspect.getsource(StreamMixin)
         self.assertNotIn("VideoCapture(", source)
