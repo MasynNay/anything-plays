@@ -11,6 +11,32 @@ Mac original-wheel binary correspondence and physical hardware acceptance
 remain **OPEN**. [Updated SDL native QA](V3_1_REFRESHED_SDL_NATIVE_QA.md).
 
 
+## All four operating systems: real source-modified pygame C extension — PASSED
+
+The [Windows original RC1 modified-source Windows CI](https://github.com/MasynNay/anything-plays/actions/runs/42953456034) **PASSED**.
+An actual Visual C compiler built an AMD64 CPython 3.13 native
+`pygame.base` from the same **changed** pinned pygame-ce 2.5.8
+`src_c/base.c` used on Linux and both Macs, with the published
+SHA-verified SDL2 2.32.10 developer SDK. The native binary differs
+from the original upstream wheel; its new C method was loaded and
+executed **from a disposable copy of the actual Windows RC1**.
+The copied genuine 18-console frozen desktop successfully started its
+Tk event loop and preserved isolated stable 3.0 preferences.
+
+Together with the [Linux source build](https://github.com/MasynNay/anything-plays/actions/runs/42949949019)
+and [both Mac source builds](https://github.com/MasynNay/anything-plays/actions/runs/42951159759),
+a genuine **source-modified pygame native extension** has now been
+compiled and executed on **all four supported platforms**. The
+original RC1 installer, signed Mac DMGs, stable 3.0, 2.0 and user
+settings were not modified.
+
+These tests cover **one native extension**, not all covered dependencies,
+a full GNU LGPL 2.1 Section 6 compliance determination, actual
+physical controllers, or final stable 3.1.0 acceptance. [Detailed
+Windows and four-platform evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md).
+
+**All six stable-release gates remain false.**
+
 ## Genuine source-modified pygame C on both Macs — PASSED
 
 [Source-build and real signed RC1 runtime workflow](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) **PASSED

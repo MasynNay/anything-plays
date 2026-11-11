@@ -66,7 +66,7 @@ LGPL-covered pygame and SDL component can be relinked, complete
 corresponding source/flags and transitive notices, Gatekeeper-supported
 user installation procedures, or legal LGPL 2.1 Section 6 satisfaction.
 
-Windows source-modified compilation, real hardware acceptance, complete
+Windows source-modified compilation has since passed [separate Windows QA](https://github.com/MasynNay/anything-plays/actions/runs/42953456034); real hardware acceptance, complete
 source/relinking materials and correctly identified final 3.1.0 builds
 also remain open. **All six stable acceptance gates remain false.**
 
