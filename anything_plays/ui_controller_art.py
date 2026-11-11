@@ -6,12 +6,31 @@ scaled from a 100 x 60 icon so the small preview and setup dialog match.
 """
 
 
-def draw_gamepad(canvas, palette, *, connected=False, expanded=False):
-    """Paint a game controller at any Canvas size using the current theme.
+def draw_gamepad(canvas, palette, *, connected=False, expanded=False,
+                 pressed=()):
+    """Paint a controller with optional read-only highlights for live inputs.
 
-    A decorative icon only; actual controls are accessible ttk widgets beside
-    it. Calling again destroys prior shapes, avoiding buildup on theme changes.
+    Native ttk buttons still own all configuration and navigation. Highlights
+    show the raw SDL snapshot; no click handlers or hardware initialization
+    are attached to this Canvas. Each redraw clears old shapes.
     """
+    # Ignore unknown/untrusted inputs instead of constructing new labels,
+    # widgets, arbitrary colors or layout positions from device data.
+    known = frozenset((
+        "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+        "A", "B", "X", "Y", "BACK", "START",
+        "LEFT_SHOULDER", "RIGHT_SHOULDER",
+        "LEFT_TRIGGER", "RIGHT_TRIGGER",
+        "LEFT_STICK_UP", "LEFT_STICK_DOWN", "LEFT_STICK_LEFT",
+        "LEFT_STICK_RIGHT", "RIGHT_STICK_UP", "RIGHT_STICK_DOWN",
+        "RIGHT_STICK_LEFT", "RIGHT_STICK_RIGHT",
+    ))
+    active = (frozenset(item for item in pressed
+                        if isinstance(item, str) and item in known)
+              if isinstance(pressed, (set, frozenset, tuple, list))
+              else frozenset())
+    if not connected:
+        active = frozenset()
     _outer, surface, foreground, accent, button, field = palette
     width, height = (278, 150) if expanded else (105, 68)
     canvas.configure(width=width, height=height, bg=surface)
@@ -24,9 +43,14 @@ def draw_gamepad(canvas, palette, *, connected=False, expanded=False):
         return x * sx, y * sy
 
     # Two offset shoulder pads, body shell, and highlighted control surface.
-    for x0, y0, x1, y1 in ((17, 6, 34, 13), (66, 6, 83, 13)):
+    for box, sources in (
+        ((17, 6, 34, 13), ("LEFT_SHOULDER", "LEFT_TRIGGER")),
+        ((66, 6, 83, 13), ("RIGHT_SHOULDER", "RIGHT_TRIGGER")),
+    ):
+        x0, y0, x1, y1 = box
         canvas.create_oval(*pt(x0, y0), *pt(x1, y1),
-                           fill=field, outline=accent, width=1.3)
+                           fill=accent if active.intersection(sources) else field,
+                           outline=accent, width=1.3)
     shell = [
         20, 12, 33, 10, 67, 10, 80, 12,
         89, 17, 97, 32, 94, 45, 88, 51,
@@ -41,25 +65,46 @@ def draw_gamepad(canvas, palette, *, connected=False, expanded=False):
 
     # D-pad and face buttons intentionally read as familiar controls without
     # copying any specific manufacturer's controller artwork.
-    for box in ((20, 21, 25, 35), (16, 25, 29, 31)):
+    # Each D-pad arm can illuminate independently while preserving its
+    # familiar cross silhouette, including in the tiny preview.
+    for box, source in (
+        ((21, 21, 24, 25), "DPAD_UP"),
+        ((21, 31, 24, 35), "DPAD_DOWN"),
+        ((16, 26, 21, 30), "DPAD_LEFT"),
+        ((24, 26, 29, 30), "DPAD_RIGHT"),
+    ):
         canvas.create_rectangle(*pt(box[0], box[1]),
                                 *pt(box[2], box[3]),
-                                fill=foreground, outline="")
+                                fill=accent if source in active else foreground,
+                                outline="")
+    canvas.create_rectangle(*pt(21, 25), *pt(24, 31),
+                            fill=foreground, outline="")
     for x, y, face in ((75, 22, "Y"), (81, 28, "B"),
                        (69, 28, "X"), (75, 34, "A")):
-        canvas.create_oval(*pt(x-4, y-4), *pt(x+4, y+4),
-                           fill=accent, outline=field, width=1.0)
+        pushed = face in active
+        canvas.create_oval(*pt(x-4.5 if pushed else x-4,
+                               y-4.5 if pushed else y-4),
+                           *pt(x+4.5 if pushed else x+4,
+                               y+4.5 if pushed else y+4),
+                           fill=foreground if pushed else accent,
+                           outline=field, width=1.0)
         if expanded:
-            canvas.create_text(*pt(x, y), text=face, fill=surface,
+            canvas.create_text(*pt(x, y), text=face,
+                               fill=surface if not pushed else field,
                                font=("TkDefaultFont", 8, "bold"))
-    for x, y in ((40, 34), (60, 35)):
+    for x, y, prefix in ((40, 34, "LEFT_STICK_"),
+                          (60, 35, "RIGHT_STICK_")):
+        moving = any(source.startswith(prefix) for source in active)
         canvas.create_oval(*pt(x-5.2, y-5.2), *pt(x+5.2, y+5.2),
-                           fill=field, outline=foreground, width=1.25)
+                           fill=field,
+                           outline=accent if moving else foreground,
+                           width=1.6 if moving else 1.25)
         canvas.create_oval(*pt(x-1.8, y-1.8), *pt(x+1.8, y+1.8),
-                           fill=accent, outline="")
-    for x in (47, 53):
+                           fill=foreground if moving else accent, outline="")
+    for x, key in ((47, "BACK"), (53, "START")):
         canvas.create_oval(*pt(x-1.4, 23), *pt(x+1.4, 25.8),
-                           fill=foreground, outline="")
+                           fill=accent if key in active else foreground,
+                           outline="")
 
     # Connection marker is purely informational; the adjacent text label
     # remains the authoritative, screen-reader-friendly device status.
