@@ -123,8 +123,9 @@ jobs:
           assert marker["public_release_approved"] is False
           assert marker["channel"] not in ("rc1","rc2")
           if target=="linux-x64":
-              fields=subprocess.check_output(["dpkg-deb","-f",str(expected),"Package","Version"],text=True).splitlines()
-              assert fields==["anything-plays-31","3.1.0"],fields
+              package=subprocess.check_output(["dpkg-deb","-f",str(expected),"Package"],text=True).strip()
+              version=subprocess.check_output(["dpkg-deb","-f",str(expected),"Version"],text=True).strip()
+              assert (package,version)==("anything-plays-31","3.1.0"),(package,version)
           if target.startswith("macos"):
               p=plistlib.loads((app/"Contents/Info.plist").read_bytes())
               assert p["CFBundleIdentifier"]=="com.anythingplays.release31",p
