@@ -1,0 +1,174 @@
+name: 3.1 | Actual disposable Mac LGPL pygame extension replacement and GUI startup
+
+# NEVER modify the original public RC1 DMG, sign its files, or publish any
+# release. Probe replaceability of only pygame.base from upstream pinned wheel.
+# Passing is a limited native swap smoke, not complete LGPL 2.1 s6 compliance.
+on:
+  push:
+    branches: [feature/v31-lgpl-macos-replacement-probe]
+    paths:
+      - ".github/workflows/v31-macos-pygame-replacement.yml"
+      - "tools/probe_v31_macos_lgpl_replacement.py"
+      - "tests/test_v31_macos_lgpl_replacement.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ap31-macos-lgpl-swap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unsigned-user-replacement-copy:
+    if: github.ref == 'refs/heads/feature/v31-lgpl-macos-replacement-probe'
+    name: Disposable pygame.base swap · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: macos-arm64, arch: arm64}
+          - {runner: macos-15-intel, target: macos-x64, arch: x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42905694504'
+      QA_SHA: c67fab048d7e44f371f2589a6d73b9d556de84d0
+      PYGAME_WHEEL: pygame_ce-2.5.8-cp313-cp313-macosx_10_13_universal2.whl
+      WHEEL_SHA: 56441a9bb75c2461750dc0e6e4a46e3833b3cf6339bfbaf16f93ecac037510f3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify read-only boundary, official wheel checks and false approval guards
+        run: python -m unittest discover -s tests -p 'test_v31_macos_lgpl_replacement.py' -v
+      - name: Require original green full 18-console RC1 on four targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$QA_RUN" --json headSha --jq .headSha)" = "$QA_SHA"
+          test "$(gh run view "$QA_RUN" --json conclusion --jq .conclusion)" = success
+          gh release view v3.1.0-rc1 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+      - name: Download actual unchanged source-built macOS RC1 DMG and native receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original
+          test -s original/FULL_MACOS_QA_RECEIPT.json
+          test -s original/SDL_RUNTIME_AUDIT.json
+          test -s "original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+      - name: Fetch exact official pygame-ce 2.5.8 wheel verified with original upstream SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern "$PYGAME_WHEEL" --dir upstream
+          echo "$WHEEL_SHA  upstream/$PYGAME_WHEEL" | shasum -a 256 --check
+      - name: Replace LGPL pygame.base in a disposable app copy only, then re-sign it
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p receipts
+          original_dmg="$PWD/original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-lgpl-orig.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mounted=0
+          for retry in 1 2 3 4 5 6; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$original_dmg"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            sleep 5
+          done
+          test "$mounted" = 1
+          original_app="$mountdir/AnythingPlays31RC.app"
+          codesign --verify --verbose=2 "$original_app"
+          copied="$RUNNER_TEMP/AnythingPlays31RC-CopiedUpstreamPygame-${{ matrix.arch }}.app"
+          python -m tools.probe_v31_macos_lgpl_replacement \
+            --bundle "$original_app" \
+            --installer "$original_dmg" \
+            --receipt original/FULL_MACOS_QA_RECEIPT.json \
+            --audit original/SDL_RUNTIME_AUDIT.json \
+            --wheel "upstream/$PYGAME_WHEEL" \
+            --target "${{ matrix.target }}" \
+            --destination "$copied" \
+            --output receipts/STAGED_PYGAME_EXTENSION_SWAP.json
+          copied_base="$copied/Contents/Frameworks/pygame/base.cpython-313-darwin.so"
+          # Only this *new disposable copy* is ad-hoc re-signed. Originals
+          # never leave a readonly-mounted DMG or lose original signatures.
+          codesign --force --sign - "$copied_base"
+          codesign --force --sign - "$copied"
+          codesign --verify --verbose=2 "$copied"
+          codesign --verify --verbose=2 "$copied_base"
+          # Actual system loader must accept copied LGPL extension, rather
+          # than trusting the signature or a file-exists check alone.
+          python - "$copied_base" <<'PY'
+          import ctypes, sys
+          obj=ctypes.CDLL(sys.argv[1])
+          print("Live Python 3.13 host dynamic-load of swapped pygame.base:",obj._name)
+          PY
+          # Use the same actual frozen Tk GUI startup diagnostic as the
+          # four-platform installed GUI smoke tests. No physical device.
+          qa_home="$(mktemp -d /tmp/ap31-lgpl-home.XXXXXX)"
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/receipts/SWAPPED_FROZEN_GUI_SMOKE.json" \
+          HOME="$qa_home" XDG_CONFIG_HOME="$qa_home/.config" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$copied/Contents/MacOS/AnythingPlays" <<'PY'
+          import os, subprocess, sys
+          p=subprocess.run([sys.argv[1], "--ap-v30-ui-smoke"],
+                           capture_output=True, text=True,
+                           env=os.environ.copy(),timeout=120)
+          print("Copied GUI exit", p.returncode, "stderr tail:",p.stderr[-1600:])
+          if p.returncode != 0:
+              raise SystemExit(p.returncode or 1)
+          PY
+          test -s receipts/SWAPPED_FROZEN_GUI_SMOKE.json
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target "${{ matrix.target }}" \
+            --installer "$original_dmg" \
+            --bundle "$copied" \
+            --receipt original/FULL_MACOS_QA_RECEIPT.json \
+            --smoke receipts/SWAPPED_FROZEN_GUI_SMOKE.json \
+            --output receipts/ACTUAL_COPIED_APP_STARTUP.json
+          codesign --verify --verbose=2 "$original_app"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("receipts/STAGED_PYGAME_EXTENSION_SWAP.json")
+          d=json.loads(p.read_text())
+          d["status"]="PUBLIC_3_1_RC1_DISPOSABLE_MACOS_UPSTREAM_PYGAME_EXTENSION_SWAPPED_AND_GUI_SMOKE_PASSED"
+          d["re_signed_modified_app"]=True
+          d["frozen_app_startup_after_swap_verified"]=True
+          d["unmodified_official_pygame_wheel_slice_used"]=True
+          d["modified_pygame_source_compiled_and_tested"]=False
+          d["lgpl_replacement_and_relinking_compliance_approved"]=False
+          d["complete_corresponding_source_approved"]=False
+          d["stable_3_1_release_approved"]=False
+          p.write_text(json.dumps(d,indent=2)+"\n")
+          print("Actual copied signed and swapped RC1 booted; LGPL approval still OPEN")
+          PY
+      - name: Retain read-only original-to-upstream replacement evidence 90 days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-${{ matrix.arch }}-UPSTREAM-PYGAME-REPLACEMENT-REVIEW
+          path: receipts/
+          if-no-files-found: warn
+          retention-days: 90
