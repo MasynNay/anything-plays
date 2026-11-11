@@ -15,6 +15,12 @@ on:
       - 'packaging/build_macos_dmg.sh'
       - 'packaging/installer.iss'
       - 'tests/test_v31_rc2_identity.py'
+      - 'tests/test_v31_rc2_full_assembly.py'
+      - 'tools/v31_rc2_source.py'
+      - 'tools/assemble_v31_full_linux.py'
+      - 'tools/assemble_v31_full_windows.py'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'tools/ci_use_canonical_ubuntu_mirror.sh'
   workflow_dispatch:
 
 permissions:
