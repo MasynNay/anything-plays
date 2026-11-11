@@ -20,6 +20,7 @@ from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from verify_bundle import verify_bundle
 from tools.audit_v31_sdl_runtime import inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v31_current_source_qa import reviewed_source_revision
 
 PREVIEW_RUN_SHA = "d176ff54de90a3cc5e585c6fc6ffd4f68388c104"
 RC_SOURCE_REVISION = "26de1e1ad1b701d0735e085158347f8c213ce437"
@@ -60,13 +61,16 @@ def mount(dmg, location):
             command("hdiutil", "detach", "-force", location)
 
 
-def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False):
+def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False, *, expected_source_revision=None):
     if arch not in ("arm64", "x64"):
         raise ValueError("Only reviewed Apple Silicon or Intel architecture")
     stable_name = "AnythingPlays-3.0.0-macos-" + arch + ".dmg"
     preview_name = ("AnythingPlays-3.1.0-rc1-macos-" if rc1
                     else "AnythingPlays-3.1.0-preview1-macos-") + arch + ".dmg"
-    expected_sha = RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA
+    expected_sha = reviewed_source_revision(
+        RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA, rc1=rc1,
+        override=expected_source_revision,
+    )
     if (stable.name != stable_name or preview.name != preview_name
             or not stable.is_file() or not preview.is_file()):
         raise ValueError("Missing exact named original/3.1 preview disk image")
@@ -81,7 +85,7 @@ def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False):
     return stable_sha
 
 
-def build(arch, stable, preview, checksums, receipt, output, rc1=False):
+def build(arch, stable, preview, checksums, receipt, output, rc1=False, *, expected_source_revision=None):
     if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Private QA flags not set")
     if rc1:
@@ -91,7 +95,8 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False):
         raise ValueError("Original full preview requires preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("Cannot treat preview as approved stable release")
-    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt, rc1=rc1)
+    stable_sha = verify_inputs(arch, stable, preview, checksums, receipt, rc1=rc1,
+        expected_source_revision=expected_source_revision)
     with tempfile.TemporaryDirectory(prefix="ap31-mac-full-") as temp:
         tmp = Path(temp)
         with mount(stable, tmp/"stable"), mount(preview, tmp/"preview"):
@@ -166,7 +171,9 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False):
             "target": "macos-" + arch,
             "original_stable_sha256": stable_sha,
             "original_preview_sha256": digest(preview),
-            "source_preview_revision": RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA,
+            "source_preview_revision": reviewed_source_revision(
+                RC_SOURCE_REVISION if rc1 else PREVIEW_RUN_SHA,
+                rc1=rc1, override=expected_source_revision),
             "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": filename, "sha256": digest(dmg),
@@ -189,9 +196,12 @@ def main():
         p.add_argument("--"+name, type=Path, required=True)
     p.add_argument("--rc1", action="store_true",
                    help="Assemble full 18-console QA from source-built RC1 app")
+    p.add_argument("--expected-source-revision", metavar="EXACT_GIT_SHA",
+                   help="Nonrelease PR QA only: exact checked-out frozen app revision")
     a = p.parse_args()
     build(a.arch, *(getattr(a, x).resolve() for x in (
-        "stable", "preview", "checksums", "receipt", "output")), rc1=a.rc1)
+        "stable", "preview", "checksums", "receipt", "output")), rc1=a.rc1,
+          expected_source_revision=a.expected_source_revision)
 
 
 if __name__ == "__main__":
