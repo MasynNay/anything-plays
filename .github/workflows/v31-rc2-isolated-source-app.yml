@@ -1,0 +1,137 @@
+name: 3.1 RC2 | Distinct four-platform source app identities (unreleased)
+
+# Build mGBA-only RC2 source shells from exact branch commit. This is not a
+# four-platform full-console release and does not publish any installer.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-rc2-isolated-source-app.yml'
+      - 'anything_plays/build_identity.py'
+      - 'anything_plays/test_preferences.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v31_rc.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+      - 'tests/test_v31_rc2_identity.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-rc2-isolated-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rc2-isolated-shell:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: True independent RC2 identity | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31-rc2_3.1.0~rc2_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0-rc2.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-rc2-macos-arm64.dmg', bundle: 'dist/AnythingPlays31RC2.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-rc2-macos-x64.dmg', bundle: 'dist/AnythingPlays31RC2.app'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    env:
+      AP_V31_RC2: '1'
+      AP_V31_RC: '0'
+      AP_V31_PREVIEW: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prove RC2 identity and RC1 immutability on current checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python -m unittest discover -s tests -p 'test_v31_rc2_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v31_candidate_identity.py' -v
+      - name: Install Linux native dependencies with bounded DNS retry
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 \
+              -o Acquire::https::Timeout=15 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 \
+                install -y --no-install-recommends python3-tk dpkg-dev \
+                libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1
+              break
+            fi
+            echo "::warning::Ubuntu package DNS failed, retry $attempt"
+            sleep "$((attempt * 20))"
+          done
+          test "$ok" = 1
+      - name: Install Windows Inno compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
+      - name: Freeze RC2 Linux application
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Freeze RC2 Windows application
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Freeze RC2 Apple/Intel Mac application
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Inspect actual frozen identity and installer checksum
+        shell: bash
+        env:
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v31_rc --channel rc2 --target "${{ matrix.target }}" \
+            --installer 'release/${{ matrix.installer }}' --bundle '${{ matrix.bundle }}' \
+            --output release/RC2_SOURCE_STAGE_RECEIPT.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("release/RC2_SOURCE_STAGE_RECEIPT.json").read_text())
+          assert r["version"] == "3.1.0-rc2"
+          assert r["settings_namespace"] == "anything-plays-31-rc2"
+          assert r["source_revision"] == os.environ["GITHUB_SHA"]
+          assert r["public_release_approved"] is False
+          assert r["final_release_candidate"] is False
+          assert r["hardware_controller_verified"] is False
+          assert len(r["bundled_console_profiles"]) == 3
+          print("Independent RC2 native source shell:", r["target"], r["source_revision"])
+          PY
+      - name: Retain private RC2 source shells, never publish release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-SOURCE-${{ matrix.target }}-UNRELEASED
+          path: |
+            release/${{ matrix.installer }}
+            release/RC2_SOURCE_STAGE_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
