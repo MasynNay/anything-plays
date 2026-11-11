@@ -332,8 +332,11 @@ class StreamMixin:
             self._stream_vars[name] = var
             ttk.Scale(
                 row, from_=low, to=high, orient="horizontal",
-                variable=var, command=lambda _value: self._stream_controls_changed(),
+                variable=var,
             ).pack(fill="x", pady=(4, 0))
+            # Tk's trace fires for drag, keys and programmatic changes;
+            # relying on Scale(command=...) misses keyboard-driven updates.
+            var.trace_add("write", lambda *_: self._stream_controls_changed())
         for name, title in (
             ("swap_screens", "Swap game and camera positions"),
             ("show_labels", "Show screen headers and live status"),
