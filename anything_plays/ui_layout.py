@@ -118,16 +118,18 @@ class LayoutMixin:
                                   width=15)
         view_combo.pack(side='left', padx=(0, 8))
         view_combo.bind('<<ComboboxSelected>>', lambda _: self.set_view_mode())
-        # Open a clean OBS-capturable display. Its customization panel lives
-        # in a different window and cannot accidentally appear in the stream.
-        self.stream_mode_button = ttk.Button(
-            view_row, text='Stream Mode', command=self.open_stream_mode,
-            style='Accent.TButton',
-        )
-        self.stream_mode_button.pack(side='left', padx=(0, 8))
         self.shortcuts_button = ttk.Button(view_row, text='Game Controls',
                                            command=self.configure_shortcuts)
         self.shortcuts_button.pack(side='right')
+        # Keep capture setup discoverable without crowding View mode on small
+        # laptops. Its controls open separately from the captured output.
+        stream_row = ttk.Frame(display_settings)
+        stream_row.pack(fill='x', pady=(0, 4))
+        self.stream_mode_button = ttk.Button(
+            stream_row, text='Open Stream Mode  ·  OBS capture',
+            command=self.open_stream_mode, style='Accent.TButton',
+        )
+        self.stream_mode_button.pack(fill='x', expand=True)
         # Put audio where the player actually watches the game. Gain applies
         # to ALL native cores, not the host operating system or browser.
         volume_row = ttk.Frame(display_settings)
