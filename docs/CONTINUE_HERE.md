@@ -16,6 +16,22 @@ Verified November 10, 2026. Read this before continuing release or controller en
   https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1 (source companion ZIP).
 - Latest stable remains public 3.0.0; 2.0 and 1.5 still public.
 
+## New verified macOS LGPL native extension replacement test
+
+The independent [macOS replacement workflow](https://github.com/MasynNay/anything-plays/actions/runs/42936779875) PASSED on both
+Apple Silicon and Intel on genuine RC1 builds. A disposable app copy
+received the exact SHA-verified official pygame-ce wheel's
+`pygame.base` native extension; each copied app was ad-hoc
+re-signed, passed a live native loader test, and successfully ran
+the **actual frozen Tk desktop GUI smoke**. The readonly original
+DMG remained unchanged. See
+[step-by-step evidence](V3_1_LGPL_UPSTREAM_EXTENSION_REPLACEMENT_QA.md).
+
+This verifies a practical **upstream ABI-compatible extension swap**,
+not a recompiled user modification, complete LGPL compliance or
+full native corresponding source. All six final 3.1.0 stable gates
+and production release approval remain **false**.
+
 ## Verified signed macOS wheel code provenance — November 10, 2026
 
 The original signed 3.1 RC1 Mac installers were independently compared

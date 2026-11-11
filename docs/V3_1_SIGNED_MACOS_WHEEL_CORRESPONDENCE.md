@@ -21,6 +21,12 @@ The signed Mac SDL/pygame sections map to:
 
 **Exactly what matched:** the `__TEXT,__text` executable section length and SHA-256, after selecting the wheel architecture slice. This is stronger than the previous 0/121 and 0/120 *full installed-file* SHA matches, because PyInstaller and macOS signing can legitimately change overall Mach-O bytes. It is **not** a proof that the installed and upstream whole files match, nor proof that the published binary's complete source, compiler flags or linked LGPL libraries are reproducible.
 
+## Follow-on genuine Mac library replacement test
+
+[Original signed Mac RC1 extension replacement study](https://github.com/MasynNay/anything-plays/actions/runs/42936779875) PASSED both Apple Silicon and Intel: a disposable copy was swapped with the verified original upstream `pygame.base` extension, re-signed, loaded by CPython 3.13, and launched to a real Tk GUI event loop. The readonly original installer remains unchanged.
+
+This is **stronger than comparing file hashes alone**, but still does not prove user-modified compiled pygame library replacement or overall LGPL Section 6 compliance. [Full procedure and limitations](V3_1_LGPL_UPSTREAM_EXTENSION_REPLACEMENT_QA.md).
+
 ## Remaining stable 3.1.0 release tasks
 
 1. Establish compiled SDL 2.32.8/2.32.10, SDL_image, SDL_mixer and SDL_ttf source build lineage, source patches, relevant transitive library source and license notices. Pinned tagged SDL source candidates alone do not certify a particular binary.
