@@ -73,10 +73,20 @@ def main():
                     app.game_bezel.set_active(False)
                     assert app.gamepad_quick_canvas.cget("bg") == app.THEMES["Plum Dark"][1]
                     assert len(app.gamepad_quick_canvas.find_all()) == original_icon_count
+                    plum = app.THEMES["Plum Dark"]
+                    assert app.camera_bezel.cget('bg') == plum[4]
+                    assert app.camera_bezel.header.cget('bg') == plum[5]
+                    assert app.game_bezel.cget('bg') == plum[5]
+                    assert app.game_bezel.header.cget('bg') == plum[4]
                     for bezel in (app.camera_bezel, app.game_bezel):
-                        assert bezel.cget('bg') == app.THEMES["Plum Dark"][4]
-                        assert bezel.rail.cget('bg') == app.THEMES["Plum Dark"][3]
-                        assert bezel.caption.cget('fg') == app.THEMES["Plum Dark"][2]
+                        assert bezel.rail.cget('bg') == plum[3]
+                        assert bezel.caption.cget('fg') == plum[2]
+                        # An idle indication must remain muted against the
+                        # *correct* housing even after changing themes.
+                        assert bezel.marker.cget('fg') == bezel.cget('bg')
+                        bezel.set_active(True)
+                        assert bezel.marker.cget('fg') == plum[3]
+                        bezel.set_active(False)
                     app._save_gamepad_binding("gba", "A", "B")
                     assert app._gamepad_bindings["gba"]["A"] == "B"
 
@@ -136,6 +146,9 @@ def main():
                     assert app.camera_bezel.rail.cget('bg') == app.THEMES["Light"][3]
                     assert app.game_bezel.rail.cget('bg') == app.THEMES["Light"][3]
                     assert app.game_canvas.cget('highlightcolor') == app.THEMES["Light"][3]
+                    assert app.camera_bezel.cget('bg') == app.THEMES["Light"][4]
+                    assert app.game_bezel.cget('bg') == app.THEMES["Light"][5]
+                    assert app.game_bezel.header.cget('bg') == app.THEMES["Light"][4]
                     app.system_key.set("snes")
                     app.switch_system()
                     assert app.system_description.cget("text") == "Super Nintendo"
