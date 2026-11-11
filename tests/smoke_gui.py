@@ -57,12 +57,14 @@ def main():
                     # survive a theme change without duplicating canvas art.
                     original_icon_count = len(app.gamepad_quick_canvas.find_all())
                     # Activity changes only the chrome, never the video.
+                    old_camera_items = tuple(app.canvas.find_all())
+                    old_game_items = tuple(app.game_canvas.find_all())
                     app.camera_bezel.set_active(True)
                     app.game_bezel.set_active(True)
                     assert app.camera_bezel.activity_label.cget('text') == 'CAMERA ON'
                     assert app.game_bezel.activity_label.cget('text') == 'SESSION'
-                    assert not app.canvas.find_all()
-                    assert not app.game_canvas.find_all()
+                    assert tuple(app.canvas.find_all()) == old_camera_items
+                    assert tuple(app.game_canvas.find_all()) == old_game_items
                     app.theme_name.set("Plum Dark")
                     root.update_idletasks()
                     assert app.camera_bezel.activity_label.cget('text') == 'CAMERA ON'
