@@ -17,6 +17,16 @@ Ocean, Retro and every other saved palette update immediately when
 the user switches themes. The existing game Canvas also uses the active
 theme's focus accent rather than a fixed blue highlight.
 
+**Material contrast follow-up:** The camera retains the original
+button-color housing with a field-color header. The game screen now
+reverses those two theme surfaces, resembling a separate console
+chassis while retaining the same rail, video inset and focus ring.
+Actual `STANDBY` / `CAMERA ON` and `NO GAME` / `SESSION`
+indicators are not replaced: both remain driven by the verified
+camera/game lifecycle and use the correct new housing color
+when inactive. All sixteen themes are covered by tests; no new
+images, rendering overlays, preferences or timers are needed.
+
 ## Distinct visual identities and real activity cues
 
 The next polishing pass gives each bezel its own identity while retaining

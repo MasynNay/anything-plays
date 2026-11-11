@@ -10,14 +10,21 @@ from __future__ import annotations
 import tkinter as tk
 
 
-def bezel_colors(palette):
-    """Use only the six existing theme slots; no hard-coded dark-only chrome."""
-    if not isinstance(palette, (tuple, list)) or len(palette) != 6:
-        raise ValueError("Expected one complete application theme palette")
+def bezel_colors(palette, *, kind="camera"):
+    """Use a complementary theme finish for each native display housing.
+
+    Camera keeps the existing lighter trim. The game reverses the two
+    chassis surfaces for the feeling of a separate console, without
+    introducing theme-specific hard-coded colors or obscuring video.
+    The default preserves the original public function's behavior.
+    """
+    if (not isinstance(palette, (tuple, list)) or len(palette) != 6
+            or kind not in ("camera", "game")):
+        raise ValueError("Expected one supported bezel and complete theme palette")
     outer, surface, foreground, accent, button, field = palette
     return {
-        "housing": button,
-        "header": field,
+        "housing": button if kind == "camera" else field,
+        "header": field if kind == "camera" else button,
         "label": foreground,
         "accent": accent,
         "well": outer,
@@ -106,7 +113,7 @@ class DisplayBezel(tk.Frame):
 
     def apply_palette(self, palette):
         """Update chrome on theme selection, never touch the video Canvas."""
-        c = bezel_colors(palette)
+        c = bezel_colors(palette, kind=self.kind)
         self._palette = palette
         self.configure(bg=c["housing"])
         self.header.configure(bg=c["header"])
@@ -136,7 +143,7 @@ class DisplayBezel(tk.Frame):
         self._render_activity()
 
     def _render_activity(self):
-        c = bezel_colors(self._palette)
+        c = bezel_colors(self._palette, kind=self.kind)
         label = (self.ACTIVE_LABELS[self.kind] if self.active
                  else self.IDLE_LABELS[self.kind])
         self.activity_label.configure(
