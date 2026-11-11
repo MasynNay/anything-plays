@@ -9,8 +9,8 @@ Stream Mode provides a dedicated, OBS-friendly window with two live screens. Its
 3. Two separate windows open:
    - **Stream Output**: only the composed game, camera, bezel, accent, and unobtrusive screen labels. Select this window in OBS **Window Capture**.
    - **Stream Settings**: customize layout and appearance. This window is **not** included in the capture.
-4. Choose **DS stacked** or **Side by side**. Swap the order of the screens, adjust how much space the game occupies, change bezel thickness, select any of the sixteen application themes, pick a custom border color, and toggle titles and source-status labels.
-5. Resize the output window freely; its two source images retain their proportions and letterbox instead of stretching. Settings persist in the current RC2-specific preferences directory.
+4. Choose **DS stacked** or **Side by side**. Swap the order of the screens, adjust how much space the game occupies, change bezel thickness, select any of the sixteen application themes, pick a custom border color, select a 15, 24, or 30 FPS output refresh rate, and toggle titles and source-status labels.
+5. The output automatically switches to a natural portrait or landscape shape when you change layouts. Resize the output window freely afterward; its two source images retain their proportions and letterbox instead of stretching. Settings persist in the current RC2-specific preferences directory.
 6. Close the output or select **Close Stream Mode** to release only the streaming view. The original camera, emulator, and desktop workspace remain running.
 
 The default DS-inspired frame is original UI artwork drawn by Pillow and Tk; no third-party Nintendo logos, hardware images or copyrighted screen graphics are bundled.
@@ -25,7 +25,7 @@ Stream output contains no ROM paths, camera device identifiers, file locations, 
 
 ## Long-session performance and safety
 
-The output is one reusable Tk Canvas image, updated at most roughly 15 FPS using one cancellable Tk timer. It only recomposes when a source frame, stream setting, viewport size, or source state changes. A game frame is copied under the existing emulator lock only when its serial advances. Existing camera frames are bounded in size and reused as snapshots only while Stream Mode is open. Fonts are cached in a 48-entry bounded table. Rendering failures back off to a one-second retry instead of spinning.
+The output is one reusable Tk Canvas image, updated at a chosen rate of 15, 24 (default), or 30 FPS using one cancellable Tk timer. It only recomposes when a source frame, stream setting, viewport size, or source state changes. A game frame is copied under the existing emulator lock only when its serial advances. Existing camera frames are bounded in size and reused as snapshots only while Stream Mode is open. Fonts are cached in a 48-entry bounded table. Rendering failures back off to a one-second retry instead of spinning.
 
 Closing Stream Mode cancels its timer, saves final style changes, destroys both auxiliary windows, and releases all cached image references. It does not modify the camera controls, game save data, stable 3.0, RC1, or emulation core packaging.
 
