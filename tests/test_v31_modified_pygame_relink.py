@@ -117,7 +117,7 @@ class ActualSourceModifiedNativeContracts(unittest.TestCase):
             bundle,installer,receipt,audit,wheel,modified,manifest=args
             original=native.digest(bundle/"_internal/pygame/base.cpython-313-x86_64-linux-gnu.so")
             with patch.dict(native.WHEELS,{"linux-x64":(wheel.name,native.digest(wheel))}):
-                output=replace.stage(*args,Path(tmp)/"copied-frozen")
+                output=replace.stage(bundle,installer,receipt,audit,wheel,manifest,modified,Path(tmp)/"copied-frozen")
             self.assertTrue(output["compiled_binary_is_not_original_wheel_binary"])
             self.assertTrue(output["original_installer_untouched"])
             self.assertNotEqual(output["compiled_modified_native_sha256"],original)
