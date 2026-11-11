@@ -70,6 +70,23 @@ if [[ "${AP_V31_RC:-0}" == "1" ]]; then
     *) echo "Unsupported 3.1 candidate macOS architecture"; exit 1 ;;
   esac
 fi
+# RC2 uses a separate bundle filename and macOS application identifier.
+if [[ "${AP_V31_RC2:-0}" == "1" ]]; then
+  [[ "${AP_V31_PREVIEW:-0}" != "1" && "${AP_V31_RC:-0}" != "1" &&
+     "${AP_RELEASE_BUILD:-0}" != "1" &&
+     "${AP_V30_APPROVED_RELEASE:-0}" != "1" &&
+     "${AP_V30_STABLE_CANDIDATE:-0}" != "1" &&
+     "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.1 RC2 requires independent nonrelease mGBA-only stage" >&2; exit 1;
+  }
+  BUNDLE_FILE="AnythingPlays31RC2.app"
+  DMG_VOLUME="Anything Plays 3.1 Release Candidate 2"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.1.0-rc2-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.1.0-rc2-macos-x64.dmg" ;;
+    *) echo "Unsupported RC2 macOS architecture" >&2; exit 1 ;;
+  esac
+fi
 APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
@@ -102,7 +119,7 @@ fi
 # Generate platform icons from the corrected v3.0 source, not the v2.0 PNG.
 .build-venv/bin/python tools/render_v21_icon.py
 V31_IDENTITY_ARGS=()
-if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" ]]; then
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
   V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
 fi
@@ -177,7 +194,14 @@ if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.0.0" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
 else
-  if [[ "${AP_V31_RC:-0}" == "1" ]]; then
+  if [[ "${AP_V31_RC2:-0}" == "1" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.rc31v2" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.1.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.1.0.20" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.1.0.20" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.1 Release Candidate 2" "$PLIST" || true
+  elif [[ "${AP_V31_RC:-0}" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.rc31" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.0" "$PLIST" ||
       /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.1.0" "$PLIST"
