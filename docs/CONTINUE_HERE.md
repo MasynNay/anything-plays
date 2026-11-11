@@ -2,6 +2,47 @@
 
 Verified November 10, 2026. Read this before continuing release or controller engineering.
 
+## Newest 3.1 user-visible improvements — merged and source-tested
+
+**Camera and emulator bezels are in `main` after RC1**, not in the
+published 3.1 RC1 installer itself. [PR #174](https://github.com/MasynNay/anything-plays/pull/174)
+added theme-aware native Tk display housings while retaining the same
+camera and emulator Canvas widgets and keyboard/mouse input.
+[PR #175](https://github.com/MasynNay/anything-plays/pull/175)
+refined the camera with lens details and the console with vent details,
+plus stateful labels: camera STANDBY/CAMERA ON only after capture open,
+and console NO GAME/SESSION only after a game start returns.
+[PR #177](https://github.com/MasynNay/anything-plays/pull/177)
+fixed two error cases: camera drivers that return `isOpened() == false`
+without a failed read, and a native emulator reporting an unexpected
+error. Both now clear the corresponding bezel status immediately and
+camera recovery uses existing bounded same-device retries.
+
+**All these PRs merged with Python 3.12, Python 3.13, native mGBA,
+and headless real Tk GUI checks passing.** No user settings, running
+public installer, video buffer or existing emulator core was changed.
+[Design and lifecycle QA](V3_1_DISPLAY_BEZELS.md).
+
+Controller work also merged after RC1:
+[PR #172](https://github.com/MasynNay/anything-plays/pull/172)
+adds analog stick and trigger hysteresis with reconnect-safe latch
+clearing; [PR #173](https://github.com/MasynNay/anything-plays/pull/173)
+makes both themed controller diagrams highlight live button inputs
+only when the input changes. PR #173 passed its native SDL controller
+checks on Linux, Windows, Apple Silicon and Intel Mac. These are
+implemented in source, **not yet included in the publicly downloadable
+3.1 RC1 installers**. [Analog stability](V3_1_ANALOG_STABILITY.md) ·
+[Live controller art](V3_1_REACTIVE_CONTROLLER_ART.md).
+
+**Next product milestone:** prepare a separate versioned 3.1 RC
+installer with the source improvements above, then re-run real
+four-platform installed GUI, camera/controller coexistence,
+preferences isolation, emulator playback and 3D performance acceptance.
+The stable 3.1.0 release remains blocked by complete native
+corresponding-source/LGPL rights review and physical hardware
+testing. All six stable release gates remain **false**; 3.0 remains
+untouched.
+
 ## Latest original signed SDL2 runpath verification
 
 [Dual Mac LC_RPATH validation run 42959425185](https://github.com/MasynNay/anything-plays/actions/runs/42959425185)
