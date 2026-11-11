@@ -1,0 +1,244 @@
+name: 3.1 FINAL | Installed full desktop and isolated settings QA
+
+# Reusable acceptance stage immediately after successful FINAL full packaging,
+# or manual recheck of a completed source-pinned full build. Read-only and
+# never publishes, modifies or marks any public release approved.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-final-installed-desktop.yml'
+      - 'tools/verify_v31_final_installed_ui.py'
+      - 'tools/qa_v31_final_installed_preferences.py'
+      - 'tests/test_v31_final_installed_ui.py'
+  workflow_call:
+    inputs:
+      qa_run_id:
+        description: 'Current, already verified caller full FINAL run ID'
+        required: true
+        type: string
+      source_sha:
+        description: 'Original checkout used by this full FINAL build'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      qa_run_id:
+        description: 'Completed four-OS full FINAL source-and-core QA workflow run ID'
+        required: true
+        type: string
+      source_sha:
+        description: 'Exact forty-character PR head SHA embedded in those full installers'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: final-installed-desktop-${{ github.event.inputs.qa_run_id || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-contracts:
+    name: FINAL installed desktop receipt and migration contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify malicious/tampered-source receipt and migration rejections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_final_installed_ui.py' -v
+
+  real-installed-final:
+    if: ${{ inputs.qa_run_id != '' && inputs.source_sha != '' }}
+    needs: evidence-contracts
+    name: Installed frozen 18-console FINAL | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31_3.1.0_amd64.deb', receipt: 'FULL_LIBRARY_QA_RECEIPT.json'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0.exe', receipt: 'FULL_WINDOWS_QA_RECEIPT.json'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-macos-arm64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: ${{ inputs.qa_run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require successful exact source-matched original four-platform full FINAL build
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$QA_RUN" =~ ^[0-9]{6,15}$ ]] || { echo "::error::Invalid QA run ID"; exit 1; }
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::Invalid source SHA"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          info=json.loads(Path('qa-run.json').read_text('utf-8'))
+          if info['id'] == int(os.environ['GITHUB_RUN_ID']):
+              # A reusable job runs within the SAME workflow run. Its
+              # 'needs: full-final-18-console' prerequisite provides successful
+              # completed assembly before we reach this check. A workflow
+              # cannot simultaneously have conclusion='success' while running.
+              assert info['conclusion'] in (None, 'success'), 'FINAL build failed'
+          else:
+              assert info['conclusion']=='success', 'Full FINAL build has not passed'
+          assert info['head_sha']==os.environ['SOURCE_SHA'], 'FINAL source SHA mismatch'
+          assert info['event']=='pull_request', 'Not the pinned development QA run'
+          assert info['name']=='3.1.0 | Private four-platform FINAL identity build QA'
+          print('Authentic completed four-platform FINAL source build:', info['html_url'])
+          PY
+      - name: Fetch only this host's finished, SHA-verified full FINAL installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1.0-FINAL-FULL-18-${{ matrix.target }}-QA-ONLY' \
+            --dir qa
+          test -s 'qa/${{ matrix.installer }}'
+          test -s 'qa/${{ matrix.receipt }}'
+          mkdir -p evidence
+      - name: Install native Linux GUI dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+      - name: Extract genuine Linux full FINAL and boot Tk window under Xvfb
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'qa/${{ matrix.installer }}' installed
+          app="$PWD/installed/opt/anything-plays-31/AnythingPlays"
+          test -x "$app"
+          qahome="$(mktemp -d)"
+          python -m tools.qa_v31_final_installed_preferences seed \
+            --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+              AP_V30_UI_SMOKE_CHECK=1 \
+              AP_V31_STREAM_SMOKE_CHECK=1 \
+              AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_FINAL_UI.json" \
+              SDL_AUDIODRIVER=dummy "$app" --ap-v30-ui-smoke
+          python -m tools.qa_v31_final_installed_preferences verify \
+            --home "$qahome" --manifest evidence/FIXTURE.json \
+            --output evidence/SETTINGS_RECEIPT.json
+          python -m tools.verify_v31_final_installed_ui \
+            --target '${{ matrix.target }}' --source-sha "$SOURCE_SHA" \
+            --installer 'qa/${{ matrix.installer }}' --bundle installed/opt/anything-plays-31 \
+            --receipt 'qa/${{ matrix.receipt }}' --smoke evidence/FROZEN_FINAL_UI.json \
+            --output evidence/FINAL_INSTALLED_RECEIPT.json
+      - name: Extract full Windows FINAL into an isolated disposable directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'qa/${{ matrix.installer }}').Path
+          $destination=Join-Path $env:RUNNER_TEMP 'AP31FINAL-Installed-QA'
+          python -c "from pathlib import Path; import sys; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $destination
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install Windows FINAL into disposable directory' }
+          "FINAL_INSTALLED=$destination" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Boot the actual Windows FINAL frozen GUI without changing RC1 settings
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $exe=Join-Path $env:FINAL_INSTALLED 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'FINAL installed Windows executable missing' }
+          # Save the genuine runner identity. During frozen GUI startup
+          # USERPROFILE/HOME must be the isolated FINAL fixture; afterwards
+          # the safety verifier must run under the REAL runner identity so
+          # it does not mistake that temporary fixture for a user HOME.
+          $originalUserProfile=$env:USERPROFILE
+          $originalHome=$env:HOME
+          $qahome=Join-Path $env:RUNNER_TEMP 'AP31FINAL-Smoke-Home'
+          New-Item -ItemType Directory -Path $qahome -ErrorAction Stop | Out-Null
+          $manifest=Join-Path $PWD 'evidence/FIXTURE.json'
+          python -m tools.qa_v31_final_installed_preferences seed --home $qahome --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'FINAL fixture setup failed' }
+          $env:USERPROFILE=$qahome
+          $env:HOME=$qahome
+          $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V31_STREAM_SMOKE_CHECK='1'
+          $env:AP_V30_UI_SMOKE_REPORT=Join-Path $PWD 'evidence/FROZEN_FINAL_UI.json'
+          $env:SDL_AUDIODRIVER='dummy'
+          $process=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
+          if ($process.ExitCode -ne 0) { throw "FINAL GUI smoke failed: $($process.ExitCode)" }
+          $env:USERPROFILE=$originalUserProfile
+          $env:HOME=$originalHome
+          python -m tools.qa_v31_final_installed_preferences verify --home $qahome --manifest $manifest --output (Join-Path $PWD 'evidence/SETTINGS_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'FINAL modified previous settings or did not copy RC1' }
+          python -m tools.verify_v31_final_installed_ui --target '${{ matrix.target }}' --source-sha $env:SOURCE_SHA --installer 'qa/${{ matrix.installer }}' --bundle $env:FINAL_INSTALLED --receipt 'qa/${{ matrix.receipt }}' --smoke 'evidence/FROZEN_FINAL_UI.json' --output 'evidence/FINAL_INSTALLED_RECEIPT.json'
+          if ($LASTEXITCODE -ne 0) { throw 'FINAL Windows source and frozen GUI receipt invalid' }
+      - name: Mount original signed FINAL DMG and run frozen desktop on Apple/Intel Mac
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="$PWD/qa/${{ matrix.installer }}"
+          mountdir="$(mktemp -d /tmp/anythingplays-final.XXXXXX)"
+          trap 'hdiutil detach "$mountdir" >/dev/null 2>&1 || true; rmdir "$mountdir" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"
+          app="$mountdir/AnythingPlays31.app"
+          test -x "$app/Contents/MacOS/AnythingPlays"
+          codesign --verify --verbose=2 "$app"
+          qahome="$(mktemp -d /tmp/ap31final-smoke.XXXXXX)"
+          python -m tools.qa_v31_final_installed_preferences seed \
+            --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
+          HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_FINAL_UI.json" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
+          import os, subprocess, sys
+          task=subprocess.run([sys.argv[1], '--ap-v30-ui-smoke'],
+                  env=os.environ.copy(), timeout=120, capture_output=True, text=True)
+          print('Installed Mac FINAL exit:',task.returncode)
+          if task.returncode:
+              print(task.stderr[-3000:])
+              raise SystemExit(1)
+          PY
+          python -m tools.qa_v31_final_installed_preferences verify \
+            --home "$qahome" --manifest evidence/FIXTURE.json \
+            --output evidence/SETTINGS_RECEIPT.json
+          python -m tools.verify_v31_final_installed_ui \
+            --target '${{ matrix.target }}' --source-sha "$SOURCE_SHA" \
+            --installer "$dmg" --bundle "$app" \
+            --receipt 'qa/${{ matrix.receipt }}' --smoke evidence/FROZEN_FINAL_UI.json \
+            --output evidence/FINAL_INSTALLED_RECEIPT.json
+      - name: Preserve actual full FINAL GUI and first-run settings evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-FINAL-INSTALLED-DESKTOP-${{ matrix.target }}-QA-ONLY
+          path: |
+            evidence/FIXTURE.json
+            evidence/SETTINGS_RECEIPT.json
+            evidence/FROZEN_FINAL_UI.json
+            evidence/FINAL_INSTALLED_RECEIPT.json
+          if-no-files-found: warn
+          retention-days: 30
