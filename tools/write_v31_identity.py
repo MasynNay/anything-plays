@@ -28,7 +28,7 @@ def choose_channel(env):
     ):
         if env.get(forbidden) == "1":
             raise ValueError("3.1 candidate cannot use release/native approval flags")
-    return "rc1" if candidate else "preview1"
+    return "rc2" if candidate2 else ("rc1" if candidate else "preview1")
 
 
 def write_identity(destination, environ=None):
