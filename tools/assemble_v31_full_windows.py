@@ -19,6 +19,7 @@ from anything_plays.v30_gpl_trial import (
 from verify_bundle import verify_bundle
 from tools.audit_v31_sdl_runtime import UPSTREAM_LGPL_SHA256, inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v31_current_source_qa import reviewed_source_revision
 
 STABLE = "AnythingPlaysSetup-3.0.0.exe"
 PREVIEW = "AnythingPlaysSetup-3.1.0-preview1.exe"
@@ -37,9 +38,12 @@ def hash_file(path):
     return digest.hexdigest()
 
 
-def check_inputs(stable, preview, sums, receipt, rc1=False):
+def check_inputs(stable, preview, sums, receipt, rc1=False, *, expected_source_revision=None):
     preview_name = RC_PREVIEW if rc1 else PREVIEW
-    source_sha = RC_SOURCE_REVISION if rc1 else SOURCE_REVISION
+    source_sha = reviewed_source_revision(
+        RC_SOURCE_REVISION if rc1 else SOURCE_REVISION, rc1=rc1,
+        override=expected_source_revision,
+    )
     if stable.name != STABLE or preview.name != preview_name:
         raise ValueError("Unexpected stable/preview filename")
     if not stable.is_file() or not preview.is_file():
@@ -96,7 +100,7 @@ def iscc():
     raise ValueError("Inno Setup compiler not found")
 
 
-def build(stable, preview, sums, receipt, output, rc1=False):
+def build(stable, preview, sums, receipt, output, rc1=False, *, expected_source_revision=None):
     if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Private QA flags required")
     if rc1:
@@ -106,7 +110,8 @@ def build(stable, preview, sums, receipt, output, rc1=False):
         raise ValueError("Original QA requires preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("No production flags for an owner QA candidate")
-    stable_sha = check_inputs(stable, preview, sums, receipt, rc1=rc1)
+    stable_sha = check_inputs(stable, preview, sums, receipt, rc1=rc1,
+        expected_source_revision=expected_source_revision)
     root = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory(prefix="ap31-win-full-") as temp:
         scratch = Path(temp)
@@ -194,7 +199,9 @@ def build(stable, preview, sums, receipt, output, rc1=False):
             "target": "windows-x64",
             "original_stable_sha256": stable_sha,
             "source_preview1_sha256": hash_file(preview),
-            "source_preview_revision": RC_SOURCE_REVISION if rc1 else SOURCE_REVISION,
+            "source_preview_revision": reviewed_source_revision(
+                RC_SOURCE_REVISION if rc1 else SOURCE_REVISION,
+                rc1=rc1, override=expected_source_revision),
             "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": target.name,
@@ -215,9 +222,12 @@ def main():
         p.add_argument("--"+name, type=Path, required=True)
     p.add_argument("--rc1", action="store_true",
                    help="Repack from the exact source-built 3.1 RC1 app")
+    p.add_argument("--expected-source-revision", metavar="EXACT_GIT_SHA",
+                   help="Nonrelease PR QA only: exact checked-out frozen app revision")
     a = p.parse_args()
     build(*(getattr(a, x).resolve() for x in (
-        "stable", "preview", "sums", "receipt", "output")), rc1=a.rc1)
+        "stable", "preview", "sums", "receipt", "output")), rc1=a.rc1,
+          expected_source_revision=a.expected_source_revision)
 
 
 if __name__ == "__main__":
