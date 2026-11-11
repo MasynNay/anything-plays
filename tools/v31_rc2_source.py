@@ -44,7 +44,7 @@ def checked_rc2_source_revision(expected, *, environ=None, checkout=None):
     return expected
 
 
-def require_rc2_receipt(receipt, *, source, target, installer, digest):
+def require_rc2_receipt(receipt, *, source, target, installer, digest, size):
     """Validate the original source-stage signed receipt, not a guessed ID."""
     if not isinstance(receipt, dict):
         raise ValueError("Missing original frozen RC2 application receipt")
@@ -65,6 +65,8 @@ def require_rc2_receipt(receipt, *, source, target, installer, digest):
     for key, value in expected.items():
         if receipt.get(key) != value:
             raise ValueError("Original source-build RC2 receipt mismatch: " + key)
-    if not isinstance(receipt.get("size_bytes"), int) or receipt["size_bytes"] <= 1024 * 1024:
-        raise ValueError("RC2 source stage size is unverified")
+    if (not isinstance(size, int) or size <= 1024 * 1024
+            or not isinstance(receipt.get("size_bytes"), int)
+            or receipt["size_bytes"] != size):
+        raise ValueError("RC2 source stage size differs from the frozen installer")
     return True
