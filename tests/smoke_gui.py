@@ -33,6 +33,12 @@ def main():
                     assert app.game_bezel.winfo_exists()
                     assert app.canvas.master is app.camera_bezel.screen
                     assert app.game_canvas.master is app.game_bezel.screen
+                    assert app.camera_bezel.lens is not None
+                    assert len(app.camera_bezel.vents) == 0
+                    assert app.game_bezel.lens is None
+                    assert len(app.game_bezel.vents) == 3
+                    assert app.camera_bezel.activity_label.cget('text') == 'STANDBY'
+                    assert app.game_bezel.activity_label.cget('text') == 'NO GAME'
                     assert app.canvas.bind('<Button-1>')
                     assert app.game_canvas.bind('<KeyPress>')
                     assert app.game_canvas.cget('takefocus') == '1'
@@ -50,8 +56,21 @@ def main():
                     # The right-side shortcut and the setup window must
                     # survive a theme change without duplicating canvas art.
                     original_icon_count = len(app.gamepad_quick_canvas.find_all())
+                    # Activity changes only the chrome, never the video.
+                    old_camera_items = tuple(app.canvas.find_all())
+                    old_game_items = tuple(app.game_canvas.find_all())
+                    app.camera_bezel.set_active(True)
+                    app.game_bezel.set_active(True)
+                    assert app.camera_bezel.activity_label.cget('text') == 'CAMERA ON'
+                    assert app.game_bezel.activity_label.cget('text') == 'SESSION'
+                    assert tuple(app.canvas.find_all()) == old_camera_items
+                    assert tuple(app.game_canvas.find_all()) == old_game_items
                     app.theme_name.set("Plum Dark")
                     root.update_idletasks()
+                    assert app.camera_bezel.activity_label.cget('text') == 'CAMERA ON'
+                    assert app.game_bezel.activity_label.cget('text') == 'SESSION'
+                    app.camera_bezel.set_active(False)
+                    app.game_bezel.set_active(False)
                     assert app.gamepad_quick_canvas.cget("bg") == app.THEMES["Plum Dark"][1]
                     assert len(app.gamepad_quick_canvas.find_all()) == original_icon_count
                     for bezel in (app.camera_bezel, app.game_bezel):

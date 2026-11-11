@@ -343,6 +343,9 @@ class LibraryMixin:
         self.current_rom = None
         self.game_photo = None
         self.game_canvas.delete('all')
+        bezel = getattr(self, "game_bezel", None)
+        if bezel is not None:
+            bezel.set_active(False)
         self.game_status.set('No ROM loaded')
         self.show_library()
 
@@ -359,6 +362,9 @@ class LibraryMixin:
             return
         self.deactivate_manual()
         self.stop_controls()
+        bezel = getattr(self, "game_bezel", None)
+        if bezel is not None:
+            bezel.set_active(False)
         # Save the selected path before starting a background Libretro worker.
         # A failure in retro_init/retro_load_game can then be retried in-place.
         self.current_rom = str(path)
@@ -394,8 +400,12 @@ class LibraryMixin:
             self.current_rom = str(path)
             if self.uses_embedded_emulator():
                 self.game_status.set('Starting ' + Path(path).stem)
+            if bezel is not None:
+                bezel.set_active(True)
             self.show_playing_info()
         except Exception as exc:
+            if bezel is not None:
+                bezel.set_active(False)
             self.game_status.set(
                 "Game could not start: " + str(exc)[:220]
                 + " · Select Restart game after correcting the issue."
