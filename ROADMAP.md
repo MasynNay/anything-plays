@@ -338,3 +338,6 @@ A focused Linux source-build verifier change now requires real file-backed PT_LO
 
 
 **November 11, 2026 — CI dependency recovery pending independent verification:** Repeated PR #186 source checks failed before regression execution when Azure Ubuntu apt mirror downloads stalled; Python 3.13 passed. A focused development branch now selects Canonical's official signed Ubuntu archive for the two Linux dependency-install steps, retaining signed apt metadata and adding four regression cases. This does not approve any Dolphin source, license rights, final installers or public release. Merge only after exact-head CI passes; stable 2.0 preserved.
+
+
+**November 11, 2026 — Ubuntu CI mirror recovery verified and merged:** [PR #189](https://github.com/MasynNay/anything-plays/pull/189) merged as `bec7862b` after [exact-head source checks 43071996499](https://github.com/MasynNay/anything-plays/actions/runs/43071996499) passed Python 3.12, Python 3.13 and native mGBA compatibility, including the previously failing apt dependency steps. Four regression tests cover signed repository metadata and safe source rewriting. Production packaging was skipped. PR #186 still needs its own fresh passing CI, and no Dolphin production source/rights clearance or final installer acceptance has been established. Public 3.0 remains gated and stable 2.0 preserved.
