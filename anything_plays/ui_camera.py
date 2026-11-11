@@ -173,6 +173,8 @@ class CameraMixin:
             if hasattr(self, "canvas"):
                 self.canvas.delete("all")
             self._camera_canvas_item = None
+        # Never retain or display stale camera imagery after a source stops.
+        self.stream_clear_camera()
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
             bezel.set_active(False)
@@ -415,6 +417,10 @@ class CameraMixin:
                 self.action.set(message)
 
         frame = self.render_zones(frame, active_zones)
+        # Reuse this already-annotated camera frame in the OBS capture view.
+        # No second VideoCapture instance, camera permissions or tracking run.
+        if getattr(self, "_stream_output_window", None) is not None:
+            self.stream_camera_snapshot(frame)
         geom = self.geometry()
         if geom:
             x, y, dw, dh, _, _ = geom
