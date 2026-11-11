@@ -294,3 +294,8 @@ A focused development change rejects a name-matching `dolphin_libretro` target u
 ### November 11, 2026 — reject imported Dolphin build targets (CI pending)
 
 A focused development branch adds an original-source CMake safeguard that rejects IMPORTED native and archive targets even when their CMake TYPE matches the pinned original source build. Three CMake/Ninja negative regressions cover all three targets. CI and original Linux compilation are pending; this does not establish production binary/source correspondence, combined GPL obligations, four-platform installer acceptance, or public release approval. Stable v2.0 preserved.
+
+
+### November 11, 2026 — imported Dolphin target rejection verified and merged
+
+[PR #168](https://github.com/MasynNay/anything-plays/pull/168) merged as `313f6515` after [source checks 42954091445](https://github.com/MasynNay/anything-plays/actions/runs/42954091445) passed Python 3.12, Python 3.13 and native mGBA, and [original pinned Dolphin Linux compilation 42954091493](https://github.com/MasynNay/anything-plays/actions/runs/42954091493) passed. Three real CMake/Ninja negative regressions reject IMPORTED precompiled substitutes for the native Dolphin target and both helper archives, even when reported target types match. Packaging was skipped. Next release milestone remains building and integrating exact source-built Dolphin in four final production installers, then verifying corresponding source, combined GPL and third-party distribution obligations, and final installer acceptance. This is not rights clearance or public approval. Stable v2.0 remains untouched.
