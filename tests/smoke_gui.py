@@ -62,6 +62,11 @@ def main():
                     assert app._stream_options["border_width"] == 9
                     assert app._stream_options["theme"] == "Ocean Dark"
                     assert app._stream_options["frame_rate"] == "30 FPS"
+                    # BooleanVar.set must be observable too, not only a
+                    # physical Checkbutton invocation during a GUI click.
+                    assert app._stream_options["swap_screens"] is True
+                    app._stream_vars["show_labels"].set(False)
+                    assert app._stream_options["show_labels"] is False
                     app._render_stream_frame()
                     assert tuple(app._stream_canvas.find_all()) == original_stream_item
                     # Simulated annotated camera frame comes from the existing
