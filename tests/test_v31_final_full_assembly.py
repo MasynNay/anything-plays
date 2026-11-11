@@ -28,6 +28,34 @@ ENV = {
 }
 
 class FinalFullContracts(unittest.TestCase):
+    def test_final_core_reuse_is_source_pinned_and_never_release_approved(self):
+        from fetch_mgba_core import core_names_for_build
+        isolated = {**ENV, "AP_V31_NEXT_QA": "1"}
+        with patch.dict("os.environ", isolated, clear=True):
+            names = core_names_for_build()
+            self.assertEqual(len(names), 11)
+            self.assertEqual(len(set(names)), 11)
+            self.assertIn("mgba", names)
+            self.assertIn("dolphin", names)
+        # The new final identity must never permit production flags,
+        # mixing historical RC channels, or unpinned source artifacts.
+        for flag, invalid in (
+            ("AP_V31_FINAL_CANDIDATE", "0"),
+            ("AP_V31_RC2", "1"),
+            ("AP_V31_RC", "1"),
+            ("AP_V31_PREVIEW", "1"),
+            ("AP_V31_NEXT_QA", "0"),
+            ("AP_V31_QA_CHECKOUT_SHA", ""),
+            ("AP_V31_QA_CHECKOUT_SHA", "invalid"),
+            ("AP_RELEASE_BUILD", "1"),
+            ("AP_V30_APPROVED_RELEASE", "1"),
+            ("AP_V30_STABLE_CANDIDATE", "1"),
+        ):
+            with self.subTest(flag=flag, value=invalid), patch.dict(
+                "os.environ", {**isolated, flag: invalid}, clear=True
+            ), self.assertRaises(ValueError):
+                core_names_for_build()
+
     def test_valid_exact_checkout_and_reject_mixed_approvals(self):
         self.assertEqual(checked_final_source_revision(SHA, environ=ENV, checkout=SHA), SHA)
         for key, value in (("AP_V31_FINAL_CANDIDATE", "0"),
