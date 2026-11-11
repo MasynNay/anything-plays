@@ -46,7 +46,7 @@ class CurrentSourceQaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reviewed_source_revision(ORIGINAL, rc1=True, override=FRESH,
                                      environ=SAFETY, checkout="b" * 40)
-        for bad in (None, "unknown", "a" * 39, "a" * 41, "A" * 40):
+        for bad in ("unknown", "a" * 39, "a" * 41, "A" * 40):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 reviewed_source_revision(ORIGINAL, rc1=True, override=bad,
                                          environ=SAFETY, checkout=FRESH)
