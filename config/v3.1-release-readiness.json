@@ -432,6 +432,46 @@
       "windows_source_modified_library_verified": false,
       "complete_lgpl_section_6_corresponding_source_approved": false,
       "stable_3_1_release_approved": false
+    },
+    "windows_source_modified_pygame_c_compile_replace_execute": {
+      "status": "PASS_GENUINE_SOURCE_MODIFIED_WINDOWS_MSVC_COMPILE_NATIVE_METHOD_AND_FROZEN_18_PROFILE_RC1_BOOT",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42953456034",
+      "original_source_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
+      "original_sdl2_development_zip_sha1": "27f5179346a0b0db80c4dd1769c7c9d62b9a91f3",
+      "upstream_pygame_modified_base_c_sha256": "89b4e97a1fe664a95d5e8c7ec8d7e2836747e19debdace6e87e463f3a3c8b050",
+      "compiled_windows_amd64_extension_sha256": "65f522cc363ecc7d8bdb5d7d85e2eb597c7e0547eb28c867ffc2169b0e92089e",
+      "pinned_official_original_windows_wheel_sha256": "f495b0eb7a5c54c59da58e964bc7f68073c3f43cf307729fd48309104a04c190",
+      "compiler": "MSVC x64 native CPython 3.13",
+      "actual_original_18_profile_rc1_installer": true,
+      "new_compiled_native_differs_from_original": true,
+      "native_modified_c_method_executed_from_disposable_rc1_copy": true,
+      "copied_real_frozen_18_profile_tk_startup": true,
+      "isolated_legacy_user_preferences_preserved": true,
+      "original_public_rc1_installer_unchanged": true,
+      "physical_controller_or_camera_tested": false,
+      "all_covered_native_lgpl_dependencies_relinkable_verified": false,
+      "complete_native_corresponding_source_approved": false,
+      "lgpl_section_6_full_compliance_approved": false,
+      "stable_3_1_release_approved": false
+    },
+    "four_platform_pygame_source_modified_extension_acceptance": {
+      "status": "PASS_TECHNICAL_MODIFIED_C_PYGAME_BASE_ONLY_NOT_LEGAL_OR_STABLE_APPROVAL",
+      "platforms": [
+        "linux-x64",
+        "windows-x64",
+        "macos-arm64",
+        "macos-x64"
+      ],
+      "linux_run": "https://github.com/MasynNay/anything-plays/actions/runs/42949949019",
+      "macos_run": "https://github.com/MasynNay/anything-plays/actions/runs/42951159759",
+      "windows_run": "https://github.com/MasynNay/anything-plays/actions/runs/42953456034",
+      "actual_modified_c_extension_built_per_platform": true,
+      "actual_modified_c_method_invoked_from_copied_rc1_per_platform": true,
+      "authentic_original_rc1_frozen_desktop_started_per_platform": true,
+      "other_lgpl_native_components_not_yet_verified": true,
+      "hardware_testing_not_complete": true,
+      "full_lgpl_2_1_compliance_approved": false,
+      "stable_3_1_release_approved": false
     }
   }
 }

@@ -1,0 +1,124 @@
+name: 3.1 | Compile modified LGPL pygame C and boot copied Windows RC1
+
+# A strict, disposable original-inventory test only. Public RC1 untouched.
+# Not complete LGPL 2.1 Section 6 correspondence or stable 3.1 approval.
+on:
+  push:
+    branches: [feature/v31-source-modified-pygame-windows-relink]
+    paths:
+      - '.github/workflows/v31-windows-modified-pygame-from-source.yml'
+      - 'tools/build_v31_modified_pygame_probe.py'
+      - 'tools/build_v31_modified_pygame_windows.py'
+      - 'tools/verify_v31_modified_pygame_windows.py'
+      - 'tools/run_v31_modified_pygame_windows_smoke.py'
+      - 'tests/test_v31_modified_pygame_windows.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ap31-windows-source-modified-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changed-source-native-frozen-app:
+    if: github.ref == 'refs/heads/feature/v31-source-modified-pygame-windows-relink'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYGAME_SHA: c8200a9eaa530f884a0a4c3384cefc48006e58be
+      QA_RUN: '42905694504'
+      QA_SHA: c67fab048d7e44f371f2589a6d73b9d556de84d0
+      WHEEL_NAME: pygame_ce-2.5.8-cp313-cp313-win_amd64.whl
+      WHEEL_SHA: f495b0eb7a5c54c59da58e964bc7f68073c3f43cf307729fd48309104a04c190
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Reject fake modified sources, unsafe SDL archives and mutation of original install
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p test_v31_modified_pygame_windows.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Negative C source and native checks failed' }
+      - name: Clone and patch pinned LGPL pygame-ce 2.5.8 original C source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          git -c core.autocrlf=false clone --depth 1 --branch 2.5.8 https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          if ($LASTEXITCODE -ne 0) { throw 'No authentic source' }
+          $sha=git -C upstream-pygame-ce rev-parse HEAD
+          if ($sha.Trim() -ne $env:PYGAME_SHA) { throw 'Wrong source commit' }
+          New-Item -ItemType Directory -Path evidence -Force | Out-Null
+          python -m tools.build_v31_modified_pygame_probe --root upstream-pygame-ce --receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json
+          if ($LASTEXITCODE -ne 0) { throw 'License or original C anchor failed' }
+          git -C upstream-pygame-ce diff -- src_c/base.c | Set-Content evidence/PYGAME_SOURCE_MODIFICATION.patch -Encoding utf8
+          if ((Get-Item evidence/PYGAME_SOURCE_MODIFICATION.patch).Length -lt 100) { throw 'No changed C source diff' }
+      - name: Download exact original SDL2 2.32.10 VC SDK and locate MSVC x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path upstream-sdl -Force | Out-Null
+          gh release download release-2.32.10 --repo libsdl-org/SDL --pattern SDL2-devel-2.32.10-VC.zip --dir upstream-sdl
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned SDL 2.32.10 developer SDK unavailable' }
+          python -c "from pathlib import Path; import hashlib; p=Path('upstream-sdl/SDL2-devel-2.32.10-VC.zip'); assert hashlib.sha1(p.read_bytes()).hexdigest()=='27f5179346a0b0db80c4dd1769c7c9d62b9a91f3'"
+          if ($LASTEXITCODE -ne 0) { throw 'Official SDL developer ZIP checksum mismatch' }
+          $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw 'MSVC VS locator missing' }
+          $vs=(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+          if (-not $vs) { throw 'No native Windows x64 C compiler' }
+          $vcvars=Join-Path $vs.Trim() 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw 'MSVC vcvars64 missing' }
+          "AP31_VCVARS=$vcvars" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Compile actual changed pygame C as a Windows x64 CPython 3.13 PE DLL
+        shell: cmd
+        run: |
+          call "%AP31_VCVARS%"
+          if errorlevel 1 exit /b 1
+          where cl.exe
+          python -m tools.build_v31_modified_pygame_windows --source upstream-pygame-ce --sdl-archive upstream-sdl\SDL2-devel-2.32.10-VC.zip --out source-compiled --source-receipt evidence\PYGAME_C_SOURCE_MODIFICATION.json --receipt evidence\ACTUAL_WINDOWS_C_BUILD.json
+          if errorlevel 1 exit /b 1
+      - name: Get SHA-pinned genuine full 3.1 Windows RC1 installer and official pygame wheel
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $qa=gh run view $env:QA_RUN --json headSha,conclusion | ConvertFrom-Json
+          if ($qa.headSha -ne $env:QA_SHA -or $qa.conclusion -ne 'success') { throw 'Unrecognized original full RC1' }
+          gh run download $env:QA_RUN --name AnythingPlays-3.1-RC1-FULL-18-windows-x64-UNRELEASED --dir original
+          if ($LASTEXITCODE -ne 0) { throw 'Original installer and QA receipts missing' }
+          foreach ($p in @('AnythingPlaysSetup-3.1.0-rc1-full.exe','FULL_WINDOWS_QA_RECEIPT.json','SDL_RUNTIME_AUDIT.json')) {
+            if (-not (Test-Path (Join-Path original $p))) { throw "Missing original RC1 $p" }
+          }
+          New-Item -ItemType Directory -Path wheel -Force | Out-Null
+          gh release download 2.5.8 --repo pygame-community/pygame-ce --pattern $env:WHEEL_NAME --dir wheel
+          if ($LASTEXITCODE -ne 0) { throw 'Original 2.5.8 official wheel missing' }
+          $hash=(Get-FileHash (Join-Path wheel $env:WHEEL_NAME) -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:WHEEL_SHA) { throw 'Published pygame wheel digest mismatch' }
+          python -c 'from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path("original/AnythingPlaysSetup-3.1.0-rc1-full.exe"),Path("unpacked-original"))'
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'unpacked-original/AnythingPlays.exe')) { throw 'Genuine Windows RC1 Inno install failed' }
+      - name: Substitute newly built modified C native ONLY into separate disposable Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m tools.verify_v31_modified_pygame_windows --bundle unpacked-original --installer original/AnythingPlaysSetup-3.1.0-rc1-full.exe --receipt original/FULL_WINDOWS_QA_RECEIPT.json --audit original/SDL_RUNTIME_AUDIT.json --original-wheel (Join-Path wheel $env:WHEEL_NAME) --source-receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json --compiled source-compiled/base.cp313-win_amd64.pyd --destination copied-rc-modified --output evidence/STAGED_WINDOWS_SOURCE_MODIFIED_NATIVE.json
+          if ($LASTEXITCODE -ne 0) { throw 'Source-modified native or original installer identity invalid' }
+      - name: Run genuine newly compiled native method AND original 18-console frozen desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -m tools.run_v31_modified_pygame_windows_smoke --bundle copied-rc-modified --installer original/AnythingPlaysSetup-3.1.0-rc1-full.exe --original-receipt original/FULL_WINDOWS_QA_RECEIPT.json --staged-receipt evidence/STAGED_WINDOWS_SOURCE_MODIFIED_NATIVE.json --smoke evidence/REAL_MODIFIED_WINDOWS_FROZEN_GUI_SMOKE.json --home evidence/ISOLATED_USER_HOME --output evidence/VERIFIED_WINDOWS_MODIFIED_SOURCE_AND_GUI.json
+          if ($LASTEXITCODE -ne 0) { throw 'Genuine source-changed Windows C method or copied RC1 desktop failed' }
+      - name: Retain exact source diff, compiled SHA and original Windows RC1 runtime receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-WINDOWS-GENUINE-SOURCE-MODIFIED-PYGAME-C
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 90

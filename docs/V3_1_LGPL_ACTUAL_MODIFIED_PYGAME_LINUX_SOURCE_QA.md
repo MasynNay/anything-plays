@@ -40,6 +40,12 @@ with SDL2 2.32.10 built from pinned original source, an isolated
 signed app copy, native method invocation and real Tk boot on both.
 See [Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
 
+## Windows follow-on completed
+
+The separate [Windows C source-modified native build and RC1 desktop QA](https://github.com/MasynNay/anything-plays/actions/runs/42953456034)
+PASSED; all four platforms now support an observable change to the
+original source-compiled pygame extension. [Windows report](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md).
+
 ## Limits
 
 The special C method was executed by a separate Python process loading the native extension **from the copied app**. The frozen GUI smoke itself does not call the method or exercise a physical controller. The compiled extension used system SDL development headers; this does not establish full upstream wheel build reproducibility, replacement of every LGPL-covered native component, complete corresponding source, or legal LGPL compliance.

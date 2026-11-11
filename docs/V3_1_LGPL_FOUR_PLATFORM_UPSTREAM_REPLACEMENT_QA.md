@@ -46,9 +46,19 @@ from the copied frozen RC1 app and passed desktop startup on Linux. This
 surpasses the previous byte-identical wheel swap but does not complete
 other three OSes or LGPL license requirements. [Complete report](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_LINUX_SOURCE_QA.md).
 
+## Follow-on: all four OS source-modified pygame C method now verified
+
+The original [Windows x64 source-modified pygame C and frozen RC1 run](https://github.com/MasynNay/anything-plays/actions/runs/42953456034)
+PASSED after the Linux and dual-Mac genuine source-modification runs.
+The new Windows native PE differs from the official wheel, was installed
+only into an original RC1 copy, and its added C method actually executed.
+The copied real frozen 18-profile Tk desktop booted and isolated legacy
+settings passed. This is **stronger** than the original byte-identical
+upstream wheel swaps reported above. [Full evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md).
+
 ## Remaining mandatory independent evidence
 
-1. **Compile a deliberately altered pygame-ce extension from pinned original LGPL 2.1 source** and demonstrate that its changed behavior is observable through the actual frozen app after swapping, not just that byte-identical published wheel bytes are accepted.
+1. **Continue compiling deliberately altered pygame-ce modules and other covered native libraries from pinned original LGPL 2.1 source** and demonstrate that its changed behavior is observable through the actual frozen app after swapping, not just that byte-identical published wheel bytes are accepted.
 2. Repeat with other covered pygame extensions and SDL/third-party LGPL shared libraries that require user modification and replacement, taking native dependencies and interface compatibility into account.
 3. Produce the exact corresponding source tree, compile scripts, patches, transitive library sources and notice inventory for each production binary, plus a working end-user replacement/relinking tutorial.
 4. Review GNU [LGPL 2.1 Section 6](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html) independently for the chosen distribution method; satisfy other emulator GPL, MPL, and custom license terms.
