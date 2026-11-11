@@ -118,12 +118,15 @@ fi
 .build-venv/bin/python tools/check_opencv_build.py
 # Generate platform icons from the corrected v3.0 source, not the v2.0 PNG.
 .build-venv/bin/python tools/render_v21_icon.py
-V31_IDENTITY_ARGS=()
+# macOS runners ship Bash 3.2, where an empty array expanded under set -u
+# is treated as unset. Positional arguments expand safely to zero arguments.
+# These arguments are only consumed by this PyInstaller invocation.
+set --
 if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
-  V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
+  set -- --add-data "build/v31_build_identity.json:assets"
 fi
-.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays "${V31_IDENTITY_ARGS[@]}" --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
+.build-venv/bin/python -m PyInstaller --collect-all pygame --collect-all glcontext --noconfirm --clean --windowed --onedir --name AnythingPlays "$@" --add-data "assets/anything_plays.png:assets" --add-data "assets/anything_plays_v21.webp:assets" app.py
 # The testing app deliberately has a separate .app name and bundle identity.
 # Do not overwrite a user's installed AnythingPlays.app (the stable 2.0 app).
 if [[ "$AP_V30_PRODUCTION" != "1" ]]; then
