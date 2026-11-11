@@ -349,6 +349,29 @@
       "lgpl_relinking_reviewed": false,
       "redistribution_approved": false,
       "stable_3_1_release_approved": false
+    },
+    "macos_upstream_pygame_extension_replacement": {
+      "status": "TWO_MAC_REAL_DISPOSABLE_UPSTREAM_BINARY_SWAP_AND_FROZEN_DESKTOP_SMOKE_PASSED",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42936779875",
+      "platforms": [
+        "macos-arm64",
+        "macos-x64"
+      ],
+      "original_qa_run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "pinned_official_pygame_wheel_sha256": "56441a9bb75c2461750dc0e6e4a46e3833b3cf6339bfbaf16f93ecac037510f3",
+      "replaced_native_extension": "Contents/Frameworks/pygame/base.cpython-313-darwin.so",
+      "disposable_copy_verified": true,
+      "native_shared_extension_loader_verified": true,
+      "copied_app_ad_hoc_codesign_verified": true,
+      "copied_app_actual_tk_loop_verified": true,
+      "original_rc1_app_and_dmg_unchanged": true,
+      "source_modified_pygame_extension_compiled_and_verified": false,
+      "all_lgpl_extensions_replacement_verified": false,
+      "windows_linux_replacement_verified": false,
+      "physical_controller_verified": false,
+      "complete_native_corresponding_source_verified": false,
+      "lgpl_2_1_section_6_compliance_approved": false,
+      "stable_3_1_release_approved": false
     }
   }
 }
