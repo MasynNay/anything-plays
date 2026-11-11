@@ -16,7 +16,8 @@ from anything_plays.build_identity import make_identity
 def choose_channel(env):
     preview = env.get("AP_V31_PREVIEW") == "1"
     candidate = env.get("AP_V31_RC") == "1"
-    if preview == candidate:
+    candidate2 = env.get("AP_V31_RC2") == "1"
+    if sum((preview, candidate, candidate2)) != 1:
         raise ValueError("Select exactly one 3.1 build channel")
     if env.get("AP_V30_MINIMAL_CORE_BUILD") != "1":
         raise ValueError("Only isolated mGBA source-build stage allowed")
