@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from anything_plays.system_profiles import DISABLED_MAPPING, BUTTONS_BY_SYSTEM
+from anything_plays.ui_bezel import DisplayBezel
 
 ALL_BUTTONS = tuple(dict.fromkeys(
     button for buttons in BUTTONS_BY_SYSTEM.values() for button in buttons
@@ -39,8 +40,16 @@ class AuxiliaryPanelsMixin:
         ttk.Button(camera_actions, text='Stop', command=self.stop_camera,
                    style='Compact.TButton').grid(row=0, column=2, sticky='ew', padx=(3, 0))
 
-        self.canvas = tk.Canvas(left, bg='#0a1a30', highlightthickness=0, height=440)
-        self.canvas.pack(fill='both', expand=True, pady=(8, 4))
+        # The bezel owns only outer chrome. Keep the original Canvas and its
+        # camera-space coordinates as the actual interactive video surface.
+        palette = self.THEMES.get(self.theme_name.get(), self.THEMES['Dark'])
+        self.camera_bezel = DisplayBezel(left, kind='camera', palette=palette)
+        self.camera_bezel.pack(fill='both', expand=True, pady=(8, 4))
+        self.canvas = tk.Canvas(
+            self.camera_bezel.screen, bg='#0a1a30',
+            highlightthickness=0, borderwidth=0, height=440,
+        )
+        self.canvas.pack(fill='both', expand=True)
         self.canvas.bind('<Button-1>', self.on_click)
         self.canvas.bind('<ButtonRelease-1>', self.on_release)
         # Frequently used label sizing belongs beside the preview, not inside
