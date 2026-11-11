@@ -148,13 +148,13 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
             ):
                 bad = bytearray(segments)
                 mutation(bad)
-                native.write_bytes(bytes(header) + bytes(bad) + b"\\0" * 200_000)
+                native.write_bytes(bytes(header) + bytes(bad) + b"\0" * 200_000)
                 with patch.object(candidate.subprocess, "check_output") as nm:
                     with self.subTest(segment_failure=expected):
                         with self.assertRaisesRegex(ValueError, expected):
                             candidate.verify_original_library(native)
                     nm.assert_not_called()
-            native.write_bytes(bytes(header) + bytes(segments) + b"\\0" * 200_000)
+            native.write_bytes(bytes(header) + bytes(segments) + b"\0" * 200_000)
             symbols = "\n".join("00000000 T " + symbol for symbol in candidate.MANDATORY_LIBRETRO_SYMBOLS)
             with patch.object(candidate.subprocess, "check_output", return_value=symbols):
                 proof = candidate.verify_original_library(native)
