@@ -179,6 +179,24 @@ def inspect(app, linkage, target, runner=subprocess.run):
         })
     if not findings:
         raise ValueError("No original SDL2 @rpath references found to inspect")
+    # A library can refer to its own LC_ID_DYLIB without needing a
+    # runpath to itself. Separate these provider/alias records from
+    # genuine consumers, and fail the evidence review if any consumer
+    # lacks an authenticated *direct* runpath candidate.
+    matched = []
+    self_library_entries = []
+    unmatched_consumers = []
+    for entry in findings:
+        has_signed_path = any(
+            option.get("status") == "signed_sdl_binary_hash_match"
+            for option in entry["direct_candidates"]
+        )
+        if has_signed_path:
+            matched.append(entry["signed_library"])
+        elif entry["signed_library"].rsplit("/", 1)[-1] == "libSDL2-2.0.0.dylib":
+            self_library_entries.append(entry["signed_library"])
+        else:
+            unmatched_consumers.append(entry["signed_library"])
     return {
         "schema_version": 1,
         "status": "REVIEW_ONLY_3_1_MACOS_SIGNED_SDL2_DIRECT_RPATHS",
@@ -186,6 +204,10 @@ def inspect(app, linkage, target, runner=subprocess.run):
         "source_app_commit": SOURCE_SHA,
         "original_signed_native_count": len(files),
         "sdl2_referencing_images": len(findings),
+        "native_images_with_direct_pinned_hash_candidate": len(matched),
+        "sdl2_self_library_or_alias_entries": sorted(self_library_entries),
+        "native_consumers_without_direct_pinned_hash_candidate": sorted(unmatched_consumers),
+        "all_consumer_images_have_direct_hash_candidate": not unmatched_consumers,
         "signed_sdl2_variants": signed,
         "linking": findings,
         "scope": "Only direct LC_RPATH entries in audited SDL/pygame Mach-O images",
@@ -221,7 +243,15 @@ def main():
     print(options.target, "signed SDL2 reference images:",
           report["sdl2_referencing_images"], "direct rpath findings:",
           json.dumps(summary, sort_keys=True))
+    print("Direct signed-hash consumers:",
+          report["native_images_with_direct_pinned_hash_candidate"],
+          "SDL2 providers/aliases:",
+          len(report["sdl2_self_library_or_alias_entries"]),
+          "consumers without direct matches:",
+          len(report["native_consumers_without_direct_pinned_hash_candidate"]))
     print("Dynamic-loader selection, complete source, LGPL and stable release NOT verified")
+    if not report["all_consumer_images_have_direct_hash_candidate"]:
+        raise SystemExit("Unmatched direct SDL2 consumer runpath requires investigation")
 
 
 if __name__ == "__main__":
