@@ -17,6 +17,29 @@ Ocean, Retro and every other saved palette update immediately when
 the user switches themes. The existing game Canvas also uses the active
 theme's focus accent rather than a fixed blue highlight.
 
+## Distinct camera and console identities
+
+The same visual system now has two restrained physical personalities:
+
+- **Camera monitor:** an optical aperture glyph in the header, an
+  **OPTICAL SENSOR** lower-rail engraving, and three small sensor-style
+  ticks. The center tick carries the theme accent.
+- **Game display:** a game-deck header glyph, a **LOCAL PLAY** lower-rail
+  engraving, and five slim ventilation-slot marks. The two outer
+  marks are accented.
+
+These are *decorative details*, not fake recording indicators,
+controller activity signals or selectable buttons. There are no
+new camera permissions or status claims. Camera housing uses the
+theme's button surface with an inset field-color header; the game
+housing reverses these two surfaces to feel like a separate console.
+Both remain completely legible across all sixteen themes.
+
+No faceplate art is drawn over camera frames or emulation pixels.
+The new lower rail is only a few pixels tall and is laid out once
+when the screen widgets are created. A theme change recolors existing
+widgets without rebuilding them.
+
 ## Behavior preserved
 
 These are *small native Tk frames around* the original Canvas widgets.
