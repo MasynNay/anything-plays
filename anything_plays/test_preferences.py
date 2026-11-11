@@ -19,6 +19,7 @@ LEGACY_DIR = Path(".config") / "fish-plays-pokemon-studio"
 TEST_DIR = Path(".config") / "anything-plays-31-preview"
 PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-30-preview"
 CANDIDATE_DIR = Path(".config") / "anything-plays-31-rc1"
+RC2_DIR = Path(".config") / "anything-plays-31-rc2"
 MIGRATED_FILENAMES = ("preferences.json", "system_profiles.json")
 MAX_SETTINGS_BYTES = 8 * 1024 * 1024
 
@@ -107,7 +108,12 @@ def prepare_test_preferences(home=None, *, channel=None):
     _checked_directory(root)
     previous_preview = home / PREVIOUS_PREVIEW_DIR
     preview = home / TEST_DIR
-    if channel == "rc1" and preview.is_dir() and not preview.is_symlink():
+    # RC2 is a clean installation but may carry forward settings from RC1
+    # only by a one-time atomic copy; existing RC1 data is never modified.
+    previous_rc = home / CANDIDATE_DIR
+    if channel == "rc2" and previous_rc.is_dir() and not previous_rc.is_symlink():
+        source_dir = previous_rc
+    elif channel in ("rc1", "rc2") and preview.is_dir() and not preview.is_symlink():
         source_dir = preview
     else:
         source_dir = (

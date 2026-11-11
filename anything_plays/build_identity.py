@@ -25,6 +25,13 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-31-rc1",
         "public_release_approved": False,
     },
+    "rc2": {
+        "version": "3.1.0",
+        "channel": "rc2",
+        "title": "Anything Plays 3.1 · Release Candidate 2",
+        "settings_namespace": "anything-plays-31-rc2",
+        "public_release_approved": False,
+    },
 }
 FALLBACK_CHANNEL = "preview1"
 

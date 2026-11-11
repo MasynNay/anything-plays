@@ -56,6 +56,13 @@ class ProfilesMixin:
         prefs['gamecube_embedded'] = bool(self.gamecube_embedded.get())
         prefs['gamecube_preview_mode'] = self.gamecube_preview_mode.get()
         prefs['view_mode'] = self.view_mode.get()
+        # Stream composition is independent of the regular camera/game
+        # display theme. Save only sanitized, simple style preferences.
+        if hasattr(self, "_stream_options"):
+            from anything_plays.ui_stream import validate_stream_settings
+            prefs['stream_mode'] = validate_stream_settings(
+                self._stream_options, self.THEMES, self.theme_name.get(),
+            )
         prefs['volume'] = max(0, min(100, int(self.volume_percent.get())))
         prefs['last_nonzero_volume'] = max(
             1, min(100, int(self._volume_before_mute))

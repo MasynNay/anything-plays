@@ -1,0 +1,363 @@
+name: 3.1 RC2 | Distinct four-platform source app identities (unreleased)
+
+# Build mGBA-only RC2 source shells from exact branch commit. This is not a
+# four-platform full-console release and does not publish any installer.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-rc2-isolated-source-app.yml'
+      - 'anything_plays/build_identity.py'
+      - 'anything_plays/test_preferences.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v31_rc.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+      - 'tests/test_v31_rc2_identity.py'
+      - 'tests/test_v31_rc2_full_assembly.py'
+      - 'tools/v31_rc2_source.py'
+      - 'tools/assemble_v31_full_linux.py'
+      - 'tools/assemble_v31_full_windows.py'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'tools/ci_use_canonical_ubuntu_mirror.sh'
+      - '.github/workflows/v31-rc2-installed-desktop.yml'
+      - 'tools/verify_v31_rc2_installed_ui.py'
+      - 'tools/qa_v31_rc2_installed_preferences.py'
+      - 'tests/test_v31_rc2_installed_ui.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+# A superseded run can remain 'queued' while a macOS runner is unavailable.
+# Include the exact source SHA so the newest verified PR head can start
+# independently; duplicate runs of the same head still cancel each other.
+concurrency:
+  group: v31-rc2-isolated-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  rc2-isolated-shell:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: True independent RC2 identity | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31-rc2_3.1.0~rc2_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0-rc2.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-rc2-macos-arm64.dmg', bundle: 'dist/AnythingPlays31RC2.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-rc2-macos-x64.dmg', bundle: 'dist/AnythingPlays31RC2.app'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    env:
+      AP_V31_RC2: '1'
+      AP_V31_RC: '0'
+      AP_V31_PREVIEW: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_RC2_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prove RC2 identity and RC1 immutability on current checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checked-out commit: $(git rev-parse HEAD)"
+          echo "Required RC2 commit: $AP_V31_RC2_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$AP_V31_RC2_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v31_rc2_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v31_candidate_identity.py' -v
+      - name: Recover official Canonical mirrors if Azure mirror DNS is unavailable
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+      - name: Install Linux native dependencies with bounded DNS retry
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 \
+              -o Acquire::https::Timeout=15 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 \
+                install -y --no-install-recommends python3-tk dpkg-dev \
+                libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1
+              break
+            fi
+            echo "::warning::Ubuntu package DNS failed, retry $attempt"
+            sleep "$((attempt * 20))"
+          done
+          test "$ok" = 1
+      - name: Install Windows Inno compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
+      - name: Freeze RC2 Linux application
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Freeze RC2 Windows application
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Freeze RC2 Apple/Intel Mac application
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Inspect actual frozen identity and installer checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v31_rc --channel rc2 --target "${{ matrix.target }}" \
+            --installer 'release/${{ matrix.installer }}' --bundle '${{ matrix.bundle }}' \
+            --output release/RC2_SOURCE_STAGE_RECEIPT.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("release/RC2_SOURCE_STAGE_RECEIPT.json").read_text())
+          assert r["version"] == "3.1.0-rc2"
+          assert r["settings_namespace"] == "anything-plays-31-rc2"
+          assert r["source_revision"] == os.environ["AP_V31_RC2_SOURCE_SHA"]
+          assert r["public_release_approved"] is False
+          assert r["final_release_candidate"] is False
+          assert r["hardware_controller_verified"] is False
+          assert len(r["bundled_console_profiles"]) == 3
+          print("Independent RC2 native source shell:", r["target"], r["source_revision"])
+          PY
+      - name: Retain private RC2 source shells, never publish release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-SOURCE-${{ matrix.target }}-UNRELEASED
+          path: |
+            release/${{ matrix.installer }}
+            release/RC2_SOURCE_STAGE_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  full-rc2-18-console:
+    # One Ubuntu mirror/DNS failure must not discard authentic Windows/Mac
+    # sources: every OS leg still must download its OWN source-stage artifact
+    # and verify the exact recorded source revision and native core hashes.
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: rc2-isolated-shell
+    name: Original-core full RC2 | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, arch: none, baseline: 'anything-plays_3.0.0_amd64.deb', installer: 'anything-plays-31-rc2_3.1.0~rc2_amd64.deb', result: 'anything-plays-31-rc2_3.1.0~rc2full_amd64.deb', receipt: FULL_LIBRARY_QA_RECEIPT.json}
+          - {target: windows-x64, runner: windows-latest, arch: none, baseline: 'AnythingPlaysSetup-3.0.0.exe', installer: 'AnythingPlaysSetup-3.1.0-rc2.exe', result: 'AnythingPlaysSetup-3.1.0-rc2-full.exe', receipt: FULL_WINDOWS_QA_RECEIPT.json}
+          - {target: macos-arm64, runner: macos-15, arch: arm64, baseline: 'AnythingPlays-3.0.0-macos-arm64.dmg', installer: 'AnythingPlays-3.1.0-rc2-macos-arm64.dmg', result: 'AnythingPlays-3.1.0-rc2-full-macos-arm64.dmg', receipt: FULL_MACOS_QA_RECEIPT.json}
+          - {target: macos-x64, runner: macos-15-intel, arch: x64, baseline: 'AnythingPlays-3.0.0-macos-x64.dmg', installer: 'AnythingPlays-3.1.0-rc2-macos-x64.dmg', result: 'AnythingPlays-3.1.0-rc2-full-macos-x64.dmg', receipt: FULL_MACOS_QA_RECEIPT.json}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V31_RC2: '1'
+      AP_V31_RC: '0'
+      AP_V31_PREVIEW: '0'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V30_MINIMAL_CORE_BUILD: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact source and reject tampered RC2 or 3.0 native receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V31_QA_CHECKOUT_SHA"
+          python -m unittest discover -s tests -p 'test_v31_rc2_full_assembly.py' -v
+          # Legacy RC1 contract tests deliberately set the RC1 flag.
+          # Do not allow the CI job's RC2 flags to contaminate that separate
+          # historical test suite; genuine RC2 assembler keeps full QA flags.
+          python - <<'PY'
+          import os, subprocess, sys
+          legacy = os.environ.copy()
+          for key in ("AP_V31_RC2", "AP_V31_NEXT_QA",
+                      "AP_V31_QA_CHECKOUT_SHA"):
+              legacy.pop(key, None)
+          subprocess.run(
+              [sys.executable, "-m", "unittest", "discover", "-s", "tests",
+               "-p", "test_v31_rc_full.py", "-v"],
+              env=legacy, check=True,
+          )
+          PY
+      - name: Download same-run RC2 source artifact for this specific platform
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-SOURCE-${{ matrix.target }}-UNRELEASED
+          path: rc2source
+      - name: Verify original public 3.0 baseline is downloadable with immutable SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original30
+          # macOS GitHub-hosted runners occasionally lose api.github.com
+          # DNS for one release download. Keep the exact published 3.0 inputs
+          # and signed SHA256 manifest; retry transient transport failures,
+          # never use a missing/stale/unauthenticated binary.
+          fetch_original_release_asset() {
+            local asset="$1" target="original30/$1"
+            for attempt in 1 2 3 4; do
+              rm -f "$target"
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                  --pattern "$asset" --dir original30 && test -s "$target"; then
+                return 0
+              fi
+              echo "::warning::GitHub release download failed for $asset (attempt $attempt/4)"
+              sleep "$((attempt * 10))"
+            done
+            echo "::error::Could not fetch exact public 3.0 asset $asset" >&2
+            return 1
+          }
+          fetch_original_release_asset '${{ matrix.baseline }}'
+          fetch_original_release_asset SHA256SUMS.txt
+          test -s 'original30/${{ matrix.baseline }}'
+          test -s original30/SHA256SUMS.txt
+          test -s 'rc2source/${{ matrix.installer }}'
+          test -s rc2source/RC2_SOURCE_STAGE_RECEIPT.json
+      - name: Install Linux authenticated original-core QA dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
+                install -y --no-install-recommends libgl1 libegl1 \
+                libglib2.0-0 libportaudio2; then
+              ok=1
+              break
+            fi
+            sleep "$((attempt * 10))"
+          done
+          test "$ok" = 1
+      - name: Install Windows compiler and verified icon dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+          python -m pip install Pillow==12.3.0 numpy==2.5.4 opencv-python-headless==4.14.0.94
+          if ($LASTEXITCODE -ne 0) { throw 'Icon dependencies unavailable' }
+      - name: Assemble authentic eleven-core Linux RC2 installer
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python -m tools.assemble_v31_full_linux --rc2 \
+            --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/${{ matrix.baseline }} \
+            --preview rc2source/${{ matrix.installer }} \
+            --sums original30/SHA256SUMS.txt \
+            --receipt rc2source/RC2_SOURCE_STAGE_RECEIPT.json --output fullrc2
+      - name: Assemble authentic eleven-core Windows RC2 installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python -m tools.assemble_v31_full_windows --rc2 \
+            --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/${{ matrix.baseline }} \
+            --preview rc2source/${{ matrix.installer }} \
+            --sums original30/SHA256SUMS.txt \
+            --receipt rc2source/RC2_SOURCE_STAGE_RECEIPT.json --output fullrc2
+      - name: Assemble authentic eleven-core Mac RC2 DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          python -m tools.assemble_v31_full_macos --rc2 \
+            --arch '${{ matrix.arch }}' --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/${{ matrix.baseline }} \
+            --preview rc2source/${{ matrix.installer }} \
+            --checksums original30/SHA256SUMS.txt \
+            --receipt rc2source/RC2_SOURCE_STAGE_RECEIPT.json --output fullrc2
+      - name: Fail if any final installer alters frozen identity, count or SHA256
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from tools.v31_rc2_source import STAGE_STATUS, FULL_STATUS
+          original=json.loads(Path('rc2source/RC2_SOURCE_STAGE_RECEIPT.json').read_text('utf-8'))
+          report=json.loads(Path('fullrc2/${{ matrix.receipt }}').read_text('utf-8'))
+          binary=Path('fullrc2/${{ matrix.result }}')
+          digest=hashlib.sha256(binary.read_bytes()).hexdigest()
+          assert original["status"] == STAGE_STATUS
+          assert original["source_revision"] == os.environ["AP_V31_QA_CHECKOUT_SHA"]
+          assert original["settings_namespace"] == "anything-plays-31-rc2"
+          assert report["status"] == FULL_STATUS
+          assert report["identity_channel"] == "rc2"
+          assert report["settings_namespace"] == "anything-plays-31-rc2"
+          assert report["source_preview_revision"] == original["source_revision"]
+          assert report["native_core_count"] == 11
+          assert report["console_profiles"] == 18
+          assert report["sha256"] == digest
+          assert report["installer"] == binary.name
+          assert report["public_release_approved"] is False
+          assert report["final_release_approved"] is False
+          assert not any(item in report for item in ("final_public_release", "license_approved"))
+          print("Verified owner-only RC2 18-console full installer:", binary.name, digest)
+          PY
+      - name: Preserve four-platform RC2 full installer for technical review only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-FULL-18-${{ matrix.target }}-UNRELEASED
+          path: |
+            fullrc2/${{ matrix.result }}
+            fullrc2/${{ matrix.receipt }}
+            fullrc2/SDL_RUNTIME_AUDIT.json
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
+
+  installed-rc2-four-os:
+    # Reusable read-only workflow executes only after ALL four original-core
+    # packages are verified and uploaded. It runs their REAL installed GUI
+    # in disposable settings homes and cannot authorize public distribution.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.full-rc2-18-console.result == 'success' }}
+    needs: full-rc2-18-console
+    name: Installed RC2 GUI and preferences | all four native hosts
+    uses: ./.github/workflows/v31-rc2-installed-desktop.yml
+    with:
+      qa_run_id: ${{ github.run_id }}
+      source_sha: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      contents: read
+      actions: read
