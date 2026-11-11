@@ -18,7 +18,7 @@ def pe_data(machine=0x8664):
     struct.pack_into("<I", data, 0x3C, 0x80)
     data[0x80:0x84] = b"PE\0\0"
     struct.pack_into("<H", data, 0x84, machine)
-    data[-64:] = b"original compiled source test marker " * 2
+    data[-64:] = (b"original compiled source test marker " * 2)[:64]
     return bytes(data)
 
 
@@ -116,6 +116,7 @@ class WindowsModifiedNativeContracts(unittest.TestCase):
                                b"#define A 1\n")
                 z.writestr(f"{builder.SDL_ARCHIVE_ROOT}/include/SDL.h",b"header")
                 z.writestr(f"{builder.SDL_ARCHIVE_ROOT}/lib/x64/SDL2.lib",b"import")
+                z.writestr(f"{builder.SDL_ARCHIVE_ROOT}/docs/test_padding.dat",b"x"*120_000)
             with patch.object(builder,"SDL_ARCHIVE_SHA1",
                     hashlib.sha1(archive.read_bytes()).hexdigest()):
                 include,lib=builder.unpack_pinned_sdl(archive,root/"extract")
