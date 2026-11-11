@@ -299,3 +299,8 @@ A focused development branch adds an original-source CMake safeguard that reject
 ### November 11, 2026 — imported Dolphin target rejection verified and merged
 
 [PR #168](https://github.com/MasynNay/anything-plays/pull/168) merged as `313f6515` after [source checks 42954091445](https://github.com/MasynNay/anything-plays/actions/runs/42954091445) passed Python 3.12, Python 3.13 and native mGBA, and [original pinned Dolphin Linux compilation 42954091493](https://github.com/MasynNay/anything-plays/actions/runs/42954091493) passed. Three real CMake/Ninja negative regressions reject IMPORTED precompiled substitutes for the native Dolphin target and both helper archives, even when reported target types match. Packaging was skipped. Next release milestone remains building and integrating exact source-built Dolphin in four final production installers, then verifying corresponding source, combined GPL and third-party distribution obligations, and final installer acceptance. This is not rights clearance or public approval. Stable v2.0 remains untouched.
+
+
+### November 11, 2026 — Linux original-source Dolphin ELF identity validation (CI pending)
+
+A focused verifier change requires the compiled native report to identify an ELF64 little-endian x86-64 shared object, not merely an ELF-magic file exporting Libretro symbols. Negative regression cases reject incorrect class, byte order, version, executable type and ARM64 machine. The actual pinned original-source Linux build and source checks must pass before merging. This does not establish final production source correspondence, mixed GPL rights clearance or four-platform installer acceptance. Public 3.0 remains gated and stable 2.0 preserved.
