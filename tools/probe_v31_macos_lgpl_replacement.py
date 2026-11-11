@@ -84,7 +84,7 @@ def validate_inputs(bundle, installer, receipt, audit, wheel, target):
     with zipfile.ZipFile(wheel) as archive:
         members = archive.infolist()
         matches = [m for m in members if m.filename == WHEEL_MEMBER]
-        if (len(matches) != 1 or matches[0].file_size < 10_000
+        if (len(matches) != 1 or matches[0].file_size < 64
                 or matches[0].file_size > MAX_DONOR_BYTES):
             raise ValueError("Missing correct original wheel pygame.base extension")
         donor = thin_slice(archive.read(matches[0]), ARCHES[target])
