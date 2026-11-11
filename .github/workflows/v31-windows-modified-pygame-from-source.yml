@@ -50,7 +50,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
-          git clone --depth 1 --branch 2.5.8 https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          git -c core.autocrlf=false clone --depth 1 --branch 2.5.8 https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
           if ($LASTEXITCODE -ne 0) { throw 'No authentic source' }
           $sha=git -C upstream-pygame-ce rev-parse HEAD
           if ($sha.Trim() -ne $env:PYGAME_SHA) { throw 'Wrong source commit' }
