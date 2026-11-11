@@ -177,6 +177,26 @@ class Rc2FullBuildTests(unittest.TestCase):
                             mac.verify_inputs(arch, old, new, sums, receipt,
                                               rc2=True, expected_source_revision=SHA)
 
+    def test_native_core_inventory_accepts_only_one_explicit_rc2_channel(self):
+        from fetch_mgba_core import core_names_for_build
+        from tools.v30_release_lock import ALTERNATIVE_TIA_CORE_ORDER
+        with patch.dict(os.environ, FLAGS, clear=False):
+            result = core_names_for_build()
+            self.assertEqual(tuple(result), tuple(ALTERNATIVE_TIA_CORE_ORDER))
+            self.assertEqual(len(result), 11)
+        for changed in (
+            {"AP_V31_RC": "1"},
+            {"AP_V31_PREVIEW": "1"},
+            {"AP_RELEASE_BUILD": "1"},
+            {"AP_V30_APPROVED_RELEASE": "1"},
+            {"AP_V31_NEXT_QA": "0"},
+            {"AP_V31_QA_CHECKOUT_SHA": ""},
+        ):
+            with self.subTest(flags=changed):
+                with patch.dict(os.environ, dict(FLAGS, **changed), clear=False):
+                    with self.assertRaises(ValueError):
+                        core_names_for_build()
+
     def test_rc2_does_not_change_historical_rc1_or_preview_names(self):
         self.assertEqual(linux.RC_PREVIEW,
                          "anything-plays-31-rc1_3.1.0~rc1_amd64.deb")
