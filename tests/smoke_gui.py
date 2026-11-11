@@ -36,6 +36,18 @@ def main():
                     assert app.canvas.bind('<Button-1>')
                     assert app.game_canvas.bind('<KeyPress>')
                     assert app.game_canvas.cget('takefocus') == '1'
+                    assert app.camera_bezel.marker.cget('text') == '◎'
+                    assert app.game_bezel.marker.cget('text') == '◆'
+                    assert app.camera_bezel.footer_caption.cget('text') == 'OPTICAL SENSOR'
+                    assert app.game_bezel.footer_caption.cget('text') == 'LOCAL PLAY'
+                    assert len(app.camera_bezel.signature_ticks) == 3
+                    assert len(app.game_bezel.signature_ticks) == 5
+                    # Decorative vent and lens details are native Tk children,
+                    # never canvas items that accumulate during video rendering.
+                    initial_chrome_children = (
+                        len(app.camera_bezel.winfo_children()),
+                        len(app.game_bezel.winfo_children()),
+                    )
                     # 3.1: the controller belongs in the right-hand game
                     # panel, and should be a real, theme-aware Tk interface.
                     assert app.gamepad_quick_canvas.winfo_exists()
@@ -54,10 +66,17 @@ def main():
                     root.update_idletasks()
                     assert app.gamepad_quick_canvas.cget("bg") == app.THEMES["Plum Dark"][1]
                     assert len(app.gamepad_quick_canvas.find_all()) == original_icon_count
+                    assert app.camera_bezel.cget('bg') == app.THEMES["Plum Dark"][4]
+                    assert app.game_bezel.cget('bg') == app.THEMES["Plum Dark"][5]
+                    assert app.camera_bezel.header.cget('bg') == app.THEMES["Plum Dark"][5]
+                    assert app.game_bezel.header.cget('bg') == app.THEMES["Plum Dark"][4]
                     for bezel in (app.camera_bezel, app.game_bezel):
-                        assert bezel.cget('bg') == app.THEMES["Plum Dark"][4]
                         assert bezel.rail.cget('bg') == app.THEMES["Plum Dark"][3]
                         assert bezel.caption.cget('fg') == app.THEMES["Plum Dark"][2]
+                        assert len(bezel.signature_ticks) in (3, 5)
+                    assert app.camera_bezel.signature_ticks[1].cget('bg') == app.THEMES["Plum Dark"][3]
+                    assert app.game_bezel.signature_ticks[0].cget('bg') == app.THEMES["Plum Dark"][3]
+                    assert app.game_bezel.signature_ticks[1].cget('bg') == app.THEMES["Plum Dark"][1]
                     app._save_gamepad_binding("gba", "A", "B")
                     assert app._gamepad_bindings["gba"]["A"] == "B"
 
@@ -117,6 +136,14 @@ def main():
                     assert app.camera_bezel.rail.cget('bg') == app.THEMES["Light"][3]
                     assert app.game_bezel.rail.cget('bg') == app.THEMES["Light"][3]
                     assert app.game_canvas.cget('highlightcolor') == app.THEMES["Light"][3]
+                    assert app.camera_bezel.cget('bg') == app.THEMES["Light"][4]
+                    assert app.game_bezel.cget('bg') == app.THEMES["Light"][5]
+                    assert app.camera_bezel.footer_caption.cget('fg') == app.THEMES["Light"][2]
+                    assert app.game_bezel.footer_caption.cget('fg') == app.THEMES["Light"][2]
+                    assert initial_chrome_children == (
+                        len(app.camera_bezel.winfo_children()),
+                        len(app.game_bezel.winfo_children()),
+                    )
                     app.system_key.set("snes")
                     app.switch_system()
                     assert app.system_description.cget("text") == "Super Nintendo"
