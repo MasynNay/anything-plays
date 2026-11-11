@@ -347,3 +347,8 @@ A focused Linux source-build verifier change now requires real file-backed PT_LO
 
 
 **November 11, 2026 — preserved native manifest integrity verified and merged:** [PR #196](https://github.com/MasynNay/anything-plays/pull/196) merged as `69ed7e5b` after [exact-head source checks 43087421217](https://github.com/MasynNay/anything-plays/actions/runs/43087421217) passed Python 3.12, Python 3.13 and native mGBA compatibility. Regression fixtures reject malformed/nonlowercase SHA-256 digests and invalid byte-count types/values while preserving archive bytes. All production packaging jobs were skipped. PR #186's change was superseded by this tested rebase, not separately merged. Remaining gates are source-built Dolphin in exact production installers, full corresponding source and combined GPL/third-party rights verification, and final four-platform installer acceptance. Public 3.0 remains unpublished and stable 2.0 unchanged.
+
+
+### November 11, 2026 — reject ambiguous preserved native manifest JSON (CI pending)
+
+A focused 3.0 source-evidence hardening change rejects repeated JSON keys, including duplicate fields inside archive records, rather than accepting Python JSON last-value-wins behavior. Synthetic positive and adversarial regression tests are committed on a separate development branch. Merge only after exact-head source CI passes. This does not establish production Dolphin corresponding source, combined GPL/third-party distribution rights or four-platform final installer acceptance. Public 3.0 remains gated and stable 2.0 unchanged.

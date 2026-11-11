@@ -99,7 +99,19 @@ def _original_inputs(root, target, extension):
     observed = {p.name for p in folder.iterdir() if p.is_file() and not p.is_symlink()}
     if observed != expected or len(list(folder.iterdir())) != len(expected):
         raise ValueError("Original 12-native-input archive set has missing/extra/symlink entries")
-    record = json.loads(_file_bytes(folder, UNAPPROVED_ORIGINAL))
+    # JSON permits repeated object keys; default json.loads silently keeps the
+    # last value. Such ambiguous source evidence must fail closed, including
+    # duplicates inside each native archive row.
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate preserved native manifest JSON key: {key}")
+            result[key] = value
+        return result
+
+    record = json.loads(_file_bytes(folder, UNAPPROVED_ORIGINAL),
+                        object_pairs_hook=unique_object)
     # The preserved-input manifest is untrusted evidence, not an authority to
     # select files. Reject malformed records before using any row as a path.
     if not isinstance(record, dict):
