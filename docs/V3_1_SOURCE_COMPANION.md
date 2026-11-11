@@ -30,3 +30,32 @@ and final 3.1.0 stable identities are separate, open release requirements.
 
 Do not label these files approved source correspondence, rename RC1
 installers as stable, or modify the existing public 3.0.0 release.
+
+## Subsequent verified native-replacement evidence
+
+The technical source-companion candidate archives above have since been
+supplemented by **actual modified-source `pygame.base` compilation, native
+method invocation from disposable original RC1 installations, and frozen
+Tk startup** on all four shipping targets:
+
+| Target | Verified CI |
+| --- | --- |
+| Linux x64 | [Source-modified Linux RC1 QA](https://github.com/MasynNay/anything-plays/actions/runs/42949949019) |
+| macOS Apple Silicon | [Source-modified dual-Mac RC1 QA](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) |
+| macOS Intel | [Source-modified dual-Mac RC1 QA](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) |
+| Windows x64 | [Source-modified Windows RC1 QA](https://github.com/MasynNay/anything-plays/actions/runs/42953456034) |
+
+This establishes a practical replacement path for **one** pygame native
+extension only. It is not a demonstration of end-user replacement for
+all LGPL-covered components, source-to-binary correspondence for every
+SDL dependency, or complete Section 6 compliance. The source companion
+must still gain exact build options, linked-library dependency inventory,
+reproducible user rebuild/replacement steps for the complete covered
+runtime, required notices and source availability review. Physical
+controller, camera, gameplay, save and stable installer acceptance are
+independent open gates.
+
+See [Windows and four-platform modified-source evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md),
+[release acceptance](V3_1_RELEASE_ACCEPTANCE.md) and the machine-readable
+`config/v3.1-release-readiness.json`. **Do not set the six stable release
+gates true on the basis of these limited technical proofs.**
