@@ -65,11 +65,11 @@ def patch_source(root, *, runner=subprocess.run):
     if (before.count(C_ANCHOR) != 1 or before.count(METHOD_ANCHOR) != 1
             or "pg_ap31_relink_probe" in before or "_ap31_relink_probe" in before):
         raise ValueError("Unexpected upstream C code; refusing ambiguous patch")
-    native.write_text(
-        before.replace(C_ANCHOR, C_REPLACEMENT, 1)
-              .replace(METHOD_ANCHOR, METHOD_REPLACEMENT, 1),
-        "utf-8",
-    )
+    # Write canonical LF bytes on all platforms. Path.write_text() converts
+    # to CRLF on Windows, obscuring source SHA correspondence to Mac/Linux.
+    changed = (before.replace(C_ANCHOR, C_REPLACEMENT, 1)
+                     .replace(METHOD_ANCHOR, METHOD_REPLACEMENT, 1))
+    native.write_bytes(changed.encode("utf-8"))
     after = native.read_text("utf-8")
     if (PROBE_VALUE not in after
             or after.count("_ap31_relink_probe") != 3
