@@ -88,7 +88,7 @@ def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False, *, rc2=F
         raise ValueError("Source-stage 3.1 app does not match its original receipt")
     if rc2:
         require_rc2_receipt(meta, source=expected_sha, target="macos-" + arch,
-                            installer=preview_name, digest=digest(preview))
+                            installer=preview_name, digest=digest(preview, size=preview.stat().st_size)
     return stable_sha
 
 
