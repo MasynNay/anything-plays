@@ -61,7 +61,7 @@ def validate_inputs(stable, preview, sums, receipt, rc1=False, *, rc2=False,
         raise ValueError("Frozen 3.1 source artifact digest/source mismatch")
     if rc2:
         require_rc2_receipt(meta, source=source_sha, target="linux-x64",
-                            installer=preview_name, digest=sha(preview))
+                            installer=preview_name, digest=sha(preview, size=preview.stat().st_size)
     return sha(stable)
 
 
