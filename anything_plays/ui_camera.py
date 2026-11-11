@@ -173,8 +173,11 @@ class CameraMixin:
             if hasattr(self, "canvas"):
                 self.canvas.delete("all")
             self._camera_canvas_item = None
-        # Never retain or display stale camera imagery after a source stops.
-        self.stream_clear_camera()
+        # Legacy camera harnesses and nonstream clients do not mix in StreamMixin.
+        # A real Stream Mode session always clears its stale preview on Stop.
+        clear_stream = getattr(self, "stream_clear_camera", None)
+        if callable(clear_stream):
+            clear_stream()
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
             bezel.set_active(False)
