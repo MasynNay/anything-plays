@@ -304,3 +304,8 @@ A focused development branch adds an original-source CMake safeguard that reject
 ### November 11, 2026 — Linux original-source Dolphin ELF identity validation (CI pending)
 
 A focused verifier change requires the compiled native report to identify an ELF64 little-endian x86-64 shared object, not merely an ELF-magic file exporting Libretro symbols. Negative regression cases reject incorrect class, byte order, version, executable type and ARM64 machine. The actual pinned original-source Linux build and source checks must pass before merging. This does not establish final production source correspondence, mixed GPL rights clearance or four-platform installer acceptance. Public 3.0 remains gated and stable 2.0 preserved.
+
+
+### November 11, 2026 — ELF architecture verifier verified and merged
+
+[PR #180](https://github.com/MasynNay/anything-plays/pull/180) merged as `447af6a1` after [source checks 42974350748](https://github.com/MasynNay/anything-plays/actions/runs/42974350748) passed Python 3.12, Python 3.13 and native mGBA compatibility and [original pinned Dolphin Linux compilation 42974350765](https://github.com/MasynNay/anything-plays/actions/runs/42974350765) passed. The verifier rejects ELF-magic impostors with wrong class, byte order, version, object type or CPU architecture before recording research source-build provenance. Final production installer packaging was skipped. Next substantive release milestone is four-platform source-built Dolphin production candidate integration, with exact corresponding source and combined licensing verification, followed by installer acceptance. Public 3.0 remains gated; stable 2.0 untouched.
