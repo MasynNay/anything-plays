@@ -341,3 +341,6 @@ A focused Linux source-build verifier change now requires real file-backed PT_LO
 
 
 **November 11, 2026 — Ubuntu CI mirror recovery verified and merged:** [PR #189](https://github.com/MasynNay/anything-plays/pull/189) merged as `bec7862b` after [exact-head source checks 43071996499](https://github.com/MasynNay/anything-plays/actions/runs/43071996499) passed Python 3.12, Python 3.13 and native mGBA compatibility, including the previously failing apt dependency steps. Four regression tests cover signed repository metadata and safe source rewriting. Production packaging was skipped. PR #186 still needs its own fresh passing CI, and no Dolphin production source/rights clearance or final installer acceptance has been established. Public 3.0 remains gated and stable 2.0 preserved.
+
+
+**November 11, 2026 — preserved native metadata validation rebased for CI (pending):** Reapplied PR #186's fail-closed digest/byte-count validation and synthetic regression tests to a focused branch based on the merged Ubuntu archive CI fix. Require fresh exact-head Python 3.12, Python 3.13 and native compatibility checks before merging. This does not establish Dolphin production source/binary correspondence, mixed GPL rights, four installer acceptance or public release approval; stable 2.0 remains untouched.
