@@ -2,6 +2,26 @@
 
 Verified November 10, 2026. Read this before continuing release or controller engineering.
 
+## Latest original signed SDL2 runpath verification
+
+[Dual Mac LC_RPATH validation run 42959425185](https://github.com/MasynNay/anything-plays/actions/runs/42959425185)
+**passed on both original source-pinned signed 3.1 RC1 Mac installers**.
+Apple Silicon: 83 SDL2 referencing native images, of which 79 have
+direct runpaths to the exact audited pygame SDL2 binary; 4 others are
+SDL2 dylib provider/alias paths. Intel: 82 references, 79 matching
+direct runpaths and 3 SDL2 self-library aliases. **No other SDL2
+consumer in the audited native subset lacks a direct signed-hash
+candidate.** Adversarial tests cover library tampering, forged audit
+identity, legitimate internal symlinks versus escaping links, and
+missing or invalid LC_RPATH data. A follow-up workflow now verifies
+the exact pinned coverage counts as well. See
+[signed macOS runpath QA](V3_1_MACOS_SIGNED_RPATH_QA.md).
+
+This is a stronger *static native evidence* milestone, not proof
+of the actual full dyld loader chain, all source/license compliance,
+physical controllers, camera/gameplay, or final stable 3.1.0.
+All six stable release gates remain false.
+
 ## Latest verified native correspondence triage
 
 **Original signed Apple Silicon and Intel RC1 linkage inventory passed** in
