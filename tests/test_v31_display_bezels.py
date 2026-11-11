@@ -32,13 +32,42 @@ class DisplayBezelTests(unittest.TestCase):
                 self.assertTrue(all(isinstance(value, str) and
                                     value.startswith("#") and len(value) == 7
                                     for value in colors.values()))
+                # The game gets a deeper console chassis instead of
+                # repeating the brighter optical monitor housing.
+                game = bezel_colors(palette, kind="game")
+                self.assertEqual(game["housing"], palette[5])
+                self.assertEqual(game["header"], palette[4])
+                self.assertEqual(game["accent"], palette[3])
+                self.assertEqual(game["well"], palette[0])
+                self.assertEqual(game["lip"], palette[1])
+                self.assertNotEqual(game["housing"], colors["housing"])
 
     def test_invalid_palette_and_unknown_frame_kind_are_not_accepted(self):
         for bad in (None, "bad", {}, [], ("#123456",)):
             with self.subTest(palette=bad), self.assertRaises(ValueError):
                 bezel_colors(bad)
         self.assertEqual(set(DisplayBezel.TITLES), {"camera", "game"})
+        self.assertEqual(set(DisplayBezel.SIGNATURES), {"camera", "game"})
         self.assertNotIn("LIVE", DisplayBezel.TITLES["camera"])
+        self.assertNotIn("RECORDING", DisplayBezel.SIGNATURES["camera"])
+        with self.assertRaises(ValueError):
+            bezel_colors(ThemeMixin.THEMES["Dark"], kind="unknown")
+
+    def test_personalized_chassis_has_no_fake_status_or_input_handlers(self):
+        source = self.source("ui_bezel.py")
+        self.assertIn('kind == "camera" else 5', source)
+        self.assertIn('kind == "camera" else 10', source)
+        self.assertIn('self.footer_caption', source)
+        self.assertIn('self.signature_ticks', source)
+        self.assertIn('self.apply_palette(palette)', source)
+        self.assertIn('self.marker', source)
+        # No decorative pixel overlays or callbacks steal camera
+        # coordinates or manual game focus.
+        self.assertNotIn("Canvas(", source)
+        self.assertNotIn(".after(", source)
+        self.assertNotIn(".bind(", source)
+        self.assertNotIn("cv2", source.lower().replace("cv2 native", ""))
+        self.assertNotIn("import pygame", source)
 
     def test_original_canvases_remain_full_size_inset_children(self):
         camera = self.source("ui_panels.py")
