@@ -59,8 +59,8 @@ class StreamPortfolioTests(unittest.TestCase):
     def test_release_notes_are_cautious_and_old_artifacts_not_faked(self):
         html = SITE.read_text("utf-8")
         readme = README.read_text("utf-8")
-        self.assertIn("Complete native LGPL corresponding-source/relinking review", html)
-        self.assertIn("3.0 remains the latest stable release", readme)
+        self.assertIn("complete native LGPL corresponding-source/relinking review", html)
+        self.assertIn("3.0.0 remains the latest stable release", readme)
         self.assertIn("RC2 is a prerelease", readme)
         self.assertIn("3.1 RC2", readme)
         self.assertIn("docs/screenshots/3.0", readme)
