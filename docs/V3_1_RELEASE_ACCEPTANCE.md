@@ -37,7 +37,7 @@ Windows and four-platform evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOU
 
 **All six stable-release gates remain false.**
 
-## Genuine source-modified pygame C on both Macs — PASSED
+## Historical milestone: genuine source-modified pygame C on both Macs — PASSED
 
 [Source-build and real signed RC1 runtime workflow](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) **PASSED
 Apple Silicon and Intel Mac**. Both runners compiled exact upstream
@@ -56,11 +56,10 @@ desktop applications started the real Tk GUI, while 3.0 settings
 fixtures remained unchanged. Original DMGs, user data and public
 releases were not modified.
 
-Now **Linux x64, macOS ARM and macOS Intel** have real modified-source
-pygame C extension compile + native method invocation and frozen-app
-startup evidence. **Windows source-modified** builds and complete
-LGPL source/relinking, real controller testing, and stable 3.1.0
-remain open. [Detailed two-Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
+At this intermediate stage, Linux and both Mac architectures had
+passed and Windows was still pending. **Windows has since passed**;
+see the four-platform result above. Complete LGPL source/relinking,
+real controller testing, and stable 3.1.0 remain open. [Detailed two-Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
 
 ## Verified genuine source-modified LGPL pygame-ce on Linux
 
@@ -129,14 +128,12 @@ SHA-256 checksums and original-source candidate report. The artifact
 expires **February 8, 2027**. It is not a newly built production
 3.1.0 installer, and existing public 3.0.0/2.0 are unchanged.
 
-**Publishing access:** An authenticated GitHub Actions workflow with
-`Contents: write` successfully performed source and package checks but
-received HTTP 403 `Resource not accessible by integration` on
-`POST /repos/MasynNay/anything-plays/releases`. No 3.1 release draft
-was created. The read-only artifact fallback passed, so rebuilding
-the same binaries repeatedly is unnecessary. Publishing will require
-an authorized GitHub release creation path after the outstanding
-source, licensing and final-identity acceptance work is complete.
+**Historical publishing access issue (resolved for RC1):** An earlier
+GitHub Actions run with `Contents: write` received HTTP 403 when
+creating a release. That attempt produced no draft. The separate
+source-matched publication workflow subsequently succeeded and public
+3.1 RC1 is available above. Stable 3.1.0 publication still requires
+all outstanding release acceptance evidence.
 
 ### Current original-source candidate bundle (technical QA only)
 
