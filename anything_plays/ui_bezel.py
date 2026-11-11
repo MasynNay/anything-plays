@@ -30,6 +30,8 @@ class DisplayBezel(tk.Frame):
 
     TITLES = {"camera": "CAMERA  /  TRACKING",
               "game": "GAME  /  OUTPUT"}
+    IDLE_LABELS = {"camera": "STANDBY", "game": "NO GAME"}
+    ACTIVE_LABELS = {"camera": "CAMERA ON", "game": "SESSION"}
 
     def __init__(self, parent, *, kind, palette):
         if kind not in self.TITLES:
@@ -37,6 +39,8 @@ class DisplayBezel(tk.Frame):
         super().__init__(parent, borderwidth=0, highlightthickness=0,
                          padx=3, pady=3)
         self.kind = kind
+        self.active = False
+        self._palette = palette
 
         # Small fixed chrome rail, not a second content panel. Text remains
         # outside the video so pixels, tracking zones and focus stay intact.
@@ -49,9 +53,39 @@ class DisplayBezel(tk.Frame):
             highlightthickness=0, padx=8, pady=2,
         )
         self.caption.pack(side="left")
+
+        # The camera receives a lens motif; the console has tiny heat vents.
+        # Decorative native widgets never steal focus from the real Canvas.
+        self.instrument = tk.Frame(self.header, borderwidth=0,
+                                   highlightthickness=0)
+        self.instrument.pack(side="right", padx=(0, 5))
+        self.vents = []
+        self.lens = None
+        if kind == "camera":
+            self.lens = tk.Label(
+                self.instrument, text="◎", font=("TkDefaultFont", 12),
+                borderwidth=0, highlightthickness=0, padx=2,
+            )
+            self.lens.pack(side="right")
+        else:
+            for _ in range(3):
+                vent = tk.Frame(
+                    self.instrument, width=2, height=9,
+                    borderwidth=0, highlightthickness=0,
+                )
+                vent.pack(side="right", padx=2)
+                self.vents.append(vent)
+
+        # A truthful open-session marker, not a simulated recording lamp.
+        self.activity_label = tk.Label(
+            self.header, text=self.IDLE_LABELS[kind],
+            font=("TkDefaultFont", 8), borderwidth=0,
+            highlightthickness=0, padx=5, pady=2,
+        )
+        self.activity_label.pack(side="right")
         self.marker = tk.Label(
-            self.header, text="◆", font=("TkDefaultFont", 9),
-            borderwidth=0, highlightthickness=0, padx=8, pady=2,
+            self.header, text="●", font=("TkDefaultFont", 9),
+            borderwidth=0, highlightthickness=0, padx=2, pady=2,
         )
         self.marker.pack(side="right")
 
@@ -73,10 +107,41 @@ class DisplayBezel(tk.Frame):
     def apply_palette(self, palette):
         """Update chrome on theme selection, never touch the video Canvas."""
         c = bezel_colors(palette)
+        self._palette = palette
         self.configure(bg=c["housing"])
         self.header.configure(bg=c["header"])
         self.caption.configure(bg=c["header"], fg=c["label"])
-        self.marker.configure(bg=c["header"], fg=c["accent"])
+        self.instrument.configure(bg=c["header"])
+        if self.lens is not None:
+            self.lens.configure(bg=c["header"], fg=c["accent"])
+        for vent in self.vents:
+            vent.configure(bg=c["accent"])
         self.rail.configure(bg=c["accent"])
         self.screen.configure(bg=c["well"])
         self.lip.configure(bg=c["lip"])
+        self._render_activity()
+
+    def set_active(self, active):
+        """Update only on a genuine start or stop transition, without a timer.
+
+        Camera ON means the driver has reported an opened capture; SESSION
+        means the user started a game session. Neither indicator claims
+        footage is recording, frames rendered, or a controller connected.
+        """
+        if not isinstance(active, bool):
+            raise TypeError("Bezel activity must be boolean")
+        if active == self.active:
+            return
+        self.active = active
+        self._render_activity()
+
+    def _render_activity(self):
+        c = bezel_colors(self._palette)
+        label = (self.ACTIVE_LABELS[self.kind] if self.active
+                 else self.IDLE_LABELS[self.kind])
+        self.activity_label.configure(
+            text=label, bg=c["header"], fg=c["label"],
+        )
+        self.marker.configure(
+            bg=c["header"], fg=c["accent"] if self.active else c["housing"],
+        )
