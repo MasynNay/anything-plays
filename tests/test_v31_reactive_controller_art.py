@@ -103,7 +103,10 @@ class ControllerArtLiveTests(unittest.TestCase):
         draw_gamepad(offline, palette, connected=False, expanded=True,
                      pressed={"A", "DPAD_UP"})
         self.assertEqual(empty.shapes, unknown.shapes)
-        self.assertEqual(empty.shapes, offline.shapes)
+        # Disconnect intentionally turns the *connection marker* off.
+        # All other controller controls must remain in their idle colors.
+        self.assertEqual(empty.shapes[:-1], offline.shapes[:-1])
+        self.assertNotEqual(empty.shapes[-1], offline.shapes[-1])
 
     def test_redraw_count_does_not_accumulate_hidden_objects(self):
         palette = ThemeMixin.THEMES["Ocean Dark"]
