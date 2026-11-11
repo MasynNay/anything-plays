@@ -42,6 +42,30 @@ altered signed binaries, forged library hashes, invalid or incomplete
 load commands, duplicate paths, untrusted/escaping symlinks, and any
 change to redistribution or relinking approval fields.
 
+## Verified signed installer result (original RC1)
+
+The [two-Mac signed runpath test](https://github.com/MasynNay/anything-plays/actions/runs/42959425185)
+passed on Apple Silicon and Intel, after adjusting strict native-file
+validation to accept only signed-hash-matched in-app relative symlinks.
+
+| Observed original signed RC1 entries | Apple Silicon | Intel Mac |
+| --- | ---: | ---: |
+| SDL2 referencing Mach-O images | 83 | 82 |
+| Images with an exact signed pygame SDL2 direct runpath candidate | 79 | 79 |
+| SDL2 provider/alias images with no direct LC_RPATH | 4 | 3 |
+| Other SDL2 consumers without a direct signed-hash match | **0** | **0** |
+
+The entries without direct runpaths are the installed SDL2 dylibs or
+aliases themselves, and are **not additional application consumers**.
+All 79 original consumer images on each architecture have an
+authenticated local direct runpath candidate to the pygame SDL2 binary.
+The report now distinguishes those groups explicitly and CI requires
+the exact original counts. These are *candidate paths*, not proof of
+the image selected by a complete live dyld loader chain. The other
+OpenCV SDL2 runtime version still exists on Apple Silicon and can
+be loaded independently, as demonstrated in prior testing. No
+copyright, LGPL, physical hardware, or stable installer gates change.
+
 ## Verified underlying inputs
 
 - [Full source-pinned RC1 QA, all four OSes](https://github.com/MasynNay/anything-plays/actions/runs/42905694504)
