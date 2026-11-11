@@ -32,6 +32,14 @@ The **real frozen 18-console, 11-core desktop executable** in the disposable cop
 | Copied real 18-console frozen desktop booted | PASS |
 | Stable user preferences and original releases untouched | PASS |
 
+## Mac follow-on completed
+
+[Apple Silicon and Intel Mac source-modified native extension and frozen GUI QA](https://github.com/MasynNay/anything-plays/actions/runs/42951159759)
+**PASSED** as a separate two-runner proof of the same C source change,
+with SDL2 2.32.10 built from pinned original source, an isolated
+signed app copy, native method invocation and real Tk boot on both.
+See [Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
+
 ## Limits
 
 The special C method was executed by a separate Python process loading the native extension **from the copied app**. The frozen GUI smoke itself does not call the method or exercise a physical controller. The compiled extension used system SDL development headers; this does not establish full upstream wheel build reproducibility, replacement of every LGPL-covered native component, complete corresponding source, or legal LGPL compliance.

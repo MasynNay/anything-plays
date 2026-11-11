@@ -409,6 +409,29 @@
       "complete_corresponding_source_verified": false,
       "lgpl_section_6_full_compliance_approved": false,
       "stable_3_1_release_approved": false
+    },
+    "macos_source_modified_lgpl_pygame_c_and_bundled_sdl_relink": {
+      "status": "BOTH_MAC_ARCHITECTURES_MODIFIED_C_SOURCE_COMPILED_RELINKED_NATIVE_METHOD_EXECUTED_AND_FROZEN_GUI_PASSED",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42951159759",
+      "platforms": [
+        "macos-arm64",
+        "macos-x64"
+      ],
+      "original_pygame_ce_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
+      "original_sdl2_2_32_10_commit": "5d249570393f7a37e037abf22cd6012a4cc56a71",
+      "modified_source_sha256": "89b4e97a1fe664a95d5e8c7ec8d7e2836747e19debdace6e87e463f3a3c8b050",
+      "modified_native_py_method": "pygame.base._ap31_relink_probe",
+      "original_signed_dmg_mounted_read_only": true,
+      "source_modified_macho_compiled_and_distinct": true,
+      "native_relinked_to_app_bundled_sdl": true,
+      "source_modified_native_method_invoked_from_copied_app": true,
+      "disposable_app_native_and_bundle_ad_hoc_codesign_verified": true,
+      "copied_original_rc1_frozen_18_profile_tk_gui_smoke_passed": true,
+      "isolated_stable_settings_preserved": true,
+      "physical_controller_hardware_verified": false,
+      "windows_source_modified_library_verified": false,
+      "complete_lgpl_section_6_corresponding_source_approved": false,
+      "stable_3_1_release_approved": false
     }
   }
 }

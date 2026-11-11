@@ -1,0 +1,281 @@
+name: 3.1 | Build real modified LGPL pygame C and boot copied signed RC1 Macs
+
+# Experimental source modification of exact upstream pygame-ce 2.5.8.
+# Native donor source is intentionally changed and compiled on EACH Mac CPU.
+# Only disposable app copies are patched, relinked and ad-hoc signed.
+# Neither modified app is published. No LGPL or stable gate is approved.
+on:
+  push:
+    branches: [feature/v31-source-modified-pygame-macos-relink]
+    paths:
+      - '.github/workflows/v31-macos-modified-pygame-from-source.yml'
+      - 'tools/verify_v31_modified_pygame_macos.py'
+      - 'tests/test_v31_modified_pygame_macos.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-real-modified-pygame-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiled-native-original-rc:
+    if: github.ref == 'refs/heads/feature/v31-source-modified-pygame-macos-relink'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-15, target: macos-arm64, arch: arm64}
+          - {runner: macos-15-intel, target: macos-x64, arch: x64}
+    name: Modified original pygame C source · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: c8200a9eaa530f884a0a4c3384cefc48006e58be
+      QA_RUN: '42905694504'
+      QA_SHA: c67fab048d7e44f371f2589a6d73b9d556de84d0
+      OFFICIAL_WHEEL: pygame_ce-2.5.8-cp313-cp313-macosx_10_13_universal2.whl
+      OFFICIAL_SHA: 56441a9bb75c2461750dc0e6e4a46e3833b3cf6339bfbaf16f93ecac037510f3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject unapproved or ambiguous original and user-modified sources
+        run: python -m unittest discover -s tests -p 'test_v31_modified_pygame_macos.py' -v
+      - name: Install a genuine Mac SDL2 C build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install sdl2 pkg-config
+          python -m pip install 'meson==1.9.1' 'ninja==1.13.0' 'cython==3.2.1'
+          pkg-config --modversion sdl2
+          python -c 'import sys; assert sys.version_info[:2]==(3,13)'
+      - name: Clone exact LGPL upstream tag and modify actual C source with observable method
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth 1 --branch 2.5.8 \
+            https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          test "$(git -C upstream-pygame-ce rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p evidence
+          python -m tools.build_v31_modified_pygame_probe \
+            --root upstream-pygame-ce \
+            --receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json
+          git -C upstream-pygame-ce diff -- src_c/base.c > evidence/PYGAME_C_SOURCE_CHANGE.patch
+          test -s evidence/PYGAME_C_SOURCE_CHANGE.patch
+      - name: Build exact original bundled SDL2 2.32.10 development headers and library
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth 1 --branch release-2.32.10 \
+            https://github.com/libsdl-org/SDL.git upstream-SDL2
+          test "$(git -C upstream-SDL2 rev-parse HEAD)" = 5d249570393f7a37e037abf22cd6012a4cc56a71
+          cmake -S upstream-SDL2 -B upstream-SDL2/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/pinned-SDL2" \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_TESTS=OFF
+          cmake --build upstream-SDL2/build --parallel 4
+          cmake --install upstream-SDL2/build
+          test -s pinned-SDL2/lib/pkgconfig/sdl2.pc
+          echo "PKG_CONFIG_PATH=$PWD/pinned-SDL2/lib/pkgconfig" >> "$GITHUB_ENV"
+          PKG_CONFIG_PATH="$PWD/pinned-SDL2/lib/pkgconfig" pkg-config --modversion sdl2 | grep -qx 2.32.10
+          echo 'Pinned, original, source-built SDL2 2.32.10 headers now match existing signed RC1 binary'
+      - name: Compile ACTUALLY modified C extension with Mac CPU's native compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg-config --modversion sdl2 | grep -qx 2.32.10
+          meson setup upstream-pygame-ce/build upstream-pygame-ce \
+            -Dstripped=true -Dimage=disabled -Dmixer=disabled \
+            -Dfont=disabled -Dfreetype=disabled -Dmidi=disabled \
+            -Derror_on_warns=false -Dsdl_api=2
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          build=Path('upstream-pygame-ce/build').resolve()
+          targets=json.loads(subprocess.check_output(['meson','introspect','--targets',str(build)],text=True))
+          paths=[]
+          for t in targets:
+              names=t.get('filename',[])
+              if isinstance(names,str): names=[names]
+              for name in names:
+                  file=Path(name)
+                  if (file.parent.name=='src_c' and file.name.startswith('base.cpython-313-')
+                          and file.name.endswith('.so')):
+                      paths.append(file)
+          if len(paths)!=1:
+              raise SystemExit('Expected one actual Mac pygame C source target; found '+repr(paths))
+          target=paths[0]
+          subprocess.run(['ninja','-C',str(build),str(target.relative_to(build))],check=True)
+          assert target.is_file() and target.stat().st_size>8192, f'Mac native extension suspicious size: {target.stat().st_size}'
+          Path('evidence/COMPILED_MAC_NATIVE_PATH.txt').write_text(str(target.resolve())+'\n')
+          print('Actual native Mac modified pygame C compilation:',target)
+          PY
+      - name: Obtain exact signed original 18-console RC1 and verified upstream wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$QA_RUN" --json headSha --jq .headSha)" = "$QA_SHA"
+          test "$(gh run view "$QA_RUN" --json conclusion --jq .conclusion)" = success
+          gh run download "$QA_RUN" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original
+          test -s original/FULL_MACOS_QA_RECEIPT.json
+          test -s original/SDL_RUNTIME_AUDIT.json
+          test -s "original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mkdir -p original-wheel
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern "$OFFICIAL_WHEEL" --dir original-wheel
+          echo "$OFFICIAL_SHA  original-wheel/$OFFICIAL_WHEEL" | shasum -a 256 --check
+      - name: Stage changed-from-source native into genuine readonly RC1 Mac app disposable copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="$PWD/original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-mac-source.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mounted=0
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            sleep 5
+          done
+          test "$mounted" = 1
+          signed_original="$mountdir/AnythingPlays31RC.app"
+          codesign --verify --verbose=2 "$signed_original"
+          modified_app="$RUNNER_TEMP/AnythingPlays31RC-CompiledFromModifiedPygame-${{ matrix.arch }}.app"
+          echo "MODIFIED_APP=$modified_app" >> "$GITHUB_ENV"
+          echo "ORIGINAL_DMG=$dmg" >> "$GITHUB_ENV"
+          python -m tools.verify_v31_modified_pygame_macos \
+            --target "${{ matrix.target }}" \
+            --bundle "$signed_original" \
+            --installer "$dmg" \
+            --receipt original/FULL_MACOS_QA_RECEIPT.json \
+            --audit original/SDL_RUNTIME_AUDIT.json \
+            --wheel "original-wheel/$OFFICIAL_WHEEL" \
+            --compiled "$(cat evidence/COMPILED_MAC_NATIVE_PATH.txt)" \
+            --source-receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json \
+            --destination "$modified_app" \
+            --output evidence/MACOS_SOURCE_COMPILED_NATIVE_STAGED.json
+          codesign --verify --verbose=2 "$signed_original"
+      - name: Relink changed native to in-app SDL2, re-sign disposable app, call changed code
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$MODIFIED_APP/Contents/Frameworks/pygame/base.cpython-313-darwin.so"
+          packaged_sdl="$MODIFIED_APP/Contents/Frameworks/pygame/__dot__dylibs/libSDL2-2.0.0.dylib"
+          test -s "$native"
+          test -s "$packaged_sdl"
+          otool -L "$native"
+          # Newly compiled C binary may link Homebrew SDL2; end users should
+          # not need Homebrew at runtime. Replace exact install-name with
+          # the already packaged official native SDL2. No original DMG writes.
+          python - "$native" <<'PY'
+          import subprocess,sys
+          path=sys.argv[1]
+          deps=subprocess.check_output(['otool','-L',path],text=True).splitlines()[1:]
+          names=[s.strip().split(' (',1)[0] for s in deps if 'SDL2' in s]
+          if len(names)!=1:
+              raise SystemExit('Expected one explicit SDL2 shared library dependency: '+repr(names))
+          subprocess.run(['install_name_tool','-change',names[0],
+                          '@loader_path/__dot__dylibs/libSDL2-2.0.0.dylib',path],check=True)
+          PY
+          codesign --force --sign - "$native"
+          codesign --force --sign - "$MODIFIED_APP"
+          codesign --verify --verbose=2 "$native"
+          codesign --verify --verbose=2 "$MODIFIED_APP"
+          python - "$native" <<'PY'
+          from importlib import util
+          from pathlib import Path
+          import json,sys,types
+          from tools.build_v31_modified_pygame_probe import PROBE_VALUE
+          file=Path(sys.argv[1])
+          modpkg=types.ModuleType('pygame')
+          modpkg.__path__=[str(file.parent)]
+          sys.modules['pygame']=modpkg
+          spec=util.spec_from_file_location('pygame.base',file)
+          if spec is None or spec.loader is None:
+              raise SystemExit('Modified source C extension cannot be imported')
+          ext=util.module_from_spec(spec)
+          sys.modules['pygame.base']=ext
+          spec.loader.exec_module(ext)
+          result=ext._ap31_relink_probe()
+          if result!=PROBE_VALUE:
+              raise SystemExit('Wrong modified C source native method result')
+          p=Path('evidence/MACOS_SOURCE_COMPILED_NATIVE_STAGED.json')
+          r=json.loads(p.read_text())
+          r['actual_modified_method_invoked']=True
+          r['copied_app_ad_hoc_codesign_verified']=True
+          p.write_text(json.dumps(r,indent=2)+'\n')
+          print('ACTUAL COMPILED MODIFIED C method invoked:',result)
+          PY
+      - name: Run copied real signed RC1 Mac GUI smoke and preserve original user settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_home="$(mktemp -d /tmp/ap31-mac-lgpl-home.XXXXXX)"
+          python -m tools.qa_v31_installed_settings_migration seed \
+            --home "$tmp_home" \
+            --manifest "$PWD/evidence/STABLE_SETTINGS_FIXTURE.json"
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/evidence/MODIFIED_PYGAME_FROZEN_GUI_SMOKE.json" \
+          HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$MODIFIED_APP/Contents/MacOS/AnythingPlays" <<'PY'
+          import os,subprocess,sys
+          p=subprocess.run([sys.argv[1],"--ap-v30-ui-smoke"],
+                           capture_output=True,text=True,env=os.environ.copy(),timeout=120)
+          print('Actual modified-native copied Mac RC1 frozen Tk GUI exit:',p.returncode)
+          print(p.stderr[-2000:])
+          if p.returncode != 0: raise SystemExit(1)
+          PY
+          python -m tools.qa_v31_installed_settings_migration verify \
+            --home "$tmp_home" \
+            --manifest "$PWD/evidence/STABLE_SETTINGS_FIXTURE.json" \
+            --output evidence/STABLE_SETTINGS_NOT_MUTATED.json
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target "${{ matrix.target }}" \
+            --installer "$ORIGINAL_DMG" \
+            --bundle "$MODIFIED_APP" \
+            --receipt original/FULL_MACOS_QA_RECEIPT.json \
+            --smoke evidence/MODIFIED_PYGAME_FROZEN_GUI_SMOKE.json \
+            --output evidence/VERIFIED_MODIFIED_PYGAME_FROZEN_UI.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          f=Path('evidence/MACOS_SOURCE_COMPILED_NATIVE_STAGED.json')
+          r=json.loads(f.read_text())
+          smoke=json.loads(Path('evidence/VERIFIED_MODIFIED_PYGAME_FROZEN_UI.json').read_text())
+          assert r['actual_modified_method_invoked']
+          assert r['copied_app_ad_hoc_codesign_verified']
+          assert r['source_modified_c_binary_verified_different']
+          assert smoke['actual_mainloop_ran'] and smoke['console_profiles']==18
+          r['status']='VERIFIED_MACOS_SOURCE_MODIFIED_PYGAME_NATIVE_C_METHOD_AND_FROZEN_RC1_UI_PASSED'
+          r['copied_original_frozen_rc1_tk_boot_verified']=True
+          r['complete_lgpl_section_6_source_and_relinking_approved']=False
+          r['stable_3_1_release_approved']=False
+          f.write_text(json.dumps(r,indent=2)+'\n')
+          print('Real signed copied Mac RC1 modified pygame source compiled/loaded/started. LGPL and physical device gates OPEN.')
+          PY
+      - name: Retain exact source change and native runtime evidence on both Macs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-${{ matrix.arch }}-REAL-SOURCE-MODIFIED-PYGAME-C
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 90
