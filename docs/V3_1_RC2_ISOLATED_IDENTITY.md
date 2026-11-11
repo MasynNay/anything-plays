@@ -21,6 +21,39 @@ When RC2 starts for the first time, it may copy existing RC1 preferences and con
 
 The four-platform workflow v31-rc2-isolated-source-app.yml creates actual **mGBA-only source application shells**, not full eighteen-console installers. The real frozen app and installer are verified with tools.verify_v31_rc --channel rc2. Windows, Mac and Linux package identities must match the embedded application identity. Each source stage stores an exact Git revision, checksum and nonrelease status.
 
-The full eighteen-console native core assembly into uniquely versioned RC2 installers is a **separate, necessary next stage**. At present, the existing full-core RC1 assembler must **not** be used to repackage an RC2 source app or reuse the RC1 app ID. The previous PR #184 provides current-source nonrelease core-assembly QA but intentionally retained RC1 internal IDs for disposable tests. A future RC2 assembly must combine both the independently verified native cores and RC2's uniquely isolated settings/installer identity.
+## Full eleven-core, eighteen-console RC2 technical builds
+
+The same source-pinned workflow now has a second, native full assembly job on
+**Windows x64, Linux x64, macOS Apple Silicon, and macOS Intel**. Each job
+downloads its exact-platform source-stage RC2 installer from the same CI run
+and the public 3.0.0 original-source core installer and SHA-256 manifest.
+The private RC2 full assembler fails closed unless the original 3.0 digest,
+exact source revision, RC2 staging status, isolated preferences namespace,
+installer ID, and the eleven original-source core families agree. It reopens
+and verifies the final generated installer rather than trusting the source
+archive alone.
+
+The resulting, separately identified output filenames are:
+
+- Linux: `anything-plays-31-rc2_3.1.0~rc2full_amd64.deb`
+- Windows: `AnythingPlaysSetup-3.1.0-rc2-full.exe`
+- Apple Silicon: `AnythingPlays-3.1.0-rc2-full-macos-arm64.dmg`
+- Intel Mac: `AnythingPlays-3.1.0-rc2-full-macos-x64.dmg`
+
+These 30-day private GitHub Actions artifacts contain checksum receipts and
+an SDL runtime audit; no upload to Releases is permitted. A failed Linux
+runner cannot cause an unverified Linux artifact to appear, but its external
+network failure also does not discard independently authenticated Windows
+and macOS candidates.
+
+**Do not infer a successful build merely from the workflow existing.** Each
+platform's original-source native assembly, installed input initialization,
+RC2 identity checks and final checksum must pass before any of these
+installers is described as usable. The full package is still owner-only
+QA, not a stable or publicly approved 3.1 release.
+
+The earlier [PR #184](https://github.com/MasynNay/anything-plays/pull/184)
+remains an independent historical RC1-identity current-source exercise,
+and must not replace this isolated RC2 path.
 
 All six stable 3.1 public-release gates remain false, including complete native corresponding source/LGPL relinking, physical camera and controller acceptance, retail-game play/saves and final release approval. RC2 is not automatically approved or public because it uses distinct identifiers.
