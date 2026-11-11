@@ -1,7 +1,9 @@
 name: 3.1 RC2 | Stage exact four-platform verified installer draft
 
 # A reviewed, SHA-pinned acceptance record on MAIN is the only automatic
-# trigger. Never publish publicly; actual license/rights approval remains open.
+# trigger. Default to private draft. The owner may explicitly request
+# PUBLIC RC2 TEST PREVIEW, never stable 3.1, after all four installed checks
+# pass. Source/license limitations must remain clearly disclosed.
 on:
   push:
     branches: [main]
@@ -44,14 +46,18 @@ jobs:
           if not p.is_file():
               raise SystemExit('No reviewed RC2 candidate source/run record on main')
           r=json.loads(p.read_text('utf-8'))
-          assert set(r)=={'source_sha','qa_run_id','status','public_release_approved'}
+          assert set(r)=={'source_sha','qa_run_id','status','public_release_approved',
+                          'public_rc2_prerelease_requested'}
           assert re.fullmatch(r'[a-f0-9]{40}',r['source_sha'])
           assert isinstance(r['qa_run_id'],int) and r['qa_run_id'] > 1
-          assert r['status']=='OWNER_QA_DRAFT_ONLY'
+          assert r['status'] in ('OWNER_QA_DRAFT_ONLY', 'OWNER_REQUESTED_PUBLIC_RC2_PREVIEW')
           assert r['public_release_approved'] is False
+          assert type(r['public_rc2_prerelease_requested']) is bool
+          assert (r['public_rc2_prerelease_requested'] is True) == (r['status']=='OWNER_REQUESTED_PUBLIC_RC2_PREVIEW')
           with Path('candidate.env').open('w', encoding='utf-8') as out:
               out.write('SOURCE_SHA='+r['source_sha']+'\n')
               out.write('QA_RUN='+str(r['qa_run_id'])+'\n')
+              out.write('PUBLIC_RC2_REQUESTED='+('true' if r['public_rc2_prerelease_requested'] else 'false')+'\n')
           PY
           cat candidate.env >> "$GITHUB_ENV"
       - name: Confirm exact successful original RC2 source and installed QA on all four platforms
@@ -130,7 +136,7 @@ jobs:
           retention-days: 90
           compression-level: 0
           if-no-files-found: error
-      - name: Stage release DRAFT on main, never make it public or stable
+      - name: Stage exact RC2 release draft on main, not stable
         shell: bash
         run: |
           set -euo pipefail
@@ -141,4 +147,40 @@ jobs:
             --notes-file docs/V3_1_RC2_PRERELEASE_NOTES.md
           gh release view v3.1.0-rc2 --json isDraft,isPrerelease,assets \
             --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
-          echo 'Created owner-visible RC2 QA DRAFT only; native rights review remains open.'
+          echo 'Created exact verified RC2 draft; native source and licensing limitations are disclosed.'
+      - name: Publish only explicitly owner-requested RC2 TEST PRERELEASE, never stable
+        if: env.PUBLIC_RC2_REQUESTED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Four exact app installers, QA manifest and source-access notes
+          # were already checked before the owner-requested promotion.
+          gh release view v3.1.0-rc2 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          notes=Path('docs/V3_1_RC2_PRERELEASE_NOTES.md').read_text('utf-8')
+          assert 'Not stable 3.1.0' in notes
+          assert 'complete corresponding source' in notes
+          assert 'Mac' in notes and 'Windows' in notes and 'Linux' in notes
+          payload={
+              'draft': False,
+              'prerelease': True,
+              'make_latest': 'false',
+              'target_commitish': os.environ['GITHUB_SHA'],
+              'name': 'Anything Plays 3.1 RC2 | Stream Mode and themed bezels',
+              'body': notes,
+          }
+          Path('rc2-publication.json').write_text(json.dumps(payload)+'\n')
+          PY
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.tag_name=="v3.1.0-rc2") | .id' | head -n 1)"
+          test -n "$id"
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$id" \
+            --input rc2-publication.json
+          gh release view v3.1.0-rc2 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==false and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+          echo 'Verified RC2 test prerelease is publicly downloadable; stable 3.0 unchanged.'
