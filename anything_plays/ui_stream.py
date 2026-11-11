@@ -352,8 +352,12 @@ class StreamMixin:
             self._stream_vars[name] = var
             ttk.Checkbutton(
                 root, text=title, variable=var,
-                command=self._stream_controls_changed,
             ).pack(anchor="w", pady=(5, 1))
+            # Tk Checkbutton(command=...) only fires on a physical click.
+            # Trace the underlying BooleanVar as with layout/sliders so
+            # programmatic accessibility changes and preference restores
+            # update the real Stream Output consistently.
+            var.trace_add("write", lambda *_: self._stream_controls_changed())
         colors = ttk.Frame(root)
         colors.pack(fill="x", pady=(12, 4))
         ttk.Button(colors, text="Choose border color…",
