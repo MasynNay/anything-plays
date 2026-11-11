@@ -26,8 +26,11 @@ on:
 permissions:
   contents: read
 
+# A superseded run can remain 'queued' while a macOS runner is unavailable.
+# Include the exact source SHA so the newest verified PR head can start
+# independently; duplicate runs of the same head still cancel each other.
 concurrency:
-  group: v31-rc2-isolated-${{ github.event.pull_request.number || github.ref }}
+  group: v31-rc2-isolated-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
