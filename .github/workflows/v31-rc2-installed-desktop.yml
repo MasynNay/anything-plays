@@ -140,6 +140,7 @@ jobs:
           timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
             env HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
               AP_V30_UI_SMOKE_CHECK=1 \
+              AP_V31_STREAM_SMOKE_CHECK=1 \
               AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_RC2_UI.json" \
               SDL_AUDIODRIVER=dummy "$app" --ap-v30-ui-smoke
           python -m tools.qa_v31_rc2_installed_preferences verify \
@@ -175,6 +176,7 @@ jobs:
           $env:USERPROFILE=$qahome
           $env:HOME=$qahome
           $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V31_STREAM_SMOKE_CHECK='1'
           $env:AP_V30_UI_SMOKE_REPORT=Join-Path $PWD 'evidence/FROZEN_RC2_UI.json'
           $env:SDL_AUDIODRIVER='dummy'
           $process=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
@@ -200,6 +202,7 @@ jobs:
             --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
           HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
           AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
           AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_RC2_UI.json" \
           SDL_AUDIODRIVER=dummy \
           python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
