@@ -16,6 +16,23 @@ Verified November 10, 2026. Read this before continuing release or controller en
   https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1 (source companion ZIP).
 - Latest stable remains public 3.0.0; 2.0 and 1.5 still public.
 
+## Four-platform original pygame wheel swap and real desktop startup
+
+**All four operating systems passed** limited upstream pygame extension
+swap acceptance against genuine pinned full 3.1 RC1 installers. Linux
+and Windows had byte-identical original native wheel bytes, and copied
+installations passed actual frozen desktop Tk startup plus isolated
+legacy settings tests: [two-platform workflow](https://github.com/MasynNay/anything-plays/actions/runs/42937982305).
+Apple Silicon and Intel Mac copies replaced differently signed/thinned
+compiled base extensions, were ad-hoc re-signed, loaded through the
+actual Python native loader and passed frozen GUI startup:
+[Mac workflow](https://github.com/MasynNay/anything-plays/actions/runs/42936779875).
+
+These demonstrate practical installation layout and certain native
+replacement mechanisms, **not modified-from-source LGPL binaries, complete
+corresponding source, legal clearance or final 3.1.0 stable approval.**
+[Full limitations and upcoming tests](V3_1_LGPL_FOUR_PLATFORM_UPSTREAM_REPLACEMENT_QA.md).
+
 ## New verified macOS LGPL native extension replacement test
 
 The independent [macOS replacement workflow](https://github.com/MasynNay/anything-plays/actions/runs/42936779875) PASSED on both

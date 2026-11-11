@@ -372,6 +372,25 @@
       "complete_native_corresponding_source_verified": false,
       "lgpl_2_1_section_6_compliance_approved": false,
       "stable_3_1_release_approved": false
+    },
+    "linux_windows_upstream_pygame_extension_swap": {
+      "status": "TWO_OS_DISPOSABLE_INSTALLED_NATIVE_SWAP_AND_TK_GUI_STARTUP_PASSED_BYTE_IDENTICAL_UPSTREAM",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42937982305",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "original_18_core_qa_run": "https://github.com/MasynNay/anything-plays/actions/runs/42905694504",
+      "original_wheel_hash_windows": "f495b0eb7a5c54c59da58e964bc7f68073c3f43cf307729fd48309104a04c190",
+      "original_wheel_hash_linux": "5bb966b610e161a8f6d908b4c62ef3a1f3e922bc7bed73bd70a3e15dc780b90e",
+      "byte_identical_to_original_native": true,
+      "upstream_native_file_copied_to_disposable_bundle": true,
+      "copied_frozen_tk_gui_started": true,
+      "isolated_stable_user_settings_preserved": true,
+      "actual_user_modified_library_rebuilt_and_tested": false,
+      "full_lgpl_relinking_verified": false,
+      "corresponding_source_complete": false,
+      "stable_3_1_release_approved": false
     }
   }
 }
