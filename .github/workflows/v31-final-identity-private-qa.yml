@@ -186,7 +186,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       AP_V31_FINAL_CANDIDATE: '1'
-       AP_V31_RC2: '0'
+      AP_V31_RC2: '0'
       AP_V31_RC: '0'
       AP_V31_PREVIEW: '0'
       AP_V31_NEXT_QA: '1'
