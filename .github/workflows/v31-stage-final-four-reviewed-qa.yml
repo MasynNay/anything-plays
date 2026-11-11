@@ -1,0 +1,98 @@
+name: 3.1.0 | Preserve four verified full installers for private release review
+
+# Run only after the genuine source-pinned 3.1.0 FINAL workflow (including
+# ALL four installed desktop/Stream Mode jobs) has succeeded. Use the trusted
+# main-branch gate code, never execute code contained in untrusted artifacts.
+# No write permission, no GitHub Release, no tag and no distribution approval.
+on:
+  workflow_run:
+    workflows:
+      - '3.1.0 | Private four-platform FINAL identity build QA'
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-final-staging-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  stage-four-real-installers:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: ${{ github.event.workflow_run.id }}
+      QA_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate successful same-repository source-pinned native workflow run
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$QA_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$QA_RUN" =~ ^[0-9]{6,15}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("qa-run.json").read_text("utf-8"))
+          assert r["status"]=="completed" and r["conclusion"]=="success"
+          assert r["name"]=="3.1.0 | Private four-platform FINAL identity build QA"
+          assert r["event"]=="pull_request"
+          assert r["head_sha"]==os.environ["QA_SHA"]
+          assert r["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          print("Four-platform genuine final-identity workflow accepted:",r["html_url"])
+          PY
+      - name: Fetch exact full 18-console and installed desktop receipts for all four native OS hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            mkdir -p "full/$target" "installed/$target"
+            gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1.0-FINAL-FULL-18-$target-QA-ONLY" \
+              --dir "full/$target"
+            gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1.0-FINAL-INSTALLED-DESKTOP-$target-QA-ONLY" \
+              --dir "installed/$target"
+            test -s "installed/$target/FINAL_INSTALLED_RECEIPT.json"
+          done
+      - name: Stage only original SHA256-matched 3.1.0 bytes with no false release/rights claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p test_v31_final_release_stage.py -v
+          python -m tools.stage_v31_final_for_review \
+            --full-root full --installed-root installed --output reviewed \
+            --source-sha "$QA_SHA" --qa-run-id "$QA_RUN"
+          (cd reviewed && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path("reviewed/FINAL_QA_MANIFEST.json").read_text("utf-8"))
+          assert len(manifest["installers"])==4
+          assert manifest["actual_installed_gui_verified_on_four_platforms"] is True
+          assert manifest["stable_3_1_0_published"] is False
+          assert manifest["public_release_approved"] is False
+          assert manifest["full_native_relinking_approved"] is False
+          print("All four version-correct installers staged, PRIVATE technical review only.")
+          PY
+      - name: Retain four exact native 3.1.0 packages, source pointers, SHA256 and honest QA manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-FINAL-FOUR-FULL-INSTALLERS-PRIVATE-REVIEW
+          path: reviewed/
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
