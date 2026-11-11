@@ -335,3 +335,7 @@ A focused Linux source-build verifier change now requires real file-backed PT_LO
 
 
 **November 11, 2026 — preserved-native manifest safeguards verified and merged:** [PR #183](https://github.com/MasynNay/anything-plays/pull/183) merged as `d2a51f12` after [source checks 43020604857](https://github.com/MasynNay/anything-plays/actions/runs/43020604857) passed Python 3.12/3.13 and native mGBA compatibility. Seven adversarial synthetic manifest fixtures and one valid fixture verify fail-closed record validation and no mutation of preserved archives on rejection. Production packaging jobs were skipped. Release-critical remaining work: source-built Dolphin in actual four-platform production candidates, exact corresponding source and combined license review, and final installer acceptance. No public v3.0 release; stable v2.0 unchanged.
+
+### November 11, 2026 — preserved native evidence validation (CI pending)
+
+- Focused source staging change rejects malformed SHA-256 strings and ambiguous JSON byte-count types in preserved native manifests; synthetic regression tests cover invalid types and verify archived input bytes are unchanged on rejection. This is **not** source/rights approval or four-platform production installer acceptance. Merge only after exact-head CI passes; stable 2.0 remains unchanged.
