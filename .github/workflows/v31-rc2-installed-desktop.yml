@@ -1,7 +1,8 @@
 name: 3.1 RC2 | Installed full desktop and isolated settings QA
 
-# This is an explicit owner QA step against a COMPLETED source-pinned
-# four-platform full RC2 workflow run; it never publishes GitHub Releases.
+# Reusable acceptance stage immediately after successful RC2 full packaging,
+# or manual recheck of a completed source-pinned full build. Read-only and
+# never publishes, modifies or marks any public release approved.
 on:
   pull_request:
     paths:
@@ -9,6 +10,16 @@ on:
       - 'tools/verify_v31_rc2_installed_ui.py'
       - 'tools/qa_v31_rc2_installed_preferences.py'
       - 'tests/test_v31_rc2_installed_ui.py'
+  workflow_call:
+    inputs:
+      qa_run_id:
+        description: 'Current, already verified caller full RC2 run ID'
+        required: true
+        type: string
+      source_sha:
+        description: 'Original checkout used by this full RC2 build'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       qa_run_id:
@@ -34,6 +45,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -44,7 +58,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v31_rc2_installed_ui.py' -v
 
   real-installed-rc2:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ inputs.qa_run_id != '' && inputs.source_sha != '' }}
     needs: evidence-contracts
     name: Installed frozen 18-console RC2 | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -59,11 +73,12 @@ jobs:
           - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-rc2-full-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
     env:
       GH_TOKEN: ${{ github.token }}
-      QA_RUN: ${{ github.event.inputs.qa_run_id }}
-      SOURCE_SHA: ${{ github.event.inputs.source_sha }}
+      QA_RUN: ${{ inputs.qa_run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.source_sha }}
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -79,7 +94,14 @@ jobs:
           import json, os
           from pathlib import Path
           info=json.loads(Path('qa-run.json').read_text('utf-8'))
-          assert info['conclusion']=='success', 'Full RC2 build has not passed'
+          if info['id'] == int(os.environ['GITHUB_RUN_ID']):
+              # A reusable job runs within the SAME workflow run. Its
+              # 'needs: full-rc2-18-console' prerequisite provides successful
+              # completed assembly before we reach this check. A workflow
+              # cannot simultaneously have conclusion='success' while running.
+              assert info['conclusion'] in (None, 'success'), 'RC2 build failed'
+          else:
+              assert info['conclusion']=='success', 'Full RC2 build has not passed'
           assert info['head_sha']==os.environ['SOURCE_SHA'], 'RC2 source SHA mismatch'
           assert info['event']=='pull_request', 'Not the pinned development QA run'
           assert info['name']=='3.1 RC2 | Distinct four-platform source app identities (unreleased)'
