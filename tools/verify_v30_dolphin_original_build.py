@@ -91,8 +91,15 @@ def verify_original_library(path):
     if not 200_000 < size < 512 * 1024 * 1024:
         raise ValueError("Original Dolphin native library has implausible byte count")
     with path.open("rb") as reader:
-        if reader.read(4) != b"\x7fELF":
+        header = reader.read(20)
+        if header[:4] != b"\x7fELF":
             raise ValueError("Expected real ELF native Dolphin image")
+        # Require ELF64, little-endian, current ELF version, ET_DYN and EM_X86_64.
+        # ELF magic alone does not prove this is a Linux x64 shared library.
+        if (len(header) != 20 or header[4:7] != b"\x02\x01\x01"
+                or int.from_bytes(header[16:18], "little") != 3
+                or int.from_bytes(header[18:20], "little") != 62):
+            raise ValueError("Expected Linux x64 ELF64 shared-library architecture")
     exported = subprocess.check_output(
         ["nm", "-D", "--defined-only", str(path)], text=True,
         timeout=45, stderr=subprocess.PIPE)
