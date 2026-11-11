@@ -20,6 +20,13 @@ function(_anything_plays_original_dolphin_link_group)
       OR NOT TARGET common)
     message(FATAL_ERROR "Original Dolphin source-linked native targets absent")
   endif()
+  # The original native Libretro output is a loadable shared library.
+  # A name-matching STATIC or INTERFACE target must not be accepted as a
+  # corresponding native build even if the two helper archives are intact.
+  get_target_property(_native_type dolphin_libretro TYPE)
+  if(NOT _native_type STREQUAL "SHARED_LIBRARY")
+    message(FATAL_ERROR "Original Dolphin native target is not SHARED_LIBRARY: dolphin_libretro")
+  endif()
   # An upstream target with the expected name but a different kind is not
   # the pinned original static archive. Refuse to attest a source build.
   foreach(_archive_target IN ITEMS common dolphin_libretro_videocontexts)
