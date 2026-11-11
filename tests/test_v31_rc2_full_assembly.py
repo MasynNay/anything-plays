@@ -224,6 +224,39 @@ class Rc2FullBuildTests(unittest.TestCase):
         # authenticate the target against the exact original Linux receipt.
         self.assertIn('"installer": deb.name', source)
 
+    def test_mac_disk_image_retries_only_transient_resource_busy(self):
+        from unittest.mock import Mock
+        from tools.assemble_v31_full_macos import create_disk_image
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            app, dmg = path / "AnythingPlays31RC2.app", path / "rc2.dmg"
+            app.mkdir()
+            fail = Mock(returncode=1, stderr="hdiutil: create failed - Resource busy",
+                        stdout="")
+            def success(*args, **kwargs):
+                dmg.write_bytes(b"test-dmg" * 200000)
+                return Mock(returncode=0, stderr="", stdout="")
+            with patch("tools.assemble_v31_full_macos.subprocess.run",
+                       side_effect=[fail, success]) as run:
+                with patch("tools.assemble_v31_full_macos.time.sleep") as sleep:
+                    create_disk_image(app, dmg, attempts=3)
+                    self.assertEqual(run.call_count, 2)
+                    self.assertEqual(sleep.call_count, 1)
+                    self.assertGreater(dmg.stat().st_size, 1024 * 1024)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app, dmg = root / "Example.app", root / "failed.dmg"
+            app.mkdir()
+            denied = Mock(returncode=1, stdout="",
+                          stderr="hdiutil: create failed - Invalid argument")
+            with patch("tools.assemble_v31_full_macos.subprocess.run",
+                       return_value=denied) as run:
+                with patch("tools.assemble_v31_full_macos.time.sleep") as sleep:
+                    with self.assertRaises(RuntimeError):
+                        create_disk_image(app, dmg)
+                    self.assertEqual(run.call_count, 1)
+                    sleep.assert_not_called()
+
     def test_rc2_does_not_change_historical_rc1_or_preview_names(self):
         self.assertEqual(linux.RC_PREVIEW,
                          "anything-plays-31-rc1_3.1.0~rc1_amd64.deb")

@@ -40,6 +40,38 @@ def command(*args):
     subprocess.run([str(x) for x in args], check=True)
 
 
+def create_disk_image(app, dmg, *, attempts=4):
+    """Retry *only* transient macOS DiskImages busy failures, never bad input.
+
+    Caller always reopens and validates the finished read-only DMG, including
+    the original eleven binary core hashes. No partial image is trusted.
+    """
+    if attempts < 1 or attempts > 5:
+        raise ValueError("Only bounded disk-image create retries are supported")
+    args = ["hdiutil", "create", "-volname", "Anything Plays 3.1 Full QA",
+            "-srcfolder", str(app), "-ov", "-format", "UDZO", str(dmg)]
+    for attempt in range(attempts):
+        if dmg.exists():
+            if dmg.is_symlink() or not dmg.is_file():
+                raise ValueError("Refusing to replace a linked/nonfile DMG")
+            dmg.unlink()
+        try:
+            result = subprocess.run(
+                args, check=False, capture_output=True, text=True, timeout=180,
+            )
+        except subprocess.TimeoutExpired:
+            raise
+        if result.returncode == 0 and dmg.is_file() and dmg.stat().st_size > 1024 * 1024:
+            return
+        details = (result.stderr or "") + "\n" + (result.stdout or "")
+        busy = ("Resource busy" in details or "resource busy" in details)
+        if not busy or attempt == attempts - 1:
+            raise RuntimeError("macOS disk image creation failed: " + details[-2200:])
+        print("DiskImages was temporarily busy; retrying signed QA DMG",
+              attempt + 1, "of", attempts)
+        time.sleep(min(5 * (attempt + 1), 20))
+
+
 @contextmanager
 def mount(dmg, location):
     location.mkdir(parents=True, exist_ok=True)
@@ -163,8 +195,7 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False, *,
                     "AnythingPlays-3.1.0-rc1-full-macos-" if rc1 else
                     "AnythingPlays-3.1.0-preview2-macos-") + arch + ".dmg"
         dmg = output/filename
-        command("hdiutil", "create", "-volname", "Anything Plays 3.1 Full QA",
-                "-srcfolder", app, "-ov", "-format", "UDZO", dmg)
+        create_disk_image(app, dmg)
         with mount(dmg, tmp/"final-dmg"):
             final = tmp/"final-dmg"/app.name
             # Native loading from an attached read-only DMG leaves a library
