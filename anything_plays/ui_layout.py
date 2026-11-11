@@ -118,6 +118,13 @@ class LayoutMixin:
                                   width=15)
         view_combo.pack(side='left', padx=(0, 8))
         view_combo.bind('<<ComboboxSelected>>', lambda _: self.set_view_mode())
+        # Open a clean OBS-capturable display. Its customization panel lives
+        # in a different window and cannot accidentally appear in the stream.
+        self.stream_mode_button = ttk.Button(
+            view_row, text='Stream Mode', command=self.open_stream_mode,
+            style='Accent.TButton',
+        )
+        self.stream_mode_button.pack(side='left', padx=(0, 8))
         self.shortcuts_button = ttk.Button(view_row, text='Game Controls',
                                            command=self.configure_shortcuts)
         self.shortcuts_button.pack(side='right')
