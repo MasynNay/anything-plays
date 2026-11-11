@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from anything_plays.gamepad import (
     AXES, BUTTON_CONST, DEADZONE, DISABLED, SOURCES,
+    STICK_RELEASE_DEADZONE, TRIGGER_THRESHOLD, TRIGGER_RELEASE_THRESHOLD,
     GamepadReader, default_bindings, mapped_buttons, normalize_bindings,
 )
 from anything_plays.libretro_input import IDS, InputBuffer
@@ -214,6 +215,84 @@ class GamepadLifecycleTests(unittest.TestCase):
         self.assertTrue(self.pad.closed)
         self.clock = 3.0
         self.assertFalse(self.reader.poll("gba")[0])
+
+    def test_stick_hysteresis_keeps_buttons_stable_near_threshold(self):
+        self.reader.start()
+        self.pad.axes["LEFTX"] = DEADZONE + 10
+        self.assertEqual(self.reader.poll("gba")[0], {"Right"})
+        # The stick has already crossed the press threshold. Mild drift
+        # back toward center must not stutter through repeated releases.
+        middle = (DEADZONE + STICK_RELEASE_DEADZONE) // 2
+        for value in (DEADZONE - 1, middle, STICK_RELEASE_DEADZONE):
+            self.pad.axes["LEFTX"] = value
+            self.assertEqual(self.reader.poll("gba")[0], {"Right"})
+        self.pad.axes["LEFTX"] = STICK_RELEASE_DEADZONE - 1
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+        self.pad.axes["LEFTX"] = middle
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+        self.pad.axes["LEFTX"] = DEADZONE
+        self.assertEqual(self.reader.poll("gba")[0], {"Right"})
+
+    def test_opposing_stick_directions_share_one_read_per_axis(self):
+        self.reader.start()
+        calls = []
+        original = self.pad.get_axis
+
+        def unstable_driver(code):
+            calls.append(code)
+            if code == "LEFTX":
+                return (DEADZONE + 1 if calls.count(code) == 1
+                        else -(DEADZONE + 1))
+            return original(code)
+
+        self.pad.get_axis = unstable_driver
+        held, _status = self.reader.poll("gba")
+        self.assertEqual(held, {"Right"})
+        self.assertEqual(calls.count("LEFTX"), 1)
+        self.assertEqual(calls.count("LEFTY"), 1)
+        self.assertEqual(calls.count("RIGHTX"), 1)
+        self.assertEqual(calls.count("RIGHTY"), 1)
+
+    def test_trigger_hysteresis_is_independent_for_both_sides(self):
+        self.reader.start()
+        self.pad.axes = {
+            "TRIGGERLEFT": TRIGGER_THRESHOLD + 1,
+            "TRIGGERRIGHT": TRIGGER_RELEASE_THRESHOLD + 100,
+        }
+        self.assertEqual(self.reader.poll("gba")[0], {"L"})
+        middle = (TRIGGER_THRESHOLD + TRIGGER_RELEASE_THRESHOLD) // 2
+        self.pad.axes["TRIGGERLEFT"] = middle
+        self.assertEqual(self.reader.poll("gba")[0], {"L"})
+        self.pad.axes["TRIGGERLEFT"] = TRIGGER_RELEASE_THRESHOLD - 1
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+        self.pad.axes["TRIGGERLEFT"] = middle
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+
+    def test_reconnect_clears_stick_and_trigger_hysteresis_latches(self):
+        self.reader.start()
+        self.pad.axes = {
+            "LEFTX": DEADZONE + 1,
+            "TRIGGERLEFT": TRIGGER_THRESHOLD + 1,
+        }
+        self.assertEqual(self.reader.poll("gba")[0], {"Right", "L"})
+        self.pad.connected = False
+        self.api.count = 0
+        self.assertFalse(self.reader.poll("gba")[0])
+        self.assertFalse(self.reader._active_axes)
+        self.assertFalse(self.reader._active_triggers)
+
+        self.api.pad = FakePad()
+        self.api.pad.axes = {
+            "LEFTX": (DEADZONE + STICK_RELEASE_DEADZONE) // 2,
+            "TRIGGERLEFT": (TRIGGER_THRESHOLD + TRIGGER_RELEASE_THRESHOLD) // 2,
+        }
+        self.api.count = 1
+        self.clock = 3.0
+        # The next controller must cross *press* thresholds afresh.
+        self.assertEqual(self.reader.poll("gba")[0], frozenset())
+        self.reader.refresh()
+        self.assertFalse(self.reader._active_axes)
+        self.assertFalse(self.reader._active_triggers)
 
     def test_quit_releases_controller_subsystems(self):
         self.reader.start()
