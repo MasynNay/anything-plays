@@ -92,27 +92,27 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
         with TemporaryDirectory() as temp:
             native = Path(temp) / "dolphin_libretro.so"
             header = bytearray(20)
-            header[:4] = b"\\x7fELF"
-            header[4:7] = b"\\x02\\x01\\x01"
+            header[:4] = b"\x7fELF"
+            header[4:7] = b"\x02\x01\x01"
             header[16:18] = (3).to_bytes(2, "little")
             header[18:20] = (62).to_bytes(2, "little")
             for offset, replacement in (
-                (4, b"\\x01"),            # ELF32
-                (5, b"\\x02"),            # big endian
-                (6, b"\\x00"),            # unsupported ELF version
+                (4, b"\x01"),            # ELF32
+                (5, b"\x02"),            # big endian
+                (6, b"\x00"),            # unsupported ELF version
                 (16, (2).to_bytes(2, "little")),  # ET_EXEC
                 (18, (183).to_bytes(2, "little")), # AArch64
             ):
                 invalid = bytearray(header)
                 invalid[offset:offset + len(replacement)] = replacement
-                native.write_bytes(bytes(invalid) + b"\\0" * 200_000)
+                native.write_bytes(bytes(invalid) + b"\0" * 200_000)
                 with patch.object(candidate.subprocess, "check_output") as nm:
                     with self.subTest(offset=offset):
                         with self.assertRaisesRegex(ValueError, "ELF64 shared-library architecture"):
                             candidate.verify_original_library(native)
                     nm.assert_not_called()
-            native.write_bytes(bytes(header) + b"\\0" * 200_000)
-            symbols = "\\n".join("00000000 T " + symbol for symbol in candidate.MANDATORY_LIBRETRO_SYMBOLS)
+            native.write_bytes(bytes(header) + b"\0" * 200_000)
+            symbols = "\n".join("00000000 T " + symbol for symbol in candidate.MANDATORY_LIBRETRO_SYMBOLS)
             with patch.object(candidate.subprocess, "check_output", return_value=symbols):
                 proof = candidate.verify_original_library(native)
             self.assertEqual(proof["native_size_bytes"], native.stat().st_size)
