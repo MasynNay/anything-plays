@@ -9,6 +9,14 @@ The public [3.1 RC2 test release](https://github.com/MasynNay/anything-plays/rel
 
 The post-RC2 source hardening in [PR #197](https://github.com/MasynNay/anything-plays/pull/197) has also been merged after Python 3.12, Python 3.13, native mGBA and GUI smoke checks passed: an unplugged webcam whose status probe fails no longer leaves its private last frame visible in Stream Output. **This later fix is on main, not inside the immutable public RC2 installer assets.** It must be included in a newly built and revalidated candidate before being claimed as shipped.
 
+## Post-RC2 verified four-platform packaging — November 11, 2026
+
+**New source and complete native installer QA PASSED 4/4** for exact revision `26fdc6cf9399ea0fd79665850089471f5ffec70d` in [GitHub Actions run 43094552705](https://github.com/MasynNay/anything-plays/actions/runs/43094552705). All four independent source stages, all four original-core 18-console installer assemblies, the installed-desktop receipt/migration contracts, and all four **actual installed frozen Tk GUI / Stream Mode / settings-isolation** jobs completed successfully on Windows x64, Linux x64, macOS Intel and macOS Apple Silicon. Twelve named source/full/installed evidence artifacts were retained and verified as present in the run.
+
+The companion [source/package checks run 43094552640](https://github.com/MasynNay/anything-plays/actions/runs/43094552640) passed Python 3.12 and 3.13 tests, native mGBA compatibility and Windows, Linux and both macOS package jobs. The Mac packaging script's empty optional PyInstaller argument bug was fixed for macOS Bash 3.2 and verified on both architectures. An initial Apple Silicon upload-artifact backend failure returned invalid HTML after the native build itself succeeded; failed jobs were retried against the **same immutable source SHA** and completed successfully. [Source changes and verification merged in PR #198](https://github.com/MasynNay/anything-plays/pull/198).
+
+**Important distinctions:** These are **private source-pinned RC2-identity QA installers**, produced after the public RC2 was published. They contain the post-RC2 camera-disconnect privacy fix but are *not* fresh stable `3.1.0` packages and were **not** uploaded to a public GitHub Release. Public RC2 assets and stable 3.0 are unchanged. No physical-camera, physical-gamepad, representative retail-game, extended-session or full native LGPL/source/relinking release gate is closed by synthetic and installed-UI acceptance alone.
+
 ## Owner Linux RC2 installation check — November 11, 2026
 
 **User-reported PASS, limited scope:** The project owner installed the public 3.1 RC2 Linux `.deb` package on a real Linux desktop and confirmed the application **launches successfully**. This is a useful real-device installation/startup check in addition to the four-platform automated installed-app acceptance. It is not independent CI evidence or proof of sustained compatibility.
