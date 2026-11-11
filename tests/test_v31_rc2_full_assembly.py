@@ -197,6 +197,25 @@ class Rc2FullBuildTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         core_names_for_build()
 
+    def test_windows_full_installer_is_exported_under_actual_rc2_name(self):
+        self.assertEqual(
+            win.full_installer_filename(rc2=True),
+            "AnythingPlaysSetup-3.1.0-rc2-full.exe",
+        )
+        self.assertEqual(win.full_installer_filename(rc1=True), win.RC_FULL)
+        self.assertEqual(win.full_installer_filename(), win.FULL)
+        with self.assertRaises(ValueError):
+            win.full_installer_filename(rc1=True, rc2=True)
+        # This helper must actually drive the generated installer export;
+        # a correctly selected filename in metadata but the wrong EXE path
+        # previously produced a 14 KB report-only artifact on Windows.
+        source = (Path(__file__).resolve().parents[1] /
+                  "tools/assemble_v31_full_windows.py").read_text("utf-8")
+        self.assertIn(
+            "target = output/full_installer_filename(rc1=rc1, rc2=rc2)",
+            source,
+        )
+
     def test_rc2_does_not_change_historical_rc1_or_preview_names(self):
         self.assertEqual(linux.RC_PREVIEW,
                          "anything-plays-31-rc1_3.1.0~rc1_amd64.deb")
