@@ -6,6 +6,25 @@ Do not mark 3.1 as stable until the acceptance criteria in
 
 ## What's new
 
+- **Streamer-ready Stream Mode:** One independent, OBS-friendly composite
+  window places the live game and annotated camera in a Nintendo DS-inspired
+  two-screen arrangement. Use **Ctrl+Shift+S** or **Stream Mode** beside
+  View mode to open a clean Stream Output window and a separate customization
+  window; OBS Window Capture can select the output without exposing settings.
+  Choose **DS stacked** or **Side by side**, swap screen positions, change the
+  game/camera proportion, choose 15/24/30 FPS, toggle screen labels, and
+  customize border width, color and all 16 existing themes. Resizing preserves
+  source aspect ratios. Anything Plays itself never transmits or records.
+  External emulators without built-in capture show truthful placeholders.
+- **Better camera and game screen bezels:** Theme-aware housings around the
+  regular preview panes, with different camera and console visual details,
+  readable **STANDBY / CAMERA ON** and **NO GAME / SESSION** status, matching
+  the actual device and emulator lifecycle. Decorative frames do not alter
+  or filter the tracked camera or emulator pixels.
+- **Safer stream disconnection handling:** When a webcam disconnects or
+  its status query raises a driver error, Stream Mode clears the last
+  camera frame rather than leaving a frozen private image visible to viewers.
+  Intentional reference images stay explicitly labeled and available.
 - **Automatic controller recovery:** Momentary SDL device enumeration
   and event-queue failures safely release held controller input and
   retry without silently disabling a saved gamepad preference. Driver
