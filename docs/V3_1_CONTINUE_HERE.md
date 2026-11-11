@@ -34,7 +34,7 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 
 **Latest PR #199 source-check suite 43120583722 is GREEN 7/7 non-skipped jobs:** Python 3.12 and 3.13 unit/regression suites, native mGBA, Windows/Linux packaging and both Intel/Apple Silicon macOS package checks all completed successfully. The virtual-controller matrix entry was deliberately skipped. This verifies source and minimal packages, **not** the final 11-core full installers.
 
-**Latest full 3.1.0 private identity run 43120583726:** genuine 3.1.0 Windows and Linux source-stage installers **passed**. At last check Intel macOS source build was in progress and Apple Silicon queued. Full original-core assembly and final installed desktop jobs are **not yet verified** in this run. Never merge PR #199 based only on source stage or this checkpoint. [Run](https://github.com/MasynNay/anything-plays/actions/runs/43120583726).
+**Latest full 3.1.0 private identity run 43120583726:** genuine 3.1.0 Windows, Linux and Intel macOS source-stage installers **PASSED and uploaded source-stage artifacts**. Apple Silicon was queued at last check. This is 3/4 source stages, **not 3/4 full 11-core installers**. Full original-core assembly and final installed desktop jobs are **not yet verified** in this run. Never merge PR #199 based only on source stage or this checkpoint. [Run](https://github.com/MasynNay/anything-plays/actions/runs/43120583726).
 
 ## Exact next actions
 
