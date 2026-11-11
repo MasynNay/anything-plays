@@ -64,7 +64,7 @@ def check_inputs(stable, preview, sums, receipt, rc1=False, *, rc2=False,
         raise ValueError("Fresh 3.1 source-stage artifact mismatch")
     if rc2:
         require_rc2_receipt(info, source=source_sha, target="windows-x64",
-                            installer=preview_name, digest=hash_file(preview))
+                            installer=preview_name, digest=hash_file(preview, size=preview.stat().st_size)
     return hash_file(stable)
 
 
