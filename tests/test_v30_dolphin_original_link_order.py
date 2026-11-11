@@ -189,5 +189,46 @@ add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
                         )
 
 
+
+    def test_imported_targets_cannot_masquerade_as_original_source(self):
+        """Imported binaries can report the right CMake TYPE without compiling source."""
+        self.assertTrue(FIX.is_file())
+        for replaced_target in ("dolphin_libretro", "common",
+                                "dolphin_libretro_videocontexts"):
+            with self.subTest(target=replaced_target):
+                with TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    lines = [
+                        "cmake_minimum_required(VERSION 3.25)",
+                        "project(imported_original_source_impostor CXX)",
+                        'file(WRITE "${CMAKE_BINARY_DIR}/stub.cpp" "int stub(){return 1;}\\n")',
+                    ]
+                    for target, kind in (
+                        ("common", "STATIC"),
+                        ("dolphin_libretro_videocontexts", "STATIC"),
+                        ("dolphin_libretro", "SHARED"),
+                    ):
+                        if target == replaced_target:
+                            lines.append(f"add_library({target} {kind} IMPORTED GLOBAL)")
+                        else:
+                            lines.append(
+                                f'add_library({target} {kind} "${{CMAKE_BINARY_DIR}}/stub.cpp")'
+                            )
+                    (root / "CMakeLists.txt").write_text(
+                        "\n".join(lines) + "\n", encoding="utf-8"
+                    )
+                    result = subprocess.run(
+                        ["cmake", "-S", str(root), "-B", str(root / "build"),
+                         "-G", "Ninja", f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={FIX}"],
+                        capture_output=True, text=True, timeout=35,
+                    )
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    import re
+                    diagnostic = re.sub(r"\s+", " ", result.stdout + result.stderr)
+                    self.assertIn(
+                        f"Original Dolphin source target is IMPORTED: {replaced_target}",
+                        diagnostic,
+                    )
+
 if __name__ == "__main__":
     unittest.main()
