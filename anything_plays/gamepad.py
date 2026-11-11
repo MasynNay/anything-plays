@@ -40,7 +40,9 @@ AXES = {
     "RIGHT_STICK_DOWN": ("RIGHTY", 1),
 }
 DEADZONE = 12000  # SDL signed-stick range is -32768..32767.
+STICK_RELEASE_DEADZONE = 9000  # Hysteresis prevents jitter near activation.
 TRIGGER_THRESHOLD = 15000
+TRIGGER_RELEASE_THRESHOLD = 11000
 SCAN_INTERVAL = 1.5
 
 
@@ -113,6 +115,10 @@ class GamepadReader:
         # Raw input is for the settings dialog only, independent of mappings
         # and whether an emulator is currently running.
         self.physical_buttons = frozenset()
+        # These input latches are per connected device, not saved settings.
+        # Clear on disconnect, rescan, disabled input or shutdown.
+        self._active_axes = frozenset()
+        self._active_triggers = frozenset()
         self.last_scan = float("-inf")
         # A transient SDL enumeration/event error must not permanently
         # disable the user's saved controller setting or spin every 65 ms.
@@ -152,6 +158,8 @@ class GamepadReader:
         device, self.controller = self.controller, None
         self.name = ""
         self.physical_buttons = frozenset()
+        self._active_axes = frozenset()
+        self._active_triggers = frozenset()
         if device is not None:
             try:
                 device.quit()
@@ -199,6 +207,8 @@ class GamepadReader:
         """Return (held emulated buttons, human-readable connection status)."""
         if self.api is None:
             self.physical_buttons = frozenset()
+            self._active_axes = frozenset()
+            self._active_triggers = frozenset()
             return frozenset(), "Controller disabled"
         # Event pumping and enumeration may throw during an SDL hotplug race.
         # Treat these as temporary input outages, not a reason for the GUI to
@@ -227,20 +237,43 @@ class GamepadReader:
                 code = self._sdl_constant("CONTROLLER_BUTTON_" + name)
                 if pad.get_button(code):
                     physical.add(source)
+            # Sample each signed stick axis only once per frame. A driver
+            # may change its state between reads, so separate reads for
+            # LEFT_STICK_LEFT/RIGHT can otherwise contradict one another.
+            axis_values = {}
+            next_axes = set()
             for source, (axis, direction) in AXES.items():
-                code = self._sdl_constant("CONTROLLER_AXIS_" + axis)
-                if direction * pad.get_axis(code) >= DEADZONE:
+                if axis not in axis_values:
+                    code = self._sdl_constant("CONTROLLER_AXIS_" + axis)
+                    axis_values[axis] = pad.get_axis(code)
+                # Apply a lower release threshold only *after* activation.
+                # Small analog fluctuations no longer flicker a game button.
+                threshold = (STICK_RELEASE_DEADZONE
+                             if source in self._active_axes else DEADZONE)
+                if direction * axis_values[axis] >= threshold:
+                    next_axes.add(source)
                     physical.add(source)
+            next_triggers = set()
             for name in ("LEFT", "RIGHT"):
+                source = name + "_TRIGGER"
                 code = self._sdl_constant("CONTROLLER_AXIS_TRIGGER" + name)
-                if pad.get_axis(code) >= TRIGGER_THRESHOLD:
-                    physical.add(name + "_TRIGGER")
+                threshold = (TRIGGER_RELEASE_THRESHOLD
+                             if source in self._active_triggers
+                             else TRIGGER_THRESHOLD)
+                if pad.get_axis(code) >= threshold:
+                    next_triggers.add(source)
+                    physical.add(source)
         except Exception:
             # A device can disappear between attached() and a button read.
             # Clear the snapshot now; rescan automatically on the next poll.
             self._close_device()
             self.last_scan = float("-inf")
             return frozenset(), "Controller disconnected · Scanning again"
+        # Commit the entire new sample only once all SDL calls succeed.
+        # On any exception, _close_device clears these latches and all held
+        # inputs; an unplugged controller cannot keep a direction pressed.
+        self._active_axes = frozenset(next_axes)
+        self._active_triggers = frozenset(next_triggers)
         self.physical_buttons = frozenset(physical)
         return mapped_buttons(system, physical, bindings), self.name + " connected"
 
