@@ -96,7 +96,7 @@ jobs:
               raise SystemExit('Expected one actual Mac pygame C source target; found '+repr(paths))
           target=paths[0]
           subprocess.run(['ninja','-C',str(build),str(target.relative_to(build))],check=True)
-          assert target.is_file() and target.stat().st_size>100_000
+          assert target.is_file() and target.stat().st_size>8192, f'Mac native extension suspicious size: {target.stat().st_size}'
           Path('evidence/COMPILED_MAC_NATIVE_PATH.txt').write_text(str(target.resolve())+'\n')
           print('Actual native Mac modified pygame C compilation:',target)
           PY

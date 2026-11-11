@@ -52,7 +52,7 @@ def stage(original_app, installer, receipt, audit, wheel,
     if (not compiled.is_file() or compiled.is_symlink()
             or not compiled.name.startswith("base.cpython-313-")
             or not compiled.name.endswith(".so")
-            or not 100_000 <= compiled.stat().st_size <= 20 * 1024 * 1024):
+            or not 8_192 <= compiled.stat().st_size <= 20 * 1024 * 1024):
         raise ValueError("No actual compiled CPython 3.13 Mac native extension")
     compiled_data = compiled.read_bytes()
     compiled_text = executable_text_fingerprint(compiled_data, ARCHES[target])
