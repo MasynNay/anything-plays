@@ -1,7 +1,15 @@
 # Anything Plays 3.1 — Release acceptance
 
-**Status: RC1 PUBLIC PRERELEASE, NOT READY FOR FINAL STABLE 3.1.0.** This document tracks evidence,
+**Status: RC2 PUBLIC PRERELEASE, NOT READY FOR FINAL STABLE 3.1.0.** This document tracks evidence,
 not a promise of a release date. Stable 3.0 stays public and untouched.
+
+## Current release state — November 11, 2026
+
+The public [3.1 RC2 test release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) offers four checked platform installers with customizable dual-screen Stream Mode, camera/emulator bezels and optional gamepad controls. The [complete RC2 native and installed-GUI acceptance run](https://github.com/MasynNay/anything-plays/actions/runs/43079085633) passed for Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. It covers 18 console profiles using the 11 original source-built core families. These are CI and installed-app tests, **not** general physical webcam/controller, retail-game, save or long-session certification.
+
+The post-RC2 source hardening in [PR #197](https://github.com/MasynNay/anything-plays/pull/197) has also been merged after Python 3.12, Python 3.13, native mGBA and GUI smoke checks passed: an unplugged webcam whose status probe fails no longer leaves its private last frame visible in Stream Output. **This later fix is on main, not inside the immutable public RC2 installer assets.** It must be included in a newly built and revalidated candidate before being claimed as shipped.
+
+**Still required before stable 3.1.0:** real cameras and controllers on supported hardware; actual gameplay, audio, save and extended-session checks; complete native corresponding-source and LGPL relinking/replacement review; fresh stable-version binaries, signed/notarization limitations and exact checksum/source receipts; final release notes and explicit stable-release decision. All six existing stable release gates remain false.
 
 **New verified native RC1 audits:** SDL source/wheel checks, signed Mac
 library inspection, duplicate SDL2 detection, two-architecture
