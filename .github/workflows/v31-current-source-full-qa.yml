@@ -74,9 +74,24 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
-            python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+          # GitHub-hosted Ubuntu mirrors have intermittently failed DNS.
+          # Keep Linux checks mandatory, but retry with bounded timeouts.
+          # Never install unauthenticated packages or ignore apt failures.
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
+                install -y --no-install-recommends \
+                python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1
+              break
+            fi
+            echo "::warning::Ubuntu apt mirror failed, attempt $attempt of 3"
+            sleep "$((attempt * 10))"
+          done
+          test "$ok" = 1
       - name: Install Windows Inno Setup
         if: runner.os == 'Windows'
         shell: pwsh
@@ -146,7 +161,10 @@ jobs:
           compression-level: 0
 
   full-18-console-qa:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    # Do not discard independently verified Windows/Mac source artifacts
+    # because one unrelated Ubuntu apt mirror/DNS download has failed.
+    # Each matrix leg still requires its *own* complete source artifact.
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     needs: fresh-source-app
     name: Full 18-console current 3.1 QA | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -206,9 +224,19 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
-            libgl1 libegl1 libglib2.0-0 libportaudio2
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 \
+              -o Acquire::https::Timeout=20 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
+                install -y --no-install-recommends libgl1 libegl1 libglib2.0-0 libportaudio2; then
+              ok=1
+              break
+            fi
+            sleep "$((attempt * 10))"
+          done
+          test "$ok" = 1
       - name: Install Windows Inno Setup and icon prerequisites
         if: runner.os == 'Windows'
         shell: pwsh
