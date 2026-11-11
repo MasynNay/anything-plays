@@ -93,6 +93,33 @@ jobs:
             --linkage "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json" \
             --target "${{ matrix.target }}" \
             --output "evidence/MACOS_SIGNED_RPATH_${{ matrix.arch }}.json"
+          # These counts belong to the immutable, source-pinned RC1 DMGs.
+          # SDL2 library self-identities are not additional missing consumers.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          target = "${{ matrix.target }}"
+          expected = {
+              "macos-arm64": (83, 79, 4),
+              "macos-x64": (82, 79, 3),
+          }[target]
+          report = json.loads(Path(
+              "evidence/MACOS_SIGNED_RPATH_${{ matrix.arch }}.json"
+          ).read_text("utf-8"))
+          actual = (
+              report["sdl2_referencing_images"],
+              report["native_images_with_direct_pinned_hash_candidate"],
+              len(report["sdl2_self_library_or_alias_entries"]),
+          )
+          assert actual == expected, (target, actual, expected)
+          assert report["native_consumers_without_direct_pinned_hash_candidate"] == []
+          assert report["all_consumer_images_have_direct_hash_candidate"] is True
+          assert report["full_dyld_loader_chain_resolved"] is False
+          assert report["live_loaded_sdl_image_proven"] is False
+          assert report["lgpl_redistribution_approved"] is False
+          assert report["stable_3_1_release_approved"] is False
+          print(target, "source-pinned signed runpath coverage:", actual)
+          PY
       - name: Archive technical evidence without publishing or approving release
         if: always()
         uses: actions/upload-artifact@v4
