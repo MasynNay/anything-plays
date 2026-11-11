@@ -45,3 +45,45 @@
   border-radius: 23%;
   clip-path: inset(0 round 23%);
 }
+
+
+/* 3.1 RC2 Stream Mode. This is clearly labeled schematic artwork, never
+   a fabricated real gameplay screenshot. It respects the existing palette. */
+.stream-section{padding-top:85px}
+.stream-layout{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(290px,.88fr);gap:clamp(22px,4vw,64px);align-items:center}
+.stream-illustration{min-width:0;padding:clamp(17px,3vw,29px);border:1px solid #466d96;border-radius:21px;background:radial-gradient(ellipse at 48% 31%,#1f3560,#101b36 60%,#091329);box-shadow:0 24px 56px #0005,inset 0 0 65px #7bb6ed08;overflow:hidden}
+.stream-topline,.stream-footnote{display:flex;align-items:center;justify-content:space-between;gap:12px;font:10px/1.5 var(--mono);letter-spacing:.07em;color:#bad1df}
+.stream-topline{padding-bottom:20px;border-bottom:1px solid #7d9bbd35}
+.stream-footnote{padding-top:21px;border-top:1px solid #7d9bbd35;font-size:9px;color:#86a9c3}
+.stream-live{color:var(--aqua)}
+.stream-handheld{width:min(420px,88%);margin:27px auto;filter:drop-shadow(0 16px 28px #0008)}
+.stream-screen{border:8px solid #60cdd6;padding:8px;border-radius:17px;background:#09152a;box-shadow:inset 0 0 0 1px #ffffff24,0 0 0 5px #143552}
+.stream-screen-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:25px;padding:3px 11px;background:#142c44;color:#f1f9ff;font:700 10px var(--mono);letter-spacing:.09em;border-radius:4px 4px 0 0}
+.stream-screen-bar small{font:9px var(--mono);color:#8de9eb}
+.stream-landscape{height:clamp(125px,19vw,194px);position:relative;overflow:hidden;isolation:isolate;background:linear-gradient(#2b4768 0%,#416887 53%,#5b8290 54%,#183b52 100%);border:1px solid #638ba5}
+.stream-sun{position:absolute;top:18%;right:22%;width:42px;height:42px;border-radius:50%;background:#f7cf9c;box-shadow:0 0 44px #f5ca93a8}
+.stream-hill{position:absolute;bottom:-55px;border-radius:50%;width:130%;height:155px;left:-20%;transform:rotate(5deg)}
+.stream-hill-back{background:#2a5e69;bottom:-38px;left:25%;transform:rotate(-8deg)}
+.stream-hill-front{background:#123c58;bottom:-72px}
+.stream-hinge{height:25px;display:flex;align-items:center;justify-content:center;gap:7px;position:relative}
+.stream-hinge:before{content:"";width:42%;height:4px;background:#78bbcb;border-radius:8px;position:absolute}
+.stream-hinge span{width:4px;height:4px;background:#9cdae7;border-radius:50%;z-index:1}
+.stream-hinge b{position:absolute;width:65px;height:13px;border-radius:5px;background:#16405c;border:2px solid #68b5c4}
+.stream-tracking{height:clamp(110px,16vw,173px);display:grid;grid-template-columns:repeat(3,1fr);align-items:center;justify-items:center;position:relative;overflow:hidden;background:linear-gradient(90deg,#73bdda14 1px,transparent 1px),linear-gradient(#73bdda14 1px,transparent 1px),radial-gradient(circle at 43% 50%,#234e64,#102b3a);background-size:33.33% 100%,100% 33.33%,auto}
+.stream-tracking:before,.stream-tracking:after{content:"";position:absolute;inset:5px;border:1px solid #6bcae75c;pointer-events:none}
+.stream-tracking:after{inset:25px;border-color:#6bcae72c}
+.stream-tracker{position:absolute;left:44%;top:48%;transform:translate(-50%,-50%);display:grid;place-items:center;color:#dbfaff;font-size:48px;text-shadow:0 0 29px #78e6fb;background:#2e788d5a;border:1px solid #94e4e5;border-radius:50%;width:72px;height:72px;box-shadow:0 0 0 6px #6bddf22a}
+.stream-grid-label{z-index:1;font:700 10px var(--mono);letter-spacing:.1em;color:#8dc4d2}
+.stream-grid-label:nth-of-type(2){grid-column:1;grid-row:1}
+.stream-grid-label:nth-of-type(3){grid-column:3;grid-row:1}
+.stream-grid-label:nth-of-type(4){grid-column:2;grid-row:3}
+.stream-copy{display:flex;flex-direction:column;align-items:flex-start;gap:19px;min-width:0}
+.stream-copy h3{font-size:clamp(31px,3vw,48px);letter-spacing:-.068em;line-height:1.05}
+.stream-copy>p:not(.eyebrow){font-size:15px;line-height:1.8;color:var(--text)}
+.stream-copy .stream-disclaimer{font-size:12px!important;color:#91b3c9!important}
+.stream-benefits{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+.stream-benefits li{display:flex;gap:13px;align-items:flex-start;font-size:14px;line-height:1.65;color:#d8eaf2}
+.stream-benefits li:before{content:"✳";color:var(--aqua);flex:none}
+.stream-copy .action{margin-top:5px}
+@media(max-width:910px){.stream-layout{grid-template-columns:1fr}.stream-illustration{max-width:650px;width:100%;margin:0 auto}.stream-copy{max-width:650px}.stream-landscape{height:178px}.stream-tracking{height:160px}}
+@media(max-width:580px){.stream-section{padding-top:25px}.stream-illustration{padding:14px}.stream-topline,.stream-footnote{font-size:8px}.stream-handheld{width:min(380px,94%)}.stream-screen{border-width:5px;padding:5px}.stream-landscape{height:135px}.stream-tracking{height:120px}.stream-screen-bar{font-size:8px;padding:4px 6px}.stream-screen-bar small{font-size:8px}.stream-tracker{width:53px;height:53px;font-size:30px}.stream-copy{gap:15px}}

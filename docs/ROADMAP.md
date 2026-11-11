@@ -11,7 +11,7 @@
 | **1.5** — Original desktop application | Released | Camera-driven controls and local emulation |
 | **2.0** — Expanded studio | Released | Game Boy, Game Boy Color, GBA, SNES; ROM libraries, themes and configurable zones |
 | **3.0** — Unified offline console library | **Released · November 9, 2026** | 18 console profiles using 11 original-source-built cores, including Nintendo 64 and GameCube |
-| **3.1** — Optional gamepad input | **Public RC1 prerelease · November 10, 2026** | [Four-platform RC1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1); controller mapping, live tester and diagnostics; hardware and native licensing review pending |
+| **3.1** — Stream Mode, optional gamepads and themed bezels | **Public RC2 prerelease · November 11, 2026** | [Four-platform RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2); customizable dual-screen OBS output, separate stream settings, live controller tester; hardware and full native source/relinking review still open |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
 **3.1 Windows modified-source native C milestone:** [Genuine Windows MSVC compile and copied RC1 runtime](https://github.com/MasynNay/anything-plays/actions/runs/42953456034) **PASSED**. The upstream pinned SDL2 2.32.10 SDK, source changes, PE AMD64 identity, observable native method, and actual frozen Tk desktop were checked. Combined with prior Linux and Mac tests, **all four platforms** pass source-modified pygame C tests, not just official-wheel swaps. All stable-release licensing, source correspondence, and real-device requirements remain open. [Full Windows evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md).
@@ -29,11 +29,19 @@ and [official OpenCV follow-up](https://github.com/MasynNay/anything-plays/actio
 pygame/SDL native executable text sections to pinned upstream wheels.
 The complete source and LGPL relinking reviews remain open.
 
-**3.1 current verification:** The 3.1 RC1 application, 18-console QA
+**3.1 RC2 verification:** The independent RC2 build and installed Stream Mode
+startup checks were added across all four native CI hosts, with a complete
+18-console original-source installer set, isolated 3.0/RC1 settings and
+exact SHA-256 provenance. See the [RC2 four-platform acceptance run](https://github.com/MasynNay/anything-plays/actions/runs/43079085633) and
+[Stream Mode design and limitations](V3_1_STREAM_MODE.md).
+Physical camera/controller testing and full corresponding-source/relinking
+review are not certified. 3.0.0 remains the most recent *stable* release.
+
+**Historical RC1 verification:** The 3.1 RC1 application, 18-console QA
 installers and installed GUI checks passed on all four OS targets;
 [six pinned pygame/SDL original-source candidates](https://github.com/MasynNay/anything-plays/actions/runs/42909893531)
 were also preserved. The hardware gameplay, full LGPL source/relinking and
-final stable release requirements remain open. The public [3.1 RC1 prerelease](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1) is downloadable now; 3.0.0 remains the latest stable release until final 3.1.0 acceptance.
+final stable release requirements remain open. The original public [3.1 RC1 prerelease](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1) remains available; the new [3.1 RC2 prerelease](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) contains Stream Mode. Stable 3.0.0 remains latest until final 3.1.0 acceptance.
 **3.1 endurance QA:** [Three-minute Linux source soak](https://github.com/MasynNay/anything-plays/actions/runs/42909405091) passed with 10,371 synthetic game frames, active SDL input polling, and 0.05 MB
 measured RSS growth. This does not certify a physical gamepad or
 retail ROM endurance. Five original SDL license texts were also preserved
@@ -69,7 +77,7 @@ Individual game compatibility, graphics performance, physical cameras, save type
 
 The distinction between technical source proof and upstream licensing obligations is explained in [the source audit](V3_0_EXACT_RUNTIME_LICENSE_SCOPE.md) and [release assessment](V3_0_SOURCE_FIRST_RELEASE_DECISION.md). These details belong in the engineering documentation, not the landing page.
 
-See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before considering a public release.
+See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before considering a **stable 3.1.0** release.
 
 ### Preview 1 packaging and owner QA (unreleased)
 
@@ -78,7 +86,23 @@ See the [3.1 release acceptance checklist](V3_1_RELEASE_ACCEPTANCE.md) before co
 - This is deliberately an initial controller and GUI acceptance build containing only the mGBA native core (GB, GBC, GBA). Other system selections may be visible but their cores are not included, and the full 18-system offline package is **not** claimed.
 - Test users should verify real controller recognition and button remapping first; complete physical-device and redistribution approvals remain future release gates.
 
-## 3.1 — Controls and usability (public RC1 prerelease; stable development continues)
+## 3.1 — Stream Mode and controls (public RC2 prerelease; stable acceptance ongoing)
+
+**What RC2 adds:** The real desktop Stream Mode mirrors current embedded
+gameplay and annotated camera tracking into a dedicated, resizable OBS Window
+Capture surface with an original DS-inspired dual-screen bezel. A separate
+settings window customizes portrait/landscape arrangement, game/camera order,
+16 themes, border color/thickness, screen proportions, labels and
+15/24/30 FPS refresh; Stream Mode never opens a second webcam or emulator.
+Output settings migrate safely into the independent RC2 preferences space.
+The source-level dual-screen renderer, Tk smoke and four-platform installed
+acceptance tests are documented in [Stream Mode](V3_1_STREAM_MODE.md).
+External emulators may need their own OBS capture. Audio comes from OBS,
+not from a new streaming/recording service within Anything Plays.
+
+**Historical RC1 scope:** Public RC1 introduced controller mapping, visual
+button feedback, hotplug recovery, and isolation from stable 3.0. The record
+below captures its verified test milestones and is retained for provenance.
 
 **Newest verified 3.1 RC1 (November 10, 2026):**
 four platform-native application builds with the atomic settings fix
@@ -117,8 +141,10 @@ All packages remain temporary nonrelease QA, and hardware, native
 corresponding-source/LGPL and stable-release gates remain OPEN.
 
 
-**Development only:** Work is isolated on `feature/v3.1-controls-usability`.
-No 3.1 installers or release tags have been published; 3.0 remains stable.
+**Release channels:** Stable 3.0 installers and original core sources remain
+available. Public RC1 and RC2 are distinct, genuinely built 3.1 prereleases;
+they are **not** approved stable 3.1.0 installers. The RC2 development branch
+and source-pinned QA receipts track the current release candidate separately.
 
 - Game Controls button replaces the old Keyboard shortcuts label above gameplay.
 - Step 8 now has a dedicated Keyboard Shortcuts button; both open editable per-console keyboard keys.
