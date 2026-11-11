@@ -88,7 +88,7 @@ class Rc2FullBuildTests(unittest.TestCase):
                               1048577)
         self.assertTrue(require_rc2_receipt(
             good, source=SHA, target="windows-x64",
-            installer=win.RC2_PREVIEW, digest="c" * 64
+            installer=win.RC2_PREVIEW, digest="c" * 64, size=1048577
         ))
         for key, value in (
             ("schema_version", 2), ("status", "APPROVED"),
@@ -107,7 +107,7 @@ class Rc2FullBuildTests(unittest.TestCase):
                 require_rc2_receipt(
                     dict(good, **{key: value}), source=SHA,
                     target="windows-x64", installer=win.RC2_PREVIEW,
-                    digest="c" * 64,
+                    digest="c" * 64, size=1048577,
                 )
 
     def test_linux_windows_and_mac_refuse_mutated_stage_or_3_0(self):
@@ -131,10 +131,10 @@ class Rc2FullBuildTests(unittest.TestCase):
                 sums = root / "SHA256SUMS.txt"
                 receipt = root / "RC2_SOURCE_STAGE_RECEIPT.json"
                 old.write_bytes(b"original native 3.0")
-                new.write_bytes(b"source-built RC2")
+                new.write_bytes(b"RC2-source" * 110000)
                 sums.write_text(digest(old) + "  " + old.name + "\n", "utf-8")
                 meta = source_receipt(target, new.name, digest(new),
-                                      2 * 1024 * 1024)
+                                      new.stat().st_size)
                 receipt.write_text(json.dumps(meta), "utf-8")
                 with patch.dict(os.environ, FLAGS):
                     with patch("tools.v31_rc2_source.subprocess.check_output",
@@ -159,10 +159,10 @@ class Rc2FullBuildTests(unittest.TestCase):
                 new = root / ("AnythingPlays-3.1.0-rc2-macos-" + arch + ".dmg")
                 sums, receipt = root / "SHA256SUMS.txt", root / "RC2_SOURCE_STAGE_RECEIPT.json"
                 old.write_bytes(b"original Mac natives")
-                new.write_bytes(b"independent source-built RC2 macOS")
+                new.write_bytes(b"RC2-macos" * 130000)
                 sums.write_text(mac.digest(old) + "  " + old.name + "\n", "utf-8")
                 stage = source_receipt("macos-" + arch, new.name, mac.digest(new),
-                                       2 * 1024 * 1024)
+                                       new.stat().st_size)
                 receipt.write_text(json.dumps(stage), "utf-8")
                 with patch.dict(os.environ, FLAGS):
                     with patch("tools.v31_rc2_source.subprocess.check_output",
