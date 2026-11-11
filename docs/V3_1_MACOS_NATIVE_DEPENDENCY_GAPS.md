@@ -1,6 +1,19 @@
 # Anything Plays 3.1 — Original macOS native dependency gaps
 
-**Status: independent read-only QA review, not stable release acceptance.**
+**Status: independently run against real signed RC1 linkage evidence; technical QA passed, stable release remains blocked.**
+
+### Verified real-artifact result
+
+[Read-only dual-Mac dependency inventory run 42957981160](https://github.com/MasynNay/anything-plays/actions/runs/42957981160) **PASSED**, including seven fail-closed regression tests. The 30-day evidence artifact is named `AnythingPlays-3.1-RC1-MACOS-NATIVE-DEPENDENCY-GAPS-UNAPPROVED`.
+
+| Installed target | Signed pygame/SDL native files | Unique otool dependency names | Unresolved or ambiguous names |
+| --- | ---: | ---: | ---: |
+| Apple Silicon | 121 | 51 | 1 |
+| Intel Mac | 120 | 51 | 0 |
+
+The sole name ambiguity **within this audited subset** is Apple Silicon `@rpath/libSDL2-2.0.0.dylib`, which could refer to two distinct installed binary hashes: OpenCV's SDL2 2.32.8 and pygame's SDL2 2.32.10. The report does not resolve runtime `@rpath` selection or establish a failure. Intel's zero ambiguous names likewise does **not** mean all linked native sources, notices or replacement rights have been verified.
+
+
 
 The signed 18-console macOS RC1 bundles contain many pygame/SDL native
 libraries. The existing [native linkage inspection](../.github/workflows/v31-macos-native-linkage-review.yml)
