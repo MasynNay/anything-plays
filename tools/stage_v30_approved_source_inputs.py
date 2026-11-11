@@ -100,18 +100,27 @@ def _original_inputs(root, target, extension):
     if observed != expected or len(list(folder.iterdir())) != len(expected):
         raise ValueError("Original 12-native-input archive set has missing/extra/symlink entries")
     record = json.loads(_file_bytes(folder, UNAPPROVED_ORIGINAL))
+    # The preserved-input manifest is untrusted evidence, not an authority to
+    # select files. Reject malformed records before using any row as a path.
+    if not isinstance(record, dict):
+        raise ValueError("Original source input record must be a JSON object")
     rows = record.get("files")
     if (record.get("target") != target
             or record.get("status") != "UNAPPROVED-TEST-INPUTS"
             or record.get("public_distribution_approved") is not False
-            or record.get("original_archive_count") != 12
-            or not isinstance(rows, list) or len(rows) != 12
-            or {row.get("name") for row in rows if isinstance(row, dict)} != originals):
+            or type(record.get("original_archive_count")) is not int
+            or record["original_archive_count"] != 12
+            or not isinstance(rows, list) or len(rows) != 12):
         raise ValueError("Original source input record is missing or rewritten")
+    names = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("name"), str):
+            raise ValueError("Invalid original source native record")
+        names.append(row["name"])
+    if len(set(names)) != len(names) or set(names) != originals:
+        raise ValueError("Original source input names are missing, duplicated or rewritten")
     binaries = {}
     for row in rows:
-        if not isinstance(row, dict):
-            raise ValueError("Invalid original source native record")
         name = row["name"]
         data = _file_bytes(folder, name)
         if sha(data) != row.get("sha256") or len(data) != row.get("size_bytes"):
