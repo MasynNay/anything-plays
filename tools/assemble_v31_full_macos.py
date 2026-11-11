@@ -213,22 +213,22 @@ def build(arch, stable, preview, checksums, receipt, output, rc1=False, *,
         create_disk_image(app, dmg, volume_name="Anything Plays 3.1" if final
                           else "Anything Plays 3.1 Full QA")
         with mount(dmg, tmp/"final-dmg"):
-            final = tmp/"final-dmg"/app.name
+            installed_app = tmp/"final-dmg"/app.name
             # Native loading from an attached read-only DMG leaves a library
             # mapped into this process, which blocks DiskImages unmount.
             # We already did actual native checks on the extracted .app
             # before DMG creation; here verify *the final mounted bytes*.
-            verify_bundle(final, "macos", check_native=False)
-            if validate_trial_core_directory(final/"Contents/Resources/cores", ".dylib") != original:
+            verify_bundle(installed_app, "macos", check_native=False)
+            if validate_trial_core_directory(installed_app/"Contents/Resources/cores", ".dylib") != original:
                 raise ValueError("Final macOS DMG changed original source binaries")
             # Inventory the *mounted final signed DMG*, not the unsigned app.
             if final:
-                validate_staged_identity(final, channel="final_candidate")
+                validate_staged_identity(installed_app, channel="final_candidate")
             elif rc2:
-                validate_staged_identity(final, channel="rc2")
+                validate_staged_identity(installed_app, channel="rc2")
             elif rc1:
-                validate_staged_identity(final)
-            audit = inspect_bundle(final, "macos-" + arch)
+                validate_staged_identity(installed_app)
+            audit = inspect_bundle(installed_app, "macos-" + arch)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         report = {
