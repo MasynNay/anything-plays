@@ -67,6 +67,42 @@ class CameraRecoveryTests(unittest.TestCase):
         app._queue_camera_retry("Camera (device 0)")
         self.assertEqual(app._camera_reconnect_attempts, 1)
 
+    def test_driver_reports_closed_without_failed_read_and_clears_bezel(self):
+        app = CameraHarness()
+        app.camera_bezel = Mock()
+        camera = Mock()
+        camera.isOpened.return_value = False
+        app.cap = camera
+        app.tick()
+        camera.read.assert_not_called()
+        camera.release.assert_called_once()
+        app.camera_bezel.set_active.assert_called_with(False)
+        self.assertIsNone(app.cap)
+        self.assertFalse(app.armed)
+        self.assertEqual(app._camera_reconnect_attempts, 1)
+        self.assertEqual(
+            app.callbacks[app._camera_reconnect_job][0], 2000
+        )
+        # The failed capture has been released; further ticks should not
+        # enqueue another retry timer or repeatedly toggle the indicator.
+        app.tick()
+        self.assertEqual(app._camera_reconnect_attempts, 1)
+        self.assertEqual(app.camera_bezel.set_active.call_count, 1)
+
+    def test_native_emulator_error_clears_session_indicator(self):
+        app = CameraHarness()
+        app.game_bezel = Mock()
+        app.game_status = Mock()
+        app.emu.error = "core unexpectedly exited"
+        app.tick()
+        app.game_bezel.set_active.assert_called_once_with(False)
+        app.game_status.set.assert_called_once()
+        self.assertIn("core unexpectedly exited", app.game_status.set.call_args.args[0])
+        self.assertIsNone(app.emu.error)
+        self.assertFalse(app.armed)
+        app.tick()
+        app.game_bezel.set_active.assert_called_once_with(False)
+
     def test_reconnection_keeps_camera_controls_disarmed(self):
         app = CameraHarness()
         app._queue_camera_retry("Camera (device 0)")
