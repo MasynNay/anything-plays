@@ -6,6 +6,72 @@ import os
 import sys
 import tkinter as tk
 
+def _exercise_installed_stream_mode(app):
+    """Test the *frozen* DS output and settings without opening real devices.
+
+    Invoked only for an explicit, disposable RC2 CI smoke. Never includes a
+    real webcam frame, ROM, personal preference, or OBS capture process.
+    """
+    import numpy as np
+
+    app.open_stream_mode()
+    app.root.update_idletasks()
+    output = getattr(app, "_stream_output_window", None)
+    controls = getattr(app, "_stream_controls_window", None)
+    canvas = getattr(app, "_stream_canvas", None)
+    if (output is None or controls is None or canvas is None
+            or not output.winfo_exists() or not controls.winfo_exists()
+            or controls is output or canvas.master is not output):
+        raise RuntimeError("Installed RC2 did not open separate stream windows")
+    if len(canvas.find_all()) != 1:
+        raise RuntimeError("Installed Stream Output has no composed display")
+
+    variables = app._stream_vars
+    variables["layout"].set("Side by side")
+    variables["theme"].set("Ocean Dark")
+    variables["frame_rate"].set("15 FPS")
+    variables["game_size"].set(62.0)
+    variables["border_width"].set(9.0)
+    variables["swap_screens"].set(True)
+    app.root.update_idletasks()
+    app._render_stream_frame()
+    options = app._stream_options
+    if (options["layout"] != "Side by side"
+            or options["theme"] != "Ocean Dark"
+            or options["frame_rate"] != "15 FPS"
+            or options["game_size"] != 62
+            or options["border_width"] != 9
+            or options["swap_screens"] is not True):
+        raise RuntimeError("Installed stream customization did not take effect")
+
+    frame = np.zeros((72, 96, 3), dtype=np.uint8)
+    frame[:, :, 1] = 180
+    app.reference_image = True
+    app.frame = frame
+    app.stream_camera_snapshot(frame)
+    app._render_stream_frame()
+    if (app._stream_photo is None
+            or len(canvas.find_all()) != 1
+            or app._stream_camera_frame is None):
+        raise RuntimeError("Installed stream did not render synthetic camera frame")
+    app.reference_image = False
+    app.frame = None
+    app.close_stream_mode()
+    if (app._stream_output_window is not None
+            or app._stream_controls_window is not None
+            or app._stream_frame_job is not None
+            or app._stream_photo is not None):
+        raise RuntimeError("Installed stream left windows, timers or image buffers")
+
+    return {
+        "stream_output_window_opened": True,
+        "stream_settings_separate": True,
+        "stream_appearance_configured": True,
+        "stream_camera_reference_rendered": True,
+        "stream_closed_cleanly": True,
+    }
+
+
 def run_smoke_gui(app_type, systems):
     """Only CI's explicit opt-in: prove installed PyInstaller GUI opens.
 
@@ -68,6 +134,12 @@ def run_smoke_gui(app_type, systems):
                 result["initialized_system"] = app.system_key.get()
                 result["top_level_widgets"] = len(root.winfo_children())
                 result["console_profile_count"] = len(systems)
+                if os.environ.get("AP_V31_STREAM_SMOKE_CHECK") == "1":
+                    try:
+                        result.update(_exercise_installed_stream_mode(app))
+                    except Exception:
+                        result["error"] = traceback.format_exc()[-9000:]
+                        result["passed"] = False
             else:
                 result["error"] = "Tk root/App did not render a live configured window"
             root.quit()

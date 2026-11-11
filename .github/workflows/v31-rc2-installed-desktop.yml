@@ -1,0 +1,236 @@
+name: 3.1 RC2 | Installed full desktop and isolated settings QA
+
+# Reusable acceptance stage immediately after successful RC2 full packaging,
+# or manual recheck of a completed source-pinned full build. Read-only and
+# never publishes, modifies or marks any public release approved.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-rc2-installed-desktop.yml'
+      - 'tools/verify_v31_rc2_installed_ui.py'
+      - 'tools/qa_v31_rc2_installed_preferences.py'
+      - 'tests/test_v31_rc2_installed_ui.py'
+  workflow_call:
+    inputs:
+      qa_run_id:
+        description: 'Current, already verified caller full RC2 run ID'
+        required: true
+        type: string
+      source_sha:
+        description: 'Original checkout used by this full RC2 build'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      qa_run_id:
+        description: 'Completed four-OS full RC2 source-and-core QA workflow run ID'
+        required: true
+        type: string
+      source_sha:
+        description: 'Exact forty-character PR head SHA embedded in those full installers'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rc2-installed-desktop-${{ github.event.inputs.qa_run_id || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-contracts:
+    name: RC2 installed desktop receipt and migration contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify malicious/tampered-source receipt and migration rejections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_rc2_installed_ui.py' -v
+
+  real-installed-rc2:
+    if: ${{ inputs.qa_run_id != '' && inputs.source_sha != '' }}
+    needs: evidence-contracts
+    name: Installed frozen 18-console RC2 | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31-rc2_3.1.0~rc2full_amd64.deb', receipt: 'FULL_LIBRARY_QA_RECEIPT.json'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0-rc2-full.exe', receipt: 'FULL_WINDOWS_QA_RECEIPT.json'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-rc2-full-macos-arm64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-rc2-full-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: ${{ inputs.qa_run_id }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require successful exact source-matched original four-platform full RC2 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$QA_RUN" =~ ^[0-9]{6,15}$ ]] || { echo "::error::Invalid QA run ID"; exit 1; }
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::Invalid source SHA"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          info=json.loads(Path('qa-run.json').read_text('utf-8'))
+          if info['id'] == int(os.environ['GITHUB_RUN_ID']):
+              # A reusable job runs within the SAME workflow run. Its
+              # 'needs: full-rc2-18-console' prerequisite provides successful
+              # completed assembly before we reach this check. A workflow
+              # cannot simultaneously have conclusion='success' while running.
+              assert info['conclusion'] in (None, 'success'), 'RC2 build failed'
+          else:
+              assert info['conclusion']=='success', 'Full RC2 build has not passed'
+          assert info['head_sha']==os.environ['SOURCE_SHA'], 'RC2 source SHA mismatch'
+          assert info['event']=='pull_request', 'Not the pinned development QA run'
+          assert info['name']=='3.1 RC2 | Distinct four-platform source app identities (unreleased)'
+          print('Authentic completed four-platform RC2 source build:', info['html_url'])
+          PY
+      - name: Fetch only this host's finished, SHA-verified full RC2 installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1-RC2-FULL-18-${{ matrix.target }}-UNRELEASED' \
+            --dir qa
+          test -s 'qa/${{ matrix.installer }}'
+          test -s 'qa/${{ matrix.receipt }}'
+          mkdir -p evidence
+      - name: Install native Linux GUI dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+      - name: Extract genuine Linux full RC2 and boot Tk window under Xvfb
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'qa/${{ matrix.installer }}' installed
+          app="$PWD/installed/opt/anything-plays-31-rc2/AnythingPlays"
+          test -x "$app"
+          qahome="$(mktemp -d)"
+          python -m tools.qa_v31_rc2_installed_preferences seed \
+            --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+              AP_V30_UI_SMOKE_CHECK=1 \
+              AP_V31_STREAM_SMOKE_CHECK=1 \
+              AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_RC2_UI.json" \
+              SDL_AUDIODRIVER=dummy "$app" --ap-v30-ui-smoke
+          python -m tools.qa_v31_rc2_installed_preferences verify \
+            --home "$qahome" --manifest evidence/FIXTURE.json \
+            --output evidence/SETTINGS_RECEIPT.json
+          python -m tools.verify_v31_rc2_installed_ui \
+            --target '${{ matrix.target }}' --source-sha "$SOURCE_SHA" \
+            --installer 'qa/${{ matrix.installer }}' --bundle installed/opt/anything-plays-31-rc2 \
+            --receipt 'qa/${{ matrix.receipt }}' --smoke evidence/FROZEN_RC2_UI.json \
+            --output evidence/RC2_INSTALLED_RECEIPT.json
+      - name: Extract full Windows RC2 into an isolated disposable directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'qa/${{ matrix.installer }}').Path
+          $destination=Join-Path $env:RUNNER_TEMP 'AP31RC2-Installed-QA'
+          python -c "from pathlib import Path; import sys; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $destination
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install Windows RC2 into disposable directory' }
+          "RC2_INSTALLED=$destination" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Boot the actual Windows RC2 frozen GUI without changing RC1 settings
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $exe=Join-Path $env:RC2_INSTALLED 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'RC2 installed Windows executable missing' }
+          $qahome=Join-Path $env:RUNNER_TEMP 'AP31RC2-Smoke-Home'
+          New-Item -ItemType Directory -Path $qahome -ErrorAction Stop | Out-Null
+          $manifest=Join-Path $PWD 'evidence/FIXTURE.json'
+          python -m tools.qa_v31_rc2_installed_preferences seed --home $qahome --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'RC2 fixture setup failed' }
+          $env:USERPROFILE=$qahome
+          $env:HOME=$qahome
+          $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V31_STREAM_SMOKE_CHECK='1'
+          $env:AP_V30_UI_SMOKE_REPORT=Join-Path $PWD 'evidence/FROZEN_RC2_UI.json'
+          $env:SDL_AUDIODRIVER='dummy'
+          $process=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
+          if ($process.ExitCode -ne 0) { throw "RC2 GUI smoke failed: $($process.ExitCode)" }
+          python -m tools.qa_v31_rc2_installed_preferences verify --home $qahome --manifest $manifest --output (Join-Path $PWD 'evidence/SETTINGS_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'RC2 modified previous settings or did not copy RC1' }
+          python -m tools.verify_v31_rc2_installed_ui --target '${{ matrix.target }}' --source-sha $env:SOURCE_SHA --installer 'qa/${{ matrix.installer }}' --bundle $env:RC2_INSTALLED --receipt 'qa/${{ matrix.receipt }}' --smoke 'evidence/FROZEN_RC2_UI.json' --output 'evidence/RC2_INSTALLED_RECEIPT.json'
+          if ($LASTEXITCODE -ne 0) { throw 'RC2 Windows source and frozen GUI receipt invalid' }
+      - name: Mount original signed RC2 DMG and run frozen desktop on Apple/Intel Mac
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="$PWD/qa/${{ matrix.installer }}"
+          mountdir="$(mktemp -d /tmp/anythingplays-rc2.XXXXXX)"
+          trap 'hdiutil detach "$mountdir" >/dev/null 2>&1 || true; rmdir "$mountdir" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"
+          app="$mountdir/AnythingPlays31RC2.app"
+          test -x "$app/Contents/MacOS/AnythingPlays"
+          codesign --verify --verbose=2 "$app"
+          qahome="$(mktemp -d /tmp/ap31rc2-smoke.XXXXXX)"
+          python -m tools.qa_v31_rc2_installed_preferences seed \
+            --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
+          HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_RC2_UI.json" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
+          import os, subprocess, sys
+          task=subprocess.run([sys.argv[1], '--ap-v30-ui-smoke'],
+                  env=os.environ.copy(), timeout=120, capture_output=True, text=True)
+          print('Installed Mac RC2 exit:',task.returncode)
+          if task.returncode:
+              print(task.stderr[-3000:])
+              raise SystemExit(1)
+          PY
+          python -m tools.qa_v31_rc2_installed_preferences verify \
+            --home "$qahome" --manifest evidence/FIXTURE.json \
+            --output evidence/SETTINGS_RECEIPT.json
+          python -m tools.verify_v31_rc2_installed_ui \
+            --target '${{ matrix.target }}' --source-sha "$SOURCE_SHA" \
+            --installer "$dmg" --bundle "$app" \
+            --receipt 'qa/${{ matrix.receipt }}' --smoke evidence/FROZEN_RC2_UI.json \
+            --output evidence/RC2_INSTALLED_RECEIPT.json
+      - name: Preserve actual full RC2 GUI and first-run settings evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-INSTALLED-DESKTOP-${{ matrix.target }}-QA-ONLY
+          path: |
+            evidence/FIXTURE.json
+            evidence/SETTINGS_RECEIPT.json
+            evidence/FROZEN_RC2_UI.json
+            evidence/RC2_INSTALLED_RECEIPT.json
+          if-no-files-found: warn
+          retention-days: 30
