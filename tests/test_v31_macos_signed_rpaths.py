@@ -205,6 +205,45 @@ class SignedMacRpathTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     probe.inspect(root, report, "macos-x64", runner=runner)
 
+    def test_signed_relative_native_symlink_with_same_original_hash_is_allowed(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            report, signed, library, _ = fake_report(root, "macos-x64")
+            real = library.with_name("base_real.so")
+            real.write_bytes(library.read_bytes())
+            library.unlink()
+            try:
+                library.symlink_to(real.name)
+            except (NotImplementedError, OSError):
+                self.skipTest("Symlink support unavailable")
+            with patch.object(probe, "select_libs", return_value=signed):
+                result = probe.inspect(
+                    root, report, "macos-x64",
+                    runner=runner_with_output(
+                        command_stdout("@loader_path/__dot__dylibs")
+                    ),
+                )
+            self.assertEqual(result["sdl2_referencing_images"], 1)
+            self.assertFalse(result["live_loaded_sdl_image_proven"])
+
+    def test_original_native_link_escaping_app_is_rejected(self):
+        with TemporaryDirectory() as folder, TemporaryDirectory() as external:
+            root = Path(folder)
+            report, signed, library, _ = fake_report(root, "macos-x64")
+            outside = Path(external) / "base_real.so"
+            outside.write_bytes(library.read_bytes())
+            library.unlink()
+            try:
+                library.symlink_to(outside)
+            except (NotImplementedError, OSError):
+                self.skipTest("Symlink support unavailable")
+            with patch.object(probe, "select_libs", return_value=signed):
+                with self.assertRaises(ValueError):
+                    probe.inspect(root, report, "macos-x64",
+                                  runner=runner_with_output(
+                                      command_stdout("@loader_path/__dot__dylibs")
+                                  ))
+
     def test_symlink_escaping_original_app_cannot_be_read(self):
         with TemporaryDirectory() as folder, TemporaryDirectory() as external:
             root = Path(folder)
