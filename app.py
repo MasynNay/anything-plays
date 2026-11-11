@@ -79,8 +79,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self.n64_core_override = preferences.get('n64_core_path', '')
         if not isinstance(self.n64_core_override, str):
             self.n64_core_override = ''
-        # Players need a single self-contained game window. External
-        # launchers remain an opt-in diagnostic for developers only.
         self.external_fallback_enabled = (
             os.environ.get("AP_V21_DEVELOPER_EXTERNAL", "") == "1"
         )
@@ -162,7 +160,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         root.protocol('WM_DELETE_WINDOW', self.close)
         if os.environ.get("AP_V30_UI_SMOKE_CHECK") != "1":
             root.after(100, self.scan_cameras)
-        # Track cancellable timers for reliable shutdown.
         self._camera_tick_job = root.after(45, self.tick)
         self._game_tick_job = root.after(16, self.game_render_tick)
         self._gamepad_tick_job = root.after(65, self.gamepad_tick)
@@ -184,8 +181,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         self._closing = True
         # Stopping a camera manually or closing the app always cancels retries.
         self.cancel_camera_reconnect()
-        # A long-lived window may have several pending after() callbacks.
-        # Cancel the periodic loops before destroying Tk widgets.
         for job_name in ("_camera_tick_job", "_game_tick_job",
                          "_gamepad_tick_job", "_updates_start_job", "_updates_repeat_job"):
             job = getattr(self, job_name, None)
