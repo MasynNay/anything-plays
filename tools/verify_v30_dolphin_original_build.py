@@ -111,6 +111,27 @@ def verify_original_library(path):
                 or not 0 < phnum < 4096 or phoff < 64
                 or phoff + phentsize * phnum > size):
             raise ValueError("Malformed Linux x64 ELF64 program-header table")
+    # A bounded program-header table alone can contain only zeroed entries.
+    # Require actual file-backed loadable code and a dynamic-linking segment.
+    with path.open("rb") as reader:
+        reader.seek(phoff)
+        segments = reader.read(phentsize * phnum)
+    loadable = False
+    dynamic = False
+    for index in range(phnum):
+        entry = segments[index * phentsize:(index + 1) * phentsize]
+        kind = int.from_bytes(entry[:4], "little")
+        offset = int.from_bytes(entry[8:16], "little")
+        filesz = int.from_bytes(entry[32:40], "little")
+        memsz = int.from_bytes(entry[40:48], "little")
+        if filesz > memsz or offset > size or filesz > size - offset:
+            raise ValueError("Malformed Linux x64 ELF64 segment file bounds")
+        if kind == 1 and filesz > 0:  # PT_LOAD
+            loadable = True
+        if kind == 2 and filesz > 0:  # PT_DYNAMIC
+            dynamic = True
+    if not loadable or not dynamic:
+        raise ValueError("Missing ELF64 loadable or dynamic segment")
     exported = subprocess.check_output(
         ["nm", "-D", "--defined-only", str(path)], text=True,
         timeout=45, stderr=subprocess.PIPE)
