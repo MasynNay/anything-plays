@@ -236,8 +236,12 @@ class Rc2FullBuildTests(unittest.TestCase):
             def success(*args, **kwargs):
                 dmg.write_bytes(b"test-dmg" * 200000)
                 return Mock(returncode=0, stderr="", stdout="")
+            calls = [0]
+            def transient_then_success(*args, **kwargs):
+                calls[0] += 1
+                return fail if calls[0] == 1 else success(*args, **kwargs)
             with patch("tools.assemble_v31_full_macos.subprocess.run",
-                       side_effect=[fail, success]) as run:
+                       side_effect=transient_then_success) as run:
                 with patch("tools.assemble_v31_full_macos.time.sleep") as sleep:
                     create_disk_image(app, dmg, attempts=3)
                     self.assertEqual(run.call_count, 2)
