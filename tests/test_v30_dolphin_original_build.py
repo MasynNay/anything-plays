@@ -100,7 +100,7 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
             header[32:40] = (64).to_bytes(8, "little")
             header[52:54] = (64).to_bytes(2, "little")
             header[54:56] = (56).to_bytes(2, "little")
-            header[56:58] = (1).to_bytes(2, "little")
+            header[56:58] = (2).to_bytes(2, "little")
             for offset, replacement in (
                 (4, b"\x01"),            # ELF32
                 (5, b"\x02"),            # big endian
@@ -132,7 +132,29 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, "program-header table"):
                             candidate.verify_original_library(native)
                     nm.assert_not_called()
-            native.write_bytes(bytes(header) + b"\0" * 200_000)
+            # Two genuine file-backed segments: PT_LOAD and PT_DYNAMIC.
+            segments = bytearray(112)
+            for index, kind in enumerate((1, 2)):
+                pos = index * 56
+                segments[pos:pos + 4] = kind.to_bytes(4, "little")
+                segments[pos + 8:pos + 16] = (176).to_bytes(8, "little")
+                segments[pos + 32:pos + 40] = (64).to_bytes(8, "little")
+                segments[pos + 40:pos + 48] = (64).to_bytes(8, "little")
+            for mutation, expected in (
+                (lambda p: p.__setitem__(slice(0, 4), (0).to_bytes(4, "little")), "loadable or dynamic"),
+                (lambda p: p.__setitem__(slice(56, 60), (0).to_bytes(4, "little")), "loadable or dynamic"),
+                (lambda p: p.__setitem__(slice(8, 16), (300_000).to_bytes(8, "little")), "segment file bounds"),
+                (lambda p: p.__setitem__(slice(32, 40), (128).to_bytes(8, "little")), "segment file bounds"),
+            ):
+                bad = bytearray(segments)
+                mutation(bad)
+                native.write_bytes(bytes(header) + bytes(bad) + b"\\0" * 200_000)
+                with patch.object(candidate.subprocess, "check_output") as nm:
+                    with self.subTest(segment_failure=expected):
+                        with self.assertRaisesRegex(ValueError, expected):
+                            candidate.verify_original_library(native)
+                    nm.assert_not_called()
+            native.write_bytes(bytes(header) + bytes(segments) + b"\\0" * 200_000)
             symbols = "\n".join("00000000 T " + symbol for symbol in candidate.MANDATORY_LIBRETRO_SYMBOLS)
             with patch.object(candidate.subprocess, "check_output", return_value=symbols):
                 proof = candidate.verify_original_library(native)
