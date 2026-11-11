@@ -192,7 +192,21 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$AP_V31_QA_CHECKOUT_SHA"
           python -m unittest discover -s tests -p 'test_v31_rc2_full_assembly.py' -v
-          python -m unittest discover -s tests -p 'test_v31_rc_full.py' -v
+          # Legacy RC1 contract tests deliberately set the RC1 flag.
+          # Do not allow the CI job's RC2 flags to contaminate that separate
+          # historical test suite; genuine RC2 assembler keeps full QA flags.
+          python - <<'PY'
+          import os, subprocess, sys
+          legacy = os.environ.copy()
+          for key in ("AP_V31_RC2", "AP_V31_NEXT_QA",
+                      "AP_V31_QA_CHECKOUT_SHA"):
+              legacy.pop(key, None)
+          subprocess.run(
+              [sys.executable, "-m", "unittest", "discover", "-s", "tests",
+               "-p", "test_v31_rc_full.py", "-v"],
+              env=legacy, check=True,
+          )
+          PY
       - name: Download same-run RC2 source artifact for this specific platform
         uses: actions/download-artifact@v4
         with:
