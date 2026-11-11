@@ -168,6 +168,12 @@ jobs:
           $ErrorActionPreference='Stop'
           $exe=Join-Path $env:RC2_INSTALLED 'AnythingPlays.exe'
           if (-not (Test-Path $exe)) { throw 'RC2 installed Windows executable missing' }
+          # Save the genuine runner identity. During frozen GUI startup
+          # USERPROFILE/HOME must be the isolated RC2 fixture; afterwards
+          # the safety verifier must run under the REAL runner identity so
+          # it does not mistake that temporary fixture for a user HOME.
+          $originalUserProfile=$env:USERPROFILE
+          $originalHome=$env:HOME
           $qahome=Join-Path $env:RUNNER_TEMP 'AP31RC2-Smoke-Home'
           New-Item -ItemType Directory -Path $qahome -ErrorAction Stop | Out-Null
           $manifest=Join-Path $PWD 'evidence/FIXTURE.json'
@@ -181,6 +187,8 @@ jobs:
           $env:SDL_AUDIODRIVER='dummy'
           $process=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
           if ($process.ExitCode -ne 0) { throw "RC2 GUI smoke failed: $($process.ExitCode)" }
+          $env:USERPROFILE=$originalUserProfile
+          $env:HOME=$originalHome
           python -m tools.qa_v31_rc2_installed_preferences verify --home $qahome --manifest $manifest --output (Join-Path $PWD 'evidence/SETTINGS_RECEIPT.json')
           if ($LASTEXITCODE -ne 0) { throw 'RC2 modified previous settings or did not copy RC1' }
           python -m tools.verify_v31_rc2_installed_ui --target '${{ matrix.target }}' --source-sha $env:SOURCE_SHA --installer 'qa/${{ matrix.installer }}' --bundle $env:RC2_INSTALLED --receipt 'qa/${{ matrix.receipt }}' --smoke 'evidence/FROZEN_RC2_UI.json' --output 'evidence/RC2_INSTALLED_RECEIPT.json'

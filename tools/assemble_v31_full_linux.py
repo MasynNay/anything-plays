@@ -161,6 +161,7 @@ def build(stable, preview, sums, receipt, output_dir, rc1=False, *, rc2=False,
         (output_dir/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
         result = {
+            "target": "linux-x64",
             "status": (FULL_STATUS if rc2 else
                        "UNRELEASED_3_1_FULL_LINUX_RC1_QA" if rc1 else
                        "UNRELEASED_3_1_FULL_LINUX_QA"),

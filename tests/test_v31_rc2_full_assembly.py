@@ -216,6 +216,14 @@ class Rc2FullBuildTests(unittest.TestCase):
             source,
         )
 
+    def test_full_linux_receipt_declares_authentic_platform(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "tools/assemble_v31_full_linux.py").read_text("utf-8")
+        self.assertIn('"target": "linux-x64"', source)
+        # Both installed QA and final release staging must be able to
+        # authenticate the target against the exact original Linux receipt.
+        self.assertIn('"installer": deb.name', source)
+
     def test_rc2_does_not_change_historical_rc1_or_preview_names(self):
         self.assertEqual(linux.RC_PREVIEW,
                          "anything-plays-31-rc1_3.1.0~rc1_amd64.deb")
