@@ -314,3 +314,8 @@ A focused verifier change requires the compiled native report to identify an ELF
 ### November 11, 2026 — ELF64 program-header integrity regression (CI pending)
 
 A focused Linux original-source Dolphin verifier improvement rejects malformed ELF64 headers and missing/out-of-bounds program-header tables, with six negative fixtures. This hardens research provenance against ELF-magic impostors; it is not production source-built installer integration, exact corresponding-source verification, combined license approval, or final four-platform acceptance. Merge requires successful Python and pinned Linux source compilation checks. Stable v2.0 remains preserved.
+
+
+### November 11, 2026 — ELF64 structural verifier passed and merged
+
+[PR #181](https://github.com/MasynNay/anything-plays/pull/181) merged as `f1c2369f` after [source checks 42986560609](https://github.com/MasynNay/anything-plays/actions/runs/42986560609) passed Python 3.12/3.13 and native mGBA, [original pinned Dolphin Linux compilation 42986560619](https://github.com/MasynNay/anything-plays/actions/runs/42986560619) passed, and separate Windows 42986560602 and macOS ARM/Intel 42986560654 original-source research workflows passed. Six negative regression fixtures enforce complete ELF64 header and bounded program-header table validation before native SHA provenance reporting. Production packaging jobs were skipped. Next substantive milestone is exact source-built Dolphin integration in four production installer candidates, followed by corresponding-source, combined GPL/third-party rights and final installer acceptance verification. Research success is not production source correspondence or distribution approval. Public 3.0 gated; stable 2.0 preserved.
