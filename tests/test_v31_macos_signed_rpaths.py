@@ -106,6 +106,9 @@ class SignedMacRpathTests(unittest.TestCase):
                         ),
                     )
                 self.assertEqual(result["sdl2_referencing_images"], 1)
+                self.assertEqual(result["native_images_with_direct_pinned_hash_candidate"], 1)
+                self.assertEqual(result["native_consumers_without_direct_pinned_hash_candidate"], [])
+                self.assertTrue(result["all_consumer_images_have_direct_hash_candidate"])
                 entry = result["linking"][0]["direct_candidates"][0]
                 self.assertEqual(entry["status"],
                                  "signed_sdl_binary_hash_match")
@@ -114,6 +117,23 @@ class SignedMacRpathTests(unittest.TestCase):
                 self.assertFalse(result["live_loaded_sdl_image_proven"])
                 self.assertFalse(result["full_dyld_loader_chain_resolved"])
                 self.assertFalse(result["stable_3_1_release_approved"])
+
+    def test_actual_consumer_without_direct_signed_hash_remains_blocked(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            report, signed, library, _ = fake_report(root, "macos-x64")
+            with patch.object(probe, "select_libs", return_value=signed):
+                result = probe.inspect(
+                    root, report, "macos-x64",
+                    runner=runner_with_output(command_stdout()),
+                )
+            self.assertFalse(result["all_consumer_images_have_direct_hash_candidate"])
+            self.assertEqual(
+                result["native_consumers_without_direct_pinned_hash_candidate"],
+                [library.relative_to(root).as_posix()],
+            )
+            self.assertEqual(result["native_images_with_direct_pinned_hash_candidate"], 0)
+            self.assertEqual(result["sdl2_self_library_or_alias_entries"], [])
 
     def test_absent_unexpanded_and_external_rpath_never_claim_matches(self):
         with TemporaryDirectory() as folder:
