@@ -43,6 +43,23 @@ stored in preferences nor advanced by a periodic Tk timer. Changing
 themes preserves the current state and recolors both instruments,
 indicators and housings together.
 
+## Disconnect and failure recovery
+
+The native camera polling loop handles **both** failed frames and the
+less obvious USB driver behavior where `VideoCapture.isOpened()` becomes
+false before `read()` runs. In either case it releases the capture,
+clears the activity indicator, disarms tracking controls, and schedules
+the existing bounded same-device reconnect. A closed camera never keeps
+a falsely active indicator or accumulates multiple retry timers.
+
+Likewise, an unexpected native emulator error clears the console
+session indicator on the same UI tick that reports the error. Loading
+the game again must explicitly start a new session.
+
+The regression suite includes these silent-disconnect and core-failure
+cases. No additional timers, simulated recordings, global input hooks
+or new hardware drivers are introduced.
+
 ## Behavior preserved
 
 These are *small native Tk frames around* the original Canvas widgets.

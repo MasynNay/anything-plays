@@ -177,13 +177,16 @@ class GameplayMixin:
         if self._closing:
             return
         try:
-            if self.cap is not None and self.cap.isOpened():
-                ok, frame = self.cap.read()
+            if self.cap is not None:
+                # Some USB drivers switch isOpened() to false on unplug,
+                # without returning a failed read(). Treat both signals as
+                # the same disconnect, clearing the bezel and held controls
+                # through stop_camera() before queuing a bounded retry.
+                camera_open = self.cap.isOpened()
+                ok, frame = self.cap.read() if camera_open else (False, None)
                 if ok:
                     self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
                 else:
-                    # A temporary USB disconnect should not require someone
-                    # to restart an unattended installation manually.
                     chosen = self.camera_name.get()
                     self.stop_camera()
                     self._queue_camera_retry(chosen)
@@ -206,6 +209,9 @@ class GameplayMixin:
                     self.stop_controls()
             # Render game video on its own faster timer, not at camera speed.
             if self.emu.error:
+                bezel = getattr(self, "game_bezel", None)
+                if bezel is not None:
+                    bezel.set_active(False)
                 self.game_status.set(
                     'Emulator stopped: ' + self.emu.error
                     + ' · Select Restart game to recover.'
