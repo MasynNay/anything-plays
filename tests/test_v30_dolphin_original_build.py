@@ -91,11 +91,16 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
         """Reject ELF-magic impostors before symbol inspection or hashing."""
         with TemporaryDirectory() as temp:
             native = Path(temp) / "dolphin_libretro.so"
-            header = bytearray(20)
+            header = bytearray(64)
             header[:4] = b"\x7fELF"
             header[4:7] = b"\x02\x01\x01"
             header[16:18] = (3).to_bytes(2, "little")
             header[18:20] = (62).to_bytes(2, "little")
+            header[20:24] = (1).to_bytes(4, "little")
+            header[32:40] = (64).to_bytes(8, "little")
+            header[52:54] = (64).to_bytes(2, "little")
+            header[54:56] = (56).to_bytes(2, "little")
+            header[56:58] = (1).to_bytes(2, "little")
             for offset, replacement in (
                 (4, b"\x01"),            # ELF32
                 (5, b"\x02"),            # big endian
@@ -109,6 +114,22 @@ class OriginalDolphinNativeLinuxContracts(unittest.TestCase):
                 with patch.object(candidate.subprocess, "check_output") as nm:
                     with self.subTest(offset=offset):
                         with self.assertRaisesRegex(ValueError, "ELF64 shared-library architecture"):
+                            candidate.verify_original_library(native)
+                    nm.assert_not_called()
+            for offset, replacement in (
+                (20, (0).to_bytes(4, "little")),
+                (32, (0).to_bytes(8, "little")),
+                (32, (500_000).to_bytes(8, "little")),
+                (52, (0).to_bytes(2, "little")),
+                (54, (32).to_bytes(2, "little")),
+                (56, (0).to_bytes(2, "little")),
+            ):
+                invalid = bytearray(header)
+                invalid[offset:offset + len(replacement)] = replacement
+                native.write_bytes(bytes(invalid) + b"\0" * 200_000)
+                with patch.object(candidate.subprocess, "check_output") as nm:
+                    with self.subTest(structure_offset=offset):
+                        with self.assertRaisesRegex(ValueError, "program-header table"):
                             candidate.verify_original_library(native)
                     nm.assert_not_called()
             native.write_bytes(bytes(header) + b"\0" * 200_000)
