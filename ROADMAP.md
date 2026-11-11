@@ -281,3 +281,7 @@ PR #160's first CI run failed because CMake line-wrapped a long expected target 
 ### November 11, 2026 — original Dolphin archive type guard verified and merged
 
 PR #160 merged as `1dba5caa` after source checks 42922959524 passed Python 3.12, Python 3.13 and native mGBA compatibility, and original pinned Dolphin Linux source build 42922959551 passed. Real CMake/Ninja negative regressions now require the original `common` and `dolphin_libretro_videocontexts` linker targets to remain STATIC_LIBRARY archives; changed upstream target kinds fail closed. Production packaging jobs were skipped. This is research source-build integrity evidence, not final production Dolphin source correspondence or licensing approval. Combined GPL/third-party obligations, four-platform installer acceptance and public 3.0 publication remain blocked. Stable 2.0 remains preserved.
+
+### November 11, 2026 — original Dolphin native output target verification (CI pending)
+
+A focused development change rejects a name-matching `dolphin_libretro` target unless CMake reports SHARED_LIBRARY. Two real CMake/Ninja negative regressions exercise STATIC and INTERFACE substitutions while preserving the expected helper archives. This protects source-build identity, not exact final production corresponding source or combined GPL/third-party rights. Merge only after Python 3.12/3.13, native compatibility and pinned Linux source compilation pass; public 3.0 and four-platform installer acceptance remain gated, stable 2.0 preserved.

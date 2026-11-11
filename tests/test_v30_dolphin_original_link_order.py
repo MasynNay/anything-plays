@@ -120,6 +120,39 @@ add_library(dolphin_libretro SHARED "${CMAKE_BINARY_DIR}/stub.cpp")
                           result.stdout + result.stderr)
 
 
+    def test_original_native_output_must_be_shared(self):
+        """Reject name-matching static/interface replacements of the native core."""
+        self.assertTrue(FIX.is_file())
+        for wrong_kind in ("STATIC", "INTERFACE"):
+            with self.subTest(kind=wrong_kind):
+                with TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    lines = [
+                        "cmake_minimum_required(VERSION 3.25)",
+                        "project(wrong_original_native_kind CXX)",
+                        'file(WRITE "${CMAKE_BINARY_DIR}/stub.cpp" "int stub(){return 1;}\\n")',
+                        'add_library(common STATIC "${CMAKE_BINARY_DIR}/stub.cpp")',
+                        'add_library(dolphin_libretro_videocontexts STATIC "${CMAKE_BINARY_DIR}/stub.cpp")',
+                    ]
+                    source = "" if wrong_kind == "INTERFACE" else ' "${CMAKE_BINARY_DIR}/stub.cpp"'
+                    lines.append(f"add_library(dolphin_libretro {wrong_kind}{source})")
+                    (root / "CMakeLists.txt").write_text(
+                        "\n".join(lines) + "\n", encoding="utf-8"
+                    )
+                    result = subprocess.run(
+                        ["cmake", "-S", str(root), "-B", str(root / "build"),
+                         "-G", "Ninja", f"-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES={FIX}"],
+                        capture_output=True, text=True, timeout=35,
+                    )
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    import re
+                    diagnostic = re.sub(r"\s+", " ", result.stdout + result.stderr)
+                    self.assertIn(
+                        "Original Dolphin native target is not SHARED_LIBRARY: dolphin_libretro",
+                        diagnostic,
+                    )
+
+
     def test_original_archive_targets_must_be_static(self):
         """A name-matching INTERFACE or SHARED target is not pinned source archive."""
         self.assertTrue(FIX.is_file())
