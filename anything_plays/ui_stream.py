@@ -19,9 +19,11 @@ import cv2
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 LAYOUTS = ("DS stacked", "Side by side")
+FRAME_RATES = ("15 FPS", "24 FPS", "30 FPS")
 _HEX = re.compile(r"#[0-9a-fA-F]{6}\Z")
 DEFAULT_STREAM = {
     "layout": "DS stacked",
+    "frame_rate": "24 FPS",
     "theme": "Dark",
     "border_color": "",
     "border_width": 6,
@@ -44,6 +46,9 @@ def validate_stream_settings(value, themes, default_theme="Dark"):
     layout = raw.get("layout", DEFAULT_STREAM["layout"])
     if layout not in LAYOUTS:
         layout = DEFAULT_STREAM["layout"]
+    frame_rate = raw.get("frame_rate", DEFAULT_STREAM["frame_rate"])
+    if not isinstance(frame_rate, str) or frame_rate not in FRAME_RATES:
+        frame_rate = DEFAULT_STREAM["frame_rate"]
     color = raw.get("border_color", "")
     if not isinstance(color, str) or not _HEX.fullmatch(color):
         color = ""
@@ -57,6 +62,7 @@ def validate_stream_settings(value, themes, default_theme="Dark"):
         size = 53
     return {
         "layout": layout,
+        "frame_rate": frame_rate,
         "theme": theme,
         "border_color": color.lower(),
         "border_width": max(2, min(16, border)),
@@ -295,8 +301,8 @@ class StreamMixin:
         panel = tk.Toplevel(self.root)
         self._stream_controls_window = panel
         panel.title("Anything Plays · Stream Settings")
-        panel.geometry("400x530")
-        panel.minsize(340, 460)
+        panel.geometry("400x610")
+        panel.minsize(340, 520)
         panel.protocol("WM_DELETE_WINDOW", self._close_stream_controls)
         root = ttk.Frame(panel, padding=16)
         root.pack(fill="both", expand=True)
@@ -311,6 +317,7 @@ class StreamMixin:
         for name, title, choices in (
             ("layout", "Screen arrangement", LAYOUTS),
             ("theme", "Stream color theme", tuple(self.THEMES)),
+            ("frame_rate", "Output refresh", FRAME_RATES),
         ):
             row = ttk.Frame(root)
             row.pack(fill="x", pady=4)
@@ -399,9 +406,20 @@ class StreamMixin:
                 options[key] = var.get()
             except tk.TclError:
                 return
+        previous_layout = self._stream_options["layout"]
         self._stream_options = validate_stream_settings(
             options, self.THEMES, self.theme_name.get(),
         )
+        if self._stream_options["layout"] != previous_layout:
+            # Present a natural portrait/landscape capture window on layout
+            # change. Manual resizing afterwards remains fully supported.
+            popup = getattr(self, "_stream_output_window", None)
+            if popup is not None:
+                natural = ((760, 980) if self._stream_options["layout"] == "DS stacked"
+                           else (1180, 720))
+                width = min(natural[0], max(450, popup.winfo_screenwidth()-65))
+                height = min(natural[1], max(480, popup.winfo_screenheight()-90))
+                popup.geometry(f"{width}x{height}")
         self._stream_options_updated()
 
     def _stream_options_updated(self):
@@ -448,7 +466,9 @@ class StreamMixin:
         self._stream_frame_job = None
         if self._stream_output_window is None or getattr(self, "_closing", False):
             return
-        interval = 66
+        # Streamers can pick smooth motion or lower CPU usage without
+        # changing the underlying emulator/camera sampling rates.
+        interval = round(1000 / int(self._stream_options["frame_rate"].split()[0]))
         try:
             self._render_stream_frame()
             if hasattr(self, "_stream_diagnostic"):
@@ -459,7 +479,7 @@ class StreamMixin:
             self.close_stream_mode()
             return
         except Exception as exc:
-            # A corrupt driver frame must not spin at 15 errors per second.
+            # A corrupt driver frame must not spin at the selected output FPS.
             # Back off, show a useful diagnostic, and retry without stopping
             # the original camera or emulator session.
             self._invalidate_stream()
