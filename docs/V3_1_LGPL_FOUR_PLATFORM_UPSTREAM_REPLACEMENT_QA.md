@@ -38,6 +38,14 @@ a SHA-256 wheel/source receipt and a report marking the original
 installation unchanged. It intentionally does not set any legal
 compliance or final-release acceptance flag true.
 
+## Subsequent source-modified Linux extension test passed
+
+The [source-modified pygame-ce build/RC1 runtime check](https://github.com/MasynNay/anything-plays/actions/runs/42949949019)
+compiled a genuinely changed C-native extension, invoked its new method
+from the copied frozen RC1 app and passed desktop startup on Linux. This
+surpasses the previous byte-identical wheel swap but does not complete
+other three OSes or LGPL license requirements. [Complete report](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_LINUX_SOURCE_QA.md).
+
 ## Remaining mandatory independent evidence
 
 1. **Compile a deliberately altered pygame-ce extension from pinned original LGPL 2.1 source** and demonstrate that its changed behavior is observable through the actual frozen app after swapping, not just that byte-identical published wheel bytes are accepted.

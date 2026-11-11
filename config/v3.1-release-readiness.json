@@ -391,6 +391,24 @@
       "full_lgpl_relinking_verified": false,
       "corresponding_source_complete": false,
       "stable_3_1_release_approved": false
+    },
+    "linux_source_modified_pygame_compiled_and_executed": {
+      "status": "PASS_SOURCE_MODIFIED_PYGAME_C_COMPILED_OBSERVABLE_METHOD_IN_COPIED_RC1_AND_FROZEN_TK_STARTUP",
+      "run": "https://github.com/MasynNay/anything-plays/actions/runs/42949949019",
+      "upstream_tag": "2.5.8",
+      "upstream_commit": "c8200a9eaa530f884a0a4c3384cefc48006e58be",
+      "patched_base_c_sha256": "89b4e97a1fe664a95d5e8c7ec8d7e2836747e19debdace6e87e463f3a3c8b050",
+      "native_method": "pygame.base._ap31_relink_probe",
+      "native_method_invoked_from_copied_rc1_extension": true,
+      "original_installed_pygame_and_modified_binary_sha256_different": true,
+      "copied_app_frozen_18_profile_tk_startup_passed": true,
+      "original_user_settings_preserved": true,
+      "real_controller_hardware_tested": false,
+      "all_four_os_source_modified_native_tested": false,
+      "all_lgpl_dependencies_user_relinkable_verified": false,
+      "complete_corresponding_source_verified": false,
+      "lgpl_section_6_full_compliance_approved": false,
+      "stable_3_1_release_approved": false
     }
   }
 }

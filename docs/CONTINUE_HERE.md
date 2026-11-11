@@ -16,6 +16,12 @@ Verified November 10, 2026. Read this before continuing release or controller en
   https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1 (source companion ZIP).
 - Latest stable remains public 3.0.0; 2.0 and 1.5 still public.
 
+## Verified genuine source-modified LGPL pygame-ce on Linux
+
+[Build and runtime QA](https://github.com/MasynNay/anything-plays/actions/runs/42949949019) **PASSED** against the authentic 3.1 RC1 Linux installer. CI pinned the original pygame-ce 2.5.8 Git commit and LGPL license, patched C source `src_c/base.c` to add a callable method, compiled the changed native CPython 3.13 extension with Meson/Ninja, and swapped its different bytes into a disposable 18-console RC1 app copy. External CPython loaded **the copied app's native file** and invoked the new method; the real frozen RC1 desktop also booted and stable preferences stayed untouched.
+
+Unlike the earlier Linux byte-identical upstream wheel swap, **this proves a changed-source native extension can run**. It does NOT yet prove compiled changes on the other three OSes, actual controller use, all LGPL library replacement/relinking or full corresponding-source/legal compliance. [Evidence and limitations](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_LINUX_SOURCE_QA.md). All stable 3.1 release approval flags remain false.
+
 ## Four-platform original pygame wheel swap and real desktop startup
 
 **All four operating systems passed** limited upstream pygame extension
