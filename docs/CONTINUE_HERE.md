@@ -42,7 +42,7 @@ Windows and four-platform evidence](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOU
 
 **All six stable-release gates remain false.**
 
-## Genuine source-modified pygame C on both Macs — PASSED
+## Historical milestone: genuine source-modified pygame C on both Macs — PASSED
 
 [Source-build and real signed RC1 runtime workflow](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) **PASSED
 Apple Silicon and Intel Mac**. Both runners compiled exact upstream
@@ -61,11 +61,11 @@ desktop applications started the real Tk GUI, while 3.0 settings
 fixtures remained unchanged. Original DMGs, user data and public
 releases were not modified.
 
-Now **Linux x64, macOS ARM and macOS Intel** have real modified-source
-pygame C extension compile + native method invocation and frozen-app
-startup evidence. **Windows source-modified** builds and complete
-LGPL source/relinking, real controller testing, and stable 3.1.0
-remain open. [Detailed two-Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
+At the time of this intermediate milestone, Linux x64 and both Mac
+architectures had passed while Windows remained open. **Windows has now
+also passed**, as recorded in the first four-platform section above.
+Complete LGPL source/relinking, real controller testing, and stable
+3.1.0 remain open. [Detailed two-Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
 
 ## Verified genuine source-modified LGPL pygame-ce on Linux
 
@@ -118,7 +118,7 @@ approval. [Two-Mac audit](https://github.com/MasynNay/anything-plays/actions/run
 
 All six stable 3.1.0 gates and public final-release approval remain false.
 
-## Release issue resolved
+## Historical publication issue — resolved
 
 GitHub's Actions release creation 403 arose because a workflow token could
 not target a feature commit that modified workflow files absent from main.
