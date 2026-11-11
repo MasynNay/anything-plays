@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from anything_plays.systems import SYSTEMS
+from anything_plays.ui_bezel import DisplayBezel
 
 class LayoutMixin:
     """Tkinter behavior shared with the main application controller.
@@ -201,10 +202,17 @@ class LayoutMixin:
             self.maintenance_frame, textvariable=self._emulator_update_status,
             wraplength=480,
         ).pack(fill='x', pady=(4, 0))
-        # Embedded emulators use the existing on-canvas software-video renderer.
-        self.game_canvas = tk.Canvas(game, bg='#0a1a30', height=340, highlightthickness=0)
-        self.game_canvas.pack(fill='both', expand=True, pady=10)
-        self.game_canvas.configure(takefocus=1, highlightthickness=2, highlightbackground='#23456f', highlightcolor='#5aa9ff')
+        # Outer console bezel adds depth without drawing on emulator pixels.
+        # Preserve the same Canvas identity, focus ring and event handlers.
+        palette = self.THEMES.get(self.theme_name.get(), self.THEMES['Dark'])
+        self.game_bezel = DisplayBezel(game, kind='game', palette=palette)
+        self.game_bezel.pack(fill='both', expand=True, pady=10)
+        self.game_canvas = tk.Canvas(
+            self.game_bezel.screen, bg='#0a1a30', height=340,
+            highlightthickness=2, borderwidth=0, takefocus=1,
+            highlightbackground='#23456f', highlightcolor='#5aa9ff',
+        )
+        self.game_canvas.pack(fill='both', expand=True)
         self.game_canvas.bind('<Button-1>', self.activate_manual)
         self.game_canvas.bind('<KeyPress>', self.manual_key_down)
         self.game_canvas.bind('<KeyRelease>', self.manual_key_up)
