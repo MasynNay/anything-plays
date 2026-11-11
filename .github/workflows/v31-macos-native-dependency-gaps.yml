@@ -1,0 +1,85 @@
+name: 3.1 | Original Mac RC1 native dependency gap inventory
+
+# Read-only triage of already verified installed, signed native libraries.
+# Never edits DMGs, links runtimes, enables release gates or publishes packages.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-macos-native-dependency-gaps.yml'
+      - 'tools/report_v31_macos_native_dependency_gaps.py'
+      - 'tests/test_v31_macos_native_dependency_gaps.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  macos-native-gap-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EVIDENCE_RUN: '42906227613'
+      EVIDENCE_SHA: '01123565029f1397cbd472538b95d8f8173a2a97'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run adversarial fail-closed report tests
+        run: python -m unittest discover -s tests -p 'test_v31_macos_native_dependency_gaps.py' -v
+      - name: Verify pinned genuine signed Mac native inspection run
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(gh run view "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+          conclusion="$(gh run view "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          if [[ "$actual_sha" != "$EVIDENCE_SHA" || "$conclusion" != success ]]; then
+            echo "::error::Mac native evidence is not the exact pinned successful run"
+            exit 1
+          fi
+      - name: Download both original signed RC1 linkage receipts (JSON only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1-RC1-MACOS-arm64-SDL-LINKAGE-REVIEW-UNAPPROVED' \
+            --dir input/arm
+          gh run download "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1-RC1-MACOS-x64-SDL-LINKAGE-REVIEW-UNAPPROVED' \
+            --dir input/intel
+          test -s input/arm/MACOS_NATIVE_LINKAGE_arm64.json
+          test -s input/intel/MACOS_NATIVE_LINKAGE_x64.json
+      - name: Produce review-only transitive native linkage gap inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.report_v31_macos_native_dependency_gaps \
+            --arm-report input/arm/MACOS_NATIVE_LINKAGE_arm64.json \
+            --intel-report input/intel/MACOS_NATIVE_LINKAGE_x64.json \
+            --output review/MACOS_NATIVE_DEPENDENCY_GAPS_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("review/MACOS_NATIVE_DEPENDENCY_GAPS_UNAPPROVED.json")
+          report = json.loads(p.read_text("utf-8"))
+          assert report["status"] == "REVIEW_ONLY_3_1_MACOS_NATIVE_LINKAGE_GAPS"
+          assert set(report["reports"]) == {"macos-arm64", "macos-x64"}
+          assert report["stable_3_1_release_approved"] is False
+          assert report["lgpl_compliance_approved"] is False
+          for target in ("macos-arm64", "macos-x64"):
+              assert report["reports"][target]["native_files_examined"] >= 100
+              assert report["reports"][target]["dependency_name_count"] > 0
+              print(target, "unique linked dependency names:",
+                    report["reports"][target]["dependency_name_count"],
+                    "unresolved/ambiguous:",
+                    len(report["reports"][target]["unresolved_or_ambiguous_names"]))
+          PY
+      - name: Retain dependency triage as temporary non-release QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-MACOS-NATIVE-DEPENDENCY-GAPS-UNAPPROVED
+          path: review/MACOS_NATIVE_DEPENDENCY_GAPS_UNAPPROVED.json
+          if-no-files-found: error
+          retention-days: 30
