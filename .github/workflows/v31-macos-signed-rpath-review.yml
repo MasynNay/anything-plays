@@ -1,0 +1,130 @@
+name: 3.1 | Original signed Mac SDL2 direct runpath review
+
+# Authentic signed RC1 DMGs, mounted read only. Static local LC_RPATH
+# review only: does not certify complete dyld loader choice or release rights.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-macos-signed-rpath-review.yml'
+      - 'tools/probe_v31_macos_signed_rpaths.py'
+      - 'tests/test_v31_macos_signed_rpaths.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  signed-macos-sdl-runpaths:
+    name: Original signed SDL2 LC_RPATH | ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: macos-arm64, arch: arm64, runner: macos-15}
+          - {target: macos-x64, arch: x64, runner: macos-15-intel}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_RUN: '42905694504'
+      ORIGINAL_SHA: 'c67fab048d7e44f371f2589a6d73b9d556de84d0'
+      SIGNED_RUN: '42906227613'
+      SIGNED_SHA: '01123565029f1397cbd472538b95d8f8173a2a97'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test unsafe paths, incorrect receipts and false approvals
+        run: python -m unittest discover -s tests -p 'test_v31_macos_signed_rpaths.py' -v
+      - name: Pin original RC1 installer and signed linkage QA runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "$ORIGINAL_RUN:$ORIGINAL_SHA" "$SIGNED_RUN:$SIGNED_SHA"; do
+            run="${pair%%:*}"
+            expected="${pair#*:}"
+            actual="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json headSha --jq '.headSha')"
+            result="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            if [[ "$actual" != "$expected" || "$result" != success ]]; then
+              echo "::error::Original signed release input was not previously verified"
+              exit 1
+            fi
+          done
+      - name: Download authentic signed RC1 DMG and original Mach-O linkage JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED" \
+            --dir original
+          gh run download "$SIGNED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "AnythingPlays-3.1-RC1-MACOS-${{ matrix.arch }}-SDL-LINKAGE-REVIEW-UNAPPROVED" \
+            --dir signed
+          test -s "original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          test -s "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json"
+      - name: Read original signed native LC_RPATH entries without modifying installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          dmg="$PWD/original/AnythingPlays-3.1.0-rc1-full-macos-${{ matrix.arch }}.dmg"
+          mountdir="$(mktemp -d /tmp/ap31-signed-rpath.XXXXXX)"
+          cleanup() {
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            rmdir "$mountdir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mounted=0
+          for attempt in 1 2 3 4 5 6; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$mountdir" >/dev/null 2>&1 || true
+            sleep 8
+          done
+          [[ "$mounted" == 1 ]] || { echo "::error::Cannot mount original signed RC1"; exit 1; }
+          app="$mountdir/AnythingPlays31RC.app"
+          codesign --verify --verbose=2 "$app"
+          python -m tools.probe_v31_macos_signed_rpaths \
+            --bundle "$app" \
+            --linkage "signed/MACOS_NATIVE_LINKAGE_${{ matrix.arch }}.json" \
+            --target "${{ matrix.target }}" \
+            --output "evidence/MACOS_SIGNED_RPATH_${{ matrix.arch }}.json"
+          # These counts belong to the immutable, source-pinned RC1 DMGs.
+          # SDL2 library self-identities are not additional missing consumers.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          target = "${{ matrix.target }}"
+          expected = {
+              "macos-arm64": (83, 79, 4),
+              "macos-x64": (82, 79, 3),
+          }[target]
+          report = json.loads(Path(
+              "evidence/MACOS_SIGNED_RPATH_${{ matrix.arch }}.json"
+          ).read_text("utf-8"))
+          actual = (
+              report["sdl2_referencing_images"],
+              report["native_images_with_direct_pinned_hash_candidate"],
+              len(report["sdl2_self_library_or_alias_entries"]),
+          )
+          assert actual == expected, (target, actual, expected)
+          assert report["native_consumers_without_direct_pinned_hash_candidate"] == []
+          assert report["all_consumer_images_have_direct_hash_candidate"] is True
+          assert report["full_dyld_loader_chain_resolved"] is False
+          assert report["live_loaded_sdl_image_proven"] is False
+          assert report["lgpl_redistribution_approved"] is False
+          assert report["stable_3_1_release_approved"] is False
+          print(target, "source-pinned signed runpath coverage:", actual)
+          PY
+      - name: Archive technical evidence without publishing or approving release
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-MACOS-${{ matrix.arch }}-SIGNED-RPATH-REVIEW-UNAPPROVED
+          path: evidence/MACOS_SIGNED_RPATH_${{ matrix.arch }}.json
+          if-no-files-found: warn
+          retention-days: 30
