@@ -1,6 +1,7 @@
 {
-  "source_sha": "e3967e5b3321ce194b8a401994fc514aca75a485",
-  "qa_run_id": 43075106767,
-  "status": "OWNER_QA_DRAFT_ONLY",
-  "public_release_approved": false
+  "source_sha": "adfb782d1b65a41f3b2684393b1f75f4997f169f",
+  "qa_run_id": 43079085633,
+  "status": "OWNER_REQUESTED_PUBLIC_RC2_PREVIEW",
+  "public_release_approved": false,
+  "public_rc2_prerelease_requested": true
 }
