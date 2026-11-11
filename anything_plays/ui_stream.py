@@ -47,11 +47,11 @@ def validate_stream_settings(value, themes, default_theme="Dark"):
     if not isinstance(color, str) or not _HEX.fullmatch(color):
         color = ""
     try:
-        border = int(raw.get("border_width", 6))
+        border = int(float(raw.get("border_width", 6)))
     except (ValueError, TypeError, OverflowError):
         border = 6
     try:
-        size = int(raw.get("game_size", 53))
+        size = int(float(raw.get("game_size", 53)))
     except (ValueError, TypeError, OverflowError):
         size = 53
     return {
@@ -326,7 +326,7 @@ class StreamMixin:
             row = ttk.Frame(root)
             row.pack(fill="x", pady=4)
             ttk.Label(row, text=title).pack(anchor="w")
-            var = tk.IntVar(value=self._stream_options[name])
+            var = tk.DoubleVar(value=self._stream_options[name])
             self._stream_vars[name] = var
             ttk.Scale(
                 row, from_=low, to=high, orient="horizontal",
@@ -520,7 +520,12 @@ class StreamMixin:
                 self.root.after_cancel(save_job)
             except tk.TclError:
                 pass
-            self._save_stream_options()
+            # App.close() sets _closing before cleaning auxiliary windows.
+            # Persist the last user style change even during that shutdown.
+            try:
+                self.save_preferences()
+            except (OSError, ValueError, tk.TclError):
+                pass
         self._close_stream_controls()
         output = getattr(self, "_stream_output_window", None)
         self._stream_output_window = None
