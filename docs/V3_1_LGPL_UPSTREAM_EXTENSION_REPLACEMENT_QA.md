@@ -68,6 +68,17 @@ The original 3.1 RC1 downloads at
 [GitHub Releases](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1)
 and the stable 3.0/2.0 distributions are **not modified**.
 
+## Follow-on Windows and Linux test passed
+
+A subsequent [two-platform upstream native wheel replacement run](https://github.com/MasynNay/anything-plays/actions/runs/42937982305)
+confirmed that copied authentic Windows and Linux RC1 installations
+accept the official pygame native library and still start the actual Tk
+desktop program, without altering stable 3.0 settings. Unlike the Mac
+case, installed native bytes on these two OS targets were already
+identical to the official wheel, so this is an installed-copy integrity
+test and not meaningful proof of modified-library replacement. See the
+[four-platform evidence report](V3_1_LGPL_FOUR_PLATFORM_UPSTREAM_REPLACEMENT_QA.md).
+
 ## Next concrete tests before stable 3.1.0
 
 - Rebuild an actual deliberately modified pygame-ce extension from the

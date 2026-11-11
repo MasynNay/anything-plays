@@ -14,6 +14,8 @@
 | **3.1** — Optional gamepad input | **Public RC1 prerelease · November 10, 2026** | [Four-platform RC1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1); controller mapping, live tester and diagnostics; hardware and native licensing review pending |
 | **3.x** — Compatibility and polish | Planned | Smooth 3D performance, simpler setup, better save diagnostics and long-session stability |
 
+**3.1 verified four-platform upstream native swap:** [Windows and Linux frozen installed-app tests](https://github.com/MasynNay/anything-plays/actions/runs/42937982305) and [Mac upstream replacement/signing](https://github.com/MasynNay/anything-plays/actions/runs/42936779875) now pass on all four platforms. Linux and Windows original wheel bytes are identical to the installed native files; a new **source-modified pygame library** and complete LGPL legal acceptance are still not verified. [Evidence](V3_1_LGPL_FOUR_PLATFORM_UPSTREAM_REPLACEMENT_QA.md).
+
 **3.1 actual macOS native replacement test:** [Both original RC1 Mac installers passed](https://github.com/MasynNay/anything-plays/actions/runs/42936779875) when pygame's native base extension was replaced in a **disposable app copy** by a matching official wheel slice, re-signed, dynamically loaded and started with the actual frozen Tk smoke test. A user-compiled modified library, legal LGPL review and Windows/Linux replacement tests remain open.
 
 **3.1 signed Mac provenance:** [Read-only genuine RC1 Mac audit](https://github.com/MasynNay/anything-plays/actions/runs/42925583942)
