@@ -29,12 +29,14 @@ class StreamModeContracts(unittest.TestCase):
                 config = validate_stream_settings(None, THEMES, name)
                 self.assertEqual(config["theme"], name)
                 self.assertEqual(config["layout"], "DS stacked")
+                self.assertEqual(config["frame_rate"], "24 FPS")
                 self.assertEqual(config["border_color"], "")
                 self.assertTrue(config["show_labels"])
                 self.assertFalse(config["swap_screens"])
         invalid = {
             "theme": ["not a string"],
             "layout": "impossible",
+            "frame_rate": "60 FPS",
             "border_color": "red; exec",
             "border_width": "100000",
             "game_size": "NaN",
@@ -44,6 +46,7 @@ class StreamModeContracts(unittest.TestCase):
         cleaned = validate_stream_settings(invalid, THEMES, "Ocean Dark")
         self.assertEqual(cleaned["theme"], "Ocean Dark")
         self.assertEqual(cleaned["layout"], "DS stacked")
+        self.assertEqual(cleaned["frame_rate"], "24 FPS")
         self.assertEqual(cleaned["border_color"], "")
         self.assertEqual(cleaned["border_width"], 16)
         self.assertEqual(cleaned["game_size"], DEFAULT_STREAM["game_size"])
@@ -51,6 +54,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertTrue(cleaned["show_labels"])
         good = validate_stream_settings({
             "theme": "Plum Dark", "layout": "Side by side",
+            "frame_rate": "30 FPS",
             "border_color": "#Ab76Fc", "border_width": 7.7,
             "game_size": 64.3, "swap_screens": True, "show_labels": False,
         }, THEMES)
@@ -58,6 +62,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(good["border_width"], 7)
         self.assertEqual(good["game_size"], 64)
         self.assertEqual(good["layout"], "Side by side")
+        self.assertEqual(good["frame_rate"], "30 FPS")
         self.assertTrue(good["swap_screens"])
         self.assertFalse(good["show_labels"])
 
@@ -162,7 +167,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIn("self._stream_photo", source)
         self.assertIn("photo.paste(frame)", source)
         self.assertIn("self.root.after_cancel(job)", source)
-        self.assertIn("self.root.after(66", source) if False else None
+        self.assertIn('self._stream_options["frame_rate"].split()[0]', source)
         self.assertIn("self.root.after(interval, self._stream_render_tick)", source)
 
     def test_long_session_font_caching_stays_bounded(self):
