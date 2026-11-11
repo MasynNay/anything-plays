@@ -276,3 +276,8 @@ A focused development PR rejects Dolphin CMake graphs that substitute INTERFACE 
 ### November 10, 2026 — Dolphin target type guard CI diagnostic repair (pending rerun)
 
 PR #160's first CI run failed because CMake line-wrapped a long expected target name in two negative tests, not because the archive-type guard accepted a non-static target. The regression assertion now normalizes diagnostic whitespace. Fresh CI and original pinned Linux compilation must succeed before merge; final production source matching, combined licensing and installer acceptance remain unresolved. Public 3.0 is not approved; v2.0 preserved.
+
+
+### November 11, 2026 — original Dolphin archive type guard verified and merged
+
+PR #160 merged as `1dba5caa` after source checks 42922959524 passed Python 3.12, Python 3.13 and native mGBA compatibility, and original pinned Dolphin Linux source build 42922959551 passed. Real CMake/Ninja negative regressions now require the original `common` and `dolphin_libretro_videocontexts` linker targets to remain STATIC_LIBRARY archives; changed upstream target kinds fail closed. Production packaging jobs were skipped. This is research source-build integrity evidence, not final production Dolphin source correspondence or licensing approval. Combined GPL/third-party obligations, four-platform installer acceptance and public 3.0 publication remain blocked. Stable 2.0 remains preserved.
