@@ -123,7 +123,12 @@ def _original_inputs(root, target, extension):
     for row in rows:
         name = row["name"]
         data = _file_bytes(folder, name)
-        if sha(data) != row.get("sha256") or len(data) != row.get("size_bytes"):
+        digest = row.get("sha256")
+        size = row.get("size_bytes")
+        if (not isinstance(digest, str) or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+                or type(size) is not int or size <= 0
+                or sha(data) != digest or len(data) != size):
             raise ValueError(f"Original preserved full offline artifact changed: {name}")
         binaries[name] = data
     return binaries
