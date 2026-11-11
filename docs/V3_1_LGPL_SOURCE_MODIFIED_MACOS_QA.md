@@ -1,6 +1,6 @@
 # Anything Plays 3.1 RC1 — Real compiled modified pygame C source on Macs
 
-**Apple Silicon: PASS. Intel Mac: independent test pending as of this checkpoint.**
+**Apple Silicon: PASS. Intel Mac: PASS. Both real signed RC1 native source replacement and frozen desktop tests complete.**
 Evidence: [Mac source-build and frozen desktop test workflow](https://github.com/MasynNay/anything-plays/actions/runs/42951159759).
 
 ## Verified source and native build
@@ -45,12 +45,12 @@ fixtures run in a disposable home, not the real user's profile.
 
 | Actual native source change test | Apple Silicon | Intel Mac |
 | --- | --- | --- |
-| Exact source of pygame-ce 2.5.8 + SDL2 2.32.10 pinned | PASS | Pending |
-| C extension compiled from changed source | PASS | Pending |
-| Original signed DMG untouched; disposable copy changed | PASS | Pending |
-| Native linked to in-app SDL2, re-signed, loaded | PASS | Pending |
-| New C method invoked from copied binary | PASS | Pending |
-| Real frozen 18-console Tk desktop boot | PASS | Pending |
+| Exact source of pygame-ce 2.5.8 + SDL2 2.32.10 pinned | PASS | PASS |
+| C extension compiled from changed source | PASS | PASS |
+| Original signed DMG untouched; disposable copy changed | PASS | PASS |
+| Native linked to in-app SDL2, re-signed, loaded | PASS | PASS |
+| New C method invoked from copied binary | PASS | PASS |
+| Real frozen 18-console Tk desktop boot | PASS | PASS |
 | LGPL Section 6 complete/source correspondence approved | **NO** | **NO** |
 
 Source diff and native/runtime receipts are retained as 90-day GitHub

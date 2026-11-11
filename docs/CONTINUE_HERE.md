@@ -16,6 +16,31 @@ Verified November 10, 2026. Read this before continuing release or controller en
   https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1 (source companion ZIP).
 - Latest stable remains public 3.0.0; 2.0 and 1.5 still public.
 
+## Genuine source-modified pygame C on both Macs — PASSED
+
+[Source-build and real signed RC1 runtime workflow](https://github.com/MasynNay/anything-plays/actions/runs/42951159759) **PASSED
+Apple Silicon and Intel Mac**. Both runners compiled exact upstream
+SDL2 **2.32.10** from commit
+`5d249570393f7a37e037abf22cd6012a4cc56a71` (matching the
+app's bundled SDL), then built the **actually changed** pygame-ce
+2.5.8 native C extension with Meson/Ninja. The compiled native binary
+differed from original signed wheel code. An isolated disposable copy
+of the original signed 18-console RC1 DMG had the extension replaced,
+its loader relinked to the existing in-app SDL2, and the changed
+binary and app ad-hoc signed and verified.
+
+Actual native CPython 3.13 imported the copied native extension and
+invoked its new C method successfully. Both copied original frozen
+desktop applications started the real Tk GUI, while 3.0 settings
+fixtures remained unchanged. Original DMGs, user data and public
+releases were not modified.
+
+Now **Linux x64, macOS ARM and macOS Intel** have real modified-source
+pygame C extension compile + native method invocation and frozen-app
+startup evidence. **Windows source-modified** builds and complete
+LGPL source/relinking, real controller testing, and stable 3.1.0
+remain open. [Detailed two-Mac report](V3_1_LGPL_SOURCE_MODIFIED_MACOS_QA.md).
+
 ## Verified genuine source-modified LGPL pygame-ce on Linux
 
 [Build and runtime QA](https://github.com/MasynNay/anything-plays/actions/runs/42949949019) **PASSED** against the authentic 3.1 RC1 Linux installer. CI pinned the original pygame-ce 2.5.8 Git commit and LGPL license, patched C source `src_c/base.c` to add a callable method, compiled the changed native CPython 3.13 extension with Meson/Ninja, and swapped its different bytes into a disposable 18-console RC1 app copy. External CPython loaded **the copied app's native file** and invoked the new method; the real frozen RC1 desktop also booted and stable preferences stayed untouched.
