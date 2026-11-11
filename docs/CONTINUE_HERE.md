@@ -2,6 +2,21 @@
 
 Verified November 10, 2026. Read this before continuing release or controller engineering.
 
+## Latest verified native correspondence triage
+
+**Original signed Apple Silicon and Intel RC1 linkage inventory passed** in
+[workflow 42957981160](https://github.com/MasynNay/anything-plays/actions/runs/42957981160).
+It inspected 121 ARM and 120 Intel native pygame/SDL candidates, with 51
+unique linked dependency names on each. Exactly **one name ambiguity**
+was reported on ARM: `@rpath/libSDL2-2.0.0.dylib` refers to the distinct
+OpenCV and pygame SDL2 copies; Intel had zero ambiguous/missing names
+*within that audited subset*. Seven new negative tests passed. See
+[macOS dependency gaps](V3_1_MACOS_NATIVE_DEPENDENCY_GAPS.md).
+
+This is **not** proof of loader resolution, every transitive binary's
+source correspondence, complete LGPL duties, physical controller operation,
+or stable 3.1 readiness. All six stable release gates remain false.
+
 ## Published and tested
 
 - Public 3.1 RC1 prerelease: https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc1
