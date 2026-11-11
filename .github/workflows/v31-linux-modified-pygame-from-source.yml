@@ -1,0 +1,213 @@
+name: 3.1 | Build truly modified LGPL pygame C source and boot frozen Linux RC1
+
+# Engineering experiment: compile actual changed LGPL pygame source at pinned
+# upstream commit, transplant native extension into a disposable RC1 install,
+# invoke the modified C method, then boot that copied frozen app.
+# No published installer is edited, no stable approval is granted.
+on:
+  push:
+    branches: [feature/v31-source-modified-pygame-linux-relink]
+    paths:
+      - '.github/workflows/v31-linux-modified-pygame-from-source.yml'
+      - 'tools/build_v31_modified_pygame_probe.py'
+      - 'tools/verify_v31_modified_pygame_linux.py'
+      - 'tests/test_v31_modified_pygame_relink.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-modified-pygame-ce-source-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-modified-native-qa:
+    if: github.ref == 'refs/heads/feature/v31-source-modified-pygame-linux-relink'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM_COMMIT: c8200a9eaa530f884a0a4c3384cefc48006e58be
+      ORIGINAL_RUN: '42905694504'
+      ORIGINAL_APP_SHA: c67fab048d7e44f371f2589a6d73b9d556de84d0
+      ORIGINAL_WHEEL: pygame_ce-2.5.8-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+      ORIGINAL_WHEEL_SHA: 5bb966b610e161a8f6d908b4c62ef3a1f3e922bc7bed73bd70a3e15dc780b90e
+      ORIGINAL_DEB: anything-plays-31-rc1_3.1.0~rc1full_amd64.deb
+      QA_HOME: /tmp/ap31-lgpl-modified-source-home
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run adversarial source and installer modification guards
+        run: python -m unittest discover -s tests -p 'test_v31_modified_pygame_relink.py' -v
+      - name: Install only isolated native C development dependencies and headless desktop display
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git gcc g++ pkg-config libsdl2-dev libfreetype6-dev \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+          python -m pip install 'meson==1.9.1' 'ninja==1.13.0' 'cython==3.2.1'
+      - name: Clone original GNU LGPL pygame-ce 2.5.8 at exact reviewed Git commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth 1 --branch 2.5.8 \
+            https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          test "$(git -C upstream-pygame-ce rev-parse HEAD)" = "$UPSTREAM_COMMIT"
+          mkdir -p evidence
+          python -m tools.build_v31_modified_pygame_probe \
+            --root upstream-pygame-ce \
+            --receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json
+          test -s evidence/PYGAME_C_SOURCE_MODIFICATION.json
+          git -C upstream-pygame-ce diff -- src_c/base.c > evidence/PYGAME_C_SOURCE_CHANGE.patch
+          test -s evidence/PYGAME_C_SOURCE_CHANGE.patch
+      - name: Compile modified CPython 3.13 pygame.base native extension FROM C source
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson setup upstream-pygame-ce/build upstream-pygame-ce \
+            -Dstripped=true -Dimage=disabled -Dmixer=disabled \
+            -Dfont=disabled -Dfreetype=disabled -Dmidi=disabled \
+            -Derror_on_warns=false -Dsdl_api=2
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          build=Path('upstream-pygame-ce/build').resolve()
+          targets=json.loads(subprocess.check_output(['meson','introspect','--targets',str(build)],text=True))
+          matched=[]
+          for entry in targets:
+              names=entry.get('filename',[])
+              if isinstance(names,str):
+                  names=[names]
+              for name in names:
+                  p=Path(name)
+                  if p.name.startswith('base.cpython-313-') and p.name.endswith('.so') and p.parent.name=='src_c':
+                      matched.append(p)
+          if len(matched)!=1:
+              raise SystemExit('No unambiguous modified pygame.base Meson C target: '+repr(matched))
+          native=matched[0]
+          subprocess.run(['ninja','-C',str(build),str(native.relative_to(build))],check=True)
+          if not native.is_file() or native.stat().st_size < 100_000:
+              raise SystemExit('Source modified pygame native was not actually compiled')
+          Path('evidence/COMPILED_C_EXTENSION_PATH.txt').write_text(str(native.resolve())+'\n')
+          print('Compiled source modified C extension:',native)
+          PY
+      - name: Require exact original 18-console Linux RC1 and original official Python wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$ORIGINAL_RUN" --json headSha --jq .headSha)" = "$ORIGINAL_APP_SHA"
+          test "$(gh run view "$ORIGINAL_RUN" --json conclusion --jq .conclusion)" = success
+          gh run download "$ORIGINAL_RUN" \
+            --name AnythingPlays-3.1-RC1-FULL-18-linux-x64-UNRELEASED \
+            --dir original
+          test -s "original/$ORIGINAL_DEB"
+          test -s original/FULL_LIBRARY_QA_RECEIPT.json
+          test -s original/SDL_RUNTIME_AUDIT.json
+          mkdir -p original-wheel
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern "$ORIGINAL_WHEEL" --dir original-wheel
+          echo "$ORIGINAL_WHEEL_SHA  original-wheel/$ORIGINAL_WHEEL" | sha256sum --check
+          dpkg-deb -x "original/$ORIGINAL_DEB" unpacked
+          test -x unpacked/opt/anything-plays-31-rc1/AnythingPlays
+      - name: Insert the ACTUAL modified C compiled extension in copied original RC1 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$(cat evidence/COMPILED_C_EXTENSION_PATH.txt)"
+          python -m tools.verify_v31_modified_pygame_linux \
+            --bundle "$PWD/unpacked/opt/anything-plays-31-rc1" \
+            --installer "original/$ORIGINAL_DEB" \
+            --receipt original/FULL_LIBRARY_QA_RECEIPT.json \
+            --audit original/SDL_RUNTIME_AUDIT.json \
+            --original-wheel "original-wheel/$ORIGINAL_WHEEL" \
+            --source-patch-receipt evidence/PYGAME_C_SOURCE_MODIFICATION.json \
+            --compiled "$native" \
+            --destination "$PWD/copied-rc-source-modified" \
+            --output evidence/STAGED_USER_SOURCE_COMPILED_REPLACEMENT.json
+      - name: Import modified native pygame.base from actual copied RC installation and invoke C code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from importlib import util
+          import json,sys,types
+          from tools.build_v31_modified_pygame_probe import PROBE_VALUE
+          report=json.loads(Path('evidence/STAGED_USER_SOURCE_COMPILED_REPLACEMENT.json').read_text())
+          root=Path('copied-rc-source-modified/_internal').resolve()
+          native=root/report['native_replacement_path'].removeprefix('_internal/')
+          if not native.is_file():
+              raise SystemExit('Missing source compiled C extension in copied original app')
+          package=types.ModuleType('pygame')
+          package.__path__=[str(root/'pygame')]
+          package.__package__='pygame'
+          sys.modules['pygame']=package
+          spec=util.spec_from_file_location('pygame.base',native)
+          if spec is None or spec.loader is None:
+              raise SystemExit('Modified C extension did not have a CPython native loader')
+          module=util.module_from_spec(spec)
+          sys.modules['pygame.base']=module
+          spec.loader.exec_module(module)
+          actual=module._ap31_relink_probe()
+          if actual != PROBE_VALUE:
+              raise SystemExit('No behavior from compiled modified LGPL C source')
+          report['source_modified_method_observed_by_native_python']=True
+          Path('evidence/STAGED_USER_SOURCE_COMPILED_REPLACEMENT.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('VERIFIED: copied installed frozen pygame.base exported changed-source C method',actual)
+          PY
+      - name: Launch source-modified copied original frozen RC1 Tk desktop and test old stable settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$QA_HOME"
+          python -m tools.qa_v31_installed_settings_migration seed \
+            --home "$QA_HOME" --manifest "$PWD/evidence/QA_LEGACY_SETTINGS_FIXTURE.json"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$QA_HOME" XDG_CONFIG_HOME="$QA_HOME/.config" \
+            SDL_AUDIODRIVER=dummy AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$PWD/evidence/SOURCE_MODIFIED_FROZEN_GUI_SMOKE.json" \
+            "$PWD/copied-rc-source-modified/AnythingPlays" --ap-v30-ui-smoke
+          python -m tools.qa_v31_installed_settings_migration verify \
+            --home "$QA_HOME" \
+            --manifest "$PWD/evidence/QA_LEGACY_SETTINGS_FIXTURE.json" \
+            --output evidence/QA_STABLE_SETTINGS_PRESERVED.json
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target linux-x64 \
+            --installer "original/$ORIGINAL_DEB" \
+            --bundle copied-rc-source-modified \
+            --receipt original/FULL_LIBRARY_QA_RECEIPT.json \
+            --smoke evidence/SOURCE_MODIFIED_FROZEN_GUI_SMOKE.json \
+            --output evidence/VERIFIED_SOURCE_MODIFIED_GUI_STARTUP.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('evidence/STAGED_USER_SOURCE_COMPILED_REPLACEMENT.json')
+          d=json.loads(p.read_text())
+          ui=json.loads(Path('evidence/VERIFIED_SOURCE_MODIFIED_GUI_STARTUP.json').read_text())
+          assert d['source_modified_method_observed_by_native_python']
+          assert d['compiled_binary_is_not_original_wheel_binary']
+          assert ui['actual_mainloop_ran'] and ui['console_profiles']==18
+          d['status']='VERIFIED_LINUX_USER_SOURCE_MODIFIED_PYGAME_EXTENSION_NATIVE_IMPORT_AND_FROZEN_GUI_SMOKE'
+          d['real_frozen_app_gui_boot_after_source_swap']=True
+          d['full_corresponding_source_available']=False
+          d['full_lgpl_2_1_relinking_approved']=False
+          d['stable_3_1_release_approved']=False
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          print('Changed LGPL C source compiled, new native method called, copied frozen RC1 booted. Full LGPL compliance still open.')
+          PY
+      - name: Preserve complete modified source patch and source-to-runtime evidence for owner review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-LINUX-REAL-SOURCE-MODIFIED-PYGAME-RELINK-QA
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 90
