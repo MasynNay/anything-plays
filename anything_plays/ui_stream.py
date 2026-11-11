@@ -517,8 +517,19 @@ class StreamMixin:
             serial = None
             self._stream_game_frame = None
             self._stream_game_serial = None
-        camera_active = self.cap is not None and self.cap.isOpened()
+        # An unplugged or misbehaving webcam may throw from isOpened()
+        # before the main camera tick processes its disconnect. Treat that
+        # driver failure as camera-off for OBS; never leave a stale private
+        # frame visible while the stream preview backs off on errors.
+        camera_active = False
+        if self.cap is not None:
+            try:
+                camera_active = bool(self.cap.isOpened())
+            except (cv2.error, OSError, RuntimeError):
+                pass
         camera_ref = bool(self.reference_image and self.frame is not None)
+        if not camera_active and not camera_ref and self._stream_camera_frame is not None:
+            self.stream_clear_camera()
         status = (active_game, camera_active, camera_ref)
         state = (
             w, h, serial, self._stream_camera_serial, status,
