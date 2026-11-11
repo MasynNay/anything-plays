@@ -63,9 +63,12 @@ def checked_bundle_file(app, relative, digest):
         raise ValueError("Unsafe or unpinned installed library record")
     location = app / relative
     if location.is_symlink():
-        # The original audit included a fully resolved hash. Disallow a
-        # mutable symlink here rather than silently following another file.
-        raise ValueError("Linked original library requires independent review")
+        # PyInstaller ships legitimate relative dylib / extension symlinks.
+        # Preserve them only if the final target remains inside the
+        # read-only signed app and its bytes match the original QA hash.
+        # Absolute or escaping symlinks are not trusted even when readable.
+        if location.readlink().is_absolute():
+            raise ValueError("Absolute original native link requires review")
     try:
         resolved = location.resolve(strict=True)
     except (OSError, RuntimeError) as exc:
