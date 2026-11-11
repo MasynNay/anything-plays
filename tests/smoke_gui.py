@@ -42,6 +42,39 @@ def main():
                     assert app.canvas.bind('<Button-1>')
                     assert app.game_canvas.bind('<KeyPress>')
                     assert app.game_canvas.cget('takefocus') == '1'
+                    # DS-style OBS stream mode uses one separate capture
+                    # window plus a separate, noncaptured controls popup.
+                    app.open_stream_mode()
+                    root.update_idletasks()
+                    assert app._stream_output_window.winfo_exists()
+                    assert app._stream_controls_window.winfo_exists()
+                    assert app._stream_controls_window.master is root
+                    assert app._stream_canvas.master is app._stream_output_window
+                    assert len(app._stream_canvas.find_all()) == 1
+                    original_stream_item = tuple(app._stream_canvas.find_all())
+                    app._stream_vars["layout"].set("Side by side")
+                    app._stream_vars["theme"].set("Ocean Dark")
+                    app._stream_vars["game_size"].set(60.5)
+                    app._stream_vars["border_width"].set(9.2)
+                    app._stream_vars["swap_screens"].set(True)
+                    assert app._stream_options["game_size"] == 60
+                    assert app._stream_options["border_width"] == 9
+                    assert app._stream_options["theme"] == "Ocean Dark"
+                    app._render_stream_frame()
+                    assert tuple(app._stream_canvas.find_all()) == original_stream_item
+                    # Simulated annotated camera frame comes from the existing
+                    # pipeline, not from a second camera or emulator.
+                    app.stream_camera_snapshot(np.zeros((80, 100, 3), dtype=np.uint8))
+                    app._render_stream_frame()
+                    assert tuple(app._stream_canvas.find_all()) == original_stream_item
+                    app.stream_clear_camera()
+                    app._render_stream_frame()
+                    app.close_stream_mode()
+                    assert app._stream_output_window is None
+                    assert app._stream_controls_window is None
+                    assert app._stream_frame_job is None
+                    assert app._stream_photo is None
+                    assert app.read_preferences()["stream_mode"]["theme"] == "Ocean Dark"
                     # 3.1: the controller belongs in the right-hand game
                     # panel, and should be a real, theme-aware Tk interface.
                     assert app.gamepad_quick_canvas.winfo_exists()
