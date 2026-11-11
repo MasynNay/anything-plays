@@ -1,0 +1,144 @@
+name: 3.1 RC2 | Stage exact four-platform verified installer draft
+
+# A reviewed, SHA-pinned acceptance record on MAIN is the only automatic
+# trigger. Never publish publicly; actual license/rights approval remains open.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/v3.1-rc2-publication-candidate.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-31-rc2-owner-qa-draft
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify reviewed candidate manifest and full staging regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_rc2_release_staging.py' -v
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          p=Path('config/v3.1-rc2-publication-candidate.json')
+          if not p.is_file():
+              raise SystemExit('No reviewed RC2 candidate source/run record on main')
+          r=json.loads(p.read_text('utf-8'))
+          assert set(r)=={'source_sha','qa_run_id','status','public_release_approved'}
+          assert re.fullmatch(r'[a-f0-9]{40}',r['source_sha'])
+          assert isinstance(r['qa_run_id'],int) and r['qa_run_id'] > 1
+          assert r['status']=='OWNER_QA_DRAFT_ONLY'
+          assert r['public_release_approved'] is False
+          with Path('candidate.env').open('w', encoding='utf-8') as out:
+              out.write('SOURCE_SHA='+r['source_sha']+'\n')
+              out.write('QA_RUN='+str(r['qa_run_id'])+'\n')
+          PY
+          cat candidate.env >> "$GITHUB_ENV"
+      - name: Confirm exact successful original RC2 source and installed QA on all four platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path('qa-run.json').read_text('utf-8'))
+          assert r['id']==int(os.environ['QA_RUN'])
+          assert r['head_sha']==os.environ['SOURCE_SHA']
+          assert r['conclusion']=='success'
+          assert r['event']=='pull_request'
+          assert r['name']=='3.1 RC2 | Distinct four-platform source app identities (unreleased)'
+          assert r['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          PY
+          git fetch --no-tags --depth 1 origin "$SOURCE_SHA"
+          # The published application must be the actual tested binary's
+          # code, not an older dev snapshot or current mutable branch.
+          git diff --exit-code --quiet "$SOURCE_SHA" "$GITHUB_SHA" -- \
+            app.py anything_plays requirements.txt requirements-build.txt \
+            packaging fetch_mgba_core.py verify_bundle.py licenses
+          gh release view v3.0.0 --json isDraft,isPrerelease \
+            --jq '.isDraft==false and .isPrerelease==false' | grep -qx true
+          gh release view v3.0.0-sources --json isDraft \
+            --jq '.isDraft==false' | grep -qx true
+          if gh release view v3.1.0-rc2 >/dev/null 2>&1; then
+            echo "::error::RC2 release already exists: refusing to overwrite"
+            exit 1
+          fi
+      - name: Download original full and installed QA evidence only from pinned run
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            for attempt in 1 2 3 4; do
+              scratch="work-$target-try-$attempt"
+              mkdir -p "$scratch/full" "$scratch/installed"
+              if gh run download "$QA_RUN" \
+                    --name "AnythingPlays-3.1-RC2-FULL-18-$target-UNRELEASED" \
+                    --dir "$scratch/full" &&
+                 gh run download "$QA_RUN" \
+                    --name "AnythingPlays-3.1-RC2-INSTALLED-DESKTOP-$target-QA-ONLY" \
+                    --dir "$scratch/installed"; then
+                mkdir -p "inputs/full/$target" "inputs/installed/$target"
+                cp -a "$scratch/full/." "inputs/full/$target/"
+                cp -a "$scratch/installed/." "inputs/installed/$target/"
+                rm -rf "$scratch"
+                break
+              fi
+              rm -rf "$scratch"
+              if [ "$attempt" = 4 ]; then
+                echo "::error::Missing exact installed QA for $target" >&2
+                exit 1
+              fi
+              sleep "$((attempt * 8))"
+            done
+          done
+      - name: Revalidate binary-by-binary source checksums and 4 genuine Stream Mode installations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v31_rc2_prerelease \
+            --full inputs/full --installed inputs/installed \
+            --source-sha "$SOURCE_SHA" --run-id "$QA_RUN" \
+            --output draft-assets
+          (cd draft-assets && sha256sum --check SHA256SUMS.txt)
+          test "$(find draft-assets -maxdepth 1 -type f | wc -l)" -eq 7
+      - name: Preserve candidate artifacts for independent source and distribution review
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC2-VERIFIED-FOUR-OS-OWNER-REVIEW-DRAFT
+          path: draft-assets/
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+      - name: Stage release DRAFT on main, never make it public or stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v3.1.0-rc2 draft-assets/* \
+            --target "$GITHUB_SHA" \
+            --draft --prerelease \
+            --title 'Anything Plays 3.1 RC2 | Stream Mode and themed bezels (OWNER QA DRAFT)' \
+            --notes-file docs/V3_1_RC2_PRERELEASE_NOTES.md
+          gh release view v3.1.0-rc2 --json isDraft,isPrerelease,assets \
+            --jq '.isDraft==true and .isPrerelease==true and (.assets|length)==7' | grep -qx true
+          echo 'Created owner-visible RC2 QA DRAFT only; native rights review remains open.'
