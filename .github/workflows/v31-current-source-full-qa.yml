@@ -266,7 +266,7 @@ jobs:
           assert stage['public_release_approved'] is False
           assert full['public_release_approved'] is False
           assert full['final_release_approved'] is False
-          print('Verified NEW source and original 3.0 native cores:', full['target'], digest)
+          print('Verified NEW source and original 3.0 native cores:', stage['target'], digest)
           PY
       - name: Retain actual four-OS full QA installer and audit (not a Release)
         uses: actions/upload-artifact@v4
