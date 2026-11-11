@@ -32,6 +32,13 @@ class DisplayBezelTests(unittest.TestCase):
                 self.assertTrue(all(isinstance(value, str) and
                                     value.startswith("#") and len(value) == 7
                                     for value in colors.values()))
+                game = bezel_colors(palette, kind="game")
+                self.assertEqual(game["housing"], palette[5])
+                self.assertEqual(game["header"], palette[4])
+                self.assertEqual(game["well"], colors["well"])
+                self.assertEqual(game["accent"], colors["accent"])
+                self.assertEqual(game["label"], colors["label"])
+                self.assertNotEqual(game["housing"], colors["housing"])
 
     def test_invalid_palette_and_unknown_frame_kind_are_not_accepted(self):
         for bad in (None, "bad", {}, [], ("#123456",)):
@@ -39,6 +46,8 @@ class DisplayBezelTests(unittest.TestCase):
                 bezel_colors(bad)
         self.assertEqual(set(DisplayBezel.TITLES), {"camera", "game"})
         self.assertNotIn("LIVE", DisplayBezel.TITLES["camera"])
+        with self.assertRaises(ValueError):
+            bezel_colors(ThemeMixin.THEMES["Dark"], kind="not-a-display")
 
     def test_original_canvases_remain_full_size_inset_children(self):
         camera = self.source("ui_panels.py")
