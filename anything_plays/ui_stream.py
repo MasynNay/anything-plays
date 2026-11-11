@@ -11,6 +11,7 @@ item and a single cancellable, bounded-rate update job.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 import tkinter as tk
 from tkinter import colorchooser, ttk
 
@@ -65,6 +66,7 @@ def validate_stream_settings(value, themes, default_theme="Dark"):
     }
 
 
+@lru_cache(maxsize=48)
 def _font(size, *, bold=False):
     name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     try:
@@ -348,6 +350,9 @@ class StreamMixin:
                    command=self._choose_stream_border_color).pack(side="left")
         ttk.Button(colors, text="Use theme accent",
                    command=self._reset_stream_border_color).pack(side="right")
+        self._stream_diagnostic = tk.StringVar(value="Stream output ready")
+        ttk.Label(root, textvariable=self._stream_diagnostic,
+                  style="Helper.TLabel", wraplength=360).pack(anchor="w", pady=(4, 0))
         ttk.Label(
             root,
             text="Resize the output window directly. Stream Mode mirrors your "
@@ -440,17 +445,28 @@ class StreamMixin:
         self._stream_frame_job = None
         if self._stream_output_window is None or getattr(self, "_closing", False):
             return
+        interval = 66
         try:
             self._render_stream_frame()
+            if hasattr(self, "_stream_diagnostic"):
+                self._stream_diagnostic.set(
+                    "Output ready · Game and camera are mirrored, not restarted."
+                )
         except tk.TclError:
             self.close_stream_mode()
             return
-        except Exception:
-            # Keep stream output alive after a corrupt frame. The next
-            # update may recover without touching game or camera input.
+        except Exception as exc:
+            # A corrupt driver frame must not spin at 15 errors per second.
+            # Back off, show a useful diagnostic, and retry without stopping
+            # the original camera or emulator session.
             self._invalidate_stream()
+            interval = 1000
+            if hasattr(self, "_stream_diagnostic"):
+                self._stream_diagnostic.set(
+                    "Stream preview retrying: " + str(exc)[:100]
+                )
         if self._stream_output_window is not None and not self._closing:
-            self._stream_frame_job = self.root.after(66, self._stream_render_tick)
+            self._stream_frame_job = self.root.after(interval, self._stream_render_tick)
 
     def _render_stream_frame(self):
         canvas = self._stream_canvas
