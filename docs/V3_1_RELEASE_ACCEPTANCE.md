@@ -9,6 +9,12 @@ The public [3.1 RC2 test release](https://github.com/MasynNay/anything-plays/rel
 
 The post-RC2 source hardening in [PR #197](https://github.com/MasynNay/anything-plays/pull/197) has also been merged after Python 3.12, Python 3.13, native mGBA and GUI smoke checks passed: an unplugged webcam whose status probe fails no longer leaves its private last frame visible in Stream Output. **This later fix is on main, not inside the immutable public RC2 installer assets.** It must be included in a newly built and revalidated candidate before being claimed as shipped.
 
+## Owner Linux RC2 installation check — November 11, 2026
+
+**User-reported PASS, limited scope:** The project owner installed the public 3.1 RC2 Linux `.deb` package on a real Linux desktop and confirmed the application **launches successfully**. This is a useful real-device installation/startup check in addition to the four-platform automated installed-app acceptance. It is not independent CI evidence or proof of sustained compatibility.
+
+**Not tested or not yet reported in this session:** a physical controller, live webcam, dual-screen Stream Mode capture with OBS, actual gameplay, game audio, saves, long sessions, other platforms, or native dependency relinking. These remain open and must not be marked as passed based on the installation/launch confirmation alone.
+
 **Still required before stable 3.1.0:** real cameras and controllers on supported hardware; actual gameplay, audio, save and extended-session checks; complete native corresponding-source and LGPL relinking/replacement review; fresh stable-version binaries, signed/notarization limitations and exact checksum/source receipts; final release notes and explicit stable-release decision. All six existing stable release gates remain false.
 
 **New verified native RC1 audits:** SDL source/wheel checks, signed Mac
