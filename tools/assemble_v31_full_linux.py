@@ -16,6 +16,7 @@ import tempfile
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.audit_v31_sdl_runtime import inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v31_current_source_qa import reviewed_source_revision
 from verify_bundle import verify_bundle
 
 STABLE = "anything-plays_3.0.0_amd64.deb"
@@ -35,9 +36,12 @@ def sha(path):
     return h.hexdigest()
 
 
-def validate_inputs(stable, preview, sums, receipt, rc1=False):
+def validate_inputs(stable, preview, sums, receipt, rc1=False, *, expected_source_revision=None):
     preview_name = RC_PREVIEW if rc1 else PREVIEW
-    source_sha = RC_SOURCE_REVISION if rc1 else SOURCE_REVISION
+    source_sha = reviewed_source_revision(
+        RC_SOURCE_REVISION if rc1 else SOURCE_REVISION, rc1=rc1,
+        override=expected_source_revision,
+    )
     if stable.name != STABLE or preview.name != preview_name:
         raise ValueError("Unexpected native or 3.1 application installer name")
     if not stable.is_file() or not preview.is_file():
@@ -53,7 +57,7 @@ def validate_inputs(stable, preview, sums, receipt, rc1=False):
     return sha(stable)
 
 
-def build(stable, preview, sums, receipt, output_dir, rc1=False):
+def build(stable, preview, sums, receipt, output_dir, rc1=False, *, expected_source_revision=None):
     if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Full library staging requires owner-only QA flags")
     if rc1:
@@ -63,7 +67,8 @@ def build(stable, preview, sums, receipt, output_dir, rc1=False):
         raise ValueError("Legacy full-preview assembly needs preview flag")
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("A full candidate is not automatically an approved release")
-    stable_sha = validate_inputs(stable, preview, sums, receipt, rc1=rc1)
+    stable_sha = validate_inputs(stable, preview, sums, receipt, rc1=rc1,
+        expected_source_revision=expected_source_revision)
     with tempfile.TemporaryDirectory(prefix="ap31-full-") as temp:
         root = Path(temp)
         subprocess.run(["dpkg-deb", "-x", str(stable), str(root/"old")], check=True)
@@ -139,7 +144,9 @@ def build(stable, preview, sums, receipt, output_dir, rc1=False):
             "public_release_approved": False,
             "source_stable_sha256": stable_sha,
             "source_preview_sha256": sha(preview),
-            "source_preview_revision": RC_SOURCE_REVISION if rc1 else SOURCE_REVISION,
+            "source_preview_revision": reviewed_source_revision(
+                RC_SOURCE_REVISION if rc1 else SOURCE_REVISION,
+                rc1=rc1, override=expected_source_revision),
             "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": deb.name,
@@ -162,9 +169,12 @@ def main():
         p.add_argument("--"+name, type=Path, required=True)
     p.add_argument("--rc1", action="store_true",
                    help="Assemble from exact fresh source-built RC1 app instead of frozen Preview 1")
+    p.add_argument("--expected-source-revision", metavar="EXACT_GIT_SHA",
+                   help="Nonrelease PR QA only: exact checked-out frozen app revision")
     args = p.parse_args()
     build(*(getattr(args, x).resolve() for x in ("stable", "preview", "sums",
-                                                 "receipt", "output")), rc1=args.rc1)
+                                                 "receipt", "output")), rc1=args.rc1,
+          expected_source_revision=args.expected_source_revision)
 
 
 if __name__ == "__main__":
