@@ -22,6 +22,8 @@ class GamepadMixin:
         reader = getattr(self, "_gamepad", None)
         connected = (reader is not None and reader.controller is not None
                      and self.gamepad_enabled.get())
+        raw = (reader.physical_buttons if connected else frozenset())
+        pressed = frozenset(raw)
         for attr, large in (("gamepad_quick_canvas", False),
                             ("gamepad_setup_canvas", True)):
             canvas = getattr(self, attr, None)
@@ -29,9 +31,13 @@ class GamepadMixin:
                 try:
                     if canvas.winfo_exists():
                         draw_gamepad(canvas, self._controller_palette(),
-                                     connected=connected, expanded=large)
+                                     connected=connected, expanded=large,
+                                     pressed=pressed)
                 except tk.TclError:
                     pass
+        # Only repaint on an actual connection/input change. The live
+        # poll runs every 65ms; idle canvases should not constantly redraw.
+        self._last_controller_art_snapshot = (connected, pressed)
 
     def build_gamepad_quick_panel(self, parent):
         """Compact manual-play controls beside display and volume settings.
@@ -221,8 +227,17 @@ class GamepadMixin:
                 elif self.root.focus_get() is None:
                     buttons = frozenset()
                 self.emu.set_gamepad_buttons(buttons)
-                if status != self.gamepad_status.get():
+                status_changed = status != self.gamepad_status.get()
+                if status_changed:
                     self.gamepad_status.set(status)
+                # Redraw live highlighted inputs even when the device
+                # connection label stays unchanged. Skip steady idle polls.
+                connected = self._gamepad.controller is not None
+                snapshot = (connected,
+                            frozenset(self._gamepad.physical_buttons)
+                            if connected else frozenset())
+                if (status_changed or
+                        snapshot != getattr(self, "_last_controller_art_snapshot", None)):
                     self.refresh_controller_artwork()
                 self._refresh_gamepad_live_input()
             # Off-state is handled immediately in toggle_gamepad(), not on

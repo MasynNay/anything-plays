@@ -1,0 +1,65 @@
+name: 3.1 | Native four-platform controller UI regression
+
+# Always exercise actual pygame-ce/SDL on all desktop targets when 3.1
+# controller input or its live artwork changes. Hardware-free, read-only CI.
+on:
+  pull_request:
+    paths:
+      - 'anything_plays/gamepad.py'
+      - 'anything_plays/ui_gamepad.py'
+      - 'anything_plays/ui_controller_art.py'
+      - 'tests/test_v31_gamepad.py'
+      - 'tests/test_v31_reactive_controller_art.py'
+      - 'tests/test_v31_controller_gui.py'
+      - '.github/workflows/v31-four-platform-controller-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-gamepad-ui:
+    name: SDL + Tk controller QA | ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: linux-x64, runner: ubuntu-24.04}
+          - {label: windows-x64, runner: windows-latest}
+          - {label: macos-arm64, runner: macos-15}
+          - {label: macos-intel, runner: macos-15-intel}
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pinned native pygame CE SDL controller runtime
+        shell: bash
+        run: python -m pip install pygame-ce==2.5.8
+      - name: Prove host architecture and native SDL initialized successfully
+        shell: bash
+        run: |
+          python - <<'PY'
+          import platform
+          import pygame
+          print("OS:", platform.system(), "CPU:", platform.machine())
+          print("Native pygame CE:", pygame.version.ver)
+          print("Native SDL:", pygame.get_sdl_version())
+          assert pygame.version.ver == "2.5.8"
+          PY
+      - name: Real SDL controller initialization and cross-platform input regressions
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -p 'test_v31_gamepad.py' -v
+          python -m unittest discover -s tests -p 'test_v31_live_controller.py' -v
+      - name: Verify both themed controller GUI states with synthetic active buttons
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -p 'test_v31_controller_gui.py' -v
+          python -m unittest discover -s tests -p 'test_v31_reactive_controller_art.py' -v
