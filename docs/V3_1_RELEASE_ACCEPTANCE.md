@@ -13,7 +13,9 @@ The post-RC2 source hardening in [PR #197](https://github.com/MasynNay/anything-
 
 **User-reported PASS, limited scope:** The project owner installed the public 3.1 RC2 Linux `.deb` package on a real Linux desktop and confirmed the application **launches successfully**. This is a useful real-device installation/startup check in addition to the four-platform automated installed-app acceptance. It is not independent CI evidence or proof of sustained compatibility.
 
-**Not tested or not yet reported in this session:** a physical controller, live webcam, dual-screen Stream Mode capture with OBS, actual gameplay, game audio, saves, long sessions, other platforms, or native dependency relinking. These remain open and must not be marked as passed based on the installation/launch confirmation alone.
+**Owner follow-up, Stream Mode visual check (user-reported PASS):** After being asked to open Stream Mode and confirm its DS-style dual-screen game/camera layout, the owner reported that it **works perfectly** on the installed Linux RC2 build and expressed satisfaction with the experience. This supports an owner-observed positive first-look of the Stream Mode window and layout. It does **not** independently verify live webcam tracking, camera device capture, OBS recording/Window Capture output, controller hardware, or game content within those panes.
+
+**Not tested or not yet reported in this session:** a physical controller, live webcam, actual OBS capture, sustained gameplay, game audio, saves, long sessions, other platforms, or native dependency relinking. Those remain open; do not mark them as passed based solely on the successful launch and Stream Mode visual report.
 
 **Still required before stable 3.1.0:** real cameras and controllers on supported hardware; actual gameplay, audio, save and extended-session checks; complete native corresponding-source and LGPL relinking/replacement review; fresh stable-version binaries, signed/notarization limitations and exact checksum/source receipts; final release notes and explicit stable-release decision. All six existing stable release gates remain false.
 
