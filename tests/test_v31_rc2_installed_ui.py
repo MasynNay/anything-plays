@@ -36,7 +36,7 @@ class InstalledRc2Tests(unittest.TestCase):
     def sample(self, root, target="linux-x64"):
         root = Path(root)
         installer = root / FILENAMES[target]
-        installer.write_bytes(b"synthetic-native-installer" * 100)
+        installer.write_bytes(b"synthetic-native-installer" * 50000)
         app = root / "app"
         identity = app / "assets/v31_build_identity.json"
         identity.parent.mkdir(parents=True)
