@@ -49,7 +49,7 @@ jobs:
       AP_RELEASE_BUILD: '0'
       AP_V30_APPROVED_RELEASE: '0'
       AP_V30_STABLE_CANDIDATE: '0'
-      GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_RC2_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,7 +62,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "Checked-out commit: $(git rev-parse HEAD)"
+          echo "Required RC2 commit: $AP_V31_RC2_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$AP_V31_RC2_SOURCE_SHA"
           python -m unittest discover -s tests -p 'test_v31_rc2_identity.py' -v
           python -m unittest discover -s tests -p 'test_v31_candidate_identity.py' -v
       - name: Install Linux native dependencies with bounded DNS retry
@@ -105,8 +107,6 @@ jobs:
         run: bash packaging/build_macos_dmg.sh
       - name: Inspect actual frozen identity and installer checksum
         shell: bash
-        env:
-          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           python -m tools.verify_v31_rc --channel rc2 --target "${{ matrix.target }}" \
@@ -118,7 +118,7 @@ jobs:
           r=json.loads(Path("release/RC2_SOURCE_STAGE_RECEIPT.json").read_text())
           assert r["version"] == "3.1.0-rc2"
           assert r["settings_namespace"] == "anything-plays-31-rc2"
-          assert r["source_revision"] == os.environ["GITHUB_SHA"]
+          assert r["source_revision"] == os.environ["AP_V31_RC2_SOURCE_SHA"]
           assert r["public_release_approved"] is False
           assert r["final_release_candidate"] is False
           assert r["hardware_controller_verified"] is False
