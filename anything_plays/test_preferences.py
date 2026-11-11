@@ -19,6 +19,7 @@ LEGACY_DIR = Path(".config") / "fish-plays-pokemon-studio"
 TEST_DIR = Path(".config") / "anything-plays-31-preview"
 PREVIOUS_PREVIEW_DIR = Path(".config") / "anything-plays-30-preview"
 CANDIDATE_DIR = Path(".config") / "anything-plays-31-rc1"
+RC2_DIR = Path(".config") / "anything-plays-31-rc2"
 MIGRATED_FILENAMES = ("preferences.json", "system_profiles.json")
 MAX_SETTINGS_BYTES = 8 * 1024 * 1024
 
