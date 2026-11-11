@@ -34,6 +34,13 @@ RC2_PREVIEW = "AnythingPlaysSetup-3.1.0-rc2.exe"
 RC2_FULL = "AnythingPlaysSetup-3.1.0-rc2-full.exe"
 
 
+def full_installer_filename(*, rc1=False, rc2=False):
+    """Choose a unique installer filename for the exact frozen app channel."""
+    if rc1 and rc2:
+        raise ValueError("RC1 and RC2 cannot share a Windows installer identity")
+    return RC2_FULL if rc2 else RC_FULL if rc1 else FULL
+
+
 def hash_file(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as inp:
@@ -208,7 +215,7 @@ def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
         output.mkdir(parents=True, exist_ok=True)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
-        target = output/(RC_FULL if rc1 else FULL)
+        target = output/full_installer_filename(rc1=rc1, rc2=rc2)
         shutil.copyfile(produced, target)
         report = {
             "status": (FULL_STATUS if rc2 else
