@@ -3,12 +3,19 @@
 These fixtures are synthetic and grant no release or redistribution approval.
 """
 import json
+import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
 from tools.stage_v30_approved_source_inputs import _original_inputs
-from tests.test_v30_approved_source_inputs import synthetic_target
+# The test directory is not a Python package; load the existing synthetic
+# fixture module by file path without modifying application import paths.
+_fixture_path = Path(__file__).with_name("test_v30_approved_source_inputs.py")
+_spec = importlib.util.spec_from_file_location("v30_approved_fixture", _fixture_path)
+_fixture = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_fixture)
+synthetic_target = _fixture.synthetic_target
 
 
 class PreservedNativeManifestSchemaTests(unittest.TestCase):
