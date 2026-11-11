@@ -140,6 +140,9 @@ class CameraMixin:
                     'using it, or refresh the list.'
                 )
             return
+        bezel = getattr(self, "camera_bezel", None)
+        if bezel is not None:
+            bezel.set_active(True)
         if reconnecting:
             self._camera_reconnect_job = None
             self._camera_reconnect_name = None
@@ -170,6 +173,9 @@ class CameraMixin:
             if hasattr(self, "canvas"):
                 self.canvas.delete("all")
             self._camera_canvas_item = None
+        bezel = getattr(self, "camera_bezel", None)
+        if bezel is not None:
+            bezel.set_active(False)
         self.status.set('Camera stopped')
 
     def pick_color(self):
