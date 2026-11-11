@@ -91,15 +91,26 @@ def verify_original_library(path):
     if not 200_000 < size < 512 * 1024 * 1024:
         raise ValueError("Original Dolphin native library has implausible byte count")
     with path.open("rb") as reader:
-        header = reader.read(20)
+        header = reader.read(64)
         if header[:4] != b"\x7fELF":
             raise ValueError("Expected real ELF native Dolphin image")
         # Require ELF64, little-endian, current ELF version, ET_DYN and EM_X86_64.
         # ELF magic alone does not prove this is a Linux x64 shared library.
-        if (len(header) != 20 or header[4:7] != b"\x02\x01\x01"
+        if (len(header) != 64 or header[4:7] != b"\x02\x01\x01"
                 or int.from_bytes(header[16:18], "little") != 3
                 or int.from_bytes(header[18:20], "little") != 62):
             raise ValueError("Expected Linux x64 ELF64 shared-library architecture")
+        # Reject truncated/forged ELF headers before treating an export list as proof.
+        # ELF64 e_version=1, e_ehsize=64, and a bounded program-header table.
+        version = int.from_bytes(header[20:24], "little")
+        phoff = int.from_bytes(header[32:40], "little")
+        ehsize = int.from_bytes(header[52:54], "little")
+        phentsize = int.from_bytes(header[54:56], "little")
+        phnum = int.from_bytes(header[56:58], "little")
+        if (version != 1 or ehsize != 64 or phentsize != 56
+                or not 0 < phnum < 4096 or phoff < 64
+                or phoff + phentsize * phnum > size):
+            raise ValueError("Malformed Linux x64 ELF64 program-header table")
     exported = subprocess.check_output(
         ["nm", "-D", "--defined-only", str(path)], text=True,
         timeout=45, stderr=subprocess.PIPE)
