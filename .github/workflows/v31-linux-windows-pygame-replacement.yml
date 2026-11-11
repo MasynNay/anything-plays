@@ -1,0 +1,167 @@
+name: 3.1 | Frozen Linux Windows pygame replacement and GUI test
+
+# Only disposable copies of genuine pinned RC1 installed apps are changed.
+# Swapping original upstream bytes does not prove modified LGPL relinking.
+on:
+  push:
+    branches: [feature/v31-lgpl-linux-windows-replacement-probe]
+    paths:
+      - ".github/workflows/v31-linux-windows-pygame-replacement.yml"
+      - "tools/probe_v31_linux_windows_pygame_replacement.py"
+      - "tests/test_v31_linux_windows_pygame_replacement.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/feature/v31-lgpl-linux-windows-replacement-probe'
+    name: Disposable upstream pygame extension · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, target: linux-x64, receipt: FULL_LIBRARY_QA_RECEIPT.json, installer: 'anything-plays-31-rc1_3.1.0~rc1full_amd64.deb', wheel: 'pygame_ce-2.5.8-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl', wheelsha: '5bb966b610e161a8f6d908b4c62ef3a1f3e922bc7bed73bd70a3e15dc780b90e'}
+          - {runner: windows-latest, target: windows-x64, receipt: FULL_WINDOWS_QA_RECEIPT.json, installer: 'AnythingPlaysSetup-3.1.0-rc1-full.exe', wheel: 'pygame_ce-2.5.8-cp313-cp313-win_amd64.whl', wheelsha: 'f495b0eb7a5c54c59da58e964bc7f68073c3f43cf307729fd48309104a04c190'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '42905694504'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run synthetic tamper and approval adversarial tests
+        run: python -m unittest discover -s tests -p 'test_v31_linux_windows_pygame_replacement.py' -v
+      - name: Verify original 18-console RC1 source and download exact native installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh run view "$QA_RUN" --json headSha --jq .headSha)" = c67fab048d7e44f371f2589a6d73b9d556de84d0
+          test "$(gh run view "$QA_RUN" --json conclusion --jq .conclusion)" = success
+          gh run download "$QA_RUN" \
+            --name 'AnythingPlays-3.1-RC1-FULL-18-${{ matrix.target }}-UNRELEASED' \
+            --dir original
+          test -s 'original/${{ matrix.installer }}'
+          test -s 'original/${{ matrix.receipt }}'
+          test -s original/SDL_RUNTIME_AUDIT.json
+      - name: Fetch exact pinned published pygame-ce 2.5.8 original wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wheel
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern '${{ matrix.wheel }}' --dir wheel
+          echo '${{ matrix.wheelsha }}  wheel/${{ matrix.wheel }}' | sha256sum --check
+      - name: Extract actual Linux RC1 to temporary install root
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'original/${{ matrix.installer }}' unpacked
+          test -x unpacked/opt/anything-plays-31-rc1/AnythingPlays
+          echo "RC_ORIGINAL=$PWD/unpacked/opt/anything-plays-31-rc1" >> "$GITHUB_ENV"
+      - name: Extract original Windows RC1 Inno installer to temporary install root
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          python -c 'from pathlib import Path; import sys; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))' 'original/${{ matrix.installer }}' 'unpacked'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno installer extraction failed' }
+          if (-not (Test-Path 'unpacked/AnythingPlays.exe')) { throw 'Frozen exe missing' }
+          "RC_ORIGINAL=$((Resolve-Path 'unpacked').Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Swap pinned official native pygame.base into a FRESH disposable app copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p receipts
+          python -m tools.probe_v31_linux_windows_pygame_replacement \
+            --target '${{ matrix.target }}' \
+            --bundle "$RC_ORIGINAL" \
+            --installer 'original/${{ matrix.installer }}' \
+            --receipt 'original/${{ matrix.receipt }}' \
+            --audit original/SDL_RUNTIME_AUDIT.json \
+            --wheel 'wheel/${{ matrix.wheel }}' \
+            --destination "$PWD/copied-rc" \
+            --output receipts/UPSTREAM_PYGAME_SWAP.json
+      - name: Test real copied Linux frozen desktop and isolated settings migration
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+          home="$(mktemp -d /tmp/ap31-pygame-swap.XXXXXX)"
+          python -m tools.qa_v31_installed_settings_migration seed \
+            --home "$home" --manifest "$PWD/receipts/QA_SETTINGS_FIXTURE.json"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$home" XDG_CONFIG_HOME="$home/.config" \
+            SDL_AUDIODRIVER=dummy AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$PWD/receipts/COPIED_FROZEN_UI_SMOKE.json" \
+            "$PWD/copied-rc/AnythingPlays" --ap-v30-ui-smoke
+          python -m tools.qa_v31_installed_settings_migration verify \
+            --home "$home" --manifest "$PWD/receipts/QA_SETTINGS_FIXTURE.json" \
+            --output receipts/COPIED_SETTINGS_MIGRATION.json
+      - name: Test real copied Windows frozen desktop and isolated settings migration
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $homePath=Join-Path $env:RUNNER_TEMP 'ap31-upstream-pygame-qa-home'
+          New-Item -ItemType Directory -Path $homePath -ErrorAction Stop | Out-Null
+          $manifest=Join-Path $PWD 'receipts/QA_SETTINGS_FIXTURE.json'
+          python -m tools.qa_v31_installed_settings_migration seed --home $homePath --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not seed isolated test home' }
+          $env:HOME=$homePath
+          $env:USERPROFILE=$homePath
+          $env:SDL_AUDIODRIVER='dummy'
+          $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V30_UI_SMOKE_REPORT=Join-Path $PWD 'receipts/COPIED_FROZEN_UI_SMOKE.json'
+          $exe=Join-Path $PWD 'copied-rc/AnythingPlays.exe'
+          $proc=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -PassThru -Wait
+          if ($proc.ExitCode -ne 0) { throw "Copied Windows frozen desktop exit $($proc.ExitCode)" }
+          python -m tools.qa_v31_installed_settings_migration verify --home $homePath --manifest $manifest --output (Join-Path $PWD 'receipts/COPIED_SETTINGS_MIGRATION.json')
+          if ($LASTEXITCODE -ne 0) { throw 'User settings isolation failed' }
+      - name: Independently verify actual frozen copied app and retain the limited acceptance report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v31_installed_ui_smoke \
+            --target '${{ matrix.target }}' \
+            --installer 'original/${{ matrix.installer }}' \
+            --bundle copied-rc \
+            --receipt 'original/${{ matrix.receipt }}' \
+            --smoke receipts/COPIED_FROZEN_UI_SMOKE.json \
+            --output receipts/VERIFIED_COPIED_FROZEN_GUI.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('receipts/UPSTREAM_PYGAME_SWAP.json')
+          r=json.loads(p.read_text())
+          q=json.loads(Path('receipts/VERIFIED_COPIED_FROZEN_GUI.json').read_text())
+          assert q['actual_mainloop_ran'] and q['console_profiles']==18
+          assert r['original_installed_native_unchanged']
+          assert not r['full_lgpl_2_1_section_6_compliance_approved']
+          r['status']='PUBLIC_RC1_DISPOSABLE_UPSTREAM_PYGAME_NATIVE_SWAP_AND_ACTUAL_TK_SMOKE_PASSED'
+          r['copied_frozen_app_gui_started']=True
+          r['user_compiled_modified_library_tested']=False
+          r['full_lgpl_2_1_section_6_compliance_approved']=False
+          r['stable_3_1_release_approved']=False
+          p.write_text(json.dumps(r,indent=2)+"\n")
+          print('Native wheel swap and frozen copied app boot passed; modified source and legal review still open')
+          PY
+      - name: Retain original-wheel swap and actual frozen desktop receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-RC1-${{ matrix.target }}-PYGAME-WHEEL-SWAP-OWNER-QA
+          path: receipts/
+          if-no-files-found: warn
+          retention-days: 90
