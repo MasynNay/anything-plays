@@ -27,6 +27,15 @@ def main():
                     root.update_idletasks()
                     assert app.library_canvas.winfo_exists()
                     assert app.game_canvas.winfo_exists()
+                    # Real 3.1 chrome surrounds, but never replaces, the
+                    # original interactive camera and emulator Canvas widgets.
+                    assert app.camera_bezel.winfo_exists()
+                    assert app.game_bezel.winfo_exists()
+                    assert app.canvas.master is app.camera_bezel.screen
+                    assert app.game_canvas.master is app.game_bezel.screen
+                    assert app.canvas.bind('<Button-1>')
+                    assert app.game_canvas.bind('<KeyPress>')
+                    assert app.game_canvas.cget('takefocus') == '1'
                     # 3.1: the controller belongs in the right-hand game
                     # panel, and should be a real, theme-aware Tk interface.
                     assert app.gamepad_quick_canvas.winfo_exists()
@@ -45,6 +54,10 @@ def main():
                     root.update_idletasks()
                     assert app.gamepad_quick_canvas.cget("bg") == app.THEMES["Plum Dark"][1]
                     assert len(app.gamepad_quick_canvas.find_all()) == original_icon_count
+                    for bezel in (app.camera_bezel, app.game_bezel):
+                        assert bezel.cget('bg') == app.THEMES["Plum Dark"][4]
+                        assert bezel.rail.cget('bg') == app.THEMES["Plum Dark"][3]
+                        assert bezel.caption.cget('fg') == app.THEMES["Plum Dark"][2]
                     app._save_gamepad_binding("gba", "A", "B")
                     assert app._gamepad_bindings["gba"]["A"] == "B"
 
@@ -101,6 +114,9 @@ def main():
                     assert app._game_only_canvas is None
 
                     app.theme_name.set("Light")
+                    assert app.camera_bezel.rail.cget('bg') == app.THEMES["Light"][3]
+                    assert app.game_bezel.rail.cget('bg') == app.THEMES["Light"][3]
+                    assert app.game_canvas.cget('highlightcolor') == app.THEMES["Light"][3]
                     app.system_key.set("snes")
                     app.switch_system()
                     assert app.system_description.cget("text") == "Super Nintendo"
