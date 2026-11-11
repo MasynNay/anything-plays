@@ -225,10 +225,26 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p original30
-          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
-            --pattern '${{ matrix.baseline }}' --dir original30
-          gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
-            --pattern SHA256SUMS.txt --dir original30
+          # macOS GitHub-hosted runners occasionally lose api.github.com
+          # DNS for one release download. Keep the exact published 3.0 inputs
+          # and signed SHA256 manifest; retry transient transport failures,
+          # never use a missing/stale/unauthenticated binary.
+          fetch_original_release_asset() {
+            local asset="$1" target="original30/$1"
+            for attempt in 1 2 3 4; do
+              rm -f "$target"
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                  --pattern "$asset" --dir original30 && test -s "$target"; then
+                return 0
+              fi
+              echo "::warning::GitHub release download failed for $asset (attempt $attempt/4)"
+              sleep "$((attempt * 10))"
+            done
+            echo "::error::Could not fetch exact public 3.0 asset $asset" >&2
+            return 1
+          }
+          fetch_original_release_asset '${{ matrix.baseline }}'
+          fetch_original_release_asset SHA256SUMS.txt
           test -s 'original30/${{ matrix.baseline }}'
           test -s original30/SHA256SUMS.txt
           test -s 'rc2source/${{ matrix.installer }}'
