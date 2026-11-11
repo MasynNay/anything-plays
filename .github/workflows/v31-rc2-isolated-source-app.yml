@@ -6,6 +6,14 @@ on:
   pull_request:
     paths:
       - '.github/workflows/v31-rc2-isolated-source-app.yml'
+      # Stream Mode or webcam processing changes require rebuilding and
+      # installing all four full-console RC2-based QA packages, not only
+      # passing Python unit tests on a source-only checkout.
+      - 'anything_plays/ui_stream.py'
+      - 'anything_plays/ui_camera.py'
+      - 'tests/test_v31_stream_mode.py'
+      - 'tests/smoke_gui.py'
+      - 'app.py'
       - 'anything_plays/build_identity.py'
       - 'anything_plays/test_preferences.py'
       - 'tools/write_v31_identity.py'
