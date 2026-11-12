@@ -52,7 +52,50 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Authenticate an already-public stable release without republishing
+        id: published
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > already-published.json 2>/dev/null; then
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("already-published.json").read_text("utf-8"))
+          assert r["id"]==int(os.environ["EXISTING_DRAFT_ID"])
+          assert r["tag_name"]=="v3.1.0"
+          assert r["draft"] is False and r["prerelease"] is False
+          assert r["target_commitish"]==os.environ["APP_SOURCE_SHA"]
+          expected={
+            "AnythingPlaysSetup-3.1.0.exe":"sha256:574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0",
+            "anything-plays-31_3.1.0_amd64.deb":"sha256:e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e",
+            "AnythingPlays-3.1.0-macos-arm64.dmg":"sha256:ddec3be8356e0b1729ff0a4131bc362128739fe39a1cdc48dfd83921feb8e49a",
+            "AnythingPlays-3.1.0-macos-x64.dmg":"sha256:ed7dd44e457b1a6c5458f7f6dce54089c98401418c1cc02d145e36f68494bae9",
+            "AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip":"sha256:469b75685b385a7992f018d04bc4ddb1ffa06b061b6471cf50ae4fcda6e746d8",
+            "SHA256SUMS.txt":"sha256:017f55c988353572ddc3630f4b3505c48945cb4007a96b5656b4444b84fb3f19",
+            "FINAL_QA_MANIFEST.json":"sha256:8d387e9d341b841c6705a2ad6de0cc457a92bb3b8cc72076b7f65a79abaacbdc",
+            "FINAL_SOURCE_ACCESS_REVIEW.md":"sha256:8998e9a606e30b90b852319355b7527329f10d8c9045abac77cc657b15f78c4f",
+          }
+          assert {a["name"]:a["digest"] for a in r["assets"]}==expected
+          assert all(a["state"]=="uploaded" for a in r["assets"])
+          print("Verified already-public exact eight-asset stable 3.1.0; no release mutation needed.")
+          PY
+            gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > public-tag.json
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          tag=json.loads(Path("public-tag.json").read_text("utf-8"))
+          assert tag["object"]["type"]=="commit"
+          assert tag["object"]["sha"]==os.environ["APP_SOURCE_SHA"]
+          print("Published tag exactly matches original immutable tested source.")
+          PY
+            echo "already_public=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_public=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Fail closed on any missing acceptance, source or approval evidence
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -75,6 +118,7 @@ jobs:
           PY
 
       - name: Authenticate original completed same-source final and provenance stage
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,6 +145,7 @@ jobs:
           PY
 
       - name: Download only the original SHA-proven private seven-asset bundle
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -110,6 +155,7 @@ jobs:
           (cd reviewed && sha256sum --check SHA256SUMS.txt)
 
       - name: Verify full four-platform identity and the seven exact assets
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -148,6 +194,7 @@ jobs:
           PY
 
       - name: Attach exactly one verified pygame SDL mpg123 source companion before release review
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -193,6 +240,7 @@ jobs:
           (cd reviewed && sha256sum --check SHA256SUMS.txt)
 
       - name: Require the original private draft, never replace a public release
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -226,6 +274,7 @@ jobs:
           fi
 
       - name: Replace only the reviewed eight private draft assets including original sources
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -249,6 +298,7 @@ jobs:
           PY
 
       - name: Publish only after every matching asset digest and gate passed
+        if: ${{ steps.published.outputs.already_public != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
