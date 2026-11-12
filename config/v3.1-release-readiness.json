@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "version": "3.1.0",
-  "status": "IN_DEVELOPMENT",
-  "public_release_approved": false,
+  "status": "APPROVED_PENDING_PUBLICATION",
+  "public_release_approved": true,
   "release_gates": {
     "full_eighteen_console_installer": {
       "verified": true,
@@ -17,16 +17,21 @@
       "evidence": null
     },
     "pygame_sdl_redistribution_review": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SCOPED_DISTRIBUTION_DECISION.md",
+      "review_scope": "Scoped no-charge, noncommercial, nonpromotional complete installer; pygame-ce 2.5.8 LGPL, zlib SDL, mpg123 LGPL sources and notices reviewed",
+      "disclaimer": "Maintainer review with no independent legal warranty or bit-reproducibility claim"
     },
     "corresponding_source_material": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43152661067",
+      "review_scope": "Original SHA-pinned pygame-ce, SDL and mpg123 source and notices in eighth companion asset; 3.0 existing original cores and exact app source public",
+      "limitation": "A source-version and library-replacement proof is not a byte-identical rebuild of every native object"
     },
     "release_notes_and_rollout": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43153670927",
+      "review_scope": "Eight immutable assets verified; accurate noncommercial release notes and explicit untested physical QA; rollback to existing public 3.0 and RC2"
     }
   },
   "verified_previews": {
@@ -530,5 +535,20 @@
     "physical_controller_tested": false,
     "evidence": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_HARDWARE_QA_SCOPE.md",
     "scope": "Owner requested free public 3.1.0 with openly disclosed real controller/camera/retail-game/long-session QA gaps; synthetic runner tests cannot count as real hardware"
+  },
+  "release_decision": {
+    "date": "2026-11-11",
+    "scope": "FREE_NONCOMMERCIAL_NONPROMOTIONAL_NO_DONATIONS_NO_ADS",
+    "source_companion_name": "AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip",
+    "asset_count": 8,
+    "review": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SCOPED_DISTRIBUTION_DECISION.md",
+    "owner_requested_publication": true,
+    "physical_controller_tested": false,
+    "legal_compliance_guaranteed": false,
+    "exact_approved_source_revision": "104b96621ec4cb8dc39fde8c3fe96fc854c406ed",
+    "existing_public_releases_preserved": [
+      "v3.0.0",
+      "v3.1.0-rc2"
+    ]
   }
 }
