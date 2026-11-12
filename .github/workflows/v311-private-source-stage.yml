@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: v311-private-build-${{ github.event.pull_request.number || github.ref }}
@@ -41,6 +42,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 110
     env:
+      GH_TOKEN: ${{ github.token }}
       AP_V311_CANDIDATE: '1'
       AP_V31_PREVIEW: '0'
       AP_V31_RC: '0'
@@ -102,6 +104,121 @@ jobs:
         run: |
           choco install innosetup --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+      - name: Download original verified camera-only OpenCV wheel for exact native target
+        shell: bash
+        env:
+          AP_CLEAN_NATIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p customcamera
+          case "$AP_CLEAN_NATIVE_TARGET" in
+            linux-x64)
+              run_id=43133383864
+              artifact=AnythingPlays-3.1-LINUX-FROM-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=linux-x86_64
+              ;;
+            windows-x64)
+              run_id=43138596964
+              artifact=AnythingPlays-3.1-WINDOWS-SOURCE-DIRECTSHOW-OPENCV-UNAPPROVED
+              native_tag=windows-x86_64
+              ;;
+            macos-arm64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-arm64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-arm64
+              ;;
+            macos-x64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-x86_64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-x86_64
+              ;;
+            *)
+              echo "::error::Unsupported clean camera source wheel target $AP_CLEAN_NATIVE_TARGET"
+              exit 1
+              ;;
+          esac
+          # Source wheels must ALREADY be built successfully in independent
+          # native runners. A job still building or a failed source probe is
+          # not an acceptable input for a unified four-platform public release.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > customcamera/source-run.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('customcamera/source-run.json').read_text('utf-8'))
+          assert r['status']=='completed' and r['conclusion']=='success',r
+          assert r['event']=='pull_request'
+          print('Original independent source-wheel native CI PASS:',r['html_url'])
+          PY
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact" --dir customcamera
+          python - "$AP_CLEAN_NATIVE_TARGET" "$native_tag" <<'PY'
+          from pathlib import Path
+          import hashlib,json,sys
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          platform,tag=sys.argv[1:]
+          root=Path('customcamera')
+          source=(root/'published20/opencv_python_headless-4.14.0.94.tar.gz'
+                  if platform=='windows-x64' else
+                  root/'sources/opencv_python_headless-4.14.0.94.tar.gz')
+          assert source.is_file(),source
+          assert hashlib.sha256(source.read_bytes()).hexdigest()==SOURCE_SHA256
+          wheels=list(root.glob('wheels/*.whl'))
+          assert len(wheels)==1,wheels
+          wheel=wheels[0]
+          manifest_path={
+              'linux-x64':'evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'windows-x64':'evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-arm64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-x64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+          }[platform]
+          receipt=json.loads((root/manifest_path).read_text('utf-8'))
+          expected_status={
+              'linux-x64':'PRIVATE_SOURCE_BUILT_LINUX_V4L2_ONLY_WHEEL_QA_NO_RELEASE',
+              'windows-x64':'PRIVATE_SOURCE_BUILT_WINDOWS_DIRECTSHOW_FFMPEG_OFF_UNAPPROVED',
+              'macos-arm64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+              'macos-x64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+          }[platform]
+          assert receipt['status']==expected_status,receipt
+          expected_receipt_target='macos-x86_64' if platform=='macos-x64' else platform
+          assert receipt['target']==expected_receipt_target
+          assert receipt['source_sha256']==SOURCE_SHA256
+          assert receipt['wheel_sha256']==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert receipt['public_release_approved'] is False
+          assert receipt['redistribution_approved'] is False
+          if platform=='linux-x64':
+              assert receipt['opencv_linux_v4l2_backend_available']
+              assert receipt['opencv_ffmpeg_backend_disabled']
+          elif platform=='windows-x64':
+              patch=root/'published20/WINDOWS_OPENCV_SETUP_PATCH.diff'
+              assert patch.is_file()
+              assert receipt['windows_source_patch_sha256']==hashlib.sha256(patch.read_bytes()).hexdigest()
+              assert receipt['directshow_backend_compiled']
+              assert receipt['opencv_ffmpeg_disabled']
+          else:
+              assert receipt['avfoundation_backend_compiled']
+              assert receipt['ffmpeg_disabled_in_native_wheel']
+              assert receipt['avif_native_dependency_omitted']
+          verify_custom_wheel(wheel,receipt['wheel_sha256'],tag)
+          Path('customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json').write_text(
+             json.dumps({'source_ci_run_id':json.loads(Path('customcamera/source-run.json').read_text('utf-8'))['id'],
+                        'source_sha256':SOURCE_SHA256,'target':platform,
+                        'native_wheel_sha256':receipt['wheel_sha256'],
+                        'native_camera_capture_backend_proven':True,
+                        'frozen_installer_tested':False,
+                        'redistribution_approved':False,
+                        'public_release_approved':False},indent=2)+'\n','utf-8')
+          print('Trusted original-source camera-only wheel for:',platform,wheel.name)
+          PY
+          wheel="$(find customcamera/wheels -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          case "$RUNNER_OS" in
+            Windows) wheel_native="$(cygpath -w "$PWD/$wheel")" ;;
+            *) wheel_native="$PWD/$wheel" ;;
+          esac
+          echo "AP_CUSTOM_OPENCV_WHEEL=$wheel_native" >> "$GITHUB_ENV"
+          wheel_hash="$(python -c 'from pathlib import Path;import hashlib,sys;print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())' "$wheel")"
+          echo "AP_CUSTOM_OPENCV_SHA256=$wheel_hash" >> "$GITHUB_ENV"
       - name: Freeze true-version Linux 3.1.1 QA app
         if: runner.os == 'Linux'
         shell: bash
@@ -136,6 +253,23 @@ jobs:
           assert r['public_release_approved'] is False
           print('Actual 3.1.1 source-built native artifact:',r['target'],r['sha256'])
           PY
+      - name: Copy verified native OpenCV source provenance into the private QA artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json
+          cp customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json \
+            release/V311_NATIVE_OPENCV_WHEEL_QA.json
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          r=json.loads(Path('release/V311_NATIVE_OPENCV_WHEEL_QA.json').read_text())
+          assert r['target']=='${{ matrix.target }}'
+          assert r['native_camera_capture_backend_proven'] is True
+          assert r['redistribution_approved'] is False
+          assert r['public_release_approved'] is False
+          print('FFmpeg-off source-built OpenCV wheel provenance retained.')
+          PY
       - name: Preserve private version-correct QA packages and original receipts
         uses: actions/upload-artifact@v4
         with:
@@ -143,6 +277,7 @@ jobs:
           path: |
             release/${{ matrix.installer }}
             release/V311_SOURCE_QA_RECEIPT.json
+            release/V311_NATIVE_OPENCV_WHEEL_QA.json
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
