@@ -65,6 +65,12 @@ An earlier reference to 2.0's FFmpeg-free custom OpenCV wheel does not describe
 the exact 3.0 or 3.1 installer bytes. This finding neither clears nor
 establishes a licensing violation; obtain actual source/build/rights evidence.
 
+## New clean final 3.1.0 Mac source-modified pygame — BOTH architectures passed
+
+The [independent actual-final native Apple Silicon and Intel Mac modified-source test 43149191077](https://github.com/MasynNay/anything-plays/actions/runs/43149191077) passed **2/2**. Each test compiled genuinely changed original pygame CE 2.5.8 C source on its own Mac CPU, validated original exact full 3.1.0 DMG/native code section correspondence, replaced only a disposable copy's `pygame.base` library, relinked to bundled SDL2, ad-hoc signed the copy, executed the changed C method and successfully started the actual frozen 18-console final desktop. Original signed DMGs remained read only. [Detailed Mac acceptance](V3_1_CLEAN_FINAL_MACOS_PYGAME_REPLACEMENT.md).
+
+This closes a **technical single-extension replacement proof on both final Mac builds**; it does not clear all pygame/native dependencies, source materials and required LGPL library modification/relinking provisions. These remain separate from physical device and production redistribution acceptance.
+
 ## New final-source native replacement result — original clean Linux 3.1.0
 
 The [real exact-clean-final Linux source-modified pygame CE test](https://github.com/MasynNay/anything-plays/actions/runs/43148388829) passed against the **new** complete final 3.1.0 source-built Linux DEB, source revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`. A native runner cloned the pinned upstream original pygame CE source, changed `base.c`, compiled a new x64 extension, replaced it **only in a disposable copy** of the final package, executed the changed C method from that copy and then launched the actual frozen 3.1.0 desktop with its real Tk event loop. Original package bytes remained unchanged.
