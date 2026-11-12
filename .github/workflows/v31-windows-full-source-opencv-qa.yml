@@ -1,0 +1,232 @@
+name: 3.1 | Fresh full Windows 18-console setup with clean source OpenCV
+
+# Real Inno setup and frozen Tk/Stream QA, private only. Does not publish or
+# change the existing seven-asset 3.1 draft or any 3.0 / RC2 installer.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-windows-full-source-opencv-qa.yml'
+      - 'packaging/build_windows.bat'
+      - 'tools/assemble_v31_full_windows.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-full-win-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  full-clean-windows-setup:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: windows-latest
+    timeout-minutes: 130
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V31_FINAL_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_NEXT_QA: '1'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FINAL_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      SOURCE_WHEEL_RUN: '43138596964'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject tampered source revision and release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V31_QA_CHECKOUT_SHA"
+          for suite in test_v31_final_candidate_identity.py test_v31_final_full_assembly.py test_v31_final_installed_ui.py test_custom_opencv_wheel.py; do
+            python -m unittest discover -s tests -p "$suite" -v
+          done
+      - name: Install native Inno compiler and icon requirements
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno compiler unavailable' }
+          python -m pip install Pillow==12.3.0 numpy==2.5.4 opencv-python-headless==4.14.0.94
+          if ($LASTEXITCODE -ne 0) { throw 'Native icon requirements unavailable' }
+      - name: Download original public 3.0 source cores and independently compiled Windows wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original30 camera fullfinal source-qa evidence
+          gh run download "$SOURCE_WHEEL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1-WINDOWS-SOURCE-DIRECTSHOW-OPENCV-UNAPPROVED --dir camera
+          for asset in AnythingPlaysSetup-3.0.0.exe SHA256SUMS.txt; do
+            good=0
+            for i in 1 2 3 4; do
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                --pattern "$asset" --dir original30 --clobber \
+                && test -s "original30/$asset"; then good=1; break; fi
+              sleep "$((i*8))"
+            done
+            test "$good" = 1
+          done
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          root=Path('camera')
+          source=root/'published20/opencv_python_headless-4.14.0.94.tar.gz'
+          patch=root/'published20/WINDOWS_OPENCV_SETUP_PATCH.diff'
+          wheels=list(root.glob('wheels/*.whl'))
+          assert source.is_file() and patch.is_file() and len(wheels)==1
+          wheel=wheels[0]
+          data=json.loads((root/'evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json').read_text('utf-8'))
+          assert data['status']=='PRIVATE_SOURCE_BUILT_WINDOWS_DIRECTSHOW_FFMPEG_OFF_UNAPPROVED'
+          assert data['target']=='windows-x64'
+          assert data['source_sha256']==SOURCE_SHA256==hashlib.sha256(source.read_bytes()).hexdigest()
+          assert data['windows_source_patch_sha256']==hashlib.sha256(patch.read_bytes()).hexdigest()
+          assert data['wheel_sha256']==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert data['opencv_ffmpeg_disabled'] and data['directshow_backend_compiled']
+          assert data['public_release_approved'] is False
+          verify_custom_wheel(wheel,data['wheel_sha256'],'windows-x86_64')
+          stable=Path('original30/AnythingPlaysSetup-3.0.0.exe')
+          assert hashlib.sha256(stable.read_bytes()).hexdigest()+'  '+stable.name in Path('original30/SHA256SUMS.txt').read_text('utf-8').splitlines()
+          print('Native source-built DirectShow wheel and public original-source cores verified.')
+          PY
+          wheel="$(find camera/wheels -maxdepth 1 -name '*.whl' -type f -print -quit)"
+          # This variable is consumed by a native Windows CMD/batch builder,
+          # not Git Bash. Never pass an MSYS /d/a/... path to pip/Win32.
+          native_wheel="$(cygpath -w "$PWD/$wheel")"
+          echo "AP_CUSTOM_OPENCV_WHEEL=$native_wheel" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=$(sha256sum "$wheel" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - name: Build NEW 3.1.0 Windows source-stage installer with clean camera wheel
+        shell: cmd
+        env:
+          AP_V30_MINIMAL_CORE_BUILD: '1'
+          AP_V31_FULL_TEST_CORES: '0'
+        run: call packaging\build_windows.bat
+      - name: Record exact genuine new 3.1.0 source-stage identity and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          exe=Path('release/AnythingPlaysSetup-3.1.0.exe')
+          assert exe.is_file() and exe.stat().st_size>1000000
+          record={'schema_version':1,'status':'PRIVATE_SOURCE_STAGE_FINAL_IDENTITY_QA_ONLY',
+            'source_revision':os.environ['AP_V31_FINAL_SOURCE_SHA'],
+            'target':'windows-x64','installer':exe.name,
+            'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),
+            'size_bytes':exe.stat().st_size,'version':'3.1.0',
+            'identity_channel':'final_candidate','settings_namespace':'anything-plays-31',
+            'only_mgba_source_stage':True,'native_core_count':1,
+            'full_18_console_release_ready':False,'public_release_approved':False,
+            'relinking_approved':False,'physical_hardware_verified':False}
+          Path('source-qa/FINAL_IDENTITY_SOURCE_QA.json').write_text(json.dumps(record,indent=2)+'\n','utf-8')
+          PY
+      - name: Assemble real eleven-original-core 18-profile complete Inno installer
+        shell: bash
+        env:
+          AP_V30_MINIMAL_CORE_BUILD: '0'
+          AP_V31_FULL_TEST_CORES: '1'
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_windows --final \
+            --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/AnythingPlaysSetup-3.0.0.exe \
+            --preview release/AnythingPlaysSetup-3.1.0.exe \
+            --sums original30/SHA256SUMS.txt \
+            --receipt source-qa/FINAL_IDENTITY_SOURCE_QA.json --output fullfinal
+          test -s fullfinal/AnythingPlaysSetup-3.1.0.exe
+          test -s fullfinal/FULL_WINDOWS_QA_RECEIPT.json
+      - name: Install original-source final setup in Windows CI and verify codec removal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'fullfinal/AnythingPlaysSetup-3.1.0.exe').Path
+          $destination=Join-Path $env:RUNNER_TEMP 'AP31-new-camera-source-full'
+          python -c "from tools.assemble_v31_full_windows import unpack;from pathlib import Path;import sys;unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $destination
+          if ($LASTEXITCODE -ne 0) { throw 'Original source full setup failed to install' }
+          "AP31_FULL_CLEAN_WINDOWS_INSTALLED=$destination" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify original eleven core hashes, full version, no bundled FFmpeg DLL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import os,json,hashlib
+          root=Path(os.environ['AP31_FULL_CLEAN_WINDOWS_INSTALLED'])
+          pkg=Path('fullfinal/AnythingPlaysSetup-3.1.0.exe')
+          r=json.loads(Path('fullfinal/FULL_WINDOWS_QA_RECEIPT.json').read_text('utf-8'))
+          assert r['status']=='PRIVATE_FULL_3_1_0_FINAL_IDENTITY_QA'
+          assert r['target']=='windows-x64'
+          assert r['source_preview_revision']==os.environ['AP_V31_QA_CHECKOUT_SHA']
+          assert r['sha256']==hashlib.sha256(pkg.read_bytes()).hexdigest()
+          assert r['console_profiles']==18 and r['native_core_count']==11
+          assert r['public_release_approved'] is False
+          assert (root/'AnythingPlays.exe').is_file()
+          assert len(list((root/'cores').glob('*_libretro.dll')))==11
+          assert not list(root.rglob('opencv_videoio_ffmpeg*.dll'))
+          Path('evidence/CLEAN_FULL_WINDOWS_NATIVE_QA.json').write_text(
+             json.dumps({'status':'PRIVATE_NEW_SOURCE_CAMERA_ONLY_WINDOWS_18_CONSOLE_QA',
+                         'installer_sha256':r['sha256'],'source_revision':r['source_preview_revision'],
+                         'native_core_count':11,'console_profiles':18,
+                         'opencv_ffmpeg_binary_present':False,
+                         'actual_camera_hardware_tested':False,
+                         'redistribution_approved':False,
+                         'public_release_approved':False},indent=2)+'\n','utf-8')
+          print('Native full Windows setup and camera-only compiled OpenCV verified.')
+          PY
+      - name: Launch installed full Windows Tk/Stream and verify isolated RC2 preferences
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $savedHome=$env:HOME
+          $savedProfile=$env:USERPROFILE
+          $qahome=Join-Path $env:RUNNER_TEMP 'AP31-new-clean-source-QA-home'
+          New-Item -ItemType Directory -Path $qahome -Force | Out-Null
+          python -m tools.qa_v31_final_installed_preferences seed --home $qahome --manifest evidence/FIXTURE.json
+          if ($LASTEXITCODE -ne 0) { throw 'Legacy preferences fixture failed' }
+          $env:HOME=$qahome
+          $env:USERPROFILE=$qahome
+          $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V31_STREAM_SMOKE_CHECK='1'
+          $env:AP_V30_UI_SMOKE_REPORT=Join-Path (Resolve-Path evidence).Path 'FROZEN_CLEAN_SOURCE_WINDOWS_GUI.json'
+          $env:SDL_AUDIODRIVER='dummy'
+          $app=Join-Path $env:AP31_FULL_CLEAN_WINDOWS_INSTALLED 'AnythingPlays.exe'
+          $task=Start-Process -FilePath $app -ArgumentList '--ap-v30-ui-smoke' -PassThru -Wait
+          if ($task.ExitCode -ne 0) { throw "Frozen source-built Windows 3.1 GUI exited $($task.ExitCode)" }
+          $env:HOME=$savedHome
+          $env:USERPROFILE=$savedProfile
+          python -m tools.qa_v31_final_installed_preferences verify --home $qahome --manifest evidence/FIXTURE.json --output evidence/SETTINGS_RECEIPT.json
+          if ($LASTEXITCODE -ne 0) { throw 'Old RC2 / 3.0 settings changed' }
+          python -m tools.verify_v31_final_installed_ui --target windows-x64 --source-sha $env:AP_V31_QA_CHECKOUT_SHA --installer fullfinal/AnythingPlaysSetup-3.1.0.exe --bundle $env:AP31_FULL_CLEAN_WINDOWS_INSTALLED --receipt fullfinal/FULL_WINDOWS_QA_RECEIPT.json --smoke evidence/FROZEN_CLEAN_SOURCE_WINDOWS_GUI.json --output evidence/FINAL_INSTALLED_RECEIPT.json
+          if ($LASTEXITCODE -ne 0) { throw 'Full frozen Windows Stream Mode proof failed' }
+      - name: Retain only private full new setup and exact source/installed receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-WINDOWS-FULL-18-CAMERA-ONLY-NEW-SETUP-PRIVATE-QA
+          path: |
+            fullfinal/AnythingPlaysSetup-3.1.0.exe
+            fullfinal/FULL_WINDOWS_QA_RECEIPT.json
+            fullfinal/SDL_RUNTIME_AUDIT.json
+            source-qa/FINAL_IDENTITY_SOURCE_QA.json
+            evidence/CLEAN_FULL_WINDOWS_NATIVE_QA.json
+            evidence/FROZEN_CLEAN_SOURCE_WINDOWS_GUI.json
+            evidence/FIXTURE.json
+            evidence/SETTINGS_RECEIPT.json
+            evidence/FINAL_INSTALLED_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 0
