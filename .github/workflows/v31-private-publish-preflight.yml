@@ -99,7 +99,7 @@ jobs:
               for name, expected in r["source_archives"].items():
                   assert hashlib.sha256(z.read("original-sources/"+name)).hexdigest()==expected
           draft=json.loads(__import__("subprocess").check_output(
-              ["gh","api",f"repos/{os.environ['GITHUB_REPOSITORY']}/releases/tags/v3.1.0"],text=True))
+              ["gh","api",f"repos/{os.environ['GITHUB_REPOSITORY']}/releases/{os.environ['DRAFT_ID']}"],text=True))
           assert draft["id"]==int(os.environ["DRAFT_ID"])
           assert draft["tag_name"]=="v3.1.0" and draft["draft"] is True
           assert {a["name"] for a in draft["assets"]}==original_names
