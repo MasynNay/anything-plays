@@ -20,6 +20,7 @@ from anything_plays.v30_gpl_trial import (
 from tools.assemble_v31_full_windows import unpack, source_app, iscc
 from tools.verify_v311_source_stage import INSTALLERS, STATUS, digest
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v311_camera_source_gate import require_pinned_native_camera_wheel
 from tools.audit_v31_sdl_runtime import UPSTREAM_LGPL_SHA256, inspect_bundle
 from verify_bundle import verify_bundle
 
@@ -45,7 +46,7 @@ def _check_receipt(receipt, *, source, digest_of_installer, size):
             raise ValueError("Not exact original 3.1.1 Windows source: "+key)
 
 
-def build(stable, preview, checksums, receipt, expected_source_sha, output):
+def build(stable, preview, checksums, receipt, camera_receipt, expected_source_sha, output):
     stable, preview, checksums, receipt, output = map(
         Path, (stable, preview, checksums, receipt, output))
     if (stable.name != OLD or preview.name != NEW
@@ -65,6 +66,7 @@ def build(stable, preview, checksums, receipt, expected_source_sha, output):
                    size=preview.stat().st_size)
     if output.exists() or output.is_symlink():
         raise ValueError("No overwrite of package destination")
+    camera = require_pinned_native_camera_wheel(camera_receipt, TARGET)
     root = Path(__file__).resolve().parents[1]
     output.mkdir(parents=True)
     with tempfile.TemporaryDirectory(prefix="ap311-full-windows-") as tmp:
@@ -144,6 +146,7 @@ def build(stable, preview, checksums, receipt, expected_source_sha, output):
             "size_bytes": final.stat().st_size,
             "old_stable_sha256": digest(stable),
             "new_source_sha256": digest(preview),
+            "sourcebuilt_ffmpeg_off_camera_wheel_sha256": camera["native_wheel_sha256"],
             "new_source_revision": expected_source_sha,
             "version": "3.1.1", "identity_channel": "v311_candidate",
             "settings_namespace": "anything-plays-311-candidate",
@@ -161,11 +164,11 @@ def build(stable, preview, checksums, receipt, expected_source_sha, output):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    for key in ("stable", "qa", "checksums", "source-receipt", "expected-source-sha", "output"):
+    for key in ("stable", "qa", "checksums", "source-receipt", "camera-receipt", "expected-source-sha", "output"):
         p.add_argument("--"+key, required=True,
                        type=Path if key != "expected-source-sha" else str)
     a = p.parse_args()
-    report = build(a.stable, a.qa, a.checksums, a.source_receipt,
+    report = build(a.stable, a.qa, a.checksums, a.source_receipt, a.camera_receipt,
                    a.expected_source_sha, a.output)
     print(json.dumps(report, indent=2))
 
