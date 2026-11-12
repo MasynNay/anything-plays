@@ -19,7 +19,7 @@ The 3.1 desktop release expands **Anything Plays** with Stream Mode, customizabl
 | macOS Apple Silicon | `AnythingPlays-3.1.0-macos-arm64.dmg` |
 | macOS Intel | `AnythingPlays-3.1.0-macos-x64.dmg` |
 
-Use `SHA256SUMS.txt` to verify download integrity. All four installers, the checksum list, `FINAL_QA_MANIFEST.json` and `FINAL_SOURCE_ACCESS_REVIEW.md` must match as one release set. **Do not mix earlier 3.1 preview or stock-OpenCV draft installer files with the clean 3.1 release.**
+Use `SHA256SUMS.txt` to verify download integrity. All four installers, the checksum list, `FINAL_QA_MANIFEST.json`, `FINAL_SOURCE_ACCESS_REVIEW.md`, and the separately SHA-256-verified `AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip` source companion form the intended eight-asset release set. The source ZIP includes seven version-pinned original pygame/SDL/mpg123 source archives and license texts. [Recipient library rebuild and replacement instructions](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) describe the real tested native extension substitution on all four OSes and list untested replacements explicitly. **Do not mix earlier 3.1 preview or stock-OpenCV draft installer files with the clean 3.1 release.**
 
 ## Verification and source
 
