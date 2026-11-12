@@ -13,6 +13,9 @@ on:
       - 'tools/verify_custom_opencv_wheel.py'
       - 'tools/check_opencv_build.py'
 
+# PR #239 builds full version-correct 3.1.1 artifacts in its dedicated
+# workflow, rather than wasting runner capacity on superseded 3.1/RC2 builds.
+# All other pull requests and the 3.1.0 public release remain unaffected.
 permissions:
   contents: read
   actions: read
@@ -23,7 +26,7 @@ concurrency:
 
 jobs:
   fresh-clean-opencv-final-deb:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     name: Original-source 11-core 3.1.0 Linux package + installed DS Stream Mode
     runs-on: ubuntu-24.04
     timeout-minutes: 125

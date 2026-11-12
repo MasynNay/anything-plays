@@ -24,6 +24,9 @@ on:
       - 'tests/test_v31_final_installed_ui.py'
       - '.github/workflows/v31-final-installed-desktop.yml'
 
+# PR #239 builds full version-correct 3.1.1 artifacts in its dedicated
+# workflow, rather than wasting runner capacity on superseded 3.1/RC2 builds.
+# All other pull requests and the 3.1.0 public release remain unaffected.
 permissions:
   contents: read
   actions: read
@@ -34,7 +37,7 @@ concurrency:
 
 jobs:
   build-private-final-identity:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     name: Genuine 3.1.0 source identity | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -308,7 +311,7 @@ jobs:
     # One Ubuntu mirror/DNS failure must not discard authentic Windows/Mac
     # sources: every OS leg still must download its OWN source-stage artifact
     # and verify the exact recorded source revision and native core hashes.
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     needs: build-private-final-identity
     name: Original-core full FINAL | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -496,7 +499,7 @@ jobs:
   installed-final-four-os:
     # Launch actual full 18-console frozen app on all four hosted operating
     # systems and audit isolated stable/RC1/RC2 preference directories.
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.full-final-18-console.result == 'success' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && needs.full-final-18-console.result == 'success' }}
     needs: full-final-18-console
     name: Installed 3.1.0 final identity GUI and preference isolation | all four native hosts
     uses: ./.github/workflows/v31-final-installed-desktop.yml
