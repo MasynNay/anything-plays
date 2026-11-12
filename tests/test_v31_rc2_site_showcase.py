@@ -1,4 +1,4 @@
-"""Public RC2 site navigation and illustrative Stream Mode art contracts."""
+"""Public stable 3.1 site navigation and honest historical Stream Mode art contracts."""
 from html.parser import HTMLParser
 from pathlib import Path
 import unittest
@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site" / "index.html"
 STYLES = ROOT / "site" / "styles.css"
 README = ROOT / "README.md"
-TAG = "v3.1.0-rc2"
+TAG = "v3.1.0"
 
 
 class Links(HTMLParser):
@@ -24,21 +24,21 @@ class Links(HTMLParser):
 
 
 class StreamPortfolioTests(unittest.TestCase):
-    def test_primary_rc2_download_and_stable_download_are_distinct(self):
+    def test_primary_stable_31_and_previous_30_are_distinct(self):
         html = SITE.read_text("utf-8")
         links = Links()
         links.feed(html)
         self.assertEqual(
-            links.links["public-rc-download"],
+            links.links["public-stable-download-31"],
             "https://github.com/MasynNay/anything-plays/releases/tag/" + TAG,
         )
         self.assertEqual(
-            links.links["public-stable-download"],
+            links.links["public-previous-stable-download"],
             "https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0",
         )
         self.assertNotIn("Download 3.1 RC1", html)
         self.assertIn("latest stable", README.read_text("utf-8"))
-        self.assertIn("3.1 RC2", html)
+        self.assertIn("STABLE 3.1.0 AVAILABLE", html)
 
     def test_stream_mode_is_unambiguously_an_illustration(self):
         html = SITE.read_text("utf-8")
@@ -59,9 +59,9 @@ class StreamPortfolioTests(unittest.TestCase):
     def test_release_notes_are_cautious_and_old_artifacts_not_faked(self):
         html = SITE.read_text("utf-8")
         readme = README.read_text("utf-8")
-        self.assertIn("complete native LGPL corresponding-source/relinking review", html)
-        self.assertIn("3.0.0 remains the latest stable release", readme)
-        self.assertIn("RC2 is a prerelease", readme)
+        self.assertIn("Separately licensed sources and notices accompany the release", html)
+        self.assertIn("Anything Plays 3.1.0 — public stable release", readme)
+        self.assertIn("3.1 RC2", readme)
         self.assertIn("3.1 RC2", readme)
         self.assertIn("docs/screenshots/3.0", readme)
         self.assertIn("LINUX · 3.0 DEVELOPMENT CAPTURE", html)
