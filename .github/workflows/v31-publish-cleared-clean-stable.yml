@@ -54,9 +54,14 @@ jobs:
           r=json.loads(Path("config/v3.1-release-readiness.json").read_text("utf-8"))
           assert r["version"]=="3.1.0"
           assert r["owner_publication_request"]["requested"] is True
+          from tools.check_v31_release import PUBLICATION_GATES
           assert r["public_release_approved"] is True
-          assert all(v["verified"] is True for v in r["release_gates"].values())
-          print("Release source, hardware and redistribution approvals are recorded.")
+          assert all(r["release_gates"][name]["verified"] is True
+                     for name in PUBLICATION_GATES)
+          assert r["hardware_acceptance_disclosure"]["owner_accepts_uncertified_hardware"] is True
+          assert r["hardware_acceptance_disclosure"]["physical_controller_tested"] is False
+          assert r["release_gates"]["real_controller_hardware_acceptance"]["verified"] is False
+          print("Source and redistribution approvals checked; physical hardware limitations disclosed.")
           PY
 
       - name: Authenticate original completed same-source final and provenance stage
