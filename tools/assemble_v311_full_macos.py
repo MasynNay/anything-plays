@@ -19,13 +19,14 @@ from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.assemble_v31_full_macos import mount, create_disk_image
 from tools.audit_v31_sdl_runtime import inspect_bundle
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v311_camera_source_gate import require_pinned_native_camera_wheel
 from tools.verify_v311_source_stage import INSTALLERS, STATUS, digest
 from verify_bundle import verify_bundle
 
 STATUS_FULL = "PRIVATE_3_1_1_FULL_18_MACOS_QA_NOT_APPROVED"
 
 
-def build(arch, stable, qa, checksums, receipt, expected_source_sha, output):
+def build(arch, stable, qa, checksums, receipt, camera_receipt, expected_source_sha, output):
     if arch not in ("arm64", "x64"):
         raise ValueError("Wrong native Mac architecture")
     stable, qa, checksums, receipt, output = map(
@@ -57,6 +58,7 @@ def build(arch, stable, qa, checksums, receipt, expected_source_sha, output):
     from tools.verify_v311_source_stage import SOURCE
     if not isinstance(expected_source_sha, str) or SOURCE.fullmatch(expected_source_sha) is None:
         raise ValueError("Missing exact new version source commit")
+    camera = require_pinned_native_camera_wheel(camera_receipt, target)
     if output.exists() or output.is_symlink():
         raise ValueError("Do not overwrite prior build artifacts")
     output.mkdir(parents=True, exist_ok=False)
@@ -129,6 +131,7 @@ def build(arch, stable, qa, checksums, receipt, expected_source_sha, output):
             "sha256": digest(final), "size_bytes": final.stat().st_size,
             "old_stable_sha256": digest(stable),
             "new_source_sha256": digest(qa),
+            "sourcebuilt_ffmpeg_off_camera_wheel_sha256": camera["native_wheel_sha256"],
             "new_source_revision": expected_source_sha,
             "version": "3.1.1", "identity_channel": "v311_candidate",
             "settings_namespace": "anything-plays-311-candidate",
@@ -148,13 +151,13 @@ def build(arch, stable, qa, checksums, receipt, expected_source_sha, output):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--arch", choices=("arm64","x64"), required=True)
-    for key in ("stable", "qa", "checksums", "source-receipt",
+    for key in ("stable", "qa", "checksums", "source-receipt", "camera-receipt",
                 "expected-source-sha", "output"):
         p.add_argument("--"+key, required=True,
                        type=str if key=="expected-source-sha" else Path)
     a = p.parse_args()
     report=build(a.arch,a.stable,a.qa,a.checksums,a.source_receipt,
-                 a.expected_source_sha,a.output)
+                 a.camera_receipt,a.expected_source_sha,a.output)
     print(json.dumps(report, indent=2))
 
 
