@@ -6,7 +6,47 @@ This is the release operator's ordered checklist. The goal is one genuine stable
 installers, the exact source and notices, integrity checks and a working
 portfolio link. This file does **not** approve third-party redistribution.
 
-## Verified technical inputs
+## November 11/12 unified clean-source final QA update
+
+**More recent than the original staging instructions below:** [13/13
+four-platform clean-native full installer and installed Stream Mode QA
+PASSED](https://github.com/MasynNay/anything-plays/actions/runs/43140637755).
+All four genuine 3.1.0 installers were built from **the same**
+`104b96621ec4cb8dc39fde8c3fe96fc854c406ed` source tree with
+SHA-pinned FFmpeg-disabled, native camera-enabled OpenCV wheels
+(original source SHA-256 `4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577`).
+Actual Windows, Linux, Apple Silicon and Intel Mac full 18-console,
+11-core installer and installed frozen GUI/DS Stream Mode/preferences QA
+passed, including all final checksum/receipt checks. Source and full native
+artifacts for each platform plus the installed desktop receipts are stored
+under this run as **private time-limited GitHub Actions evidence**.
+
+**Do not publish the original existing seven-asset draft as if it represented
+this new clean OpenCV release.** The original draft (GitHub release ID
+`442346875`, source `d852de9a513f83a329c14647ddc86bf3690fb5f5`)
+still holds the **older** stock-OpenCV binaries and checksums from the
+historical 3.1.0 run `43120583726`. The four NEW clean-source installers have
+**not been uploaded to that draft**. The original source and latest
+SHA-256 checksums must match *the exact proposed release bytes*.
+
+If licensing/corresponding source and hardware acceptance are independently
+cleared, first generate/review a **new private four-installer staging
+manifest** sourced only from run `43140637755`, with exact SHA-256,
+source-wheel and native-core receipts and newly reviewed notices. Only then
+perform any deliberately approved draft asset replacement; **do not
+silently blend the old and new versions**. Confirm all
+`config/v3.1-release-readiness.json` gates and owner release notes are
+approved before public release. The existing draft, public stable 3.0,
+public RC2 and portfolio remain unchanged until that happens.
+
+Current comprehensive technical truth and archive artifact names:
+[Unified clean final QA handoff](V3_1_UNIFIED_SOURCE_BUILT_FINAL_QA.md).
+**Remaining independent blockers:** real hardware, camera, gamepad,
+gameplay/audio/save/endurance acceptance; exact native pygame/SDL and
+other third-party LGPL/source/notices/relinking/rights review; then final
+rollout decision. A successful full desktop smoke does not close those gates.
+
+## Historical 3.1.0 stock-OpenCV staging inputs (not the clean final source)
 
 | Check | Exact evidence | State |
 | --- | --- | --- |
