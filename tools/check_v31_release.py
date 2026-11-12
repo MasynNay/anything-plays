@@ -1,8 +1,8 @@
-"""Fail-closed 3.1 publication gate; informational until all evidence exists.
+"""Fail-closed stable binary release check with separate physical QA disclosure.
 
-Technical QA is necessary but cannot automate a copyright/licensing judgment
-or substitute for real controller acceptance. GitHub Actions must not create
-a public release from a preview-only build.
+Real hardware acceptance is a QA quality check, not itself a license mandate.
+Unperformed real-controller testing must be explicitly disclosed, and cannot
+stand in for LGPL source, notices, replacement/redistribution clearance.
 """
 from __future__ import annotations
 import argparse
@@ -19,6 +19,11 @@ REQUIRED_GATES = (
     "corresponding_source_material",
     "release_notes_and_rollout",
 )
+# Physical controller validation must stay truthfully unverified until a real
+# device is tested. For a clearly labeled free portfolio release it may be
+# disclosed rather than silently converted to a fake technical PASS.
+ADVISORY_GATE = "real_controller_hardware_acceptance"
+PUBLICATION_GATES = tuple(g for g in REQUIRED_GATES if g != ADVISORY_GATE)
 
 
 def blockers(report):
@@ -32,7 +37,20 @@ def blockers(report):
     failures = []
     for gate in REQUIRED_GATES:
         item = gates[gate]
-        if not isinstance(item, dict) or item.get("verified") is not True:
+        if not isinstance(item, dict):
+            failures.append(gate)
+            continue
+        if gate == ADVISORY_GATE and item.get("verified") is False:
+            disclosure = report.get("hardware_acceptance_disclosure")
+            if (not isinstance(disclosure, dict)
+                    or disclosure.get("owner_accepts_uncertified_hardware") is not True
+                    or disclosure.get("physical_controller_tested") is not False
+                    or not isinstance(disclosure.get("evidence"), str)
+                    or not disclosure["evidence"].startswith(
+                        "https://github.com/MasynNay/anything-plays/")):
+                failures.append("missing explicit untested-hardware disclosure")
+            continue
+        if item.get("verified") is not True:
             failures.append(gate)
         elif not isinstance(item.get("evidence"), str) or not item["evidence"].startswith(
             "https://github.com/MasynNay/anything-plays/"

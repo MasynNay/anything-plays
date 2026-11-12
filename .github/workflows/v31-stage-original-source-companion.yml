@@ -1,0 +1,117 @@
+name: 3.1 | Verify and stage original LGPL pygame SDL and mpg123 source bundle
+
+# Source provenance evidence only. No release, no GPL/LGPL permission verdict.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-stage-original-source-companion.yml'
+      - 'tools/stage_v31_public_source_companion.py'
+      - 'tests/test_v31_public_source_companion.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-source-companion-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  stage-source-companion:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '42909893531'
+      SOURCE_ARTIFACT: AnythingPlays-3.1-RC1-SDL-UPSTREAM-SOURCE-REVIEW-UNAPPROVED
+      MPG_SHA256: 31d0e35a4ca567ec9b5ebda6c3062bb4435d6d3eacd6ef0d95cadd7854dc03ee
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject source/archive tampering and forged legal approval
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_public_source_companion.py' -v
+      - name: Authenticate original six-source pygame/SDL archive and public existing core sources
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > source-run.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          s=json.loads(Path("source-run.json").read_text("utf-8"))
+          assert s["id"]==int(os.environ["SOURCE_RUN"])
+          assert s["status"]=="completed" and s["conclusion"]=="success"
+          assert s["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.0.0-sources" > cores-source-release.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path("cores-source-release.json").read_text("utf-8"))
+          assert s["tag_name"]=="v3.0.0-sources"
+          assert s["draft"] is False and len(s["assets"])>=1
+          print("Existing public original-core source release accessible:",s["html_url"])
+          PY
+          mkdir -p source-inputs
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "$SOURCE_ARTIFACT" --dir source-inputs
+          test -s source-inputs/pygame-ce-2.5.8-tagged-upstream-source.tar.gz
+          test -s source-inputs/SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt
+          (cd source-inputs && sha256sum --check SIX_ORIGINAL_SOURCE_CANDIDATE_SHA256SUMS.txt)
+      - name: Retrieve immutable official mpg123 1.33.7 original LGPL C source
+        run: |
+          set -euo pipefail
+          mkdir -p mpg-original
+          expected="$MPG_SHA256"
+          verified=0
+          for url in \
+            'https://downloads.sourceforge.net/mpg123/mpg123-1.33.7.tar.bz2' \
+            'https://www.mpg123.org/download/mpg123-1.33.7.tar.bz2' \
+            'https://mirror.math.princeton.edu/pub/macports/distfiles/mpg123/mpg123-1.33.7.tar.bz2'
+          do
+            if curl --fail --location --retry 3 --connect-timeout 15 --max-time 100 \
+              --silent --show-error "$url" -o mpg-original/mpg123-1.33.7.tar.bz2 &&
+              echo "$expected  mpg-original/mpg123-1.33.7.tar.bz2" | sha256sum --check; then
+              verified=1
+              break
+            fi
+          done
+          test "$verified" = 1
+          tar -tjf mpg-original/mpg123-1.33.7.tar.bz2 | grep -F src/libmpg123/frame.c
+      - name: Stage full original source/notice candidate materials, keep release unapproved
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v31_public_source_companion \
+            --source-root source-inputs \
+            --mpg123 mpg-original/mpg123-1.33.7.tar.bz2 \
+            --output staging/source
+          (cd staging/source && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('staging/source/SOURCE_RECEIPT.json').read_text('utf-8'))
+          assert len(r['source_archives'])==7
+          assert r['full_library_source_match_independently_proven'] is False
+          assert r['complete_lgpl_redistribution_approved'] is False
+          assert r['public_release_approved'] is False
+          print("Original source bundle verified; not a legal or public binary release.")
+          PY
+          (cd staging/source && zip -q -r -9 \
+            ../AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip .)
+          sha256sum staging/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip \
+            > staging/SOURCE_COMPANION_SHA256SUMS.txt
+      - name: Preserve exact source archives for release candidate review only
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE-PRIVATE-REVIEW
+          path: |
+            staging/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip
+            staging/SOURCE_COMPANION_SHA256SUMS.txt
+          retention-days: 90
+          if-no-files-found: error

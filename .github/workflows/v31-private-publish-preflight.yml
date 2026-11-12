@@ -1,0 +1,130 @@
+name: 3.1 | Read-only public release asset and source preflight
+
+# Independently verifies the exact eight future release assets without
+# touching the owner-only draft, any public tag or existing 3.0/RC2 binary.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-private-publish-preflight.yml'
+      - '.github/workflows/v31-publish-cleared-clean-stable.yml'
+      - 'tools/check_v31_release.py'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-exact-binary-and-source-package:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APP_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+      ORIGINAL_RUN: '43140637755'
+      STAGE_RUN: '43142249044'
+      SOURCE_RUN: '43152661067'
+      SOURCE_REVIEW_NAME: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE-PRIVATE-REVIEW
+      SOURCE_NAME: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip
+      DRAFT_ID: '442346875'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download only immutable completed authentic original final packages and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run in "$ORIGINAL_RUN" "$STAGE_RUN" "$SOURCE_RUN"; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" > "run-$run.json"
+          done
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          for env in ("ORIGINAL_RUN","STAGE_RUN","SOURCE_RUN"):
+              run=int(os.environ[env])
+              r=json.loads(Path(f"run-{run}.json").read_text("utf-8"))
+              assert r["id"]==run and r["status"]=="completed" and r["conclusion"]=="success"
+              assert r["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          r=json.loads(Path(f"run-{os.environ['ORIGINAL_RUN']}.json").read_text())
+          assert r["head_sha"]==os.environ["APP_SHA"]
+          PY
+          mkdir original source
+          gh run download "$STAGE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW --dir original
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$SOURCE_REVIEW_NAME" --dir source
+          (cd original && sha256sum --check SHA256SUMS.txt)
+      - name: Verify future eight-item public release set from actual immutable input
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,zipfile
+          root=Path("original")
+          manifest=json.loads((root/"FINAL_QA_MANIFEST.json").read_text("utf-8"))
+          assert manifest["source_revision"]==os.environ["APP_SHA"]
+          assert manifest["qa_run_id"]==int(os.environ["ORIGINAL_RUN"])
+          assert len(manifest["installers"])==4
+          assert manifest["native_core_count"]==11 and manifest["console_profiles"]==18
+          assert manifest["actual_installed_gui_verified_on_four_platforms"] is True
+          assert manifest["clean_original_camera_only_wheels_verified_on_four_hosts"] is True
+          assert manifest["public_release_approved"] is False
+          original_names={
+              "AnythingPlaysSetup-3.1.0.exe","anything-plays-31_3.1.0_amd64.deb",
+              "AnythingPlays-3.1.0-macos-arm64.dmg",
+              "AnythingPlays-3.1.0-macos-x64.dmg",
+              "SHA256SUMS.txt","FINAL_QA_MANIFEST.json","FINAL_SOURCE_ACCESS_REVIEW.md",
+          }
+          assert {p.name for p in root.iterdir()}==original_names
+          src=Path("source")/os.environ["SOURCE_NAME"]
+          assert src.is_file()
+          checked=(Path("source")/"SOURCE_COMPANION_SHA256SUMS.txt").read_text().strip().split("  ",1)
+          assert len(checked)==2 and checked[1].endswith(src.name)
+          def sha(p):
+              with p.open("rb") as f:
+                  return hashlib.file_digest(f,"sha256").hexdigest()
+          assert sha(src)==checked[0]
+          with zipfile.ZipFile(src) as z:
+              r=json.loads(z.read("SOURCE_RECEIPT.json"))
+              assert r["exact_application_source_revision"]==os.environ["APP_SHA"]
+              assert len(r["source_archives"])==7
+              assert r["complete_lgpl_redistribution_approved"] is False
+              assert r["public_release_approved"] is False
+              for name, expected in r["source_archives"].items():
+                  assert hashlib.sha256(z.read("original-sources/"+name)).hexdigest()==expected
+          # PR-scoped read-only GITHUB_TOKEN cannot read an owner-only GitHub
+          # draft release (403 Resource not accessible by integration). The
+          # actual main-branch publish job has contents:write and independently
+          # authenticates ID, private state and exact original seven assets.
+          # This PR preflight checks immutable original bytes, not draft ACLs.
+          print("Private draft ACL verification deferred to write-scoped publication job.")
+          report={
+              "status":"PRIVATE_EIGHT_RELEASE_ASSETS_REPRODUCIBLY_VERIFIED",
+              "source_revision":os.environ["APP_SHA"],
+              "original_qa_run":int(os.environ["ORIGINAL_RUN"]),
+              "source_companion_run":int(os.environ["SOURCE_RUN"]),
+              "expected_private_draft_id":int(os.environ["DRAFT_ID"]),
+              "private_draft_inspected_by_read_only_pr":False,
+              "binary_qa_assets":{p.name:sha(p) for p in root.iterdir() if p.is_file()},
+              "new_original_source_companion_sha256":sha(src),
+              "release_asset_count":8,
+              "source_and_redistribution_approved":False,
+              "public_release_published":False,
+          }
+          Path("PREPUBLICATION_EIGHT_ASSET_RECEIPT.json").write_text(
+              json.dumps(report,indent=2)+"\n","utf-8")
+          print("Verified new eight-asset release source and original installers without publishing.")
+          PY
+      - name: Preserve read-only release checksums for owner decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-EIGHT-ORIGINAL-ASSET-PUBLICATION-PREFLIGHT
+          path: PREPUBLICATION_EIGHT_ASSET_RECEIPT.json
+          retention-days: 90
+          if-no-files-found: error
