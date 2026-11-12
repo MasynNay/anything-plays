@@ -26,7 +26,7 @@ class MacCleanFinalPygameTests(unittest.TestCase):
         modified.write_bytes(os.urandom(10_000))
         wheel=root/check.WHEEL_NAME
         with zipfile.ZipFile(wheel,"w",zipfile.ZIP_STORED) as archive:
-            archive.writestr("pygame/base.cpython-313-darwin.so",b"official MachO wheel")
+            archive.writestr("pygame/base.cpython-313-darwin.so",b"official MachO wheel" * 8)
             archive.writestr("pygame/extra.bin",os.urandom(1_100_000))
         receipt={
             "target":target,"installer":original.name,"sha256":check.sha(original),
