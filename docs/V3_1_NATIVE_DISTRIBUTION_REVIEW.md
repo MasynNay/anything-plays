@@ -8,7 +8,7 @@ the immutable source/build QA receipts, but no public redistribution decision.
 
 ## Four clean-source installed native inventories now verified on all targets
 
-The [new exact four-platform native/notice audit](https://github.com/MasynNay/anything-plays/actions/runs/43146068474) **passed 4/4** on the real Windows, Linux, Intel Mac and Apple Silicon GitHub runners. This directly supersedes the earlier stock-OpenCV native inventory for the proposed *new clean-source* installers. The [complete inventory summary](V3_1_CLEAN_FINAL_NATIVE_INVENTORY.md) records exact native counts, notice candidate counts, SHA-256 evidence artifacts and the still-open source, replacement and redistribution review.
+The [corrected four-platform native/notice audit](https://github.com/MasynNay/anything-plays/actions/runs/43147036559) **passed 4/4** on the real Windows, Linux, Intel Mac and Apple Silicon GitHub runners. This directly supersedes the earlier stock-OpenCV native inventory for the proposed *new clean-source* installers. The [complete inventory summary](V3_1_CLEAN_FINAL_NATIVE_INVENTORY.md) records exact native counts, notice candidate counts, SHA-256 evidence artifacts and the still-open source, replacement and redistribution review.
 
 This closes the missing four-platform **inventory coverage**, not the underlying legal correspondence and end-user relinking requirements. SDL 2.x itself is zlib-licensed; pygame-ce is LGPL-2.1-or-later, and other transitive libraries require independent license classification. Do not mark release approval true solely because these package inventory jobs passed.
 
