@@ -72,11 +72,17 @@ def verify(target, installer, bundle, camera_receipt, source_revision, *,
     if real[0].is_symlink() or real[0].stat().st_size <= 1024:
         raise ValueError("Missing frozen native mGBA core")
     if target=="linux-x64":
-        fields=subprocess.check_output(
-            ["dpkg-deb","-f",str(installer),"Package","Version"],
+        # A multi-field dpkg-deb -f emits "Package: ..." labels.
+        # Use individual fields to validate actual apt upgrade identity.
+        package=subprocess.check_output(
+            ["dpkg-deb","-f",str(installer),"Package"],
             text=True,timeout=15,
-        ).splitlines()
-        if fields != ["anything-plays-31","3.1.1"]:
+        ).strip()
+        version=subprocess.check_output(
+            ["dpkg-deb","-f",str(installer),"Version"],
+            text=True,timeout=15,
+        ).strip()
+        if (package,version) != ("anything-plays-31","3.1.1"):
             raise ValueError("3.1.1 DEB does not update the existing stable package")
     elif target=="windows-x64":
         with installer.open("rb") as stream:
