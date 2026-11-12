@@ -1,0 +1,41 @@
+name: 3.1.1 | Native macOS DMG cleanup failures (source only)
+
+# Exercise actual assembly module with mocked DiskImages mount ownership.
+# No disk image is generated, no mount is created, no installer is published.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-macos-dmg-unmount-regression.yml'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'tests/test_v311_macos_mount_cleanup.py'
+
+permissions:
+  contents: read
+
+jobs:
+  macos-mount-error-recovery:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Handle spontaneous CI unmount, fail on stuck DMG | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+          - {target: linux-source-control, runner: ubuntu-24.04}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require full source-only negative-case checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v311_macos_mount_cleanup.py' -v
+          echo 'Tested temporary DMG cleanup and stuck-mounted failure without any actual device or public build.'
