@@ -42,11 +42,19 @@ def scan_rom_directory(folder, extensions, cancelled=None):
                 return []
             if index > MAX_DIRECTORIES or len(games) >= MAX_GAMES:
                 break
-            folders[:] = sorted(
-                folder for folder in folders
-                if not folder.startswith(".")
-                and not (Path(root) / folder).is_symlink()
-            )
+            # A failing stat on ONE vanished/inaccessible directory must
+            # not abort scanning other healthy subdirectories. Avoid ever
+            # descending into an unknown or symlinked directory.
+            def safe_child_folder(folder):
+                if folder.startswith("."):
+                    return False
+                try:
+                    return not (Path(root) / folder).is_symlink()
+                except OSError:
+                    return False
+
+            folders[:] = sorted(folder for folder in folders
+                                if safe_child_folder(folder))
             for name in files:
                 if cancelled is not None and cancelled():
                     return []
