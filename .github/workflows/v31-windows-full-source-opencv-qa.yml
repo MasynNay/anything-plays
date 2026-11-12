@@ -103,7 +103,10 @@ jobs:
           print('Native source-built DirectShow wheel and public original-source cores verified.')
           PY
           wheel="$(find camera/wheels -maxdepth 1 -name '*.whl' -type f -print -quit)"
-          echo "AP_CUSTOM_OPENCV_WHEEL=$PWD/$wheel" >> "$GITHUB_ENV"
+          # This variable is consumed by a native Windows CMD/batch builder,
+          # not Git Bash. Never pass an MSYS /d/a/... path to pip/Win32.
+          native_wheel="$(cygpath -w "$PWD/$wheel")"
+          echo "AP_CUSTOM_OPENCV_WHEEL=$native_wheel" >> "$GITHUB_ENV"
           echo "AP_CUSTOM_OPENCV_SHA256=$(sha256sum "$wheel" | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - name: Build NEW 3.1.0 Windows source-stage installer with clean camera wheel
         shell: cmd
