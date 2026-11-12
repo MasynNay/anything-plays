@@ -110,8 +110,14 @@ def _original_inputs(root, target, extension):
             result[key] = value
         return result
 
+    # Python accepts NaN/Infinity by default although these are not JSON.
+    # Reject non-finite constants even in currently unused evidence fields.
+    def reject_nonfinite(value):
+        raise ValueError(f"Non-finite preserved native manifest JSON constant: {value}")
+
     record = json.loads(_file_bytes(folder, UNAPPROVED_ORIGINAL),
-                        object_pairs_hook=unique_object)
+                        object_pairs_hook=unique_object,
+                        parse_constant=reject_nonfinite)
     # The preserved-input manifest is untrusted evidence, not an authority to
     # select files. Reject malformed records before using any row as a path.
     if not isinstance(record, dict):

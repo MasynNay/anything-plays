@@ -6,6 +6,7 @@
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
 **Current focus:** Complete exact 44-native source review evidence, third-party GPL compatibility and source obligations, and final four-platform release acceptance  
+**Source evidence hardening:** Strict rejection of nonstandard NaN/Infinity preserved-native JSON constants is proposed on a focused branch; CI pending. This does not clear Dolphin binary/source correspondence, rights, or installer acceptance.
 **Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
 
 > **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
