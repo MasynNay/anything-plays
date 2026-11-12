@@ -50,11 +50,14 @@ def core_names_for_build():
         preview = os.environ.get("AP_V31_PREVIEW") == "1"
         candidate = os.environ.get("AP_V31_RC") == "1"
         candidate2 = os.environ.get("AP_V31_RC2") == "1"
-        if (sum((preview, candidate, candidate2)) != 1
+        final_candidate = os.environ.get("AP_V31_FINAL_CANDIDATE") == "1"
+        # The final-identity build is still PRIVATE QA: only a distinct
+        # channel with exact pinned source and no 3.0 release approval.
+        if (sum((preview, candidate, candidate2, final_candidate)) != 1
                 or os.environ.get("AP_RELEASE_BUILD") == "1"
                 or os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
                 or os.environ.get("AP_V30_STABLE_CANDIDATE") == "1"
-                or (candidate2 and (
+                or ((candidate2 or final_candidate) and (
                     os.environ.get("AP_V31_NEXT_QA") != "1"
                     or not re.fullmatch(r"[a-f0-9]{40}",
                                         os.environ.get("AP_V31_QA_CHECKOUT_SHA", ""))

@@ -22,6 +22,10 @@ from tools.verify_v31_rc import validate_staged_identity
 from tools.v31_rc2_source import (
     checked_rc2_source_revision, require_rc2_receipt, FULL_STATUS,
 )
+from tools.v31_final_source import (
+    checked_final_source_revision, require_final_receipt,
+    FULL_STATUS as FINAL_STATUS,
+)
 
 STABLE = "AnythingPlaysSetup-3.0.0.exe"
 PREVIEW = "AnythingPlaysSetup-3.1.0-preview1.exe"
@@ -32,13 +36,15 @@ RC_FULL = "AnythingPlaysSetup-3.1.0-rc1-full.exe"
 RC_SOURCE_REVISION = "26de1e1ad1b701d0735e085158347f8c213ce437"
 RC2_PREVIEW = "AnythingPlaysSetup-3.1.0-rc2.exe"
 RC2_FULL = "AnythingPlaysSetup-3.1.0-rc2-full.exe"
+FINAL_PREVIEW = "AnythingPlaysSetup-3.1.0.exe"
+FINAL_FULL = FINAL_PREVIEW
 
 
-def full_installer_filename(*, rc1=False, rc2=False):
+def full_installer_filename(*, rc1=False, rc2=False, final=False):
     """Choose a unique installer filename for the exact frozen app channel."""
-    if rc1 and rc2:
-        raise ValueError("RC1 and RC2 cannot share a Windows installer identity")
-    return RC2_FULL if rc2 else RC_FULL if rc1 else FULL
+    if sum((rc1, rc2, final)) > 1:
+        raise ValueError("RC and final build channels cannot share a Windows identity")
+    return FINAL_FULL if final else RC2_FULL if rc2 else RC_FULL if rc1 else FULL
 
 
 def hash_file(path):
@@ -50,11 +56,12 @@ def hash_file(path):
 
 
 def check_inputs(stable, preview, sums, receipt, rc1=False, *, rc2=False,
-                 expected_source_revision=None):
-    if rc1 and rc2:
-        raise ValueError("RC1/RC2 source identity cannot be mixed")
-    preview_name = RC2_PREVIEW if rc2 else RC_PREVIEW if rc1 else PREVIEW
-    source_sha = (checked_rc2_source_revision(expected_source_revision)
+                 final=False, expected_source_revision=None):
+    if sum((rc1, rc2, final)) > 1:
+        raise ValueError("RC and final source identities cannot be mixed")
+    preview_name = FINAL_PREVIEW if final else RC2_PREVIEW if rc2 else RC_PREVIEW if rc1 else PREVIEW
+    source_sha = (checked_final_source_revision(expected_source_revision)
+                  if final else checked_rc2_source_revision(expected_source_revision)
                   if rc2 else RC_SOURCE_REVISION if rc1 else SOURCE_REVISION)
     if stable.name != STABLE or preview.name != preview_name:
         raise ValueError("Unexpected stable/preview filename")
@@ -69,6 +76,10 @@ def check_inputs(stable, preview, sums, receipt, rc1=False, *, rc2=False,
             or info.get("installer") != preview_name
             or info.get("sha256") != hash_file(preview)):
         raise ValueError("Fresh 3.1 source-stage artifact mismatch")
+    if final:
+        require_final_receipt(info, source=source_sha, target="windows-x64",
+                              installer=preview_name, digest=hash_file(preview),
+                              size=preview.stat().st_size)
     if rc2:
         require_rc2_receipt(info, source=source_sha, target="windows-x64",
                             installer=preview_name, digest=hash_file(preview), size=preview.stat().st_size)
@@ -116,12 +127,14 @@ def iscc():
 
 
 def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
-          expected_source_revision=None):
+          final=False, expected_source_revision=None):
     if os.getenv("AP_V31_FULL_TEST_CORES") != "1":
         raise ValueError("Private QA flags required")
-    if rc1 and rc2:
-        raise ValueError("RC1 and RC2 cannot share a build")
-    if rc2:
+    if sum((rc1, rc2, final)) > 1:
+        raise ValueError("RC and final build channels cannot be combined")
+    if final:
+        checked_final_source_revision(expected_source_revision)
+    elif rc2:
         checked_rc2_source_revision(expected_source_revision)
     elif rc1:
         if os.getenv("AP_V31_RC") != "1" or os.getenv("AP_V31_PREVIEW") == "1":
@@ -131,7 +144,8 @@ def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
     if os.getenv("AP_RELEASE_BUILD") == "1" or os.getenv("AP_V30_APPROVED_RELEASE") == "1":
         raise ValueError("No production flags for an owner QA candidate")
     stable_sha = check_inputs(stable, preview, sums, receipt, rc1=rc1,
-                               rc2=rc2, expected_source_revision=expected_source_revision)
+                               rc2=rc2, final=final,
+                               expected_source_revision=expected_source_revision)
     root = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory(prefix="ap31-win-full-") as temp:
         scratch = Path(temp)
@@ -175,14 +189,15 @@ def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
         # Icons are made from the original source artwork, not generic glyphs.
         subprocess.run([os.sys.executable, str(root/"tools/render_v21_icon.py")],
                        check=True, cwd=root)
-        setup_mode = ("/DV31RC2Build=1" if rc2 else
-                      "/DV31RCBuild=1" if rc1 else "/DV31PreviewBuild=1")
-        app_version = ("/DAppVersion=3.1.0-rc2-full" if rc2 else
+        setup_mode = ("/DV31FinalBuild=1" if final else "/DV31RC2Build=1" if rc2
+                      else "/DV31RCBuild=1" if rc1 else "/DV31PreviewBuild=1")
+        app_version = ("/DAppVersion=3.1.0" if final else
+                       "/DAppVersion=3.1.0-rc2-full" if rc2 else
                        "/DAppVersion=3.1.0-rc1-full" if rc1 else
                        "/DAppVersion=3.1.0-preview2")
         subprocess.run([iscc(), setup_mode, app_version,
                         str(root/"packaging/installer.iss")], check=True, cwd=root)
-        produced = root/"release"/(RC2_FULL if rc2 else RC_FULL if rc1 else FULL)
+        produced = root/"release"/(FINAL_FULL if final else RC2_FULL if rc2 else RC_FULL if rc1 else FULL)
         if not produced.is_file():
             raise ValueError("Expected full candidate Inno Setup EXE was not created")
         # The actual installer is the artifact; require that it unpacks
@@ -207,7 +222,9 @@ def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
         verify_bundle(installed, "windows", check_native=False)
         if validate_trial_core_directory(installed/"cores", ".dll") != first:
             raise ValueError("Final Setup installer altered original source-built cores")
-        if rc2:
+        if final:
+            validate_staged_identity(installed, channel="final_candidate")
+        elif rc2:
             validate_staged_identity(installed, channel="rc2")
         elif rc1:
             validate_staged_identity(installed)
@@ -215,20 +232,20 @@ def build(stable, preview, sums, receipt, output, rc1=False, *, rc2=False,
         output.mkdir(parents=True, exist_ok=True)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", encoding="utf-8")
-        target = output/full_installer_filename(rc1=rc1, rc2=rc2)
+        target = output/full_installer_filename(rc1=rc1, rc2=rc2, final=final)
         shutil.copyfile(produced, target)
         report = {
-            "status": (FULL_STATUS if rc2 else
+            "status": (FINAL_STATUS if final else FULL_STATUS if rc2 else
                        "UNRELEASED_3_1_FULL_WINDOWS_RC1_QA" if rc1 else
                        "UNRELEASED_3_1_FULL_WINDOWS_QA"),
             "public_release_approved": False,
             "target": "windows-x64",
             "original_stable_sha256": stable_sha,
             "source_preview1_sha256": hash_file(preview),
-            "source_preview_revision": (expected_source_revision if rc2 else
+            "source_preview_revision": (expected_source_revision if final or rc2 else
                                         RC_SOURCE_REVISION if rc1 else SOURCE_REVISION),
-            "identity_channel": "rc2" if rc2 else "rc1" if rc1 else "preview1",
-            "settings_namespace": "anything-plays-31-rc2" if rc2 else None,
+            "identity_channel": "final_candidate" if final else "rc2" if rc2 else "rc1" if rc1 else "preview1",
+            "settings_namespace": "anything-plays-31" if final else "anything-plays-31-rc2" if rc2 else None,
             "final_release_approved": False,
             "sdl_runtime_audit": "SDL_RUNTIME_AUDIT.json",
             "installer": target.name,
@@ -250,11 +267,13 @@ def main():
     p.add_argument("--rc1", action="store_true",
                    help="Repack from the exact source-built 3.1 RC1 app")
     p.add_argument("--rc2", action="store_true", help="Full RC2 private QA with separate Inno Setup ID")
+    p.add_argument("--final", action="store_true", help="Full authentic 3.1.0 identity, PRIVATE QA only")
     p.add_argument("--expected-source-revision", metavar="EXACT_PR_HEAD_SHA")
     a = p.parse_args()
     build(*(getattr(a, x).resolve() for x in (
         "stable", "preview", "sums", "receipt", "output")), rc1=a.rc1,
-          rc2=a.rc2, expected_source_revision=a.expected_source_revision)
+          rc2=a.rc2, final=a.final,
+          expected_source_revision=a.expected_source_revision)
 
 
 if __name__ == "__main__":

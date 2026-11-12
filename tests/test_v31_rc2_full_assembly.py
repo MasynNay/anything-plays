@@ -204,15 +204,20 @@ class Rc2FullBuildTests(unittest.TestCase):
         )
         self.assertEqual(win.full_installer_filename(rc1=True), win.RC_FULL)
         self.assertEqual(win.full_installer_filename(), win.FULL)
+        self.assertEqual(win.full_installer_filename(final=True),
+                         "AnythingPlaysSetup-3.1.0.exe")
         with self.assertRaises(ValueError):
             win.full_installer_filename(rc1=True, rc2=True)
+        with self.assertRaises(ValueError):
+            win.full_installer_filename(rc2=True, final=True)
         # This helper must actually drive the generated installer export;
         # a correctly selected filename in metadata but the wrong EXE path
         # previously produced a 14 KB report-only artifact on Windows.
+        # The RC1/RC2 output paths remain unchanged when final=False.
         source = (Path(__file__).resolve().parents[1] /
                   "tools/assemble_v31_full_windows.py").read_text("utf-8")
         self.assertIn(
-            "target = output/full_installer_filename(rc1=rc1, rc2=rc2)",
+            "target = output/full_installer_filename(rc1=rc1, rc2=rc2, final=final)",
             source,
         )
 

@@ -1,7 +1,7 @@
 """Produce reviewed, channel-specific identity embedded by frozen 3.1 builds.
 
-Only use the isolated non-public mGBA build mode. Neither selecting RC1 nor
-embedding the correct version name grants redistribution permission.
+Only use the isolated non-public mGBA build mode. Selecting an exact
+3.1.0 final-candidate identity never grants redistribution permission.
 """
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ def choose_channel(env):
     preview = env.get("AP_V31_PREVIEW") == "1"
     candidate = env.get("AP_V31_RC") == "1"
     candidate2 = env.get("AP_V31_RC2") == "1"
-    if sum((preview, candidate, candidate2)) != 1:
+    final_candidate = env.get("AP_V31_FINAL_CANDIDATE") == "1"
+    if sum((preview, candidate, candidate2, final_candidate)) != 1:
         raise ValueError("Select exactly one 3.1 build channel")
     if env.get("AP_V30_MINIMAL_CORE_BUILD") != "1":
         raise ValueError("Only isolated mGBA source-build stage allowed")
@@ -28,7 +29,8 @@ def choose_channel(env):
     ):
         if env.get(forbidden) == "1":
             raise ValueError("3.1 candidate cannot use release/native approval flags")
-    return "rc2" if candidate2 else ("rc1" if candidate else "preview1")
+    return ("final_candidate" if final_candidate else "rc2" if candidate2
+            else "rc1" if candidate else "preview1")
 
 
 def write_identity(destination, environ=None):

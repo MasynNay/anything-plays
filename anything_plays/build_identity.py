@@ -32,6 +32,16 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-31-rc2",
         "public_release_approved": False,
     },
+    # Actual 3.1.0 package/version identity for private, independently
+    # validated final-candidate builds. Release rights are NOT approved
+    # merely by selecting the identity or uploading a QA artifact.
+    "final_candidate": {
+        "version": "3.1.0",
+        "channel": "final_candidate",
+        "title": "Anything Plays 3.1",
+        "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
 }
 FALLBACK_CHANNEL = "preview1"
 
