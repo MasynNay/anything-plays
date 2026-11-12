@@ -3,6 +3,21 @@
 **Status: RC2 PUBLIC PRERELEASE, NOT READY FOR FINAL STABLE 3.1.0.** This document tracks evidence,
 not a promise of a release date. Stable 3.0 stays public and untouched.
 
+## Exact clean-final four-OS native source replacement — new verified results
+
+**Technical PASS on all four original full 3.1.0 installers.** The same genuine upstream pygame-ce 2.5.8 C modification was independently compiled and executed as a native `pygame.base` replacement in **disposable copies** of exact source-built final 3.1.0 app installs, followed by actual 18-console frozen Tk startup. The original Windows EXE, Linux DEB and both Mac DMGs were verified against source revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed` and stayed unchanged.
+
+| Platform | Original full-final source-modified native / actual frozen GUI evidence |
+| --- | --- |
+| Linux x64 | [PASS 43148388829](https://github.com/MasynNay/anything-plays/actions/runs/43148388829), [details](V3_1_CLEAN_FINAL_LINUX_PYGAME_REPLACEMENT.md) |
+| Windows x64 | [PASS 43149732092](https://github.com/MasynNay/anything-plays/actions/runs/43149732092), [details](V3_1_CLEAN_FINAL_WINDOWS_PYGAME_REPLACEMENT.md) |
+| Apple Silicon macOS | [PASS 43149191077](https://github.com/MasynNay/anything-plays/actions/runs/43149191077), [both Mac details](V3_1_CLEAN_FINAL_MACOS_PYGAME_REPLACEMENT.md) |
+| Intel macOS | [PASS 43149191077](https://github.com/MasynNay/anything-plays/actions/runs/43149191077), same independent native audit |
+
+The [corrected real four-platform dependency/notice inventory](https://github.com/MasynNay/anything-plays/actions/runs/43147036559) also passed 4/4; [inventory details](V3_1_CLEAN_FINAL_NATIVE_INVENTORY.md). Native replacement PRs [#226](https://github.com/MasynNay/anything-plays/pull/226), [#227](https://github.com/MasynNay/anything-plays/pull/227) and [#228](https://github.com/MasynNay/anything-plays/pull/228) are merged.
+
+**Scope is deliberately limited:** one covered pygame C extension compiled and replaced per platform. This does **not** prove replacement, source correspondence, build materials and applicable LGPL/copyright compliance for every pygame-ce or transitive native library, nor is it a real controller, camera, game/audio/save or long-session pass. The four required release gates remain open; do not set `pygame_sdl_redistribution_review`, `corresponding_source_material`, `real_controller_hardware_acceptance` or `public_release_approved` to true solely because the genuine single-extension tests passed.
+
 ## Current release state — November 11, 2026
 
 The public [3.1 RC2 test release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) offers four checked platform installers with customizable dual-screen Stream Mode, camera/emulator bezels and optional gamepad controls. The [complete RC2 native and installed-GUI acceptance run](https://github.com/MasynNay/anything-plays/actions/runs/43079085633) passed for Windows x64, Linux x64, macOS Apple Silicon and macOS Intel. It covers 18 console profiles using the 11 original source-built core families. These are CI and installed-app tests, **not** general physical webcam/controller, retail-game, save or long-session certification.
