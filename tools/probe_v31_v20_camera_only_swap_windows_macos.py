@@ -92,6 +92,36 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
                          and path.name.lower().startswith(ffmpeg_prefixes))
         if target == "macos-arm64" and not to_remove:
             raise ValueError("Expected FFmpeg-bearing native ARM OpenCV runtime")
+    # The public 2.0 Intel Mac camera-only extension was linked against
+    # libavif.16.dylib. The 3.1 stock OpenCV wheel on Intel does not ship
+    # that dependency, so the frozen copied extension needs its ORIGINAL
+    # SHA-identifiable 2.0 native library in the disposable app as well.
+    # This is NOT a license or source/relinking review for libavif itself.
+    copied_shared_dependency = None
+    if target == "macos-x64":
+        filename = "libavif.16.dylib"
+        matches = [p for p in old_app.rglob(filename)
+                   if p.is_file() and not p.is_symlink()]
+        if not matches:
+            raise ValueError("Original 2.0 Intel camera-only libavif dependency missing")
+        checksums = {hash_file(path) for path in matches}
+        if len(checksums) != 1:
+            raise ValueError("Ambiguous original libavif binaries")
+        avif_original = matches[0]
+        checked_scratch_path(avif_original, scratch)
+        target_dir = new_app/"Contents/Frameworks"
+        checked_scratch_path(target_dir, scratch)
+        avif_destination = target_dir/filename
+        if avif_destination.exists() or avif_destination.is_symlink():
+            raise ValueError("Refusing to overwrite an existing 3.1 shared native dylib")
+        shutil.copyfile(avif_original, avif_destination)
+        if hash_file(avif_destination) != hash_file(avif_original):
+            raise ValueError("Source-built camera wheel dependency copy changed bytes")
+        copied_shared_dependency = {
+            "filename": filename,
+            "sha256": hash_file(avif_destination),
+            "target": str(avif_destination.relative_to(new_app)),
+        }
     previous = [{"path": str(f.relative_to(new_app)), "sha256":hash_file(f)}
                 for f in to_remove]
     # Only these original public v2.0.0 native bytes are copied into the
@@ -109,6 +139,7 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
         "disposable_final_3_1_native_sha256":hash_file(replaced),
         "removed_stock_cv2_libraries":previous,
         "removed_library_count":len(previous),
+        "copied_original_camera_only_shared_dependency":copied_shared_dependency,
         "ad_hoc_resign_required":target.startswith("macos"),
         "actual_frozen_app_smoke_passed":False,
         "physical_camera_tested":False,
