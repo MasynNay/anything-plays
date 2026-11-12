@@ -57,7 +57,8 @@ jobs:
           python -m unittest discover -s tests -p test_v31_final_candidate_identity.py -v
           python -m unittest discover -s tests -p test_v31_final_full_assembly.py -v
           python -m unittest discover -s tests -p test_v31_final_installed_ui.py -v
-          python -m unittest discover -s tests -p test_v31_macos_camera_only_wheel.py -v
+          # Wheel acceptance is checked by its immutable earlier native run
+          # receipt. PR #213 source-only tests remain on their own branch.
       - name: Obtain native newly source-built camera-only AVFoundation wheel and original public core DMG
         shell: bash
         run: |
@@ -84,7 +85,7 @@ jobs:
           python - <<'PY'
           import hashlib,json
           from pathlib import Path
-          from tools.qa_v31_macos_camera_only_wheel import STATUS
+          STATUS='PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED'
           from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
           from tools.verify_custom_opencv_wheel import verify_custom_wheel
           source=Path('camera/sources/opencv_python_headless-4.14.0.94.tar.gz')
