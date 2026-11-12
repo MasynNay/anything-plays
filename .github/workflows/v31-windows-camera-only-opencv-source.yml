@@ -1,0 +1,138 @@
+name: 3.1 | Source-build FFmpeg-off Windows DirectShow OpenCV
+
+# Private native wheel engineering only. No installer/public release mutation.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-windows-camera-only-opencv-source.yml'
+      - 'tools/qa_v31_windows_camera_only_wheel.py'
+      - 'tests/test_v31_windows_camera_only_wheel.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-win-camera-only-wheel-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  windows-source-camera-wheel:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ENABLE_HEADLESS: '1'
+      ENABLE_CONTRIB: '0'
+      CMAKE_BUILD_PARALLEL_LEVEL: '3'
+      CMAKE_ARGS: '-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DWITH_AVIF=OFF -DWITH_DSHOW=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF'
+      AP_REQUIRE_OPENCV_FFMPEG_OFF: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate private DirectShow/FFmpeg and source patch guard contracts
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p 'test_v31_windows_camera_only_wheel.py' -v
+          if ($LASTEXITCODE -ne 0) { throw "Windows source/patch/backend contract tests failed" }
+          python -m unittest discover -s tests -p 'test_custom_opencv_wheel.py' -v
+          if ($LASTEXITCODE -ne 0) { throw "Native wheel security tests failed" }
+      - name: Install host native build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip==26.3
+          if ($LASTEXITCODE -ne 0) { throw "pip unavailable" }
+          python -m pip install numpy==2.5.4
+          if ($LASTEXITCODE -ne 0) { throw "NumPy unavailable" }
+      - name: Download exact published original source, patch and SHA manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          New-Item -ItemType Directory -Path 'published20','wheels','evidence','extracted' -Force | Out-Null
+          foreach ($asset in @('opencv_python_headless-4.14.0.94.tar.gz',
+                               'WINDOWS_OPENCV_SETUP_PATCH.diff','SHA256SUMS.txt')) {
+            gh release download v2.0.0 --repo $env:GITHUB_REPOSITORY --pattern $asset --dir published20 --clobber
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path published20 $asset))) {
+              throw "Published original source or patch missing: $asset"
+            }
+          }
+      - name: Authenticate original source and apply source-level Windows FFmpeg DLL packaging patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          @'
+          from pathlib import Path,PurePosixPath
+          import hashlib,tarfile
+          root=Path("published20")
+          lines=(root/"SHA256SUMS.txt").read_text("utf-8").splitlines()
+          for name in ("opencv_python_headless-4.14.0.94.tar.gz",
+                       "WINDOWS_OPENCV_SETUP_PATCH.diff"):
+              file=root/name
+              matches=[row.partition("  ")[0] for row in lines if row.endswith("  "+name)]
+              assert len(matches)==1,name
+              assert hashlib.sha256(file.read_bytes()).hexdigest()==matches[0],name
+          source=root/"opencv_python_headless-4.14.0.94.tar.gz"
+          assert hashlib.sha256(source.read_bytes()).hexdigest()=="4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577"
+          with tarfile.open(source,"r:gz") as package:
+              top={PurePosixPath(m.name).parts[0] for m in package.getmembers()
+                   if m.name and not PurePosixPath(m.name).is_absolute()}
+              assert len(top)==1,top
+              package.extractall("extracted",filter="data")
+          location=(Path("extracted")/next(iter(top))).resolve()
+          assert (location/"setup.py").is_file()
+          (Path("evidence")/"SOURCE_DIR.txt").write_text(str(location)+"\n","utf-8")
+          patch=root/"WINDOWS_OPENCV_SETUP_PATCH.diff"
+          (Path("evidence")/"PATCH_SHA256.txt").write_text(
+              hashlib.sha256(patch.read_bytes()).hexdigest()+"\n","ascii")
+          print("Verified original public 2.0 source and exact Windows source patch.")
+          '@ | Set-Content -Path verify_source.py -Encoding utf8
+          python verify_source.py
+          if ($LASTEXITCODE -ne 0) { throw "Pinned original source verification failed" }
+          $sourceDir=(Get-Content evidence/SOURCE_DIR.txt).Trim()
+          $patch=(Resolve-Path 'published20/WINDOWS_OPENCV_SETUP_PATCH.diff').Path
+          Push-Location $sourceDir
+          git apply --check $patch
+          if ($LASTEXITCODE -ne 0) { throw "Pinned original Windows patch not compatible" }
+          git apply $patch
+          if ($LASTEXITCODE -ne 0) { throw "Cannot apply original published FFmpeg DLL packager patch" }
+          Pop-Location
+      - name: Compile independent Windows source wheel with DirectShow and no FFmpeg
+        shell: pwsh
+        timeout-minutes: 160
+        run: |
+          $ErrorActionPreference="Stop"
+          $sourceDir=(Get-Content evidence/SOURCE_DIR.txt).Trim()
+          python -m pip wheel --no-deps --wheel-dir wheels $sourceDir
+          if ($LASTEXITCODE -ne 0) { throw "Native Windows OpenCV source build failed" }
+          $w=@(Get-ChildItem wheels -Filter 'opencv_python_headless-4.14.0.94-*.whl' -File)
+          if ($w.Count -ne 1) { throw "Expected exactly one independent Windows native wheel" }
+      - name: Install newly compiled wheel and verify DirectShow with FFmpeg OFF
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $w=@(Get-ChildItem wheels -Filter 'opencv_python_headless-4.14.0.94-*.whl' -File)
+          if ($w.Count -ne 1) { throw "Native wheel count mismatch" }
+          python -m pip install --no-deps --force-reinstall $w[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw "Cannot import new Windows native wheel" }
+          $patchSha=(Get-Content evidence/PATCH_SHA256.txt).Trim()
+          python -m tools.qa_v31_windows_camera_only_wheel --source published20/opencv_python_headless-4.14.0.94.tar.gz --patch published20/WINDOWS_OPENCV_SETUP_PATCH.diff --wheel $w[0].FullName --patch-sha $patchSha --output evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          if ($LASTEXITCODE -ne 0) { throw "Native DirectShow/FFmpeg-off validation failed" }
+      - name: Retain only independently built wheel, original source/patch and private evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-WINDOWS-SOURCE-DIRECTSHOW-OPENCV-UNAPPROVED
+          path: |
+            published20/opencv_python_headless-4.14.0.94.tar.gz
+            published20/WINDOWS_OPENCV_SETUP_PATCH.diff
+            wheels/opencv_python_headless-4.14.0.94-*.whl
+            evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 0
