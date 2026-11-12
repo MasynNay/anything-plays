@@ -42,6 +42,14 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-31",
         "public_release_approved": False,
     },
+    "v311_candidate": {
+        "version": "3.1.1",
+        "channel": "v311_candidate",
+        "title": "Anything Plays 3.1.1 · Private QA",
+        # No user stable/RC settings may be touched by a test installer.
+        "settings_namespace": "anything-plays-311-candidate",
+        "public_release_approved": False,
+    },
 }
 FALLBACK_CHANNEL = "preview1"
 
