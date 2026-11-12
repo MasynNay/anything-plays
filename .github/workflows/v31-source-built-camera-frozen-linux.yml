@@ -1,0 +1,154 @@
+name: 3.1 | Test source-built FFmpeg-off OpenCV in complete frozen Linux Stream Mode
+
+# This workflow deliberately cannot publish or write to GitHub Releases.
+# Both original complete 3.1 DEB and independently compiled OpenCV wheel are
+# SHA verified; only a disposable CI-owned extraction is changed. 3.0,
+# public RC2 and existing private 3.1 draft remain byte-identical.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-source-built-camera-frozen-linux.yml'
+      - 'tools/probe_v31_source_built_linux_frozen.py'
+      - 'tests/test_v31_source_wheel_frozen_linux.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-built-cv2-frozen-linux-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  scratch-full-frozen-source-wheel:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Real 18-console Linux frozen GUI with source-built FFmpeg-off OpenCV
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI: 'true'
+      AP_V31_DISPOSABLE_QA: '1'
+      FULL_QA_RUN: '43120583726'
+      CAMERA_WHEEL_RUN: '43133383864'
+      QA_SOURCE_SHA: d852de9a513f83a329c14647ddc86bf3690fb5f5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject bad native source hashes, forged approval and non-sandbox writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_source_wheel_frozen_linux.py' -v
+      - name: Prepare disposable Linux native frozen GUI prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 \
+            install -y --no-install-recommends \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 \
+            libportaudio2 libasound2t64 libx11-6
+      - name: Download original exact-source full 3.1 and independently built camera wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p full wheelartifact evidence sandbox/final
+          gh run download "$FULL_QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1.0-FINAL-FULL-18-linux-x64-QA-ONLY' \
+            --dir full
+          gh run download "$CAMERA_WHEEL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1-LINUX-FROM-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED' \
+            --dir wheelartifact
+          test -s full/anything-plays-31_3.1.0_amd64.deb
+          test -s full/FULL_LIBRARY_QA_RECEIPT.json
+          test -s wheelartifact/sources/opencv_python_headless-4.14.0.94.tar.gz
+          test -s wheelartifact/evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          test "$(find wheelartifact/wheels -maxdepth 1 -name '*.whl' -type f | wc -l)" -eq 1
+      - name: Extract original frozen 18-console app without modifying installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x full/anything-plays-31_3.1.0_amd64.deb sandbox/final
+          test -x sandbox/final/opt/anything-plays-31/AnythingPlays
+          test -s sandbox/final/opt/anything-plays-31/_internal/cv2/cv2.abi3.so
+          test -d sandbox/final/opt/anything-plays-31/_internal/opencv_python_headless.libs
+      - name: Verify pinned original source and wheel, replace only frozen scratch copies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AP_V31_QA_SANDBOX="$PWD/sandbox"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from tools.probe_v31_source_built_linux_frozen import source_wheel_swap
+          wheels=list(Path("wheelartifact/wheels").glob("*.whl"))
+          assert len(wheels)==1
+          p=Path("evidence/SOURCE_BUILT_CAMERA_ONLY_FROZEN_SWAP_UNAPPROVED.json")
+          r=source_wheel_swap(
+              app=Path(os.environ["AP_V31_QA_SANDBOX"])/"final/opt/anything-plays-31",
+              scratch=Path(os.environ["AP_V31_QA_SANDBOX"]),
+              installer=Path("full/anything-plays-31_3.1.0_amd64.deb"),
+              full_receipt=Path("full/FULL_LIBRARY_QA_RECEIPT.json"),
+              source=Path("wheelartifact/sources/opencv_python_headless-4.14.0.94.tar.gz"),
+              wheel=wheels[0],
+              wheel_receipt=Path("wheelartifact/evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json"),
+          )
+          p.write_text(json.dumps(r,indent=2)+"\n","utf-8")
+          assert r["removed_original_dependency_count"]>0
+          assert len(r["removed_ffmpeg_related_names"])>0
+          assert r["public_release_approved"] is False
+          print("Exact independently source-built wheel installed into disposable 3.1 app.")
+          PY
+      - name: Launch real frozen Tk/DS Stream Mode using newly source-built OpenCV
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/sandbox/final/opt/anything-plays-31/AnythingPlays"
+          qahome="$(mktemp -d)"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+              AP_V30_UI_SMOKE_CHECK=1 \
+              AP_V31_STREAM_SMOKE_CHECK=1 \
+              AP_V30_UI_SMOKE_REPORT="$PWD/evidence/REAL_FROZEN_SOURCE_WHEEL_GUI.json" \
+              SDL_AUDIODRIVER=dummy "$app" --ap-v30-ui-smoke
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          smoke=json.loads(Path("evidence/REAL_FROZEN_SOURCE_WHEEL_GUI.json").read_text("utf-8"))
+          expected={
+            "passed":True,"actual_tk_window_started":True,
+            "actual_tk_mainloop_ran":True,"frozen_binary":True,
+            "console_profile_count":18,
+            "stream_output_window_opened":True,
+            "stream_settings_separate":True,
+            "stream_camera_reference_rendered":True,
+            "stream_closed_cleanly":True,
+            "camera_hardware_tested":False,
+            "gameplay_hardware_tested":False,
+            "public_distribution_approved":False,
+          }
+          for field,value in expected.items():
+              assert smoke.get(field)==value,(field,smoke.get(field))
+          p=json.loads(Path("evidence/SOURCE_BUILT_CAMERA_ONLY_FROZEN_SWAP_UNAPPROVED.json").read_text("utf-8"))
+          assert p["status"]=="PASSED_PRIVATE_SOURCE_WHEEL_IN_DISPOSABLE_FULL_3_1_LINUX_UNAPPROVED"
+          assert p["public_release_approved"] is False
+          print("Full 18-console frozen 3.1 app started Tk and Stream Mode with FFmpeg-off newly source-built cv2.")
+          print("This is not real camera, gamepad, codec rights or stable-release QA.")
+          PY
+      - name: Preserve proof only; never upload modified binaries or unreviewed installers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-LINUX-SOURCE-WHEEL-FROZEN-STREAM-QA-UNAPPROVED
+          path: |
+            evidence/SOURCE_BUILT_CAMERA_ONLY_FROZEN_SWAP_UNAPPROVED.json
+            evidence/REAL_FROZEN_SOURCE_WHEEL_GUI.json
+          retention-days: 30
+          if-no-files-found: warn
