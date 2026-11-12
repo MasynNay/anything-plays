@@ -103,7 +103,7 @@ class GameplayMixin:
                 'controller bridge. Launch a GameCube game first.'
             )
             return
-        if not self._camera_is_open():
+        if not GameplayMixin._camera_is_open(self):
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
             return
         if backend == "libretro" and not self.emu.running:
@@ -197,7 +197,7 @@ class GameplayMixin:
                 # without returning a failed read(). Treat both signals as
                 # the same disconnect, clearing the bezel and held controls
                 # through stop_camera() before queuing a bounded retry.
-                camera_open = self._camera_is_open()
+                camera_open = GameplayMixin._camera_is_open(self)
                 ok, frame = self.cap.read() if camera_open else (False, None)
                 if ok:
                     self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
@@ -210,14 +210,14 @@ class GameplayMixin:
                 # a live camera, repeatedly detecting the same pixels wastes
                 # CPU and makes a week-long session unnecessarily expensive.
                 now = time.monotonic()
-                live = self._camera_is_open()
+                live = GameplayMixin._camera_is_open(self)
                 if live or now >= getattr(self, "_static_preview_next_draw", 0):
                     self.draw_camera()
                     self._static_preview_next_draw = now + 0.5
             # Finish a user-requested arm only when the background native
             # core is actually ready. No global keyboard injection occurs.
             if getattr(self, "_pending_object_controls", False):
-                if self.emu.running and self._camera_is_open():
+                if self.emu.running and GameplayMixin._camera_is_open(self):
                     self._pending_object_controls = False
                     self.toggle()
                 elif not getattr(self.emu, "launching", False):
@@ -270,7 +270,7 @@ class GameplayMixin:
             self.status.set('Tracking error: ' + str(exc)[:120])
         finally:
             if not self._closing:
-                active_camera = self._camera_is_open()
+                active_camera = GameplayMixin._camera_is_open(self)
                 interval = 45 if active_camera else (
                     500 if self.reference_image else 200
                 )
