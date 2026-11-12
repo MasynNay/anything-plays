@@ -78,6 +78,14 @@ jobs:
           mkdir -p package evidence
           gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
             --name '${{ matrix.artifact }}' --dir package
+          # The real source-built QA workflows upload fullfinal/ plus
+          # proof/ and source-qa/ together. upload-artifact preserves their
+          # paths under the common repository root. Never assume --dir
+          # flattens a multi-directory artifact into package/.
+          test -s 'package/fullfinal/${{ matrix.installer }}'
+          test -s 'package/fullfinal/${{ matrix.receipt }}'
+          cp 'package/fullfinal/${{ matrix.installer }}' 'package/${{ matrix.installer }}'
+          cp 'package/fullfinal/${{ matrix.receipt }}' 'package/${{ matrix.receipt }}'
           test -s 'package/${{ matrix.installer }}'
           test -s 'package/${{ matrix.receipt }}'
       - name: Extract exact clean Linux full installer without installing software on the host
