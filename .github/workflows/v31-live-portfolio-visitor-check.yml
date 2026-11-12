@@ -1,0 +1,41 @@
+name: 3.1 | Check live portfolio shows public stable downloads
+
+# Uses public visitor access, not repo source text. This is read only.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-live-portfolio-visitor-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-public-portfolio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fetch actual public homepage like an anonymous visitor
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 --connect-timeout 15 --max-time 60 \
+            -H 'Cache-Control: no-cache' \
+            "https://anythingplays.masynnay.com/?qa_31=${GITHUB_RUN_ID}" -o homepage.html
+          python - <<'PY'
+          from pathlib import Path
+          page=Path("homepage.html").read_text("utf-8")
+          expected=(
+            "STABLE 3.1.0 AVAILABLE",
+            "Download stable 3.1",
+            "releases/tag/v3.1.0",
+            "releases/download/v3.1.0/AnythingPlaysSetup-3.1.0.exe",
+            "releases/download/v3.1.0/anything-plays-31_3.1.0_amd64.deb",
+            "releases/download/v3.1.0/AnythingPlays-3.1.0-macos-arm64.dmg",
+            "releases/download/v3.1.0/AnythingPlays-3.1.0-macos-x64.dmg",
+            "releases/download/v3.1.0/SHA256SUMS.txt",
+            "releases/download/v3.1.0/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip",
+          )
+          for fragment in expected:
+            assert fragment in page, f"Live website missing verified 3.1 stable link: {fragment}"
+          print("LIVE WEBSITE VISITOR CHECK PASSED; stable 3.1 release, 4 direct installers, source and SHA links all exposed.")
+          PY
