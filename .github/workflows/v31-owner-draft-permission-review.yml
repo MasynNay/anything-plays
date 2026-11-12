@@ -1,0 +1,43 @@
+name: 3.1 | Same-repo release-draft owner permission review
+
+# Authenticates an owner-only draft with a same-repo PR write-capable token.
+# No release asset, tag or public/published state is ever modified here.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-owner-draft-permission-review.yml'
+permissions:
+  contents: write
+jobs:
+  inspect-owner-draft-read-only:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_DRAFT_ID: '442346875'
+    steps:
+      - name: Verify authenticated exact private release draft via API
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/$EXPECTED_DRAFT_ID" > draft.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('draft.json').read_text('utf-8'))
+          assert r['id']==int(os.environ['EXPECTED_DRAFT_ID'])
+          assert r['draft'] is True and r['prerelease'] is False
+          assert r['tag_name']=='v3.1.0'
+          names={x['name'] for x in r['assets']}
+          expected={
+              'AnythingPlaysSetup-3.1.0.exe',
+              'anything-plays-31_3.1.0_amd64.deb',
+              'AnythingPlays-3.1.0-macos-arm64.dmg',
+              'AnythingPlays-3.1.0-macos-x64.dmg',
+              'SHA256SUMS.txt','FINAL_QA_MANIFEST.json',
+              'FINAL_SOURCE_ACCESS_REVIEW.md',
+          }
+          assert names==expected
+          print('Private draft accessible to release-scoped CI. Old 7 assets stay untouched.')
+          PY
