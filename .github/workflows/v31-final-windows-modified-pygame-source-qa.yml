@@ -1,0 +1,179 @@
+name: 3.1 | Actual clean-final Windows changed-source pygame C and desktop
+
+# Read-only original full 18-console clean 3.1.0 Windows package, genuinely
+# modified original LGPL pygame C compiled on native Windows MSVC.
+# Only an ephemeral EXTRACTED COPY is changed; no public release mutation.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-final-windows-modified-pygame-source-qa.yml'
+      - 'tools/verify_v31_final_windows_modified_pygame.py'
+      - 'tests/test_v31_final_windows_modified_pygame.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-final-windows-source-modified-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  genuine-final-modified-windows-pygame:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYGAME_SHA: c8200a9eaa530f884a0a4c3384cefc48006e58be
+      FINAL_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+      FINAL_RUN: '43140637755'
+      AUDIT_RUN: '43146068474'
+      WHEEL_NAME: pygame_ce-2.5.8-cp313-cp313-win_amd64.whl
+      WHEEL_SHA: f495b0eb7a5c54c59da58e964bc7f68073c3f43cf307729fd48309104a04c190
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Reject wrong installer, forged approvals, source and PE before native work
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p test_v31_final_windows_modified_pygame.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Adversarial final Windows source/PE tests failed' }
+          python -m unittest discover -s tests -p test_v31_modified_pygame_windows.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Existing genuine changed-C Windows build tests failed' }
+      - name: Clone exact original LGPL pygame source and make real C change
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          git -c core.autocrlf=false clone --depth 1 --branch 2.5.8 https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot recover upstream source' }
+          if ((git -C upstream-pygame-ce rev-parse HEAD).Trim() -ne $env:PYGAME_SHA) { throw 'Wrong pygame original C source' }
+          New-Item -ItemType Directory -Path evidence -Force | Out-Null
+          python -m tools.build_v31_modified_pygame_probe --root upstream-pygame-ce --receipt evidence/PYGAME_C_SOURCE_CHANGE.json
+          if ($LASTEXITCODE -ne 0) { throw 'Not actual modified original C source' }
+          git -C upstream-pygame-ce diff -- src_c/base.c | Set-Content evidence/ORIGINAL_PYGAME_BASE_C_CHANGE.patch -Encoding utf8
+          if ((Get-Item evidence/ORIGINAL_PYGAME_BASE_C_CHANGE.patch).Length -lt 100) { throw 'Original C code diff missing' }
+      - name: Recover checksum-pinned original SDL2 VC SDK and native MSVC
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path upstream-sdl -Force | Out-Null
+          gh release download release-2.32.10 --repo libsdl-org/SDL --pattern SDL2-devel-2.32.10-VC.zip --dir upstream-sdl
+          if ($LASTEXITCODE -ne 0) { throw 'Original SDL dev files unavailable' }
+          python -c "from pathlib import Path;import hashlib;p=Path('upstream-sdl/SDL2-devel-2.32.10-VC.zip');assert hashlib.sha1(p.read_bytes()).hexdigest()=='27f5179346a0b0db80c4dd1769c7c9d62b9a91f3'"
+          if ($LASTEXITCODE -ne 0) { throw 'Wrong SDL VC SDK original bytes' }
+          $vswhere=Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs=(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+          if (-not $vs) { throw 'MSVC x64 compiler unavailable' }
+          $vcvars=Join-Path $vs.Trim() 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw 'MSVC x64 environment unavailable' }
+          "AP31_VCVARS=$vcvars" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Compile actual original-source-modified pygame C into independent Windows x64 PE
+        shell: cmd
+        run: |
+          call "%AP31_VCVARS%"
+          if errorlevel 1 exit /b 1
+          python -m tools.build_v31_modified_pygame_windows --source upstream-pygame-ce --sdl-archive upstream-sdl\SDL2-devel-2.32.10-VC.zip --out compiled-new --source-receipt evidence\PYGAME_C_SOURCE_CHANGE.json --receipt evidence\INDEPENDENT_WINDOWS_C_BUILD.json
+          if errorlevel 1 exit /b 1
+      - name: Verify original full final Windows source, native audit and wheel identities
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $final=gh run view $env:FINAL_RUN --json headSha,conclusion | ConvertFrom-Json
+          if ($final.headSha -ne $env:FINAL_SHA -or $final.conclusion -ne 'success') { throw 'Wrong original 13-job clean final source build' }
+          $audit=gh run view $env:AUDIT_RUN --json conclusion | ConvertFrom-Json
+          if ($audit.conclusion -ne 'success') { throw 'Original clean final native inventory did not complete' }
+          New-Item -ItemType Directory -Path original,inventory,wheel -Force | Out-Null
+          gh run download $env:FINAL_RUN --repo $env:GITHUB_REPOSITORY --name AnythingPlays-3.1.0-FINAL-FULL-18-windows-x64-QA-ONLY --dir original
+          if ($LASTEXITCODE -ne 0) { throw 'Missing original complete Windows final package' }
+          gh run download $env:AUDIT_RUN --repo $env:GITHUB_REPOSITORY --name AnythingPlays-3.1.0-CLEAN-FINAL-windows-x64-NATIVE-NOTICE-INVENTORY-UNAPPROVED --dir inventory
+          if ($LASTEXITCODE -ne 0) { throw 'Missing original four-platform native report' }
+          gh release download 2.5.8 --repo pygame-community/pygame-ce --pattern $env:WHEEL_NAME --dir wheel
+          if ($LASTEXITCODE -ne 0) { throw 'Original wheel missing' }
+          $actual=(Get-FileHash (Join-Path wheel $env:WHEEL_NAME) -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:WHEEL_SHA) { throw 'Original pygame wheel SHA invalid' }
+          foreach ($name in @('AnythingPlaysSetup-3.1.0.exe','FULL_WINDOWS_QA_RECEIPT.json','FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json')) {
+            if (-not (Test-Path (Join-Path original $name))) { throw "Missing original final item $name" }
+          }
+          if (-not (Test-Path 'inventory/FINAL_NATIVE_NOTICE_INVENTORY.json')) { throw 'No original Windows native hashes' }
+          python -c 'from pathlib import Path;from tools.assemble_v31_full_windows import unpack;unpack(Path("original/AnythingPlaysSetup-3.1.0.exe"),Path("unpacked-final"))'
+          if ($LASTEXITCODE -ne 0) { throw 'Original Windows Inno unpack failed' }
+          if (-not (Test-Path 'unpacked-final/AnythingPlays.exe')) { throw 'Missing actual full frozen Windows app' }
+      - name: Validate exact full final original native and replace C only in disposable copied app
+        shell: pwsh
+        run: |
+          python -m tools.verify_v31_final_windows_modified_pygame --bundle unpacked-final --installer original/AnythingPlaysSetup-3.1.0.exe --receipt original/FULL_WINDOWS_QA_RECEIPT.json --audit inventory/FINAL_NATIVE_NOTICE_INVENTORY.json --original-wheel (Join-Path wheel $env:WHEEL_NAME) --source-receipt evidence/PYGAME_C_SOURCE_CHANGE.json --compiled compiled-new/base.cp313-win_amd64.pyd --destination copied-clean-final --output evidence/FINAL_WINDOWS_SOURCE_COMPILED_NATIVE_STAGED.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original source native/final installer identity mismatch' }
+      - name: Execute new native C method and boot genuine copied 3.1 final Windows Tk app
+        shell: pwsh
+        run: |
+          @'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import types
+          from tools.build_v31_modified_pygame_probe import PROBE_VALUE
+          from tools.verify_v31_final_windows_modified_pygame import STATUS,RELATIVE,digest
+          report_path=Path("evidence/FINAL_WINDOWS_SOURCE_COMPILED_NATIVE_STAGED.json")
+          report=json.loads(report_path.read_text("utf-8"))
+          assert report["status"]==STATUS
+          assert report["public_release_approved"] is False
+          bundle=Path("copied-clean-final").resolve()
+          native=bundle/RELATIVE
+          assert native.is_file() and digest(native)==report["compiled_changed_native_sha256"]
+          handles=[]
+          for folder in (bundle/"_internal",bundle/"_internal/pygame",
+                         bundle/"_internal/pygame/__dot__dylibs",
+                         bundle/"_internal/pygame/libs"):
+              if folder.is_dir():
+                  handles.append(os.add_dll_directory(str(folder)))
+          pkg=types.ModuleType("pygame")
+          pkg.__path__=[str(native.parent)]
+          sys.modules["pygame"]=pkg
+          spec=importlib.util.spec_from_file_location("pygame.base",native)
+          assert spec and spec.loader
+          module=importlib.util.module_from_spec(spec)
+          sys.modules["pygame.base"]=module
+          spec.loader.exec_module(module)
+          assert module._ap31_relink_probe()==PROBE_VALUE
+          report["real_modified_c_method_executed"]=True
+          home=Path("evidence/isolated-home").resolve()
+          home.mkdir()
+          smoke=Path("evidence/FINAL_WINDOWS_FROZEN_TK_SMOKE.json").resolve()
+          env=os.environ.copy()
+          env.update({"HOME":str(home),"USERPROFILE":str(home),
+                      "SDL_AUDIODRIVER":"dummy","AP_V30_UI_SMOKE_CHECK":"1",
+                      "AP_V30_UI_SMOKE_REPORT":str(smoke)})
+          result=subprocess.run([str(bundle/"AnythingPlays.exe"),"--ap-v30-ui-smoke"],
+                                cwd=bundle,env=env,timeout=120)
+          assert result.returncode==0,result.returncode
+          data=json.loads(smoke.read_text("utf-8"))
+          assert data["actual_tk_window_started"] is True
+          assert data["actual_tk_mainloop_ran"] is True
+          assert data["console_profile_count"]==18
+          assert data["public_distribution_approved"] is False
+          report["status"]="CLEAN_FINAL_WINDOWS_CHANGED_C_METHOD_AND_REAL_FROZEN_TK_PASSED"
+          report["actual_full_final_frozen_tk_booted"]=True
+          assert report["all_lgpl_native_relinking_verified"] is False
+          assert report["corresponding_source_review_complete"] is False
+          report_path.write_text(json.dumps(report,indent=2)+"\n","utf-8")
+          print("Exact clean final Windows source-modified native and real desktop PASSED, legal/hardware open.")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Authentic changed C method or frozen final Tk failed' }
+      - name: Retain exact immutable original and changed-source Windows proof, NOT installers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-CLEAN-FINAL-WINDOWS-MODIFIED-PYGAME-C-UNAPPROVED-QA
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 90
