@@ -5,6 +5,12 @@ name: 3.1.0 | Publish exact clean installers after release clearance
 # rollout gate. It never builds different installer bytes or releases RC2.
 on:
   workflow_dispatch:
+  # When the independently verified release gates are updated on main,
+  # run the same fail-closed release procedure without a separate CLI step.
+  push:
+    branches: [main]
+    paths:
+      - 'config/v3.1-release-readiness.json'
 
 permissions:
   contents: write
