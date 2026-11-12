@@ -5,12 +5,12 @@
   "public_release_approved": false,
   "release_gates": {
     "full_eighteen_console_installer": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726"
     },
     "four_platform_full_installer_verification": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726"
     },
     "real_controller_hardware_acceptance": {
       "verified": false,
@@ -473,5 +473,21 @@
       "full_lgpl_2_1_compliance_approved": false,
       "stable_3_1_release_approved": false
     }
+  },
+  "verified_final_candidate_qa": {
+    "status": "PASSED_FOUR_PLATFORM_FULL_18_CONSOLE_AND_INSTALLED_FROZEN_GUI_QA_ONLY",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726",
+    "source_app_revision": "d852de9a513f83a329c14647ddc86bf3690fb5f5",
+    "source_stages": 4,
+    "full_installer_stages": 4,
+    "installed_desktop_stages": 4,
+    "native_core_families": 11,
+    "console_profiles": 18,
+    "owner_linux_rc2_install_and_stream_visual_reported": true,
+    "physical_camera_or_gamepad_or_gameplay_verification": false,
+    "pygame_sdl_redistribution_review_complete": false,
+    "corresponding_source_and_native_relinking_complete": false,
+    "public_release_approved": false,
+    "stable_3_1_published": false
   }
 }
