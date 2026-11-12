@@ -7,6 +7,10 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 
 ## Latest verified technical state — unified source-built clean four-platform candidate
 
+The full immutable-build evidence, original native wheel provenance, old draft
+vs new package distinction, and exact remaining blockers are consolidated in
+[the unified 3.1.0 acceptance record](V3_1_UNIFIED_SOURCE_BUILT_FINAL_QA.md).
+
 **CURRENT, November 11/12 2026 UTC. DO NOT REBUILD THIS COMPLETED FOUR-OS QA.**
 
 - [PR #219](https://github.com/MasynNay/anything-plays/pull/219) **MERGED**
@@ -38,12 +42,13 @@ GitHub Actions results before reporting a new pass or publishing an installer.
   private artifact, **NOT yet attached to the previously created GitHub
   Release draft**. Its 30-day retention must be checked before use.
 - [PR #220](https://github.com/MasynNay/anything-plays/pull/220)
-  is under CI (source checks run 43141494554): adds an explicit four-platform
-  original source-built OpenCV wheel digest, native source run and
-  provenance section to the private staging manifest, preserving the exact
-  same seven-asset format. It must not be called merged until actual checks
-  complete. Current stage above was produced with PRE-#220 main staging
-  code, so it **does not yet carry the four explicit wheel digest entries**.
+  **MERGED** after [successful source checks 43141494554](https://github.com/MasynNay/anything-plays/actions/runs/43141494554).
+  It adds four explicit original-source OpenCV wheel digests/native source-run
+  provenance fields to the private staging manifest without granting any
+  distribution approval. The existing staging artifact in run 43141406341
+  was produced **before** this change and does **not** gain those extra
+  fields retroactively. Re-verify future staging receipts by exact run,
+  source SHA and package hashes, not by assuming they were updated.
 - [PR #216](https://github.com/MasynNay/anything-plays/pull/216) **MERGED**,
   [exact new Linux/ARM native notice scan 43141091687](https://github.com/MasynNay/anything-plays/actions/runs/43141091687)
   successful; technical inventories cannot approve library license terms.
