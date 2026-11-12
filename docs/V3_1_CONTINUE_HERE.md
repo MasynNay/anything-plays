@@ -46,6 +46,20 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 
 **Do not redo full package builds just to stage installers. They are in the GitHub draft now.** Do not publish the draft until a genuine redistribution/source/relinking review is complete, physical-device acceptance requirements are resolved or explicitly documented and accepted, and the owner makes a final release decision. The formal manifest closes only 2 of 6 gates (`full_eighteen_console_installer`, `four_platform_full_installer_verification`). `public_release_approved` remains false. Stable `3.0`, public `3.1-rc2`, and the portfolio public stable link remain untouched.
 
+## Native licensing/source review handoff
+
+A consolidated exact-final-binary dependency review now lives in
+[V3_1_NATIVE_DISTRIBUTION_REVIEW.md](V3_1_NATIVE_DISTRIBUTION_REVIEW.md).
+It enumerates the final 3.1 installer filenames, upstream pygame/SDL and
+eleven original-core source evidence, actual modified pygame C extension
+replacement results across four operating systems, the unverified matching
+native components and the specific tests/rights decisions required before
+public publication. The [source candidate artifact run 42909893531](https://github.com/MasynNay/anything-plays/actions/runs/42909893531)
+remains available; candidates are not full LGPL correspondence certification.
+The private GitHub release draft and seven uploads have been independently
+rechecked through authenticated releases API. **The public latest release is
+still stable v3.0.0.** Keep both public RC2 and stable 3.0 untouched.
+
 ## Exact next actions
 
 1. Inspect PR #199's current head and [the native full workflow](https://github.com/MasynNay/anything-plays/actions/workflows/v31-final-identity-private-qa.yml). If a job fails, read its exact GitHub job logs, fix source/test bugs and run exact-head checks again. A previous macOS error was an intermittent `upload-artifact@v4` backend failure (invalid HTML); retry only failed jobs after checking it is infrastructure, not application failure.
