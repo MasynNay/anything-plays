@@ -5,7 +5,58 @@ Keep this file factual and current. This project has experienced interrupted
 conversations and expensive duplicated native builds. Always inspect actual
 GitHub Actions results before reporting a new pass or publishing an installer.
 
-## Current verified milestone and next dependency decision (November 11)
+## November 11/12 release engineering update — newer than the checkpoint below
+
+**Progress now actually completed and merged (do not rerun expensive work):**
+
+- [PR #209](https://github.com/MasynNay/anything-plays/pull/209) merged: real
+  pristine SHA256-pinned OpenCV 4.14.0.94 Linux source wheel with FFmpeg disabled,
+  V4L2 backend present and unmodified source/wheel retained as private evidence
+  ([native run 43133383864](https://github.com/MasynNay/anything-plays/actions/runs/43133383864)).
+- [PR #211](https://github.com/MasynNay/anything-plays/pull/211) merged: that
+  **newly compiled** wheel swapped into an extracted complete 18-profile 3.1.0
+  Linux GUI and tested under Xvfb; actual frozen Tk and Stream Mode passed
+  ([run 43135466315](https://github.com/MasynNay/anything-plays/actions/runs/43135466315)).
+- [PR #212](https://github.com/MasynNay/anything-plays/pull/212) merged at
+  `d94efcd03a3fcf30df31e67bd6331de30a157f49`: a **fresh genuine 3.1.0
+  full Linux DEB** rebuilt with that source OpenCV wheel, the original 11
+  core families and 18 profiles, FFmpeg-codec filename inventory, and
+  real installed frozen Tk/Stream Mode QA all **PASSED**
+  ([run 43136053895](https://github.com/MasynNay/anything-plays/actions/runs/43136053895)).
+  The new complete DEB and truthful SHA/source receipts are in private
+  artifact `AnythingPlays-3.1.0-LINUX-FULL-18-CAMERA-ONLY-NEW-BUILD-QA-PRIVATE`.
+  It does **not** replace the existing seven-asset private `v3.1.0` draft.
+- [PR #210](https://github.com/MasynNay/anything-plays/pull/210) merged:
+  disposable full 3.1 GUIs with source-built **2.0** camera-only cv2 binaries
+  booted on Windows and two Macs
+  ([43137224618](https://github.com/MasynNay/anything-plays/actions/runs/43137224618)).
+  Reuse proof is not a source-complete new 3.1 wheel or redistribution approval.
+
+**Native source build work currently in progress (check latest runs):**
+
+- [PR #213](https://github.com/MasynNay/anything-plays/pull/213):
+  genuine OpenCV 4.14.0.94 source wheel builds on native
+  Apple Silicon and Intel Mac, with FFmpeg/AVIF disabled and
+  AVFoundation backend retained. Both builds passed source/test setup
+  and were compiling at last check
+  ([run 43137079614](https://github.com/MasynNay/anything-plays/actions/runs/43137079614)).
+- [PR #214](https://github.com/MasynNay/anything-plays/pull/214):
+  new independent Windows FFmpeg-disabled DirectShow source wheel.
+  First build failed because the published original 2.0 packaging patch's
+  descriptive `setup.py` diff headers were misread as literal filenames;
+  scratch-only header normalization was committed on this PR. Check
+  its new workflow run before claiming compile success.
+
+**Next:** finish/repair both Mac and Windows source wheels, use them in fresh
+native final-identity 18-console build/installed GUI acceptance (original
+full frozen 3.1 draft bytes must not be silently changed), audit new
+source/notice/relinking obligations per OS, then handle the remaining physical
+hardware / owner signoff and stable public release authorization.
+The original four full QA passes and private draft remain valid evidence
+for the *old* stock-OpenCV binaries, not the newly rebuilt Linux binary.
+**None of these private technical passes closes legal or real-device gates.**
+
+## Prior dated engineering milestone and dependency decision (November 11)
 
 **New camera-only OpenCV remediation experiment:** [PR #209](https://github.com/MasynNay/anything-plays/pull/209) adds a **disposable Linux-only source-build** of `opencv-python-headless==4.14.0.94`, with the exact published PyPI sdist SHA-256, FFmpeg/GStreamer/Qt disabled and V4L2 enabled. [Actions 43133383864](https://github.com/MasynNay/anything-plays/actions/runs/43133383864) had verified the sdist and passed its private receipt tests; actual native wheel compilation was **IN PROGRESS** at this checkpoint. The accompanying [source tests 43133383667](https://github.com/MasynNay/anything-plays/actions/runs/43133383667) passed on Python 3.12/3.13 plus native mGBA. No frozen installer, camera hardware, third-party source/relinking clearance or public release result follows until future native evidence is checked. Do not merge it or repeat heavy builds just because this report says queued/in progress.
 
