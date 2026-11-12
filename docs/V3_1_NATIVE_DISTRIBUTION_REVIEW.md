@@ -6,6 +6,12 @@ built from `d852de9a513f83a329c14647ddc86bf3690fb5f5`, not a historical
 RC1 or RC2 binary. The draft contains four verified complete installers and
 the immutable source/build QA receipts, but no public redistribution decision.
 
+## Latest clean-source candidate (separate from the original draft)
+
+The source-verified candidate was built in [four-platform installed QA run 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755) at app revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed` and staged without changing the original draft in [run 43142249044](https://github.com/MasynNay/anything-plays/actions/runs/43142249044). Its exact original OpenCV source archive, Windows packaging patch, compile settings and independent native source-wheel provenance are documented in [Clean OpenCV source reproduction](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
+
+**Important:** The older draft listed below still contains stock-OpenCV installers at source revision `d852de9a513f83a329c14647ddc86bf3690fb5f5`; it is not the new clean candidate. Neither the passing build nor the OpenCV source record establishes pygame/SDL and transitive corresponding-source, notices, relinking, distribution-rights clearance or physical hardware acceptance. This review remains OPEN.
+
 ## 1. Exact frozen binaries under review
 
 | Target | Reviewed full installer | Native/installed QA |
