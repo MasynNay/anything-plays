@@ -1,6 +1,8 @@
 """Saved game RAM stays beside the ROM and writes atomically."""
 
 import ctypes as C
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import os
 from pathlib import Path
 import tempfile
@@ -171,6 +173,42 @@ class SaveRAMTests(unittest.TestCase):
                                 and name.endswith(".tmp")
                                 for name in temp_names))
             self.assertEqual(fsync.call_count, 2)
+            self.assertEqual(list(Path(tmp).glob("*.tmp")), [])
+
+    def test_two_independent_writers_never_share_temporary_save_files(self):
+        # Force two independent app instances to reach the atomic replace
+        # at the same time. The old fixed .sav.tmp design clobbered one
+        # writer's snapshot and could delete the other's in-flight data.
+        with tempfile.TemporaryDirectory() as tmp:
+            rom = Path(tmp) / "game.gba"
+            first = C.create_string_buffer(b"AAAA", 4)
+            second = C.create_string_buffer(b"BBBB", 4)
+            a = SaveRAM(rom, lambda kind: C.addressof(first), lambda kind: 4)
+            b = SaveRAM(rom, lambda kind: C.addressof(second), lambda kind: 4)
+            barrier = threading.Barrier(2)
+            seen = []
+            lock = threading.Lock()
+            native_replace = os.replace
+
+            def synchronized_replace(source, target):
+                with lock:
+                    seen.append(Path(source))
+                barrier.wait(timeout=10)
+                return native_replace(source, target)
+
+            with patch("anything_plays.libretro_save.os.replace",
+                       side_effect=synchronized_replace):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    fa = pool.submit(a.persist)
+                    fb = pool.submit(b.persist)
+                    self.assertTrue(fa.result(timeout=20))
+                    self.assertTrue(fb.result(timeout=20))
+
+            self.assertEqual(len(seen), 2)
+            self.assertNotEqual(seen[0], seen[1])
+            self.assertTrue(all(p.parent == rom.parent for p in seen))
+            self.assertEqual((rom.with_suffix(".sav")).read_bytes() in
+                             (b"AAAA", b"BBBB"), True)
             self.assertEqual(list(Path(tmp).glob("*.tmp")), [])
 
     def test_existing_fixed_tmp_symlink_is_never_followed(self):
