@@ -1,0 +1,236 @@
+name: 3.1 | Rebuild full Intel Mac DMG with source-built camera-only OpenCV
+
+# Build and install an entirely NEW genuine 3.1.0 Intel Mac full 18-console
+# package with clean OpenCV. This is PRIVATE QA and does not alter the
+# existing seven-asset draft, public RC2, stable 3.0 or any real Mac.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-macos-intel-full-source-opencv-qa.yml'
+      - 'tools/qa_v31_macos_camera_only_wheel.py'
+      - 'tools/assemble_v31_full_macos.py'
+      - 'packaging/build_macos_dmg.sh'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-native-intel-dmg-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  rebuild-native-full-intel-dmg:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: macos-15-intel
+    timeout-minutes: 135
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V31_FINAL_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_NEXT_QA: '1'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FINAL_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      CLEAN_WHEEL_RUN: '43137079614'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate source, platform, preferences and release guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V31_QA_CHECKOUT_SHA"
+          test "$(uname -m)" = 'x86_64'
+          python -m unittest discover -s tests -p test_v31_final_candidate_identity.py -v
+          python -m unittest discover -s tests -p test_v31_final_full_assembly.py -v
+          python -m unittest discover -s tests -p test_v31_final_installed_ui.py -v
+          # Wheel acceptance is checked by its immutable earlier native run
+          # receipt. PR #213 source-only tests remain on their own branch.
+      - name: Obtain native newly source-built camera-only AVFoundation wheel and original public core DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p camera clean original30 release source-qa fullfinal evidence
+          gh run download "$CLEAN_WHEEL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1-macos-x86_64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED \
+            --dir camera
+          for file in camera/sources/opencv_python_headless-4.14.0.94.tar.gz \
+                      camera/evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json; do
+            test -s "$file"
+          done
+          test "$(find camera/wheels -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d ' ')" = '1'
+          for asset in AnythingPlays-3.0.0-macos-x64.dmg SHA256SUMS.txt; do
+            found=0
+            for attempt in 1 2 3 4; do
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                   --pattern "$asset" --dir original30 --clobber \
+                   && test -s "original30/$asset"; then found=1; break; fi
+              sleep "$((attempt * 8))"
+            done
+            test "$found" -eq 1
+          done
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          STATUS='PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED'
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          source=Path('camera/sources/opencv_python_headless-4.14.0.94.tar.gz')
+          assert hashlib.sha256(source.read_bytes()).hexdigest()==SOURCE_SHA256
+          wheels=list(Path('camera/wheels').glob('*.whl'))
+          assert len(wheels)==1
+          wheel=wheels[0]
+          data=json.loads(Path('camera/evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json').read_text('utf-8'))
+          assert data['status']==STATUS
+          assert data['target']=='macos-x86_64'
+          assert data['source_sha256']==SOURCE_SHA256
+          assert data['wheel_sha256']==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert data['ffmpeg_disabled_in_native_wheel'] is True
+          assert data['avif_native_dependency_omitted'] is True
+          assert data['avfoundation_backend_compiled'] is True
+          assert data['public_release_approved'] is False
+          verify_custom_wheel(wheel,data['wheel_sha256'],'macos-x86_64')
+          stable=Path('original30/AnythingPlays-3.0.0-macos-x64.dmg')
+          sums=Path('original30/SHA256SUMS.txt').read_text('utf-8').splitlines()
+          assert hashlib.sha256(stable.read_bytes()).hexdigest()+'  '+stable.name in sums
+          print('Trusted original public cores and genuine clean source OpenCV wheel.')
+          PY
+          wheel="$(find camera/wheels -name '*.whl' -type f -print -quit)"
+          echo "AP_CUSTOM_OPENCV_WHEEL=$PWD/$wheel" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=$(shasum -a 256 "$wheel" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - name: Compile real clean native Intel Mac 3.1.0 final-version source DMG
+        shell: bash
+        timeout-minutes: 85
+        env:
+          AP_V30_MINIMAL_CORE_BUILD: '1'
+          AP_V31_FULL_TEST_CORES: '0'
+        run: |
+          set -euo pipefail
+          bash packaging/build_macos_dmg.sh
+          test -s release/AnythingPlays-3.1.0-macos-x64.dmg
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          pkg=Path('release/AnythingPlays-3.1.0-macos-x64.dmg')
+          src=os.environ['AP_V31_FINAL_SOURCE_SHA']
+          receipt={
+            'schema_version':1,'status':'PRIVATE_SOURCE_STAGE_FINAL_IDENTITY_QA_ONLY',
+            'source_revision':src,'target':'macos-x64','installer':pkg.name,
+            'sha256':hashlib.sha256(pkg.read_bytes()).hexdigest(),
+            'size_bytes':pkg.stat().st_size,'version':'3.1.0',
+            'identity_channel':'final_candidate','settings_namespace':'anything-plays-31',
+            'only_mgba_source_stage':True,'native_core_count':1,
+            'full_18_console_release_ready':False,'public_release_approved':False,
+            'relinking_approved':False,'physical_hardware_verified':False,
+          }
+          Path('source-qa/FINAL_IDENTITY_SOURCE_QA.json').write_text(json.dumps(receipt,indent=2)+'\n','utf-8')
+          print('New version-correct private Mac INTEL source DMG:',receipt['sha256'])
+          PY
+      - name: Assemble original-source 11-core 18-profile complete 3.1.0 Mac INTEL DMG
+        shell: bash
+        timeout-minutes: 45
+        env:
+          AP_V30_MINIMAL_CORE_BUILD: '0'
+          AP_V31_FULL_TEST_CORES: '1'
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_macos --final \
+            --arch x64 --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/AnythingPlays-3.0.0-macos-x64.dmg \
+            --preview release/AnythingPlays-3.1.0-macos-x64.dmg \
+            --checksums original30/SHA256SUMS.txt \
+            --receipt source-qa/FINAL_IDENTITY_SOURCE_QA.json --output fullfinal
+          test -s fullfinal/AnythingPlays-3.1.0-macos-x64.dmg
+          test -s fullfinal/FULL_MACOS_QA_RECEIPT.json
+      - name: Mount full ad-hoc-signed Mac final, audit codec omission, boot real Tk and DS Stream
+        shell: bash
+        run: |
+          set -euo pipefail
+          mountdir="$(mktemp -d /tmp/ap31-clean-intel-full.XXXXXX)"
+          trap 'hdiutil detach "$mountdir" >/dev/null 2>&1 || true; rmdir "$mountdir" >/dev/null 2>&1 || true' EXIT
+          dmg="$PWD/fullfinal/AnythingPlays-3.1.0-macos-x64.dmg"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountdir" "$dmg"
+          app="$mountdir/AnythingPlays31.app"
+          test -x "$app/Contents/MacOS/AnythingPlays"
+          codesign --verify --verbose=2 "$app"
+          python - "$dmg" "$app" <<'PY'
+          import hashlib,json,os,sys
+          from pathlib import Path
+          from tools.compare_v31_v30_opencv import scan
+          pkg=Path(sys.argv[1]);app=Path(sys.argv[2])
+          report=json.loads(Path('fullfinal/FULL_MACOS_QA_RECEIPT.json').read_text('utf-8'))
+          assert report['status']=='PRIVATE_FULL_3_1_0_FINAL_IDENTITY_QA'
+          assert report['target']=='macos-x64'
+          assert report['source_preview_revision']==os.environ['AP_V31_QA_CHECKOUT_SHA']
+          assert report['sha256']==hashlib.sha256(pkg.read_bytes()).hexdigest()
+          assert report['native_core_count']==11 and report['console_profiles']==18
+          assert report['public_release_approved'] is False
+          cv=scan(app)
+          assert not cv['risky_codec_paths'],cv['risky_codec_paths']
+          Path('evidence/FULL_CLEAN_INTEL_OPENCV_AUDIT.json').write_text(
+             json.dumps({'status':'PRIVATE_FULL_MACOS_INTEL_NATIVE_CAMERA_ONLY_QA',
+                         'installer_sha256':report['sha256'],
+                         'source_revision':report['source_preview_revision'],
+                         'opencv_risky_codec_paths':cv['risky_codec_paths'],
+                         'console_profiles':18,'native_core_count':11,
+                         'camera_hardware_tested':False,
+                         'redistribution_approved':False,
+                         'public_release_approved':False},indent=2)+'\n','utf-8')
+          print('New real 18-console Mac source-built OpenCV DMG audited.')
+          PY
+          qahome="$(mktemp -d /tmp/ap31-clean-intel-home.XXXXXX)"
+          python -m tools.qa_v31_final_installed_preferences seed \
+            --home "$qahome" --manifest "$PWD/evidence/FIXTURE.json"
+          HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_FULL_CLEAN_INTEL_GUI.json" \
+          SDL_AUDIODRIVER=dummy \
+          python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
+          import os,subprocess,sys
+          result=subprocess.run([sys.argv[1],'--ap-v30-ui-smoke'],
+              env=os.environ.copy(),timeout=120,capture_output=True,text=True)
+          print('Full source-built Mac INTEL frozen GUI exit:',result.returncode)
+          if result.returncode:
+              print(result.stderr[-3500:]);print(result.stdout[-1500:])
+              raise SystemExit(1)
+          PY
+          python -m tools.qa_v31_final_installed_preferences verify \
+            --home "$qahome" --manifest evidence/FIXTURE.json \
+            --output evidence/SETTINGS_RECEIPT.json
+          python -m tools.verify_v31_final_installed_ui \
+            --target macos-x64 --source-sha "$AP_V31_QA_CHECKOUT_SHA" \
+            --installer "$dmg" --bundle "$app" \
+            --receipt fullfinal/FULL_MACOS_QA_RECEIPT.json \
+            --smoke evidence/FROZEN_FULL_CLEAN_INTEL_GUI.json \
+            --output evidence/FINAL_INSTALLED_RECEIPT.json
+      - name: Retain independent newly built native DMG and exact installed UI evidence as PRIVATE QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-MACOS-X64-FULL-18-CAMERA-ONLY-NEW-DMG-PRIVATE-QA
+          path: |
+            fullfinal/AnythingPlays-3.1.0-macos-x64.dmg
+            fullfinal/FULL_MACOS_QA_RECEIPT.json
+            fullfinal/SDL_RUNTIME_AUDIT.json
+            source-qa/FINAL_IDENTITY_SOURCE_QA.json
+            evidence/FULL_CLEAN_INTEL_OPENCV_AUDIT.json
+            evidence/FROZEN_FULL_CLEAN_INTEL_GUI.json
+            evidence/FIXTURE.json
+            evidence/SETTINGS_RECEIPT.json
+            evidence/FINAL_INSTALLED_RECEIPT.json
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 0
