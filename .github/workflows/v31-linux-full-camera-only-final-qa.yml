@@ -1,0 +1,239 @@
+name: 3.1 | Build new full Linux candidate with source-built FFmpeg-off OpenCV
+
+# A real, independently rebuilt, genuine 3.1.0 source-pinned 18-console
+# Debian package, never a relabeled or overwritten immutable draft asset.
+# No tag, GitHub Release write permission, or third-party licensing approval.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-linux-full-camera-only-final-qa.yml'
+      - 'packaging/build_linux_deb.sh'
+      - 'tools/assemble_v31_full_linux.py'
+      - 'tools/qa_v31_linux_camera_only_wheel.py'
+      - 'tools/verify_custom_opencv_wheel.py'
+      - 'tools/check_opencv_build.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-full-native-camera-only-deb-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  fresh-clean-opencv-final-deb:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Original-source 11-core 3.1.0 Linux package + installed DS Stream Mode
+    runs-on: ubuntu-24.04
+    timeout-minutes: 125
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V31_FINAL_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_NEXT_QA: '1'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FINAL_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      ORIGINAL_WHEEL_RUN: '43133383864'
+      ORIGINAL_SOURCE_RUN: '43120583726'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact source revision, package identity and full core guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V31_QA_CHECKOUT_SHA"
+          python -m unittest discover -s tests -p 'test_v31_final_candidate_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v31_final_full_assembly.py' -v
+          python -m unittest discover -s tests -p 'test_v31_linux_camera_only_wheel.py' -v
+      - name: Install native Ubuntu build/GUI requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 \
+            install -y --no-install-recommends \
+            python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 \
+            libportaudio2 libasound2t64 xvfb xauth libx11-6
+      - name: Fetch trusted original OpenCV source build and public 3.0 core package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wheelartifact original30 proof fullfinal
+          gh run download "$ORIGINAL_WHEEL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1-LINUX-FROM-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED \
+            --dir wheelartifact
+          test -s wheelartifact/sources/opencv_python_headless-4.14.0.94.tar.gz
+          test -s wheelartifact/evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          test "$(find wheelartifact/wheels -name '*.whl' -type f | wc -l)" -eq 1
+          for asset in anything-plays_3.0.0_amd64.deb SHA256SUMS.txt; do
+            ok=0
+            for attempt in 1 2 3 4; do
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                --pattern "$asset" --dir original30 --clobber \
+                && test -s "original30/$asset"; then ok=1; break; fi
+              sleep "$((attempt * 8))"
+            done
+            test "$ok" = 1
+          done
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256,SOURCE_NAME,STATUS
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          src=Path("wheelartifact/sources")/SOURCE_NAME
+          assert hashlib.sha256(src.read_bytes()).hexdigest()==SOURCE_SHA256
+          wheels=list(Path("wheelartifact/wheels").glob("*.whl"))
+          assert len(wheels)==1
+          wheel=wheels[0]
+          record=json.loads(Path("wheelartifact/evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json").read_text("utf-8"))
+          assert record["status"]==STATUS
+          assert record["source_sha256"]==SOURCE_SHA256
+          assert record["wheel_sha256"]==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert record["opencv_linux_v4l2_backend_available"] is True
+          assert record["opencv_ffmpeg_backend_disabled"] is True
+          assert record["public_release_approved"] is False
+          verify_custom_wheel(wheel,record["wheel_sha256"],"linux-x86_64")
+          Path("proof/SOURCE_BUILT_OPENCV_SHA256.txt").write_text(record["wheel_sha256"]+"  "+wheel.name+"\n")
+          print("Independently built V4L2-only wheel and source match immutable proof.")
+          PY
+          wheel="$(find wheelartifact/wheels -maxdepth 1 -name '*.whl' -type f -print -quit)"
+          echo "AP_CUSTOM_OPENCV_WHEEL=$PWD/$wheel" >> "$GITHUB_ENV"
+          echo "AP_CUSTOM_OPENCV_SHA256=$(sha256sum "$wheel" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          # Exact original public 3.0 native archive and checksum.
+          grep '  anything-plays_3.0.0_amd64.deb$' original30/SHA256SUMS.txt \
+            | (cd original30 && sha256sum --check -)
+      - name: Build fresh Python 3.1.0 mGBA source-stage Debian with clean OpenCV
+        shell: bash
+        env:
+          AP_V30_MINIMAL_CORE_BUILD: '1'
+          AP_V31_FULL_TEST_CORES: '0'
+        run: |
+          set -euo pipefail
+          bash packaging/build_linux_deb.sh
+          test -s release/anything-plays-31_3.1.0_amd64.deb
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          installer=Path("release/anything-plays-31_3.1.0_amd64.deb")
+          receipt={
+            "schema_version":1,"status":"PRIVATE_SOURCE_STAGE_FINAL_IDENTITY_QA_ONLY",
+            "source_revision":os.environ["AP_V31_FINAL_SOURCE_SHA"],
+            "target":"linux-x64","installer":installer.name,
+            "sha256":hashlib.sha256(installer.read_bytes()).hexdigest(),
+            "size_bytes":installer.stat().st_size,"version":"3.1.0",
+            "identity_channel":"final_candidate",
+            "settings_namespace":"anything-plays-31",
+            "only_mgba_source_stage":True,"native_core_count":1,
+            "full_18_console_release_ready":False,
+            "public_release_approved":False,"relinking_approved":False,
+            "physical_hardware_verified":False,
+          }
+          Path("release/FINAL_IDENTITY_SOURCE_QA.json").write_text(json.dumps(receipt,indent=2)+"\n","utf-8")
+          print("Source-built fresh camera-only 3.1.0 stage SHA256:",receipt["sha256"])
+          PY
+      - name: Assemble complete original-source eleven cores without changing clean camera runtime
+        shell: bash
+        env:
+          AP_V31_FULL_TEST_CORES: '1'
+          AP_V30_MINIMAL_CORE_BUILD: '0'
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v31_full_linux --final \
+            --expected-source-revision "$AP_V31_QA_CHECKOUT_SHA" \
+            --stable original30/anything-plays_3.0.0_amd64.deb \
+            --preview release/anything-plays-31_3.1.0_amd64.deb \
+            --sums original30/SHA256SUMS.txt \
+            --receipt release/FINAL_IDENTITY_SOURCE_QA.json \
+            --output fullfinal
+          test -s fullfinal/anything-plays-31_3.1.0_amd64.deb
+          test -s fullfinal/FULL_LIBRARY_QA_RECEIPT.json
+      - name: Verify genuinely new full 18-console camera-only package identity and codec absence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p installed
+          dpkg-deb -x fullfinal/anything-plays-31_3.1.0_amd64.deb installed
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          from tools.compare_v31_v30_opencv import scan
+          pkg=Path("fullfinal/anything-plays-31_3.1.0_amd64.deb")
+          report=json.loads(Path("fullfinal/FULL_LIBRARY_QA_RECEIPT.json").read_text("utf-8"))
+          assert report["status"]=="PRIVATE_FULL_3_1_0_FINAL_IDENTITY_QA"
+          assert report["source_preview_revision"]==os.environ["AP_V31_QA_CHECKOUT_SHA"]
+          assert report["sha256"]==hashlib.sha256(pkg.read_bytes()).hexdigest()
+          assert report["native_core_count"]==11 and report["console_profiles"]==18
+          assert report["public_release_approved"] is False
+          root=Path("installed/opt/anything-plays-31")
+          cv=scan(root)
+          assert not cv["risky_codec_paths"],cv["risky_codec_paths"]
+          assert not (root/"_internal/opencv_python_headless.libs").exists()
+          assert (root/"_internal/cv2/cv2.abi3.so").is_file()
+          Path("proof/CAMERA_ONLY_FULL_INSTALLER_NATIVE_QA.json").write_text(
+            json.dumps({"status":"PRIVATE_18_CONSOLE_SOURCE_BUILT_OPENCV_LINUX_QA",
+                        "source_revision":os.environ["AP_V31_QA_CHECKOUT_SHA"],
+                        "installer_sha256":report["sha256"],
+                        "native_core_count":11,"console_profiles":18,
+                        "opencv_ffmpeg_names_present":False,
+                        "camera_hardware_tested":False,
+                        "redistribution_approved":False,
+                        "public_release_approved":False},indent=2)+"\n","utf-8")
+          print("Full 18-core clean OpenCV package built; no FFmpeg-named camera wheel files.")
+          PY
+      - name: Boot actual installed full 3.1.0 Tk and DS Stream Mode with verified new wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/installed/opt/anything-plays-31/AnythingPlays"
+          qahome="$(mktemp -d)"
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$qahome" XDG_CONFIG_HOME="$qahome/.config" \
+              AP_V30_UI_SMOKE_CHECK=1 AP_V31_STREAM_SMOKE_CHECK=1 \
+              AP_V30_UI_SMOKE_REPORT="$PWD/proof/REAL_FULL_CLEAN_OPENCV_STREAM_GUI.json" \
+              SDL_AUDIODRIVER=dummy "$app" --ap-v30-ui-smoke
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          r=json.loads(Path("proof/REAL_FULL_CLEAN_OPENCV_STREAM_GUI.json").read_text("utf-8"))
+          expect={"passed":True,"actual_tk_window_started":True,
+                  "actual_tk_mainloop_ran":True,"frozen_binary":True,
+                  "console_profile_count":18,"stream_output_window_opened":True,
+                  "stream_settings_separate":True,"stream_closed_cleanly":True,
+                  "camera_hardware_tested":False,"gameplay_hardware_tested":False,
+                  "public_distribution_approved":False}
+          for key,val in expect.items():
+              assert r.get(key)==val,(key,r.get(key))
+          print("Original-source complete 18-console final DEB booted with FFmpeg-off custom cv2.")
+          PY
+      - name: Keep new package and original source/installed evidence PRIVATE
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-LINUX-FULL-18-CAMERA-ONLY-NEW-BUILD-QA-PRIVATE
+          path: |
+            fullfinal/anything-plays-31_3.1.0_amd64.deb
+            fullfinal/FULL_LIBRARY_QA_RECEIPT.json
+            fullfinal/SDL_RUNTIME_AUDIT.json
+            proof/CAMERA_ONLY_FULL_INSTALLER_NATIVE_QA.json
+            proof/REAL_FULL_CLEAN_OPENCV_STREAM_GUI.json
+            proof/SOURCE_BUILT_OPENCV_SHA256.txt
+            release/FINAL_IDENTITY_SOURCE_QA.json
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 0
