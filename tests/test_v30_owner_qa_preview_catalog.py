@@ -64,7 +64,8 @@ class PinnedOwnerPreviewHashesTests(unittest.TestCase):
         # not as stale release clutter on the public project landing page.
         self.assertNotIn("42455076101", readme)
         self.assertIn("docs/README.md", readme)
-        self.assertIn("releases/latest", readme)
+        self.assertIn("releases/tag/v3.1.0", readme)
+        self.assertIn("releases/tag/v3.0.0", readme)
         self.assertIn("NOT approved", docs)
         self.assertNotIn("gh release create", docs)
 
