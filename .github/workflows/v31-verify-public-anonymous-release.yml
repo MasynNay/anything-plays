@@ -1,0 +1,103 @@
+name: 3.1 | Verify anonymous public stable eight-asset release
+
+# Independent public GitHub REST and direct-download validation. No
+# authentication, no draft/asset/tag/release mutation, and no binary rebuild.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-verify-public-anonymous-release.yml'
+permissions:
+  contents: read
+
+jobs:
+  anonymous-public-release-receipt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Verify public release and exact source tag anonymously
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/MasynNay/anything-plays/releases/tags/v3.1.0' \
+            > release.json
+          curl --fail --silent --show-error --location --retry 3 \
+            -H 'Accept: application/vnd.github+json' \
+            'https://api.github.com/repos/MasynNay/anything-plays/git/ref/tags/v3.1.0' \
+            > tag.json
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          release=json.loads(Path("release.json").read_text())
+          tag=json.loads(Path("tag.json").read_text())
+          assert release["tag_name"]=="v3.1.0"
+          assert release["draft"] is False
+          assert release["prerelease"] is False
+          assert release["published_at"],"Not published"
+          assert tag["object"]["type"]=="commit"
+          assert tag["object"]["sha"]=="104b96621ec4cb8dc39fde8c3fe96fc854c406ed"
+          required={
+              "AnythingPlaysSetup-3.1.0.exe",
+              "anything-plays-31_3.1.0_amd64.deb",
+              "AnythingPlays-3.1.0-macos-arm64.dmg",
+              "AnythingPlays-3.1.0-macos-x64.dmg",
+              "AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip",
+              "SHA256SUMS.txt","FINAL_QA_MANIFEST.json",
+              "FINAL_SOURCE_ACCESS_REVIEW.md",
+          }
+          assets={a["name"]:a for a in release["assets"]}
+          assert set(assets)==required,(set(assets),required)
+          for name,a in assets.items():
+              assert a["state"]=="uploaded",(name,a["state"])
+              assert a["size"]>200,name
+              assert re.fullmatch(r"sha256:[0-9a-f]{64}",a.get("digest") or ""),name
+              assert a["browser_download_url"]==(
+                  f"https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/{name}"
+              ),name
+          assert "3.1" in release["body"]
+          Path("PUBLIC_3_1_EIGHT_ASSET_RECEIPT.json").write_text(
+              json.dumps({
+                  "status":"PUBLIC_ANONYMOUS_STABLE_3_1_VERIFIED",
+                  "published_at":release["published_at"],
+                  "source_sha":tag["object"]["sha"],
+                  "release_url":release["html_url"],
+                  "asset_count":len(assets),
+                  "assets":{name:{"sha256":a["digest"],"size":a["size"]}
+                            for name,a in assets.items()},
+              },indent=2)+"\n","utf-8")
+          print("ANONYMOUS PUBLIC RELEASE VERIFIED:",release["html_url"])
+          print("Exactly eight public binary/source/integrity assets verified")
+          PY
+      - name: Independently fetch public checksum list without authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 \
+            'https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/SHA256SUMS.txt' \
+            -o SHA256SUMS.txt
+          python - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          manifest=Path("SHA256SUMS.txt").read_bytes()
+          release=json.loads(Path("release.json").read_text())
+          assets={a["name"]:a for a in release["assets"]}
+          assert "sha256:"+hashlib.sha256(manifest).hexdigest()==assets["SHA256SUMS.txt"]["digest"]
+          entries={}
+          for line in manifest.decode("ascii").splitlines():
+              m=re.fullmatch(r"([0-9a-f]{64})  (.+)",line)
+              assert m,line
+              entries[m[2]]=m[1]
+          assert len(entries)==7, entries
+          assert set(entries)==set(assets)-{"SHA256SUMS.txt"}
+          for name,digest in entries.items():
+              assert "sha256:"+digest==assets[name]["digest"],(name,digest,assets[name]["digest"])
+          print("Public anonymous SHA256SUMS matches all other seven asset digests.")
+          PY
+      - name: Preserve public eight-asset verification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-PUBLIC-ANONYMOUS-EIGHT-ASSET-VERIFIED
+          path: PUBLIC_3_1_EIGHT_ASSET_RECEIPT.json
+          retention-days: 90
+          if-no-files-found: error
