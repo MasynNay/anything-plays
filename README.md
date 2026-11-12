@@ -10,21 +10,21 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Portfolio website](https://anythingplays.masynnay.com/) · [Try 3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) · [Download stable 3.0](https://github.com/MasynNay/anything-plays/releases/latest) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) · [Previous 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
 ---
 
-## Anything Plays 3.1 RC2 — public test release
+## Anything Plays 3.1.0 — public stable release
 
-**[Download Anything Plays 3.1 RC2 for Windows, Linux or macOS](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2)**
+**[Download the official Anything Plays 3.1.0 release for Windows, Linux and both Macs](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0)**
 
-**New in RC2: customizable Stream Mode.** One resizable, DS-inspired window mirrors the current game above the annotated camera for OBS Window Capture. A separate, noncaptured settings panel controls stacked/side-by-side screens, all 16 color themes, customizable bezels, screen proportions, status labels, and 15/24/30 FPS. Optional gamepad controls, reactive controller art, console-specific mapping, reconnect/focus safety, diagnostics and isolated settings remain available. [See Stream Mode setup and limits](docs/V3_1_STREAM_MODE.md).
+**New in 3.1: customizable Stream Mode and optional controller support.** One resizable, Nintendo DS-inspired window displays the current game beside the annotated camera for OBS Window Capture. Separate controls adjust stacked or side-by-side screens, 16 themes, customizable bezels, proportions and 15/24/30 FPS display presets. 3.1 also adds per-console gamepad mapping, a controller tester, improved reconnect/focus safety, and isolated settings. [Learn about Stream Mode](docs/V3_1_STREAM_MODE.md).
 
-All four RC2 installers include the **18 console profiles and 11 native emulator-core families** from 3.0. Each completed installed-app acceptance test requires the real frozen Tk app to launch, open Stream Output plus Stream Settings, change appearance, render a synthetic camera frame and close without disturbing original stable/RC1 settings. The release includes its checked binaries, QA manifest, source-access information and SHA-256 checksums.
+All four complete installers ship the same **18 console profiles and 11 original-source emulator core families** as stable 3.0. The [13/13 native build and installed application QA jobs passed](https://github.com/MasynNay/anything-plays/actions/runs/43140637755), and the [release's eight assets](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) include original pygame/SDL/mpg123 sources, SHA256 checksums, source access notes, and the build manifest.
 
-**RC2 is a prerelease, not final stable 3.1.0.** Installed GUI, virtual-controller and source checks are not broad physical-device or retail-game acceptance. Complete pygame/SDL corresponding-source and LGPL relinking review remain open, as do real webcam/gamepad sessions and extended gameplay. See the release notes before redistributing native libraries. **3.0.0 remains the latest stable release**, and RC1/2.0 remain available.
+**Hardware scope:** these tests do not certify connected real controllers, webcams, retail-game save/audio behavior or multi-hour sessions on every platform. See [hardware QA disclosure](docs/V3_1_HARDWARE_QA_SCOPE.md). The complete installer is free for noncommercial use, with separately licensed emulator cores and runtime dependencies. [Original LGPL source and rebuild instructions](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) are available. Stable 3.0 and public 3.1 RC2 remain accessible as earlier downloads.
 
 ## Screenshots
 
@@ -79,9 +79,9 @@ Anything Plays uses your webcam to follow a selected color and translate movemen
 
 The controls are sent directly to the embedded emulator, **not injected as system-wide keyboard events**. You can also click the game display and play with a keyboard. A webcam is optional.
 
-**Version 3.0** brings 18 console profiles into one desktop application, including Nintendo 64 and GameCube, with local ROM libraries, saved control layouts, embedded video and audio, and bundled native emulator cores.
+**Version 3.0 introduced** 18 console profiles into one desktop application, including Nintendo 64 and GameCube, with local ROM libraries, saved control layouts, embedded video and audio, and bundled native emulator cores.
 
-> **Portfolio project:** [anythingplays.masynnay.com](https://anythingplays.masynnay.com/) showcases the design and engineering. The playable experience is the **downloadable desktop app**, not a hosted browser emulator. Anything Plays remains free of charge.
+> **Official product site:** [anythingplays.masynnay.com](https://anythingplays.masynnay.com/) showcases the design and engineering. The playable experience is the **downloadable desktop app**, not a hosted browser emulator. Anything Plays remains free of charge.
 
 ## What's new in 3.0
 
@@ -97,7 +97,7 @@ The original **2.0 release is preserved** for anyone who prefers the earlier fou
 ## Features
 
 - **Anything can be a controller.** Choose a target color from your camera and use the tracked object's position to trigger game inputs.
-- **Stream Mode (3.1 RC2).** Capture the game and annotated camera together in a DS-inspired, customizable output window without including its separate controls in your OBS stream.
+- **Stream Mode (3.1 stable).** Capture the game and annotated camera together in a DS-inspired, customizable output window without including its separate controls in your OBS stream.
 - **Optional gamepad controls (3.1).** Configure console-specific controller mappings with a live tester and gamepad status feedback; hardware compatibility varies.
 - **Customizable layouts.** Configure button zones and mappings, keep them balanced or place them manually, and adjust the labels displayed over video.
 - **Console-specific profiles.** Retain the right library folders and input preferences when switching systems.
@@ -132,25 +132,24 @@ The desktop software is built with Python, Tkinter, OpenCV, NumPy and native Lib
 
 ### Download the desktop app
 
-**[Try the publicly available 3.1 RC2 release candidate](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2)** for dual-screen Stream Mode, themed bezels and controller features. It is a prerelease with four platform installers and checksum/source receipts. Stable 3.0 remains the recommended proven version until final 3.1.0 testing and compliance work are complete.
+**[Anything Plays 3.1.0 — latest stable GitHub release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0)**
 
-
-**[Download Anything Plays 3.0 from GitHub Releases](https://github.com/MasynNay/anything-plays/releases/latest)**
-
-| Computer | Official 3.0 installer |
+| Computer | Official 3.1.0 installer |
 | :-- | :-- |
-| Windows 10/11 x64 | [AnythingPlaysSetup-3.0.0.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlaysSetup-3.0.0.exe) |
-| Mac with Apple Silicon | [AnythingPlays-3.0.0-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-arm64.dmg) |
-| Mac with Intel | [AnythingPlays-3.0.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/AnythingPlays-3.0.0-macos-x64.dmg) |
-| Ubuntu / Debian Linux x64 | [anything-plays_3.0.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/anything-plays_3.0.0_amd64.deb) |
+| Windows 10/11 x64 | [AnythingPlaysSetup-3.1.0.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlaysSetup-3.1.0.exe) |
+| Mac with Apple Silicon | [AnythingPlays-3.1.0-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-arm64.dmg) |
+| Mac with Intel | [AnythingPlays-3.1.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-x64.dmg) |
+| Ubuntu / Debian Linux x64 | [anything-plays-31_3.1.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/anything-plays-31_3.1.0_amd64.deb) |
 
-Download **one** installer for your computer from the release assets. You can verify it using [SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.0.0/SHA256SUMS.txt).
+Download **one** installer for your computer. Verify it with the [3.1 SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/SHA256SUMS.txt). The same release includes the [original controller-runtime source ZIP](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip) and [native library replacement guide](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md).
 
-**Windows:** Run the setup program. Windows SmartScreen may display a warning because the installer is not commercially signed.
+**Windows:** Run the setup program. SmartScreen may display a warning because the installer is not commercially signed.
 
-**macOS:** Open the DMG and copy the app into Applications. The application is ad hoc signed rather than notarized with an Apple Developer ID, so macOS may request approval in System Settings → Privacy & Security.
+**macOS:** Open the DMG and copy the app into Applications. The app is ad hoc signed, not Apple-notarized, so macOS may request approval in System Settings → Privacy & Security.
 
-**Linux:** Install the DEB with the package manager or run `sudo apt install ./anything-plays_3.0.0_amd64.deb` from its downloaded folder.
+**Linux:** Install the DEB with your package manager or run `sudo apt install ./anything-plays-31_3.1.0_amd64.deb` from its downloaded folder.
+
+**Previous versions:** [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) remain available for rollback.
 
 ### Your first five minutes
 
@@ -226,7 +225,7 @@ Anything Plays is actively maintained. The [public roadmap](docs/ROADMAP.md) sep
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-The source includes automated tests and four-platform release checks. The [verified 3.0 build](https://github.com/MasynNay/anything-plays/actions/runs/42718569352) covers packaged startup and selected emulator behavior. This is **not** a claim of compatibility with every retail game, webcam, GPU or extended session.
+The source includes automated tests and four-platform release checks. The [verified 3.1 stable build](https://github.com/MasynNay/anything-plays/actions/runs/43140637755) covers packaged startup and selected emulator behavior. This is **not** a claim of compatibility with every retail game, webcam, GPU or extended session.
 
 See [technical documentation](docs/README.md), [contributing](.github/CONTRIBUTING.md), and the [security policy](.github/SECURITY.md). If you encounter an issue, include your OS, console, expected behavior, and steps to reproduce, without uploading copyrighted game files or private camera footage.
 
