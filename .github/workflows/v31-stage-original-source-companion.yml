@@ -115,35 +115,3 @@ jobs:
             staging/SOURCE_COMPANION_SHA256SUMS.txt
           retention-days: 90
           if-no-files-found: error
-
-      - name: Stage full original source/notice candidate materials, keep release unapproved
-        run: |
-          set -euo pipefail
-          python -m tools.stage_v31_public_source_companion \
-            --source-root source-inputs \
-            --mpg123 mpg-original/mpg123-1.33.7.tar.bz2 \
-            --output staging/source
-          (cd staging/source && sha256sum --check SHA256SUMS.txt)
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          r=json.loads(Path('staging/source/SOURCE_RECEIPT.json').read_text('utf-8'))
-          assert len(r['source_archives'])==7
-          assert r['full_library_source_match_independently_proven'] is False
-          assert r['complete_lgpl_redistribution_approved'] is False
-          assert r['public_release_approved'] is False
-          print("Original source bundle verified; not a legal or public binary release.")
-          PY
-          (cd staging/source && zip -q -r -9 \
-            ../AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip .)
-          sha256sum staging/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip \
-            > staging/SOURCE_COMPANION_SHA256SUMS.txt
-      - name: Preserve exact source archives for release candidate review only
-        uses: actions/upload-artifact@v4
-        with:
-          name: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE-PRIVATE-REVIEW
-          path: |
-            staging/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip
-            staging/SOURCE_COMPANION_SHA256SUMS.txt
-          retention-days: 90
-          if-no-files-found: error
