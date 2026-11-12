@@ -11,6 +11,7 @@ on:
       - 'tools/write_v31_identity.py'
       - 'tools/verify_v311_source_stage.py'
       - 'tools/assemble_v311_full_linux.py'
+      - 'tools/assemble_v311_full_windows.py'
       - 'tests/test_v311_private_qa_identity.py'
       - 'packaging/build_linux_deb.sh'
       - 'packaging/build_windows.bat'
@@ -235,6 +236,95 @@ jobs:
           path: |
             fullqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb
             fullqa/V311_FULL_LINUX_QA_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-windows-18:
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Windows 18-console source-core QA | not release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_310_SHA: 574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install official Inno Setup compiler
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+      - name: Recover exact original same-run 3.1.1 Windows source app
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-windows-x64-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Confirm public 3.1.0 core binary and download source-reviewed old stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > stable.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads(Path('stable.json').read_text('utf-8'))
+          assert data['draft'] is False and data['prerelease'] is False
+          assert data['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(data['assets'])==8
+          match=[e for e in data['assets'] if e['name']=='AnythingPlaysSetup-3.1.0.exe']
+          assert len(match)==1
+          assert match[0]['digest']=='sha256:'+os.environ['EXPECTED_310_SHA']
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern AnythingPlaysSetup-3.1.0.exe \
+            --pattern SHA256SUMS.txt --dir stableqa
+          echo "$EXPECTED_310_SHA  stableqa/AnythingPlaysSetup-3.1.0.exe" | sha256sum -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Assemble genuine 11 original cores and verify installed Windows program
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_windows \
+            --stable stableqa/AnythingPlaysSetup-3.1.0.exe \
+            --qa sourceqa/AnythingPlaysSetup-3.1.1-qa1.exe \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('fullqa/V311_FULL_WINDOWS_QA_RECEIPT.json').read_text('utf-8'))
+          assert r['status']=='PRIVATE_3_1_1_FULL_18_WINDOWS_QA_NOT_APPROVED'
+          assert r['new_source_revision']==os.environ['QA_SOURCE_SHA']
+          assert r['native_core_count']==11 and r['console_profiles']==18
+          assert r['identity_channel']=='v311_candidate'
+          assert r['public_release_approved'] is False
+          assert r['full_four_platform_311_verified'] is False
+          print('Actual full 3.1.1 Windows private QA receipt:',r['sha256'])
+          PY
+      - name: Preserve private installed-full-Windows evidence, NOT public
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-WINDOWS-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/AnythingPlaysSetup-3.1.1-qa1.exe
+            fullqa/V311_FULL_WINDOWS_QA_RECEIPT.json
+            fullqa/SDL_RUNTIME_AUDIT.json
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
