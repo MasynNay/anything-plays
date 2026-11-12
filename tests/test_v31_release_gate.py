@@ -11,8 +11,26 @@ class V31ReleaseGateTests(unittest.TestCase):
         self.assertEqual(report["status"], "IN_DEVELOPMENT")
         self.assertIs(report["public_release_approved"], False)
         self.assertEqual(set(report["release_gates"]), set(REQUIRED_GATES))
-        self.assertEqual(len(blockers(report)), 7)
-        for name in REQUIRED_GATES:
+        # Two source-pinned full-installer gates passed real four-platform
+        # installed QA. Keep the unresolved hardware, source, rights and
+        # publication gates blocking rather than assuming all six are open.
+        verified = {
+            "full_eighteen_console_installer",
+            "four_platform_full_installer_verification",
+        }
+        still_open = set(REQUIRED_GATES) - verified
+        self.assertEqual(
+            set(blockers(report)),
+            still_open | {"owner has not approved this exact release"},
+        )
+        for name in verified:
+            self.assertIs(report["release_gates"][name]["verified"], True)
+            self.assertTrue(report["release_gates"][name]["evidence"].startswith(
+                "https://github.com/MasynNay/anything-plays/actions/runs/"
+            ))
+            self.assertNotIn(name, blockers(report))
+        for name in still_open:
+            self.assertIs(report["release_gates"][name]["verified"], False)
             self.assertIn(name, blockers(report))
 
     def test_missing_licensing_and_hardware_cannot_be_waved_through(self):
