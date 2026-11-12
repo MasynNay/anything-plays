@@ -1,0 +1,118 @@
+name: 3.1.0 | Restage SHA-verified clean four-platform installers and exact native source wheels
+
+# This is a READ-ONLY second staging of an ALREADY-SUCCESSFUL, same-source
+# 13-job native four-platform final QA run. Never rebuild binary installers,
+# change GitHub Release draft, touch public 3.0/RC2 or set approval flags.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-restage-clean-final-provenance.yml'
+      - 'tools/stage_v31_final_for_review.py'
+      - 'tests/test_v31_final_release_stage.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-source-provenance-restage-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  reverify-four-native-same-source-final:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_FINAL_QA_RUN: '43140637755'
+      ORIGINAL_FINAL_SOURCE_SHA: '104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Regression-test exact immutable source wheel and release-stage contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_final_release_stage.py' -v
+      - name: Authenticate exact completed four-platform clean-final native installed run
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_FINAL_QA_RUN" > original-qa-run.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads(Path('original-qa-run.json').read_text('utf-8'))
+          assert data['id']==int(os.environ['ORIGINAL_FINAL_QA_RUN'])
+          assert data['head_sha']==os.environ['ORIGINAL_FINAL_SOURCE_SHA']
+          assert data['event']=='pull_request'
+          assert data['name']=='3.1.0 | Private four-platform FINAL identity build QA'
+          assert data['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert data['status']=='completed' and data['conclusion']=='success'
+          print('Same-source 13-job native QA accepted:',data['html_url'])
+          PY
+      - name: Download ONLY original full 18-console signed installer and installed-GUI artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            mkdir -p "full/$target" "installed/$target"
+            gh run download "$ORIGINAL_FINAL_QA_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1.0-FINAL-FULL-18-$target-QA-ONLY" \
+              --dir "full/$target"
+            gh run download "$ORIGINAL_FINAL_QA_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1.0-FINAL-INSTALLED-DESKTOP-$target-QA-ONLY" \
+              --dir "installed/$target"
+            test -s "full/$target/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json"
+            test -s "installed/$target/FINAL_INSTALLED_RECEIPT.json"
+          done
+      - name: Stage all four exact original installers with upstream source-wheel fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v31_final_for_review \
+            --full-root full --installed-root installed --output reviewed \
+            --source-sha "$ORIGINAL_FINAL_SOURCE_SHA" \
+            --qa-run-id "$ORIGINAL_FINAL_QA_RUN"
+          (cd reviewed && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('reviewed/FINAL_QA_MANIFEST.json').read_text('utf-8'))
+          assert r['source_revision']==os.environ['ORIGINAL_FINAL_SOURCE_SHA']
+          assert r['qa_run_id']==int(os.environ['ORIGINAL_FINAL_QA_RUN'])
+          assert r['actual_installed_gui_verified_on_four_platforms'] is True
+          assert r['clean_original_camera_only_wheels_verified_on_four_hosts'] is True
+          assert len(r['installers'])==4
+          assert r['native_core_count']==11 and r['console_profiles']==18
+          assert r['stable_3_1_0_published'] is False
+          assert r['public_release_approved'] is False
+          assert r['full_native_relinking_approved'] is False
+          expected={'linux-x64':43133383864,'windows-x64':43138596964,
+                    'macos-arm64':43137079614,'macos-x64':43137079614}
+          fingerprints=r['clean_source_built_opencv_wheel_receipts']
+          assert set(fingerprints)==set(expected)
+          for target,w in fingerprints.items():
+              assert w['independent_source_build_run_id']==expected[target],(target,w)
+              assert w['upstream_source_sha256']=='4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577'
+              assert w['independent_camera_backend_proven'] is True
+              assert w['redistribution_approved'] is False
+          assert len(list(Path('reviewed').iterdir()))==7
+          notes=Path('reviewed/FINAL_SOURCE_ACCESS_REVIEW.md').read_text('utf-8')
+          assert 'Four independent native camera-only' in notes
+          print('All four immutable installer bytes and source wheel hashes preserved. Still PRIVATE.')
+          PY
+      - name: Retain checked final four native clean installer bytes and source access receipts privately
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW
+          path: reviewed/
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
