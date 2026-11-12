@@ -216,6 +216,35 @@ class SaveRAMTests(unittest.TestCase):
                           (b"AAAA", b"BBBB"))
             self.assertEqual(list(Path(tmp).glob("*.tmp")), [])
 
+    def test_windows_transient_sharing_violation_retries_without_fallback(self):
+        if os.name != "nt":
+            self.skipTest("Windows sharing error codes are platform-specific")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            memory = C.create_string_buffer(b"SAFE", 4)
+            save = SaveRAM(root / "game.gba",
+                           lambda kind: C.addressof(memory), lambda kind: 4)
+            native_replace = os.replace
+            attempts = [0]
+
+            def temporary_lock(source, destination):
+                attempts[0] += 1
+                if attempts[0] == 1:
+                    denied = PermissionError(13, "temporary file sharing violation")
+                    denied.winerror = 32
+                    raise denied
+                return native_replace(source, destination)
+
+            with (patch("anything_plays.libretro_save.os.replace",
+                        side_effect=temporary_lock),
+                  patch("anything_plays.libretro_save.time.sleep") as sleeper):
+                self.assertTrue(save.persist())
+            self.assertEqual(attempts[0], 2)
+            sleeper.assert_called_once()
+            self.assertEqual(save.path, root / "game.sav")
+            self.assertEqual(save.path.read_bytes(), b"SAFE")
+            self.assertEqual(list(root.glob("*.tmp")), [])
+
     def test_existing_fixed_tmp_symlink_is_never_followed(self):
         if os.name == "nt":
             self.skipTest("Symlink creation may require Windows developer mode")
