@@ -65,6 +65,12 @@ An earlier reference to 2.0's FFmpeg-free custom OpenCV wheel does not describe
 the exact 3.0 or 3.1 installer bytes. This finding neither clears nor
 establishes a licensing violation; obtain actual source/build/rights evidence.
 
+## Exact final Windows pygame native replacement is also verified
+
+The [genuine source-modified final Windows 3.1.0 test](https://github.com/MasynNay/anything-plays/actions/runs/43149732092) **passed** after separating an obsolete RC1 profile-migration fixture from the already verified final-settings contracts. The original SHA-pinned Windows 18-console/11-core Inno package was checked against its original QA receipt and the independent native inventory, source-modified pygame CE `base.c` was compiled by native MSVC, and the new C method executed from the copied final application before the real frozen Tk desktop successfully booted. The original full installer remained unchanged. [Reproduction and exact limits](V3_1_CLEAN_FINAL_WINDOWS_PYGAME_REPLACEMENT.md).
+
+Together with the [Linux exact-final modified-source result](V3_1_CLEAN_FINAL_LINUX_PYGAME_REPLACEMENT.md) and [both actual final Mac source-modified results](V3_1_CLEAN_FINAL_MACOS_PYGAME_REPLACEMENT.md), **one genuine LGPL-covered pygame native-extension replacement has been compiled and runtime-tested on all four shipping operating systems**. This is significant technical corresponding-source/replacement evidence, but not a claim that all pygame/SDL, transitive native dependency source, required notices, actual LGPL modification/relinking provision, or legal permission is fully satisfied. Keep the independent legal and real-device release gates unapproved.
+
 ## Actual full clean final Mac source-modified pygame CE — both CPUs passed
 
 [Native Apple Silicon and Intel Mac source modification 43149191077](https://github.com/MasynNay/anything-plays/actions/runs/43149191077) **passed 2/2** using the new exact source-built final 3.1.0 DMGs. Each native host independently compiled changed pygame C against pinned original source and SDL2, verified the original wheel's code sections, modified a disposable copy, relinked and ad-hoc signed it, executed the changed C method and booted the real 18-console frozen Tk application. Original signed DMGs remained unchanged. [Reproducible exact Mac evidence and limits](V3_1_CLEAN_FINAL_MACOS_PYGAME_REPLACEMENT.md).
