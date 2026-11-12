@@ -176,8 +176,15 @@ jobs:
             assert "notices-and-manifests/Pygame-CE-LGPL-2.1.txt" in z.namelist()
           assert not (Path("reviewed")/name).exists()
           shutil.copyfile(package,Path("reviewed")/name)
-          print("Verified new original upstream source companion; eight proposed release files.")
+          sums=Path("reviewed")/"SHA256SUMS.txt"
+          assert sums.is_file()
+          existing=sums.read_text("ascii")
+          assert name not in existing, "Unexpected source entry already present"
+          with sums.open("a",encoding="ascii") as out:
+            out.write(f"{checks[0]}  {name}\\n")
+          print("Verified original-source companion and included its SHA256 in final release checksum list.")
           PY
+          (cd reviewed && sha256sum --check SHA256SUMS.txt)
 
       - name: Require the original private draft, never replace a public release
         shell: bash
