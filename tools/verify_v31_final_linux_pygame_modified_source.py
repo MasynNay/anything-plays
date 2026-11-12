@@ -67,9 +67,8 @@ def stage(*, bundle, installer, receipt, wheel, source_change, compiled, destina
     _file(compiled, 100_000, 20 * 1024**2)
     if compiled.name != BASENAME:
         raise ValueError("Wrong CPython 3.13 compiled extension")
-    if (original.resolve().is_relative_to(compiled.resolve())
-            or compiled.resolve().is_relative_to(original.resolve())):
-        raise ValueError("Source-compiled replacement is not independent")
+    if compiled.resolve().is_relative_to(bundle.resolve()):
+        raise ValueError("Source-compiled replacement must be outside original app")
     _file(wheel, 1_000_000, 70 * 1024**2)
     if wheel.name != WHEEL_NAME or digest(wheel) != WHEEL_SHA256:
         raise ValueError("Official original pygame CE wheel differs from pinned source")
