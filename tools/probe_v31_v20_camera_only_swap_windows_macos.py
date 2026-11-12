@@ -100,10 +100,21 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
     copied_shared_dependency = None
     if target == "macos-x64":
         filename = "libavif.16.dylib"
-        matches = [p for p in old_app.rglob(filename)
-                   if p.is_file() and not p.is_symlink()]
+        # Mach-O libraries are often stored under a full versioned name
+        # with libavif.16.dylib as a symlink. Resolve ONLY links staying in
+        # the original SHA-verified, copied 2.0 app; never follow host dylibs.
+        candidates = []
+        for path in old_app.rglob("*"):
+            if not path.name.lower().startswith("libavif") or not path.name.endswith(".dylib"):
+                continue
+            target = path.resolve()
+            if (not target.is_relative_to(old_app.resolve()) or
+                    not target.is_file() or target.is_symlink()):
+                raise ValueError("Untrusted external/symlinked native libavif")
+            candidates.append(target)
+        matches = list(dict.fromkeys(candidates))
         if not matches:
-            raise ValueError("Original 2.0 Intel camera-only libavif dependency missing")
+            raise ValueError("Original 2.0 Intel app does not bundle libavif; cannot safely supply an OS library")
         checksums = {hash_file(path) for path in matches}
         if len(checksums) != 1:
             raise ValueError("Ambiguous original libavif binaries")
