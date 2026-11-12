@@ -193,7 +193,11 @@ class SaveRAMTests(unittest.TestCase):
             def synchronized_replace(source, target):
                 with lock:
                     seen.append(Path(source))
-                barrier.wait(timeout=10)
+                    initial_call = len(seen) <= 2
+                if initial_call:
+                    # First calls overlap; retries must not reenter this
+                    # two-party barrier or deadlock after one writer wins.
+                    barrier.wait(timeout=10)
                 return native_replace(source, target)
 
             with patch("anything_plays.libretro_save.os.replace",
@@ -204,11 +208,12 @@ class SaveRAMTests(unittest.TestCase):
                     self.assertTrue(fa.result(timeout=20))
                     self.assertTrue(fb.result(timeout=20))
 
-            self.assertEqual(len(seen), 2)
+            self.assertGreaterEqual(len(seen), 2)
+            self.assertEqual(len(set(seen)), 2)
             self.assertNotEqual(seen[0], seen[1])
             self.assertTrue(all(p.parent == rom.parent for p in seen))
-            self.assertEqual((rom.with_suffix(".sav")).read_bytes() in
-                             (b"AAAA", b"BBBB"), True)
+            self.assertIn(rom.with_suffix(".sav").read_bytes(),
+                          (b"AAAA", b"BBBB"))
             self.assertEqual(list(Path(tmp).glob("*.tmp")), [])
 
     def test_existing_fixed_tmp_symlink_is_never_followed(self):
