@@ -16,6 +16,7 @@ import tempfile
 
 from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.verify_v31_rc import validate_staged_identity
+from tools.v311_camera_source_gate import require_pinned_native_camera_wheel
 from tools.verify_v311_source_stage import INSTALLERS, STATUS, digest
 from verify_bundle import verify_bundle
 
@@ -25,7 +26,7 @@ QA_NAME = INSTALLERS[TARGET]
 OUTPUT_STATUS = "PRIVATE_3_1_1_FULL_18_LINUX_QA_NOT_APPROVED"
 
 
-def prepare(stable, qa, checksums, receipt, expected_source_sha, destination):
+def prepare(stable, qa, checksums, receipt, camera_receipt, expected_source_sha, destination):
     stable, qa, checksums, receipt, destination = map(
         Path, (stable, qa, checksums, receipt, destination))
     if (stable.name != BASELINE_NAME or qa.name != QA_NAME
@@ -49,6 +50,7 @@ def prepare(stable, qa, checksums, receipt, expected_source_sha, destination):
     for key, value in expected.items():
         if type(info.get(key)) is not type(value) or info.get(key) != value:
             raise ValueError("Wrong original 3.1.1 source-stage receipt: " + key)
+    camera = require_pinned_native_camera_wheel(camera_receipt, TARGET)
     if not isinstance(expected_source_sha, str) or len(expected_source_sha) != 40:
         raise ValueError("Missing exact source revision")
     if destination.exists() or destination.is_symlink():
@@ -122,6 +124,7 @@ def prepare(stable, qa, checksums, receipt, expected_source_sha, destination):
             "installer_size_bytes": output.stat().st_size,
             "source_app_sha256": digest(qa),
             "baseline_3_1_0_sha256": digest(stable),
+            "sourcebuilt_ffmpeg_off_camera_wheel_sha256": camera["native_wheel_sha256"],
             "app_source_sha": expected_source_sha,
             "version": "3.1.1", "identity_channel": "v311_candidate",
             "settings_namespace": "anything-plays-311-candidate",
@@ -143,11 +146,12 @@ def main():
     p.add_argument("--qa", type=Path, required=True)
     p.add_argument("--checksums", type=Path, required=True)
     p.add_argument("--source-receipt", type=Path, required=True)
+    p.add_argument("--camera-receipt", type=Path, required=True)
     p.add_argument("--expected-source-sha", required=True)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     report = prepare(args.stable, args.qa, args.checksums,
-                     args.source_receipt, args.expected_source_sha,
+                     args.source_receipt, args.camera_receipt, args.expected_source_sha,
                      args.output)
     print(json.dumps(report, indent=2))
 
