@@ -517,5 +517,12 @@
     "corresponding_source_and_native_relinking_complete": false,
     "public_release_approved": false,
     "stable_3_1_published": false
+  },
+  "owner_publication_request": {
+    "requested": true,
+    "date": "2026-11-11",
+    "scope": "Publish stable v3.1.0 publicly with the four newly verified clean-source installers",
+    "meaning": "Owner has approved the goal of public publication, not certified third-party redistribution or hardware checks",
+    "still_blocked_by": "release_gates"
   }
 }
