@@ -6,11 +6,11 @@
   "release_gates": {
     "full_eighteen_console_installer": {
       "verified": true,
-      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726"
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43140637755"
     },
     "four_platform_full_installer_verification": {
       "verified": true,
-      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726"
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43140637755"
     },
     "real_controller_hardware_acceptance": {
       "verified": false,
@@ -484,6 +484,34 @@
     "native_core_families": 11,
     "console_profiles": 18,
     "owner_linux_rc2_install_and_stream_visual_reported": true,
+    "physical_camera_or_gamepad_or_gameplay_verification": false,
+    "pygame_sdl_redistribution_review_complete": false,
+    "corresponding_source_and_native_relinking_complete": false,
+    "public_release_approved": false,
+    "stable_3_1_published": false
+  },
+  "verified_clean_opencv_unified_final_candidate_qa": {
+    "status": "PASSED_FOUR_PLATFORM_SOURCE_BUILT_CAMERA_ONLY_FULL_NATIVE_AND_INSTALLED_GUI_QA_ONLY",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/43140637755",
+    "source_app_revision": "104b96621ec4cb8dc39fde8c3fe96fc854c406ed",
+    "source_builds_passed": 4,
+    "full_18_console_installers_passed": 4,
+    "installed_frozen_stream_and_settings_passed": 4,
+    "source_and_installed_contracts_passed": 1,
+    "total_workflow_jobs_passed": 13,
+    "native_core_families": 11,
+    "console_profiles": 18,
+    "opencv_pristine_source_sha256": "4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577",
+    "source_built_camera_backends": {
+      "linux-x64": "V4L2",
+      "windows-x64": "DirectShow",
+      "macos-arm64": "AVFoundation",
+      "macos-x64": "AVFoundation"
+    },
+    "source_core_published_original": "v3.0.0",
+    "old_private_release_draft_id": 442346875,
+    "old_private_draft_source_revision": "d852de9a513f83a329c14647ddc86bf3690fb5f5",
+    "new_native_final_installers_staged_to_original_draft": false,
     "physical_camera_or_gamepad_or_gameplay_verification": false,
     "pygame_sdl_redistribution_review_complete": false,
     "corresponding_source_and_native_relinking_complete": false,
