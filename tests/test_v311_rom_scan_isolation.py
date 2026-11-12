@@ -87,6 +87,26 @@ class LinkedGameShelfTests(unittest.TestCase):
             self.assertEqual([p.name for p in found],
                              ["first.gba", "third.gba"])
 
+    def test_one_inaccessible_subfolder_does_not_hide_valid_sibling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = root / "bad-device"
+            healthy = root / "healthy"
+            missing.mkdir()
+            healthy.mkdir()
+            (missing / "hidden.gba").write_bytes(b"synthetic")
+            (healthy / "working.gba").write_bytes(b"synthetic")
+            old_is_symlink = Path.is_symlink
+
+            def intermittent_folder_stat(path):
+                if path == missing:
+                    raise OSError("USB directory metadata disappeared")
+                return old_is_symlink(path)
+
+            with patch.object(Path, "is_symlink", intermittent_folder_stat):
+                games = scan_rom_directory(root, (".gba",))
+            self.assertEqual([game.name for game in games], ["working.gba"])
+
     def test_inaccessible_selected_root_returns_empty_without_crashing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
