@@ -1,0 +1,207 @@
+name: 3.1.0 | Prove disposable 2.0 camera-only OpenCV in Windows and Mac GUIs
+
+# Does not alter signed public packages, original private full 3.1 files
+# or any GitHub Release. Extracts genuine SHA-verified packages into runner
+# temp, modifies a copy, signs only that temporary Mac copy and boots Tk.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-v20-opencv-disposable-windows-macos.yml'
+      - 'tools/probe_v31_v20_camera_only_swap_windows_macos.py'
+      - 'tests/test_v31_camera_only_swap_windows_macos.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-v20-temp-windows-mac-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  full-frozen-camera-only-compat:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Genuine 2.0 OpenCV in disposable full 3.1 | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: windows-x64, runner: windows-latest, stable: 'AnythingPlaysSetup-2.0.0.exe', final: 'AnythingPlaysSetup-3.1.0.exe', receipt: 'FULL_WINDOWS_QA_RECEIPT.json'}
+          - {target: macos-arm64, runner: macos-15, stable: 'AnythingPlays-2.0.0-macos-arm64.dmg', final: 'AnythingPlays-3.1.0-macos-arm64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+          - {target: macos-x64, runner: macos-15-intel, stable: 'AnythingPlays-2.0.0-macos-x86_64.dmg', final: 'AnythingPlays-3.1.0-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI: 'true'
+      AP_V31_DISPOSABLE_QA: '1'
+      QA_RUN: '43120583726'
+      SOURCE_SHA: d852de9a513f83a329c14647ddc86bf3690fb5f5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify isolated scratch, tamper rejections and no public approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_camera_only_swap_windows_macos.py' -v
+      - name: Download exact original public 2.0 and full final 3.1 from immutable native CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source20 source31 evidence sandbox/public20 sandbox/private31
+          for asset in '${{ matrix.stable }}' SHA256SUMS.txt; do
+            ok=0
+            for n in 1 2 3 4; do
+              if gh release download v2.0.0 --repo "$GITHUB_REPOSITORY" \
+                --pattern "$asset" --dir source20 --clobber \
+                && test -s "source20/$asset"; then ok=1; break; fi
+              sleep "$((n * 8))"
+            done
+            test "$ok" = 1
+          done
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1.0-FINAL-FULL-18-${{ matrix.target }}-QA-ONLY' \
+            --dir source31
+          test -s 'source31/${{ matrix.final }}'
+          test -s 'source31/${{ matrix.receipt }}'
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          import json,os
+          old=Path('source20/${{ matrix.stable }}')
+          rows=Path('source20/SHA256SUMS.txt').read_text('utf-8').splitlines()
+          hashes=[x.partition('  ')[0] for x in rows if x.endswith('  '+old.name)]
+          assert len(hashes)==1 and sha256(old.read_bytes()).hexdigest()==hashes[0]
+          installer=Path('source31/${{ matrix.final }}')
+          receipt=json.loads(Path('source31/${{ matrix.receipt }}').read_text('utf-8'))
+          assert receipt['source_preview_revision']==os.environ['SOURCE_SHA']
+          assert receipt['target']=='${{ matrix.target }}'
+          assert receipt['installer']==installer.name
+          assert receipt['sha256']==sha256(installer.read_bytes()).hexdigest()
+          assert receipt['console_profiles']==18 and receipt['native_core_count']==11
+          assert receipt['public_release_approved'] is False
+          print('Original public 2.0 and exact private complete 3.1 binary bytes verified')
+          PY
+      - name: Extract both Windows installers strictly into sandbox, replace camera-only cv2
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $sandbox=(Resolve-Path 'sandbox').Path
+          $old=Join-Path $sandbox 'public20'
+          $new=Join-Path $sandbox 'private31'
+          $original=(Resolve-Path 'source20/${{ matrix.stable }}').Path
+          $final=(Resolve-Path 'source31/${{ matrix.final }}').Path
+          python -c "from pathlib import Path;import sys;from tools.assemble_v31_full_windows import unpack;unpack(Path(sys.argv[1]),Path(sys.argv[2]));unpack(Path(sys.argv[3]),Path(sys.argv[4]))" $original $old $final $new
+          if ($LASTEXITCODE -ne 0) { throw 'Installer extraction failure' }
+          $env:AP_V31_QA_SANDBOX=$sandbox
+          python -m tools.probe_v31_v20_camera_only_swap_windows_macos --target windows-x64 --old-app $old --new-app $new --scratch $sandbox --source-sha $env:SOURCE_SHA --output evidence/CAMERA_ONLY_SWAP_UNAPPROVED.json
+          if ($LASTEXITCODE -ne 0) { throw 'Non-disposable or unsafe frozen camera-only swap' }
+          $env:WINDOWS_SWAPPED_EXE=Join-Path $new 'AnythingPlays.exe'
+      - name: Boot real modified disposable Windows 3.1 Tk/Stream desktop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $exe=Join-Path (Resolve-Path 'sandbox/private31').Path 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Swapped frozen 3.1 executable missing' }
+          $home=Join-Path $env:RUNNER_TEMP 'AP31-v2-cv2-frozen-smoke'
+          New-Item -ItemType Directory -Path $home -ErrorAction Stop | Out-Null
+          $env:USERPROFILE=$home
+          $env:HOME=$home
+          $env:AP_V30_UI_SMOKE_CHECK='1'
+          $env:AP_V31_STREAM_SMOKE_CHECK='1'
+          $env:AP_V30_UI_SMOKE_REPORT=Join-Path (Resolve-Path 'evidence').Path 'FROZEN_SWAP_UI.json'
+          $env:SDL_AUDIODRIVER='dummy'
+          $process=Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
+          if ($process.ExitCode -ne 0) { throw "Windows frozen GUI/Stream Mode failed: $($process.ExitCode)" }
+      - name: Mount both exact Mac DMGs readonly, copy apps to scratch and swap camera-only cv2
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          first="$(mktemp -d /tmp/ap20-swapped-dmg.XXXXXX)"
+          second="$(mktemp -d /tmp/ap31-swapped-dmg.XXXXXX)"
+          trap 'hdiutil detach "$second" >/dev/null 2>&1 || true; hdiutil detach "$first" >/dev/null 2>&1 || true; rmdir "$first" "$second" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$first" 'source20/${{ matrix.stable }}'
+          hdiutil attach -readonly -nobrowse -mountpoint "$second" 'source31/${{ matrix.final }}'
+          codesign --verify "$first/AnythingPlays.app"
+          codesign --verify "$second/AnythingPlays31.app"
+          ditto "$first/AnythingPlays.app" "$PWD/sandbox/public20/AnythingPlays.app"
+          ditto "$second/AnythingPlays31.app" "$PWD/sandbox/private31/AnythingPlays31.app"
+          export AP_V31_QA_SANDBOX="$PWD/sandbox"
+          python -m tools.probe_v31_v20_camera_only_swap_windows_macos \
+            --target '${{ matrix.target }}' \
+            --old-app "$PWD/sandbox/public20/AnythingPlays.app" \
+            --new-app "$PWD/sandbox/private31/AnythingPlays31.app" \
+            --scratch "$AP_V31_QA_SANDBOX" \
+            --source-sha "$SOURCE_SHA" \
+            --output evidence/CAMERA_ONLY_SWAP_UNAPPROVED.json
+          app="$PWD/sandbox/private31/AnythingPlays31.app"
+          codesign --force --sign - "$app/Contents/Frameworks/cv2/cv2.abi3.so"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --verbose=2 "$app"
+      - name: Boot actual temporary Mac 3.1 native Tk/Stream Mode after local ad-hoc signing
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$(mktemp -d /tmp/ap31-v2-cv2-gui.XXXXXX)"
+          HOME="$home" XDG_CONFIG_HOME="$home/.config" \
+            AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V31_STREAM_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$PWD/evidence/FROZEN_SWAP_UI.json" \
+            SDL_AUDIODRIVER=dummy \
+            python - "$PWD/sandbox/private31/AnythingPlays31.app/Contents/MacOS/AnythingPlays" <<'PY'
+          import subprocess,os,sys
+          task=subprocess.run([sys.argv[1],'--ap-v30-ui-smoke'],
+                env=os.environ.copy(), timeout=120, capture_output=True, text=True)
+          print('Mac disposable final GUI exited:',task.returncode)
+          if task.returncode:
+              print(task.stderr[-3500:]);print(task.stdout[-1600:]);raise SystemExit(1)
+          PY
+      - name: Verify frozen two-screen session really ran and remained unapproved
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          smoke=json.loads(Path('evidence/FROZEN_SWAP_UI.json').read_text('utf-8'))
+          proof=json.loads(Path('evidence/CAMERA_ONLY_SWAP_UNAPPROVED.json').read_text('utf-8'))
+          assert proof['target']=='${{ matrix.target }}'
+          assert proof['public_release_approved'] is False
+          assert proof['redistribution_approved'] is False
+          assert proof['removed_library_count'] >= 1
+          expected={
+            'passed':True,'actual_tk_window_started':True,
+            'actual_tk_mainloop_ran':True,
+            'frozen_binary':True,'console_profile_count':18,
+            'stream_output_window_opened':True,
+            'stream_settings_separate':True,
+            'stream_camera_reference_rendered':True,
+            'stream_closed_cleanly':True,
+            'camera_hardware_tested':False,
+            'gameplay_hardware_tested':False,
+            'public_distribution_approved':False,
+          }
+          for field,value in expected.items():
+              assert smoke.get(field)==value,(field,smoke.get(field))
+          print('Disposably modified true frozen 3.1.0 Stream Mode PASSED; license and hardware are still OPEN')
+          PY
+      - name: Preserve results only, not modified binaries or ROMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-${{ matrix.target }}-V2-CAMERA-ONLY-OPENCV-TK-GUI-UNAPPROVED
+          path: |
+            evidence/CAMERA_ONLY_SWAP_UNAPPROVED.json
+            evidence/FROZEN_SWAP_UI.json
+          retention-days: 30
+          if-no-files-found: warn
