@@ -5,6 +5,42 @@ Keep this file factual and current. This project has experienced interrupted
 conversations and expensive duplicated native builds. Always inspect actual
 GitHub Actions results before reporting a new pass or publishing an installer.
 
+## Latest verified technical state — fresh clean 3.1.0 installers
+
+**TWO complete, genuine source-built FFmpeg-disabled 3.1.0 installers passed
+native full 18-console assembly and installed Tk/DS Stream Mode QA:**
+
+- **Linux x64:** [PR #212](https://github.com/MasynNay/anything-plays/pull/212)
+  MERGED, [Actions 43136053895](https://github.com/MasynNay/anything-plays/actions/runs/43136053895)
+  PASS. Private `AnythingPlays-3.1.0-LINUX-FULL-18-CAMERA-ONLY-NEW-BUILD-QA-PRIVATE`.
+- **macOS Apple Silicon:** [PR #215](https://github.com/MasynNay/anything-plays/pull/215)
+  MERGED, [Actions 43138729334](https://github.com/MasynNay/anything-plays/actions/runs/43138729334)
+  PASS. Private `AnythingPlays-3.1.0-MACOS-ARM64-FULL-18-CAMERA-ONLY-NEW-DMG-PRIVATE-QA`.
+  This used the genuinely newly source-built Apple Silicon wheel from
+  [PR #213](https://github.com/MasynNay/anything-plays/pull/213), with FFmpeg/AVIF off,
+  AVFoundation camera backend proven, and verified the real ad-hoc signed/mounted
+  full 18-console GUI, Stream Mode and isolated first-run preferences.
+
+**Still active, DO NOT CLAIM PASSED until current job results confirm:**
+- **Windows:** [PR #214](https://github.com/MasynNay/anything-plays/pull/214);
+  original published 2.0 setup.py patch headers corrected in the workflow,
+  exact-head [run 43138596964](https://github.com/MasynNay/anything-plays/actions/runs/43138596964)
+  reached actual native FFmpeg-off DirectShow OpenCV compilation. At this
+  checkpoint native wheel **IN PROGRESS**; no new Windows full installer yet.
+- **Mac Intel:** [PR #213](https://github.com/MasynNay/anything-plays/pull/213);
+  [run 43137079614](https://github.com/MasynNay/anything-plays/actions/runs/43137079614)
+  had Apple Silicon wheel PASS but Intel source wheel compilation **IN PROGRESS**;
+  no new Intel Mac full installer yet.
+
+The **older four-platform stock-OpenCV seven-asset private draft** remains
+unchanged and should NOT be mixed with either new clean native binary/receipt.
+The historical public stable 3.0 and public 3.1 RC2 releases are unchanged.
+All clean native results are technical QA only. Real physical camera/gamepad,
+actual game saves/audio/endurance, corresponding source/third-party LGPL and
+codec/relinking legal review and final owner publication approval are OPEN.
+Formal release manifest still has just 2/6 gates supported. No public stable
+3.1.0 release has been verified.
+
 ## November 11/12 release engineering update — newer than the checkpoint below
 
 **Progress now actually completed and merged (do not rerun expensive work):**
