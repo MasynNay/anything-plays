@@ -6,7 +6,7 @@ Anything Plays lets a camera, tracked objects and manual inputs control classic 
 
 ## What's new
 
-**Stream Mode for creators.** Open a separate composed output window and customization window, with a default Nintendo DS-inspired top/bottom arrangement. Switch to side-by-side, swap game and camera placement, change proportions, select themes, bezel widths and colors, or resize the output without distorting game and camera images. OBS can capture the Stream Output window. OBS manages audio and recording; Anything Plays itself does not stream or record.
+**Stream Mode for creators.** Open it beside **View mode** or with **Ctrl+Shift+S**. A separate **Stream Output** window and **Stream Settings** window offer a Nintendo DS-inspired top/bottom default, or a side-by-side layout. Swap game and camera placement, change proportions, select any of 16 themes, adjust bezel widths/colors, choose 15, 24 or 30 FPS, and resize without distorting either image. In OBS, capture **Stream Output**, not **Stream Settings**. External emulators without an embedded frame source display a clear placeholder rather than simulated game video. OBS manages audio and recording; Anything Plays itself does not stream or record.
 
 **Polished camera and emulator presentation.** Matching, theme-aware display bezels distinguish camera tracking from game output, using status indicators driven by real camera/emulator state instead of decorative fake activity.
 
@@ -40,5 +40,7 @@ The release draft must also contain `FINAL_QA_MANIFEST.json`, `SHA256SUMS.txt` a
 - The macOS applications are ad-hoc signed and are **not Apple-notarized**. Windows packages are not necessarily publisher-signed.
 - The project's own source is MIT-licensed; included emulator cores, pygame-ce, SDL and transitive native dependencies retain their respective licenses. The exact application source is available at the commit linked above, with all eleven original emulator sources and notices in [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). The pygame/SDL upstream source candidates and technical replacement tests are documented in [the source companion](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SOURCE_COMPANION.md). **Complete native corresponding-source, replacement/relinking and redistribution review has not been finished.** This draft does not constitute legal approval.
 - Before pressing Publish, complete the outstanding release acceptance checks and independently inspect the compiled-binary and source-notice evidence. Until then, the existing public [RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) remains the available 3.1 prerelease and [3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) remains stable.
+
+Before any publication, follow the [exact release runbook](V3_1_PUBLICATION_RUNBOOK.md), verify the draft's seven assets and original matching source, and finish the remaining [native distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md).
 
 **Status: Private GitHub draft only. Do not publish, edit existing public releases, or treat checksums as a replacement for redistribution obligations.**
