@@ -91,6 +91,10 @@ def verify(target, installer, bundle, expected_source_sha, *, checkout=None):
         ).strip()
         if (package, version) != ("anything-plays-311-candidate", "3.1.1~qa1"):
             raise ValueError("Wrong Linux package/version metadata")
+    elif target == "windows-x64":
+        with installer.open("rb") as handle:
+            if handle.read(2) != b"MZ":
+                raise ValueError("Windows 3.1.1 source installer lacks a PE signature")
     return {
         "schema_version": 1,
         "status": STATUS,
