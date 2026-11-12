@@ -84,19 +84,46 @@ def mount(dmg, location):
     try:
         yield location
     finally:
-        # The hosted macOS DiskImages service can briefly hold the verified
-        # mount. Do not pretend a failed detach is a successful QA check.
-        # Retry only this temporary CI volume, never an actual user disk.
-        for attempt in range(8):
-            detached = subprocess.run(
-                ["hdiutil", "detach", str(location)],
-                capture_output=True, text=True,
-            )
-            if detached.returncode == 0:
-                break
+        # DiskImages may asynchronously detach a hosted CI volume while
+        # shutil/verification finishes. A subsequent hdiutil detach then
+        # returns "No such file or directory". That is NOT an unmount failure
+        # if the actual temporary mount point is no longer mounted. Never
+        # hide a real failure while a volume is still attached.
+        _detach_owned_ci_mount(location)
+
+
+def _detach_owned_ci_mount(location, *, attempts=8):
+    """Detach only our temporary mount, fail closed if still mounted.
+
+    macOS DiskImages often races with hosted-runner cleanup. Check the
+    kernel's actual mount state after a failed detach, not stderr wording.
+    Unknown failures with a still-mounted volume remain fatal.
+    """
+    location = Path(location)
+    if attempts < 1 or attempts > 8:
+        raise ValueError("Bounded CI mount detach retries only")
+    for attempt in range(attempts):
+        if not os.path.ismount(location):
+            return
+        detached = subprocess.run(
+            ["hdiutil", "detach", str(location)],
+            capture_output=True, text=True, timeout=45,
+        )
+        if not os.path.ismount(location):
+            return
+        if attempt < attempts - 1:
             time.sleep(min(2 * (attempt + 1), 10))
-        else:
-            command("hdiutil", "detach", "-force", location)
+    # A genuinely mounted volume can remain busy after standard detach.
+    # Force ONLY our own transient build directory, never a user volume.
+    forced = subprocess.run(
+        ["hdiutil", "detach", "-force", str(location)],
+        capture_output=True, text=True, timeout=45,
+    )
+    if os.path.ismount(location):
+        raise RuntimeError(
+            "Temporary CI DMG remains mounted after forced detach; "
+            + (forced.stderr or forced.stdout or "")[-600:]
+        )
 
 
 def verify_inputs(arch, stable, preview, checksums, receipt, rc1=False, *, rc2=False,
