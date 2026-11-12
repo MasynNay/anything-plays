@@ -2,6 +2,7 @@ name: 3.1 | Authenticate private release draft with main write token
 
 # Read-only check of actual owner-only v3.1.0 draft with a main-branch
 # contents:write token. Does not upload/delete/edit tags, assets or releases.
+# Re-checked on main to verify owner-only draft API access before any publication.
 on:
   push:
     branches: [main]
