@@ -9,6 +9,8 @@ on:
     paths:
       - '.github/workflows/v311-sustained-session-qa.yml'
       - 'tests/test_v311_session_endurance.py'
+      - 'tests/test_v311_soak_health.py'
+      - 'anything_plays/soak_health.py'
       - 'tests/soak_gui.py'
       - 'anything_plays/gamepad.py'
       - 'anything_plays/libretro_input.py'
@@ -51,6 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v311_session_endurance.py' -v
+          python -m unittest discover -s tests -p 'test_v311_soak_health.py' -v
           python -m unittest discover -s tests -p 'test_save_ram.py' -v
           echo "Synthetic 1,800-second virtual time passed on ${{ matrix.target }}; not real 30-minute or device testing."
 
@@ -95,6 +98,8 @@ jobs:
           result=json.loads(Path("test-evidence/v311-tk-180s.json").read_text("utf-8"))
           assert result["passed"] is True, result["errors"]
           assert result["seconds_requested"] == 180
+          assert result["elapsed_real_seconds"] >= 179.0
+          assert result["tk_callback_exception_count"] == 0
           assert result["gamepad_sdl_polling_requested"] is True
           assert result["sdl_initialized_samples"] >= 2
           assert result["real_controller_hardware_tested"] is False
