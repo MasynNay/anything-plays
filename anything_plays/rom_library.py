@@ -23,7 +23,13 @@ def scan_rom_directory(folder, extensions, cancelled=None):
         return []
 
     directory = Path(folder)
-    if not directory.is_dir():
+    try:
+        # followlinks=False only protects os.walk's *descendants*: a selected
+        # symlinked root is still followed. Never scan outside the chosen
+        # actual ROM directory, including during removable-drive churn.
+        if directory.is_symlink() or not directory.is_dir():
+            return []
+    except OSError:
         return []
 
     supported = {suffix.lower() for suffix in extensions}
@@ -36,19 +42,37 @@ def scan_rom_directory(folder, extensions, cancelled=None):
                 return []
             if index > MAX_DIRECTORIES or len(games) >= MAX_GAMES:
                 break
-            folders[:] = sorted(
-                folder for folder in folders
-                if not folder.startswith(".")
-                and not (Path(root) / folder).is_symlink()
-            )
+            # A failing stat on ONE vanished/inaccessible directory must
+            # not abort scanning other healthy subdirectories. Avoid ever
+            # descending into an unknown or symlinked directory.
+            def safe_child_folder(folder):
+                if folder.startswith("."):
+                    return False
+                try:
+                    return not (Path(root) / folder).is_symlink()
+                except OSError:
+                    return False
+
+            folders[:] = sorted(folder for folder in folders
+                                if safe_child_folder(folder))
             for name in files:
                 if cancelled is not None and cancelled():
                     return []
                 path = Path(root) / name
-                if path.suffix.lower() in supported and path.is_file():
-                    games.append(path)
-                    if len(games) >= MAX_GAMES:
-                        break
+                if path.suffix.lower() not in supported:
+                    continue
+                try:
+                    # os.walk(followlinks=False) still lists symlinked files.
+                    # Do not present external private files as game ROMs.
+                    if path.is_symlink() or not path.is_file():
+                        continue
+                except OSError:
+                    # A single inaccessible/corrupt directory entry should
+                    # not hide the other valid games in the same library.
+                    continue
+                games.append(path)
+                if len(games) >= MAX_GAMES:
+                    break
     except OSError:
         # A removable or network volume can disappear mid-scan.
         pass
@@ -61,6 +85,11 @@ def find_cover_art(rom):
     for stem in (rom.stem, "cover", "folder"):
         for extension in COVER_EXTENSIONS:
             candidate = rom.parent / (stem + extension)
-            if candidate.is_file():
-                return candidate
+            try:
+                # Artwork loaders open the returned file later; never point
+                # one at an image outside the selected local ROM directory.
+                if not candidate.is_symlink() and candidate.is_file():
+                    return candidate
+            except OSError:
+                continue
     return None

@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
@@ -139,13 +140,26 @@ class SaveRAM:
         elif not destination.parent.is_dir():
             # Do not accidentally recreate an unplugged removable ROM mount.
             raise FileNotFoundError("The ROM directory is unavailable")
-        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        # Two independent app versions can open the same user ROM. A fixed
+        # <ROM>.sav.tmp path lets their writes overwrite each other and one
+        # process delete another process's in-flight snapshot. Use a private
+        # temporary file in the SAME directory for atomic rename semantics.
+        temporary = None
         try:
-            temporary.write_bytes(snapshot)
-            temporary.replace(destination)
+            with tempfile.NamedTemporaryFile(
+                mode="wb", prefix=destination.name + ".", suffix=".tmp",
+                dir=destination.parent, delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(snapshot)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, destination)
         finally:
-            # Failure cannot clobber the previous save or leave a partial tmp.
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
+            # A failed or interrupted save must leave the previous committed
+            # .sav untouched. Never unlink another writer's temporary file.
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass

@@ -1,0 +1,44 @@
+name: 3.1.1 | ROM shelf isolation across four operating systems
+
+# Unit tests use synthetic filenames/content in temporary directories.
+# No game ROMs or personal folders are accessed or uploaded; no release.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-rom-library-native-regression.yml'
+      - 'anything_plays/rom_library.py'
+      - 'tests/test_v311_rom_scan_isolation.py'
+      - 'tests/test_rom_library.py'
+
+permissions:
+  contents: read
+
+jobs:
+  safe-library-scan:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Safe ROM scan and cover art | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify original scans, symlink rejection and one-bad-folder recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v311_rom_scan_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_rom_library.py' -v
+          echo "Synthetic ROM filename traversal verified on ${{ matrix.target }}; no commercial games supplied."
