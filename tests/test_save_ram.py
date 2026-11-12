@@ -1,6 +1,7 @@
 """Saved game RAM stays beside the ROM and writes atomically."""
 
 import ctypes as C
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -65,12 +66,13 @@ class SaveRAMTests(unittest.TestCase):
                        return_value=root / "safe-saves"):
                 save = SaveRAM(rom, lambda n: C.addressof(memory), lambda n: 4)
                 old_tmp = save.path.with_suffix(".sav.tmp")
-                actual_write = Path.write_bytes
-                def block_legacy(path, data):
-                    if path == old_tmp:
+                original_open = tempfile.NamedTemporaryFile
+                def block_legacy(*args, **kwargs):
+                    if Path(kwargs["dir"]) == rom.parent:
                         raise PermissionError("Read-only game library")
-                    return actual_write(path, data)
-                with patch.object(Path, "write_bytes", block_legacy):
+                    return original_open(*args, **kwargs)
+                with patch("anything_plays.libretro_save.tempfile.NamedTemporaryFile",
+                           side_effect=block_legacy):
                     self.assertTrue(save.persist())
                 self.assertEqual(save.path, save.fallback_path)
                 self.assertEqual(save.path.read_bytes(), b"ABCD")
@@ -105,7 +107,8 @@ class SaveRAMTests(unittest.TestCase):
                 save.fallback_path.write_bytes(b"GOOD")
                 save.restore()
                 memory.raw = b"NEXT"
-                with patch.object(Path, "replace", side_effect=OSError("disk full")):
+                with patch("anything_plays.libretro_save.os.replace",
+                           side_effect=OSError("disk full")):
                     with self.assertRaisesRegex(OSError, "disk full"):
                         save.persist()
                 self.assertEqual(save.fallback_path.read_bytes(), b"GOOD")
@@ -118,14 +121,15 @@ class SaveRAMTests(unittest.TestCase):
             memory = C.create_string_buffer(b'ABCD', 4)
             save = SaveRAM(Path(tmp) / 'game.gba',
                            lambda kind: C.addressof(memory), lambda kind: 4)
-            actual_replace = Path.replace
+            actual_replace = os.replace
             replacements = []
 
             def count_replace(source, target):
                 replacements.append(target)
                 return actual_replace(source, target)
 
-            with patch.object(Path, 'replace', count_replace):
+            with patch("anything_plays.libretro_save.os.replace",
+                       side_effect=count_replace):
                 self.assertTrue(save.persist())
                 for _ in range(1000):
                     self.assertFalse(save.persist())
@@ -135,6 +139,54 @@ class SaveRAMTests(unittest.TestCase):
                 self.assertTrue(save.persist())
                 self.assertEqual(len(replacements), 2)
                 self.assertEqual(save.path.read_bytes(), b'WXYZ')
+
+    def test_unique_temporary_files_and_fsync_preserve_last_complete_save(self):
+        # Independent instances must not share a fixed .sav.tmp pathname.
+        with tempfile.TemporaryDirectory() as tmp:
+            memory = C.create_string_buffer(b"ONE!", 4)
+            save = SaveRAM(Path(tmp) / "game.gba",
+                           lambda kind: C.addressof(memory), lambda kind: 4)
+            actual_replace = os.replace
+            temp_names = []
+
+            def count_replace(source, target):
+                temp_names.append(Path(source).name)
+                self.assertEqual(Path(target), save.path)
+                self.assertEqual(Path(source).parent, save.path.parent)
+                return actual_replace(source, target)
+
+            with patch("anything_plays.libretro_save.os.replace",
+                       side_effect=count_replace), \\
+                 patch("anything_plays.libretro_save.os.fsync",
+                       wraps=os.fsync) as fsync:
+                self.assertTrue(save.persist())
+                memory.raw = b"TWO!"
+                self.assertTrue(save.persist())
+            self.assertEqual(save.path.read_bytes(), b"TWO!")
+            self.assertEqual(len(temp_names), 2)
+            self.assertNotEqual(temp_names[0], temp_names[1])
+            self.assertTrue(all(name.startswith("game.sav.")
+                                and name.endswith(".tmp")
+                                for name in temp_names))
+            self.assertEqual(fsync.call_count, 2)
+            self.assertEqual(list(Path(tmp).glob("*.tmp")), [])
+
+    def test_existing_fixed_tmp_symlink_is_never_followed(self):
+        if os.name == "nt":
+            self.skipTest("Symlink creation may require Windows developer mode")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            victim = root / "other-file"
+            victim.write_bytes(b"PRIVATE")
+            stale = root / "game.sav.tmp"
+            stale.symlink_to(victim)
+            memory = C.create_string_buffer(b"GOOD", 4)
+            save = SaveRAM(root / "game.gba",
+                           lambda kind: C.addressof(memory), lambda kind: 4)
+            self.assertTrue(save.persist())
+            self.assertEqual(victim.read_bytes(), b"PRIVATE")
+            self.assertTrue(stale.is_symlink())
+            self.assertEqual(save.path.read_bytes(), b"GOOD")
 
     def test_restore_does_not_rewrite_existing_save_without_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
