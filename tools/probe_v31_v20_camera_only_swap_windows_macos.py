@@ -35,9 +35,13 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
     env = os.environ if environ is None else environ
     if target not in TARGETS or source_sha != SOURCE_SHA:
         raise ValueError("Unrecognized source revision or target for private camera QA")
-    scratch = Path(scratch).resolve()
+    # Keep the original lexical sandbox spelling for the parent's symlink
+    # safety traversal. On macOS /var is a symlink to /private/var; resolving
+    # scratch alone before walking raw child paths mislabels the trusted
+    # runner's own temporary directory as an untrusted in-sandbox link.
+    scratch = Path(scratch).absolute()
     if (env.get("CI") != "true" or env.get("AP_V31_DISPOSABLE_QA") != "1"
-            or env.get("AP_V31_QA_SANDBOX") != str(scratch)):
+            or env.get("AP_V31_QA_SANDBOX") != str(scratch.resolve())):
         raise ValueError("Only isolated CI experiments are permitted")
     old_app = checked_scratch_path(old_app, scratch)
     new_app = checked_scratch_path(new_app, scratch)
