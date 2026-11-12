@@ -13,6 +13,8 @@ on:
       - 'tools/assemble_v311_full_linux.py'
       - 'tools/assemble_v311_full_windows.py'
       - 'tools/assemble_v311_full_macos.py'
+      - 'tools/v311_camera_source_gate.py'
+      - 'tests/test_v311_camera_source_gate.py'
       - 'tests/test_v311_private_qa_identity.py'
       - 'packaging/build_linux_deb.sh'
       - 'packaging/build_windows.bat'
@@ -70,6 +72,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
           python -m unittest discover -s tests -p 'test_v311_private_qa_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v311_camera_source_gate.py' -v
           python - <<'PY'
           from anything_plays.build_identity import make_identity
           value=make_identity('v311_candidate')
@@ -353,6 +356,7 @@ jobs:
             --qa 'sourceqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb' \
             --checksums stableqa/SHA256SUMS.txt \
             --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
             --expected-source-sha "$QA_SOURCE_SHA" --output fullqa
           python - <<'PY'
           import json,os
@@ -439,6 +443,7 @@ jobs:
             --qa sourceqa/AnythingPlaysSetup-3.1.1-qa1.exe \
             --checksums stableqa/SHA256SUMS.txt \
             --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
             --expected-source-sha "$QA_SOURCE_SHA" \
             --output fullqa
           python - <<'PY'
@@ -532,6 +537,7 @@ jobs:
             --qa 'sourceqa/AnythingPlays-3.1.1-qa1-macos-${{ matrix.arch }}.dmg' \
             --checksums stableqa/SHA256SUMS.txt \
             --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
             --expected-source-sha "$QA_SOURCE_SHA" \
             --output fullqa
           python - <<'PY'
