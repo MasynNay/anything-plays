@@ -90,7 +90,7 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
                     self.assertTrue(location.is_dir())
                     raise ValueError("intentional body failure")
             attach.assert_called_once()
-            self.assertEqual(attach.call_args.args[0][:2],
+            self.assertEqual(attach.call_args.args[:2],
                              ("hdiutil", "attach"))
             detach.assert_called_once_with(location)
 
