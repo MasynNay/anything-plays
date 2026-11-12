@@ -38,6 +38,13 @@ jobs:
           repo="$GITHUB_REPOSITORY"
           test "$repo" = "MasynNay/anything-plays"
           test -n "$SOURCE_SHA"
+          # This cleanup run might have sat in a queue while the PR advanced.
+          # Never cancel a run from the LATEST commit using a stale event SHA.
+          live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+          if test "$live_sha" != "$SOURCE_SHA"; then
+            echo "This cleanup job is stale ($SOURCE_SHA vs $live_sha); leaving all workflow runs untouched."
+            exit 0
+          fi
           count=0
           # Re-fetch page one as cancellations remove queued entries.
           for pass in 1 2 3 4 5; do
@@ -54,6 +61,11 @@ jobs:
                   and r['status'] in ('queued','pending')):
                   print(r['id'])
           PY
+            live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+            if test "$live_sha" != "$SOURCE_SHA"; then
+              echo "PR advanced during queue cleanup; stop without canceling anything further."
+              exit 0
+            fi
             if test ! -s stale-ids.txt; then
               echo "No further stale queued runs found"
               break
@@ -83,6 +95,11 @@ jobs:
                   and r['status']=='in_progress'):
                   print(r['id'])
           PY
+          live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+          if test "$live_sha" != "$SOURCE_SHA"; then
+            echo "PR head changed; do not cancel any currently running jobs."
+            exit 0
+          fi
           while IFS= read -r run; do
             test -n "$run" || continue
             if gh api -X POST "repos/$repo/actions/runs/$run/cancel" >/dev/null 2>&1; then
