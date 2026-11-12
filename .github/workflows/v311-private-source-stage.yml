@@ -1,0 +1,145 @@
+name: 3.1.1 | Four source-built PRIVATE native QA installers
+
+# First real, version-correct 3.1.1 packaging stage.
+# mGBA-only and NOT releasable: no full 18-console original-core assembly,
+# physical hardware acceptance, LGPL clearance or public publication here.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-private-source-stage.yml'
+      - 'anything_plays/build_identity.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v311_source_stage.py'
+      - 'tests/test_v311_private_qa_identity.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v311-private-build-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  actual-311-source-build:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Real 3.1.1 source-built installer | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-311-candidate_3.1.1~qa1_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.1-qa1.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.1-qa1-macos-arm64.dmg', bundle: 'dist/AnythingPlays311QA.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.1-qa1-macos-x64.dmg', bundle: 'dist/AnythingPlays311QA.app'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    env:
+      AP_V311_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_FINAL_CANDIDATE: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify 3.1.1 source checkout and fail-closed candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v311_private_qa_identity.py' -v
+          python - <<'PY'
+          from anything_plays.build_identity import make_identity
+          value=make_identity('v311_candidate')
+          assert value['version']=='3.1.1'
+          assert value['public_release_approved'] is False
+          assert value['settings_namespace']!='anything-plays-31'
+          print('QA source and version distinct from public stable 3.1.0')
+          PY
+      - name: Restore official Ubuntu mirror if GitHub-hosted mirror fails
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+      - name: Install native Linux build and Tk dependencies with retries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+              -o Acquire::http::Timeout=15 install -y --no-install-recommends \
+              python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1; break
+            fi
+            sleep "$((attempt * 20))"
+          done
+          test "$ok" = 1
+      - name: Install native Windows Inno installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+      - name: Freeze true-version Linux 3.1.1 QA app
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Freeze true-version Windows 3.1.1 QA app
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Freeze true-version Apple/Intel 3.1.1 QA app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Authenticate original package, native core, version and exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v311_source_stage \
+            --target '${{ matrix.target }}' \
+            --installer 'release/${{ matrix.installer }}' \
+            --bundle '${{ matrix.bundle }}' \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output release/V311_SOURCE_QA_RECEIPT.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('release/V311_SOURCE_QA_RECEIPT.json').read_text('utf-8'))
+          assert r['status']=='PRIVATE_3_1_1_MGBA_ONLY_SOURCE_SHELL_NOT_RELEASE'
+          assert r['source_revision']==os.environ['QA_SOURCE_SHA']
+          assert r['settings_namespace']=='anything-plays-311-candidate'
+          assert r['native_core_count']==1
+          assert r['full_18_console_installer'] is False
+          assert r['public_release_approved'] is False
+          print('Actual 3.1.1 source-built native artifact:',r['target'],r['sha256'])
+          PY
+      - name: Preserve private version-correct QA packages and original receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-${{ matrix.target }}-ONE-CORE-UNRELEASED
+          path: |
+            release/${{ matrix.installer }}
+            release/V311_SOURCE_QA_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
