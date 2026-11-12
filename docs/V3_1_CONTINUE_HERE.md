@@ -5,54 +5,69 @@ Keep this file factual and current. This project has experienced interrupted
 conversations and expensive duplicated native builds. Always inspect actual
 GitHub Actions results before reporting a new pass or publishing an installer.
 
-## Latest verified technical state — fresh clean 3.1.0 installers
+## Latest verified technical state — unified source-built clean four-platform candidate
 
-**TWO complete, genuine source-built FFmpeg-disabled 3.1.0 installers passed
-native full 18-console assembly and installed Tk/DS Stream Mode QA:**
+**CURRENT, November 11/12 2026 UTC. DO NOT REBUILD THIS COMPLETED FOUR-OS QA.**
 
-- **Linux x64:** [PR #212](https://github.com/MasynNay/anything-plays/pull/212)
-  MERGED, [Actions 43136053895](https://github.com/MasynNay/anything-plays/actions/runs/43136053895)
-  PASS. Private `AnythingPlays-3.1.0-LINUX-FULL-18-CAMERA-ONLY-NEW-BUILD-QA-PRIVATE`.
-- **macOS Apple Silicon:** [PR #215](https://github.com/MasynNay/anything-plays/pull/215)
-  MERGED, [Actions 43138729334](https://github.com/MasynNay/anything-plays/actions/runs/43138729334)
-  PASS. Private `AnythingPlays-3.1.0-MACOS-ARM64-FULL-18-CAMERA-ONLY-NEW-DMG-PRIVATE-QA`.
-  This used the genuinely newly source-built Apple Silicon wheel from
-  [PR #213](https://github.com/MasynNay/anything-plays/pull/213), with FFmpeg/AVIF off,
-  AVFoundation camera backend proven, and verified the real ad-hoc signed/mounted
-  full 18-console GUI, Stream Mode and isolated first-run preferences.
+- [PR #219](https://github.com/MasynNay/anything-plays/pull/219) **MERGED**
+  (main squash commit `b1f63f1b60c33e4c126f27d146ab14b92ec28179`).
+  Its exact source PR head was
+  `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`.
+- [Four-platform clean source-built full FINAL Actions run 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755)
+  **PASS ALL THIRTEEN REQUIRED NATIVE JOBS**: actual version-correct frozen
+  source stages 4/4, eleven original-source core families plus all
+  18 console profiles in full Windows/Linux/ARM/Intel installers 4/4,
+  independent installed Tk/Stream Mode settings contract 1/1, and
+  real installed frozen GUI/DS Stream Mode and RC2 migration on all
+  four native hosts 4/4. All these four installers are from the SAME
+  original source SHA above.
+- Every platform used independently SOURCE-BUILT `opencv-python-headless
+  4.14.0.94` wheels from original pinned source SHA256
+  `4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577`,
+  FFmpeg disabled, native V4L2/DirectShow/AVFoundation camera backends
+  present and Mac AVIF disabled. Exact native source wheel builds:
+  [Linux 43133383864](https://github.com/MasynNay/anything-plays/actions/runs/43133383864),
+  [Windows 43138596964](https://github.com/MasynNay/anything-plays/actions/runs/43138596964),
+  [both Macs 43137079614](https://github.com/MasynNay/anything-plays/actions/runs/43137079614).
+  This is COMPILE-TIME native camera capability, not real webcam hardware testing.
+- A **new private seven-asset full installer review bundle** was created
+  successfully at [staging run 43141406341](https://github.com/MasynNay/anything-plays/actions/runs/43141406341),
+  artifact `AnythingPlays-3.1.0-FINAL-FOUR-FULL-INSTALLERS-PRIVATE-REVIEW`.
+  It includes exact four unified clean installer bytes, SHA256SUMS,
+  FINAL_QA_MANIFEST.json and source access notes. This is a GitHub Actions
+  private artifact, **NOT yet attached to the previously created GitHub
+  Release draft**. Its 30-day retention must be checked before use.
+- [PR #220](https://github.com/MasynNay/anything-plays/pull/220)
+  is under CI (source checks run 43141494554): adds an explicit four-platform
+  original source-built OpenCV wheel digest, native source run and
+  provenance section to the private staging manifest, preserving the exact
+  same seven-asset format. It must not be called merged until actual checks
+  complete. Current stage above was produced with PRE-#220 main staging
+  code, so it **does not yet carry the four explicit wheel digest entries**.
+- [PR #216](https://github.com/MasynNay/anything-plays/pull/216) **MERGED**,
+  [exact new Linux/ARM native notice scan 43141091687](https://github.com/MasynNay/anything-plays/actions/runs/43141091687)
+  successful; technical inventories cannot approve library license terms.
+- Independent genuine full CLEAN installers all passed and were MERGED:
+  [Linux #212 / 43136053895](https://github.com/MasynNay/anything-plays/actions/runs/43136053895);
+  [Windows #218 / 43140465834](https://github.com/MasynNay/anything-plays/actions/runs/43140465834);
+  [Apple Silicon #215 / 43138729334](https://github.com/MasynNay/anything-plays/actions/runs/43138729334);
+  [Intel Mac #217 / 43140319401](https://github.com/MasynNay/anything-plays/actions/runs/43140319401).
+  These are useful separate native fallback evidence but contain different
+  PR source hashes. Prefer the unified run 43140637755 for release review.
 
-**Next-platform full package workflows are safely staged as branches, but NOT yet
-verified or released:** `qa/v31-windows-full-clean-opencv-exe` contains
-`.github/workflows/v31-windows-full-source-opencv-qa.yml`; and
-`qa/v31-macos-intel-full-clean-opencv-dmg` contains
-`.github/workflows/v31-macos-intel-full-source-opencv-qa.yml`. Both are
-prepared to consume independent pinned native source-built wheels, reassemble
-11 original-source cores/18 console profiles, inspect the real finished
-EXE/DMG and run installed frozen Tk/Stream Mode plus settings-isolation checks.
-Do **not** create their PRs before the supplier wheel runs below pass and
-retain their original artifacts; absent source-wheel evidence is a hard
-stop. Windows workflow passes native Windows paths into the CMD builder.
-These two staged source branches are *not* successful installer QA yet.
-
-**Still active, DO NOT CLAIM PASSED until current job results confirm:**
-- **Windows:** [PR #214](https://github.com/MasynNay/anything-plays/pull/214);
-  original published 2.0 setup.py patch headers corrected in the workflow,
-  exact-head [run 43138596964](https://github.com/MasynNay/anything-plays/actions/runs/43138596964)
-  reached actual native FFmpeg-off DirectShow OpenCV compilation. At this
-  checkpoint native wheel **IN PROGRESS**; no new Windows full installer yet.
-- **Mac Intel:** [PR #213](https://github.com/MasynNay/anything-plays/pull/213);
-  [run 43137079614](https://github.com/MasynNay/anything-plays/actions/runs/43137079614)
-  had Apple Silicon wheel PASS but Intel source wheel compilation **IN PROGRESS**;
-  no new Intel Mac full installer yet.
-
-The **older four-platform stock-OpenCV seven-asset private draft** remains
-unchanged and should NOT be mixed with either new clean native binary/receipt.
-The historical public stable 3.0 and public 3.1 RC2 releases are unchanged.
-All clean native results are technical QA only. Real physical camera/gamepad,
-actual game saves/audio/endurance, corresponding source/third-party LGPL and
-codec/relinking legal review and final owner publication approval are OPEN.
-Formal release manifest still has just 2/6 gates supported. No public stable
-3.1.0 release has been verified.
+**PUBLIC RELEASE STILL BLOCKED:** stable `v3.1.0` GitHub Release draft
+ID `442346875` remains `draft=true` with **OLD stock-OpenCV QA installers**.
+Do **not** mix old draft checksums/source receipt with the new clean binaries.
+The actual published stable is v3.0.0; RC2 is still public. Formal
+`config/v3.1-release-readiness.json` retains just 2/6 verified gates and
+`public_release_approved=false`. Missing requirements:
+physical controller/camera/gameplay/OBS/saves/endurance acceptance,
+independent per-native pygame/SDL/other LGPL/source/notice/relinking
+redistribution review, corresponding source availability and final
+owner publication/rollout approval. No synthetic QA substitutes for these.
+Only after genuine release review and permission, stage/publish the newly
+reviewed exact four installers with matching legal source companion and
+SHA-256 checksums. Preserve 1.5, 2.0, 3.0 and public RC2.
 
 ## November 11/12 release engineering update — newer than the checkpoint below
 
