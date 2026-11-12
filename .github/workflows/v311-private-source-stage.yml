@@ -10,6 +10,7 @@ on:
       - 'anything_plays/build_identity.py'
       - 'tools/write_v31_identity.py'
       - 'tools/verify_v311_source_stage.py'
+      - 'tools/assemble_v311_full_linux.py'
       - 'tests/test_v311_private_qa_identity.py'
       - 'packaging/build_linux_deb.sh'
       - 'packaging/build_windows.bat'
@@ -140,6 +141,100 @@ jobs:
           path: |
             release/${{ matrix.installer }}
             release/V311_SOURCE_QA_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-linux-18:
+    # Assemble and inspect a true 18-console 3.1.1 Linux app using the
+    # PUBLIC, SHA-pinned 3.1.0 original source cores. Other OSes must
+    # independently pass their own full-core assembly before release.
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Linux 18-console source-core QA | not release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_310_SHA: e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install read-only Linux native core validation runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y \
+            --no-install-recommends dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Download exact same-run 3.1.1 source-built Linux installer
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-linux-x64-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Authenticate actual public 3.1.0 Linux core baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > baseline-release.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('baseline-release.json').read_text('utf-8'))
+          assert r['draft'] is False and r['prerelease'] is False
+          assert r['tag_name']=='v3.1.0'
+          assert r['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(r['assets'])==8
+          old=[a for a in r['assets']
+               if a['name']=='anything-plays-31_3.1.0_amd64.deb']
+          assert len(old)==1 and old[0]['digest']=='sha256:'+os.environ['EXPECTED_310_SHA']
+          print('Using exact published old stable core baseline, not guessed release files.')
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'anything-plays-31_3.1.0_amd64.deb' \
+            --pattern SHA256SUMS.txt --dir stableqa
+          echo "$EXPECTED_310_SHA  stableqa/anything-plays-31_3.1.0_amd64.deb" | sha256sum -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Assemble authentic 3.1.1 full 18-console Linux test installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_linux \
+            --stable stableqa/anything-plays-31_3.1.0_amd64.deb \
+            --qa 'sourceqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb' \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --expected-source-sha "$QA_SOURCE_SHA" --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads(Path('fullqa/V311_FULL_LINUX_QA_RECEIPT.json').read_text())
+          assert report['status']=='PRIVATE_3_1_1_FULL_18_LINUX_QA_NOT_APPROVED'
+          assert report['app_source_sha']==os.environ['QA_SOURCE_SHA']
+          assert report['native_core_count']==11 and report['console_profiles']==18
+          assert report['public_release_approved'] is False
+          assert report['full_four_platform_311_verified'] is False
+          print('3.1.1 Linux private full-18 native QA:',report['installer_sha256'])
+          PY
+      - name: Preserve full native test installer and original source provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-LINUX-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb
+            fullqa/V311_FULL_LINUX_QA_RECEIPT.json
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
