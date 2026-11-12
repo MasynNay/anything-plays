@@ -1,0 +1,59 @@
+name: 3.1.1 | Save RAM atomic-write regression (four native OSes)
+
+# No ROM content is needed or uploaded: synthetic four-byte SRAM buffers
+# exercise unique same-directory temporary files, fsync and atomic replace.
+# Never build or publish an installer/release.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-save-atomic-four-platform-qa.yml'
+      - 'anything_plays/libretro_save.py'
+      - 'tests/test_save_ram.py'
+
+permissions:
+  contents: read
+
+jobs:
+  native-save-durability:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Atomic SRAM snapshots | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify saved RAM durability with actual OS filesystem calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_save_ram.py' -v
+          python - <<'PY'
+          import os, platform, tempfile
+          from pathlib import Path
+          print("Actual filesystem:",platform.platform())
+          with tempfile.TemporaryDirectory() as root:
+              path=Path(root)/"game.sav"
+              path.write_bytes(b"old")
+              for data in (b"new",b"final"):
+                  with tempfile.NamedTemporaryFile(mode="wb",prefix=path.name+".",suffix=".tmp",dir=root,delete=False) as f:
+                      temp=Path(f.name)
+                      f.write(data)
+                      f.flush()
+                      os.fsync(f.fileno())
+                  os.replace(temp,path)
+              assert path.read_bytes()==b"final"
+          print("File replacement and persistence syscalls verified; real game ROM/save not used.")
+          PY
