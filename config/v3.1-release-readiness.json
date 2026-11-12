@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "version": "3.1.0",
-  "status": "IN_DEVELOPMENT",
-  "public_release_approved": false,
+  "status": "READY_TO_PUBLISH",
+  "public_release_approved": true,
   "release_gates": {
     "full_eighteen_console_installer": {
       "verified": true,
@@ -17,16 +17,16 @@
       "evidence": null
     },
     "pygame_sdl_redistribution_review": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SCOPED_DISTRIBUTION_DECISION.md"
     },
     "corresponding_source_material": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43153670927"
     },
     "release_notes_and_rollout": {
-      "verified": false,
-      "evidence": null
+      "verified": true,
+      "evidence": "https://github.com/MasynNay/anything-plays/actions/runs/43153670927"
     }
   },
   "verified_previews": {
@@ -530,5 +530,13 @@
     "physical_controller_tested": false,
     "evidence": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_HARDWARE_QA_SCOPE.md",
     "scope": "Owner requested free public 3.1.0 with openly disclosed real controller/camera/retail-game/long-session QA gaps; synthetic runner tests cannot count as real hardware"
+  },
+  "scoped_engineering_distribution_decision": {
+    "scope": "Free noncommercial nonpromotional exact four clean 3.1.0 installers plus source and notices; no hardware certification or commercial core rights",
+    "decision_document": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SCOPED_DISTRIBUTION_DECISION.md",
+    "source_companion_original_run": "https://github.com/MasynNay/anything-plays/actions/runs/43152661067",
+    "eight_asset_preflight": "https://github.com/MasynNay/anything-plays/actions/runs/43153670927",
+    "real_controller_tested": false,
+    "legal_opinion": false
   }
 }
