@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "version": "3.1.0",
-  "status": "READY_TO_PUBLISH",
+  "status": "PUBLISHED",
   "public_release_approved": true,
   "release_gates": {
     "full_eighteen_console_installer": {
@@ -538,5 +538,58 @@
     "eight_asset_preflight": "https://github.com/MasynNay/anything-plays/actions/runs/43153670927",
     "real_controller_tested": false,
     "legal_opinion": false
+  },
+  "published_stable_release": {
+    "published": true,
+    "version": "3.1.0",
+    "release_url": "https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0",
+    "release_id": 442346875,
+    "published_at": "2026-11-12T04:25:51Z",
+    "immutable_tested_application_source": "104b96621ec4cb8dc39fde8c3fe96fc854c406ed",
+    "assets": [
+      {
+        "filename": "anything-plays-31_3.1.0_amd64.deb",
+        "sha256": "sha256:e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e",
+        "size_bytes": 95560922
+      },
+      {
+        "filename": "AnythingPlays-3.1.0-macos-arm64.dmg",
+        "sha256": "sha256:ddec3be8356e0b1729ff0a4131bc362128739fe39a1cdc48dfd83921feb8e49a",
+        "size_bytes": 93150216
+      },
+      {
+        "filename": "AnythingPlays-3.1.0-macos-x64.dmg",
+        "sha256": "sha256:ed7dd44e457b1a6c5458f7f6dce54089c98401418c1cc02d145e36f68494bae9",
+        "size_bytes": 102110205
+      },
+      {
+        "filename": "AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip",
+        "sha256": "sha256:469b75685b385a7992f018d04bc4ddb1ffa06b061b6471cf50ae4fcda6e746d8",
+        "size_bytes": 43626444
+      },
+      {
+        "filename": "AnythingPlaysSetup-3.1.0.exe",
+        "sha256": "sha256:574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0",
+        "size_bytes": 69916109
+      },
+      {
+        "filename": "FINAL_QA_MANIFEST.json",
+        "sha256": "sha256:8d387e9d341b841c6705a2ad6de0cc457a92bb3b8cc72076b7f65a79abaacbdc",
+        "size_bytes": 3226
+      },
+      {
+        "filename": "FINAL_SOURCE_ACCESS_REVIEW.md",
+        "sha256": "sha256:8998e9a606e30b90b852319355b7527329f10d8c9045abac77cc657b15f78c4f",
+        "size_bytes": 2374
+      },
+      {
+        "filename": "SHA256SUMS.txt",
+        "sha256": "sha256:017f55c988353572ddc3630f4b3505c48945cb4007a96b5656b4444b84fb3f19",
+        "size_bytes": 706
+      }
+    ],
+    "original_eight_asset_release_job": "https://github.com/MasynNay/anything-plays/actions/runs/43154682911",
+    "physical_controller_verified": false,
+    "hardware_limitations": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_HARDWARE_QA_SCOPE.md"
   }
 }
