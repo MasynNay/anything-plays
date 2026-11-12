@@ -27,6 +27,12 @@ The exact application source revision for these packages is [`104b96621ec4cb8dc3
 
 Each candidate uses an independently built camera-only OpenCV wheel with FFmpeg disabled. See [the exact OpenCV source archive, compile flags, Windows patch and reproduction instructions](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md). Emulator source archives and notices are in the [3.0 source companion](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Other license-covered native libraries retain their own copyright and source obligations as documented in the published corresponding-source materials.
 
+## Distribution and third-party source licenses
+
+This complete emulator-bundled installer is offered **free for noncommercial use**, with no paid promotion, subscription, donations or bundled game ROMs/BIOS files. The program's original code is MIT-licensed, while the included Snes9x emulator uses a separate noncommercial license. The shipped pygame-ce controller runtime is LGPL 2.1 or later; its packaged SDL2 2.x components use zlib-style licensing, and its `libmpg123` audio dependency is also LGPL 2.1 where bundled. These libraries are **not** relicensed as MIT. See [the 3.0 versus 3.1 distribution changes](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_DISTRIBUTION_DELTA.md), [the pygame and SDL source companion](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SOURCE_COMPANION.md), and [the original mpg123 LGPL notice](https://github.com/MasynNay/anything-plays/blob/main/licenses/mpg123-LGPL-2.1-ORIGINAL.txt).
+
+The source and native package QA evidence does not prove real-game compatibility or connected physical devices. **No physical gamepad, live webcam, retail-ROM save/audio, or long-session acceptance is claimed for all four exact final installers.** [Exact hardware QA scope and user support policy](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_HARDWARE_QA_SCOPE.md).
+
 ## Installation and limitations
 
 This is a desktop application; a physical camera, gamepad and emulator compatibility depend on your hardware and operating system. Some external emulator views do not provide an embeddable game frame and display an explicit placeholder in Stream Mode. OBS handles recording and audio capture. On macOS the app is ad-hoc signed and not Apple-notarized; Windows binaries may not be publisher-signed.
