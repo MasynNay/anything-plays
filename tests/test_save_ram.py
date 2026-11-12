@@ -155,10 +155,12 @@ class SaveRAMTests(unittest.TestCase):
                 self.assertEqual(Path(source).parent, save.path.parent)
                 return actual_replace(source, target)
 
-            with patch("anything_plays.libretro_save.os.replace",
-                       side_effect=count_replace), \\
-                 patch("anything_plays.libretro_save.os.fsync",
-                       wraps=os.fsync) as fsync:
+            with (
+                patch("anything_plays.libretro_save.os.replace",
+                      side_effect=count_replace),
+                patch("anything_plays.libretro_save.os.fsync",
+                      wraps=os.fsync) as fsync,
+            ):
                 self.assertTrue(save.persist())
                 memory.raw = b"TWO!"
                 self.assertTrue(save.persist())
