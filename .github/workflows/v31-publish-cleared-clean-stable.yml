@@ -183,7 +183,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > draft.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/$EXISTING_DRAFT_ID" > draft.json
           python - <<'PY'
           import json,os
           from pathlib import Path
