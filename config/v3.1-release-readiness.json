@@ -476,7 +476,7 @@
   },
   "verified_final_candidate_qa": {
     "status": "PASSED_FOUR_PLATFORM_FULL_18_CONSOLE_AND_INSTALLED_FROZEN_GUI_QA_ONLY",
-    "run": "https://github.com/MasynNay/anything-plays/actions/runs/43140637755",
+    "run": "https://github.com/MasynNay/anything-plays/actions/runs/43120583726",
     "source_app_revision": "d852de9a513f83a329c14647ddc86bf3690fb5f5",
     "source_stages": 4,
     "full_installer_stages": 4,
