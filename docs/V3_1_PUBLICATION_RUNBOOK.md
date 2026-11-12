@@ -6,6 +6,35 @@ This is the release operator's ordered checklist. The goal is one genuine stable
 installers, the exact source and notices, integrity checks and a working
 portfolio link. This file does **not** approve third-party redistribution.
 
+## Current clean four-platform candidate supersedes the older stock-OpenCV draft
+
+The latest technical candidate is [the exact same-source 13/13 native QA
+run 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755):
+four source builds, four full eleven-core/18-profile installers, four actual
+installed desktop/DS Stream Mode checks and a settings/receipt contract.
+Its source SHA is `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`.
+Every native package used source-built, FFmpeg-disabled OpenCV, with its
+original upstream source SHA and platform-specific wheel fingerprint
+preserved as described in [OpenCV source reproduction and distribution
+materials](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
+
+A [new source-provenance-matched private bundle
+43142249044](https://github.com/MasynNay/anything-plays/actions/runs/43142249044)
+passed all four SHA256/installed-app/core/source-wheel receipt checks and
+retains the **new four installers** as
+`AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW`.
+This is an expiring private artifact, not a published release.
+The **existing owner-only seven-asset GitHub draft** ID `442346875`
+still contains the older **stock OpenCV** installer bytes and checksums.
+Do not upload a new candidate over it or publish that draft until the
+owner has completed independent licensing/source/relinking and physical
+device acceptance, confirmed matching source and notices, and reviewed
+the exact new checksums after any draft replacement.
+
+**The older 43120583726 evidence below applies to the historical
+stock-OpenCV private draft only.** It is preserved for provenance and
+must not be confused with the new clean source-built candidate.
+
 ## Verified technical inputs
 
 | Check | Exact evidence | State |
