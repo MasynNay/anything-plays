@@ -58,6 +58,24 @@ def blockers(report):
             failures.append(gate + ": missing explicit GitHub evidence")
     if report.get("public_release_approved") is not True:
         failures.append("owner has not approved this exact release")
+    else:
+        decision = report.get("release_decision")
+        expected = {
+            "scope": "FREE_NONCOMMERCIAL_NONPROMOTIONAL_NO_DONATIONS_NO_ADS",
+            "source_companion_name": "AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip",
+            "asset_count": 8,
+            "exact_approved_source_revision": "104b96621ec4cb8dc39fde8c3fe96fc854c406ed",
+            "owner_requested_publication": True,
+            "physical_controller_tested": False,
+            "legal_compliance_guaranteed": False,
+        }
+        if (not isinstance(decision, dict)
+                or any(type(decision.get(key)) is not type(val)
+                       or decision[key] != val for key, val in expected.items())
+                or not isinstance(decision.get("review"), str)
+                or not decision["review"].startswith(
+                    "https://github.com/MasynNay/anything-plays/")):
+            failures.append("approved release missing exact free-source scope and risk record")
     return tuple(failures)
 
 
