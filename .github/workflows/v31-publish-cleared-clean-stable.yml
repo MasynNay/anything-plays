@@ -162,7 +162,10 @@ jobs:
           import hashlib,json
           from pathlib import Path
           a=json.loads(Path("uploaded-assets.json").read_text("utf-8"))
-          local={p.name:"sha256:"+hashlib.sha256(p.read_bytes()).hexdigest()
+          def file_hash(p):
+            with p.open("rb") as handle:
+              return "sha256:"+hashlib.file_digest(handle, "sha256").hexdigest()
+          local={p.name:file_hash(p)
                  for p in Path("reviewed").iterdir() if p.is_file()}
           assert len(a)==len(local)==7
           assert {x["name"] for x in a}==set(local)
@@ -191,5 +194,15 @@ jobs:
           assert r["draft"] is False and r["prerelease"] is False
           assert len(r["assets"])==7
           assert r["tag_name"]=="v3.1.0"
+          assert r["target_commitish"]==os.environ["APP_SOURCE_SHA"], "Release source target mismatch"
           print("Public stable 3.1.0 verified:",r["html_url"])
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > final-tag.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          tag=json.loads(Path("final-tag.json").read_text("utf-8"))
+          assert tag["object"]["type"]=="commit", "Unexpected annotated or indirect tag"
+          assert tag["object"]["sha"]==os.environ["APP_SOURCE_SHA"], "Published tag not at exact tested source!"
+          print("Public v3.1.0 tag points to exact original tested source.")
           PY
