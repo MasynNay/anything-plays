@@ -6,36 +6,27 @@ from tools.check_v31_release import blockers, FILE, REQUIRED_GATES, PUBLICATION_
 
 
 class V31ReleaseGateTests(unittest.TestCase):
-    def test_public_3_1_is_explicitly_blocked_by_evidence_not_yet_available(self):
+    def test_scoped_public_3_1_release_decision_is_evidence_backed(self):
         report = json.loads(FILE.read_text("utf-8"))
-        self.assertEqual(report["status"], "IN_DEVELOPMENT")
-        self.assertIs(report["public_release_approved"], False)
+        self.assertEqual(report["status"], "APPROVED_PENDING_PUBLICATION")
+        self.assertIs(report["public_release_approved"], True)
         self.assertEqual(set(report["release_gates"]), set(REQUIRED_GATES))
-        # Two source-pinned full-installer gates passed real four-platform
-        # installed QA. Keep the unresolved hardware, source, rights and
-        # publication gates blocking rather than assuming all six are open.
-        verified = {
-            "full_eighteen_console_installer",
-            "four_platform_full_installer_verification",
-        }
-        still_open = set(REQUIRED_GATES) - verified
-        self.assertEqual(
-            set(blockers(report)),
-            (still_open - {ADVISORY_GATE}) | {"owner has not approved this exact release"},
-        )
-        for name in verified:
-            self.assertIs(report["release_gates"][name]["verified"], True)
-            self.assertTrue(report["release_gates"][name]["evidence"].startswith(
-                "https://github.com/MasynNay/anything-plays/actions/runs/"
-            ))
-            self.assertNotIn(name, blockers(report))
-        for name in still_open:
-            self.assertIs(report["release_gates"][name]["verified"], False)
-            if name in PUBLICATION_GATES:
-                self.assertIn(name, blockers(report))
-            else:
-                self.assertNotIn(name, blockers(report))
+        self.assertEqual(blockers(report), ())
+        for name in PUBLICATION_GATES:
+            with self.subTest(gate=name):
+                self.assertIs(report["release_gates"][name]["verified"], True)
+                self.assertTrue(report["release_gates"][name]["evidence"].startswith(
+                    "https://github.com/MasynNay/anything-plays/"
+                ))
+        self.assertIs(report["release_gates"][ADVISORY_GATE]["verified"], False)
         self.assertIs(report["hardware_acceptance_disclosure"]["physical_controller_tested"], False)
+        decision=report["release_decision"]
+        self.assertEqual(decision["scope"], "FREE_NONCOMMERCIAL_NONPROMOTIONAL_NO_DONATIONS_NO_ADS")
+        self.assertEqual(decision["asset_count"], 8)
+        self.assertEqual(decision["exact_approved_source_revision"],
+                         "104b96621ec4cb8dc39fde8c3fe96fc854c406ed")
+        self.assertIs(decision["legal_compliance_guaranteed"], False)
+        self.assertIs(decision["owner_requested_publication"], True)
 
     def test_missing_licensing_remains_blocking_even_when_hardware_disclosed(self):
         report = json.loads(FILE.read_text("utf-8"))
