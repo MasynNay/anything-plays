@@ -65,5 +65,29 @@ class PreservedManifestDuplicateKeysTest(unittest.TestCase):
             self.verify()
 
 
+    def test_nonfinite_json_constants_rejected_at_every_depth(self):
+        # Python's json.loads accepts these nonstandard constants by default.
+        raw = json.dumps(self.record)
+        first = json.dumps(self.rows[0])
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant=constant, location="top"):
+                self.write_raw(raw[:-1] + ', "extra": ' + constant + '}')
+                with self.assertRaisesRegex(ValueError, "Non-finite preserved native"):
+                    self.verify()
+            with self.subTest(constant=constant, location="row"):
+                tampered = first[:-1] + ', "extra": ' + constant + '}'
+                self.write_raw(raw.replace(first, tampered, 1))
+                with self.assertRaisesRegex(ValueError, "Non-finite preserved native"):
+                    self.verify()
+
+    def test_nonfinite_rejection_preserves_original_archive_bytes(self):
+        name = self.rows[0]["name"]
+        original = (self.root / name).read_bytes()
+        self.write_raw(json.dumps(self.record)[:-1] + ', "extra": NaN}')
+        with self.assertRaisesRegex(ValueError, "Non-finite preserved native"):
+            self.verify()
+        self.assertEqual((self.root / name).read_bytes(), original)
+
+
 if __name__ == "__main__":
     unittest.main()
