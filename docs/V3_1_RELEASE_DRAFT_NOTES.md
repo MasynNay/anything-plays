@@ -29,26 +29,19 @@ The release draft must also contain `FINAL_QA_MANIFEST.json`, `SHA256SUMS.txt` a
 
 ## Verification
 
-- [Exact-version four-platform build and installed desktop QA](https://github.com/MasynNay/anything-plays/actions/runs/43120583726) passed four native source apps, four original-core full installers and four installed frozen Tk desktop/Stream Mode smoke suites.
-- [Python 3.12/3.13 and native mGBA source checks](https://github.com/MasynNay/anything-plays/actions/runs/43120583722) passed.
-- [Private final binary provenance and SHA256 staging](https://github.com/MasynNay/anything-plays/actions/runs/43123263034) passed for the exact source SHA `d852de9a513f83a329c14647ddc86bf3690fb5f5`.
+- [Newest same-source four-platform native build and installed desktop QA](https://github.com/MasynNay/anything-plays/actions/runs/43140637755) passed all 13 jobs, with four complete 11-core, 18-console installers and installed Tk, Stream Mode and settings-isolation verification. All four were built from the same application revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`.
+- Each platform uses its own original-source-built OpenCV 4.14.0.94 camera-only wheel, with FFmpeg disabled and the applicable native camera backend retained; see the [exact source, build recipes, checksums and limitations](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
+- The [new private staged four-installer package](https://github.com/MasynNay/anything-plays/actions/runs/43142249044) rechecked SHA256, original source SHA, all four compiled wheel hashes and native installed GUI receipts. This candidate is **not** yet uploaded to the existing v3.1.0 GitHub Release draft. That older draft still contains stock-OpenCV binaries and must not be published as the new candidate.
 - Project owner confirmed that RC2 installed and launched on Linux and Stream Mode's two-screen presentation worked visually. **That was RC2, not a claim of real-world final-installer acceptance on every platform.**
 
 ## Known limitations and review before public publication
 
-- **Bundled OpenCV codec provenance requires review.** Byte-level
-  [four-platform verification](https://github.com/MasynNay/anything-plays/actions/runs/43131176213)
-  confirms that final 3.1.0 includes the *same* OpenCV files shipped in public
-  3.0, including FFmpeg components on Windows/Linux/Apple Silicon and
-  libx264/libx265 on Apple Silicon. These are **not newly introduced 3.1
-  binaries**, but the current private release still needs exact codec source,
-  applicable licenses and downstream distribution/replacement review.
-  [Evidence and remediation options](V3_1_OPENCV_EXACT_RUNTIME_REVIEW.md).
+- **Native dependency redistribution review remains open.** The new four-platform full installer candidate is built with SHA-pinned, FFmpeg-disabled native camera-only OpenCV wheels, unlike the older stock-OpenCV draft and the public stable 3.0 packages. Source reproduction is documented, but this does **not** resolve pygame-ce/SDL, transitive native library, source availability, required notices, user replacement/relinking or other redistribution conditions. Consult the [native distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md) and the [clean OpenCV source record](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
 - Automated installed-GUI tests cannot certify actual controller hardware, live camera tracking, retail-game compatibility, audio, saving or extended real-world sessions. These requirements remain outstanding.
 - The macOS applications are ad-hoc signed and are **not Apple-notarized**. Windows packages are not necessarily publisher-signed.
-- The project's own source is MIT-licensed; included emulator cores, pygame-ce, SDL and transitive native dependencies retain their respective licenses. The exact application source is available at the commit linked above, with all eleven original emulator sources and notices in [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). The pygame/SDL upstream source candidates and technical replacement tests are documented in [the source companion](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SOURCE_COMPANION.md). **Complete native corresponding-source, replacement/relinking and redistribution review has not been finished.** This draft does not constitute legal approval.
+- The project's own source is MIT-licensed; included emulator cores, pygame-ce, SDL and transitive native dependencies retain their respective licenses. The exact proposed application source is available at the source revision in Verification above, with all eleven original emulator sources and notices in [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). The pygame/SDL upstream source candidates and technical replacement tests are documented in [the source companion](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SOURCE_COMPANION.md). **Complete native corresponding-source, replacement/relinking and redistribution review has not been finished.** This draft does not constitute legal approval.
 - Before pressing Publish, complete the outstanding release acceptance checks and independently inspect the compiled-binary and source-notice evidence. Until then, the existing public [RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) remains the available 3.1 prerelease and [3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) remains stable.
 
-Before any publication, follow the [exact release runbook](V3_1_PUBLICATION_RUNBOOK.md), verify the draft's seven assets and original matching source, and finish the remaining [native distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md).
+Before publication, follow the [exact release runbook](V3_1_PUBLICATION_RUNBOOK.md), replace the **older** private draft with the newly verified four clean-source installers and matching receipts only after the remaining [native distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md) and physical acceptance are actually cleared. Verify all seven corresponding assets after any replacement.
 
-**Status: Private GitHub draft only. Do not publish, edit existing public releases, or treat checksums as a replacement for redistribution obligations.**
+**Status: Four source-verified new installers exist in private staging; the existing owner-only draft still contains older binaries. Stable 3.1.0 is not publicly published or approved for redistribution. Do not substitute checksum verification for licensing and real-device acceptance.**
