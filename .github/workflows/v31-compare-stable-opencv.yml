@@ -79,8 +79,6 @@ jobs:
                    if row.endswith("  "+stable.name)]
           assert len(matches)==1
           assert hashlib.sha256(stable.read_bytes()).hexdigest()==matches[0]
-          r=json.loads(Path("finalassets/${{ matrix.target }}".replace(
-              "/${{ matrix.target }}","/${{ matrix.target }}")).read_text()) if False else None
           from tools.v31_final_source import FULL_STATUS
           receipt_name={"linux-x64":"FULL_LIBRARY_QA_RECEIPT.json",
              "windows-x64":"FULL_WINDOWS_QA_RECEIPT.json",
