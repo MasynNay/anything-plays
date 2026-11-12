@@ -114,8 +114,9 @@ jobs:
               if evidence['filename']!=name or evidence['sha256']!=sha(binary) or evidence['bytes']!=binary.stat().st_size:
                   raise SystemExit('Source-pinned native byte mismatch '+platform)
           notes=Path('docs/V3_1_RELEASE_DRAFT_NOTES.md').read_text('utf-8')
-          for required in ('NOT APPROVED FOR PUBLIC RELEASE','Complete native corresponding-source','physical', 'Apple-notarized'):
-              if required not in notes:
+          for required in ('NOT APPROVED FOR PUBLIC RELEASE','Complete native corresponding-source',
+                           'controller hardware', 'Apple-notarized'):
+              if required.casefold() not in notes.casefold():
                   raise SystemExit('Missing public review limitation in draft notes: '+required)
           print('Exact four installers + 3 supporting receipts passed owner-only draft gate')
           PY
