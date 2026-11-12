@@ -1,0 +1,171 @@
+name: 3.1 | Audit new clean Linux and Apple Silicon installers plus native notices
+
+# Audit the *new* real FFmpeg-disabled 18-console full installers from their
+# exact completed private CI runs. Keep old GitHub Release draft untouched.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-clean-full-native-notice-audit.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-full-audit-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-native-absence-and-notices:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Genuine clean 18-console native library audit | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            qa_run: '43136053895'
+            artifact: AnythingPlays-3.1.0-LINUX-FULL-18-CAMERA-ONLY-NEW-BUILD-QA-PRIVATE
+            source_sha: 8e2a6c575a48d93d6ff2f87eb02d30eb87182e54
+            installer: anything-plays-31_3.1.0_amd64.deb
+            receipt: FULL_LIBRARY_QA_RECEIPT.json
+          - target: macos-arm64
+            runner: macos-15
+            qa_run: '43138729334'
+            artifact: AnythingPlays-3.1.0-MACOS-ARM64-FULL-18-CAMERA-ONLY-NEW-DMG-PRIVATE-QA
+            source_sha: b1bb6b9de4ce38c8c37d5ed434eba1f8d16ae039
+            installer: AnythingPlays-3.1.0-macos-arm64.dmg
+            receipt: FULL_MACOS_QA_RECEIPT.json
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ matrix.source_sha }}
+      QA_RUN: ${{ matrix.qa_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify native inventory never grants license/distribution permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_final_native_inventory.py' -v
+      - name: Verify both newly built clean package artifact sources are immutable and completed
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import os,json
+          from pathlib import Path
+          r=json.loads(Path('qa-run.json').read_text('utf-8'))
+          assert r['conclusion']=='success' and r['status']=='completed'
+          assert r['head_sha']==os.environ['SOURCE_SHA']
+          assert r['event']=='pull_request'
+          assert r['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          print("Original clean full-installer run approved for READ-ONLY inventory:",r['html_url'])
+          PY
+      - name: Fetch exact new source-built full native package only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package evidence
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name '${{ matrix.artifact }}' --dir package
+          # The real source-built QA workflows upload fullfinal/ plus
+          # proof/ and source-qa/ together. upload-artifact preserves their
+          # paths under the common repository root. Never assume --dir
+          # flattens a multi-directory artifact into package/.
+          test -s 'package/fullfinal/${{ matrix.installer }}'
+          test -s 'package/fullfinal/${{ matrix.receipt }}'
+          cp 'package/fullfinal/${{ matrix.installer }}' 'package/${{ matrix.installer }}'
+          cp 'package/fullfinal/${{ matrix.receipt }}' 'package/${{ matrix.receipt }}'
+          test -s 'package/${{ matrix.installer }}'
+          test -s 'package/${{ matrix.receipt }}'
+      - name: Extract exact clean Linux full installer without installing software on the host
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'package/${{ matrix.installer }}' installed
+          test -d installed/opt/anything-plays-31/licenses
+          python -m tools.inventory_v31_final_native \
+            --target '${{ matrix.target }}' \
+            --bundle installed/opt/anything-plays-31 \
+            --installer 'package/${{ matrix.installer }}' \
+            --receipt 'package/${{ matrix.receipt }}' \
+            --source-sha "$SOURCE_SHA" --output evidence/NEW_CLEAN_NATIVE_INVENTORY.json
+          python -m tools.compare_v31_v30_opencv \
+            --help >/dev/null
+          python - <<'PY'
+          from tools.compare_v31_v30_opencv import scan
+          cv=scan("installed/opt/anything-plays-31")
+          assert not cv['risky_codec_paths'],cv['risky_codec_paths']
+          print("New full Linux DEB has NO FFmpeg/x264/x265 OpenCV runtime filenames.")
+          PY
+      - name: Audit mounted, ad-hoc signed newly rebuilt full Apple Silicon DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mountpoint="$(mktemp -d /tmp/ap31-clean-audit.XXXXXX)"
+          trap 'hdiutil detach "$mountpoint" >/dev/null 2>&1 || true; rmdir "$mountpoint" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" 'package/${{ matrix.installer }}'
+          app="$mountpoint/AnythingPlays31.app"
+          codesign --verify --verbose=2 "$app"
+          python -m tools.inventory_v31_final_native \
+            --target '${{ matrix.target }}' --bundle "$app" \
+            --installer 'package/${{ matrix.installer }}' \
+            --receipt 'package/${{ matrix.receipt }}' \
+            --source-sha "$SOURCE_SHA" --output evidence/NEW_CLEAN_NATIVE_INVENTORY.json
+          python - "$app" <<'PY'
+          import sys
+          from tools.compare_v31_v30_opencv import scan
+          cv=scan(sys.argv[1])
+          assert not cv['risky_codec_paths'],cv['risky_codec_paths']
+          print("New full Mac ARM DMG has NO FFmpeg/x264/x265 OpenCV runtime filenames.")
+          PY
+      - name: Confirm native/notice provenance and preserve unapproved license scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          r=json.loads(Path('evidence/NEW_CLEAN_NATIVE_INVENTORY.json').read_text('utf-8'))
+          assert r["status"]=="UNAPPROVED_EXACT_FINAL_3_1_NATIVE_AND_NOTICE_INVENTORY"
+          assert r["source_revision"]==os.environ['SOURCE_SHA']
+          assert r["native_file_count"]>0 and r["notice_file_count"]>0
+          for key in ("public_release_approved","source_to_binary_correspondence_verified",
+                      "all_native_library_replacement_paths_verified","all_redistribution_rights_reviewed"):
+              assert r[key] is False,key
+          summary={
+              "status":"PRIVATE_NEW_CLEAN_FULL_INSTALLER_NATIVE_AUDIT_UNAPPROVED",
+              "target":r["target"],"source_revision":r["source_revision"],
+              "sha256":r["installer_sha256"],
+              "native_file_count":r["native_file_count"],
+              "notice_file_count":r["notice_file_count"],
+              "codec_candidates_still_needing_review":r["codec_candidates"],
+              "camera_hardware_tested":False,
+              "corresponding_source_and_redistribution_approved":False,
+              "public_release_approved":False
+          }
+          Path('evidence/NEW_CLEAN_NATIVE_SUMMARY.json').write_text(
+              json.dumps(summary,indent=2)+'\n','utf-8')
+          print("Exact clean package inventory finished:",summary["target"],
+                summary["native_file_count"],"native files;",
+                summary["notice_file_count"],"notices. Legal review remains OPEN.")
+          PY
+      - name: Retain only per-platform native inventory, not any new unapproved installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-${{ matrix.target }}-NEW-CLEAN-FULL-NATIVE-NOTICES-PRIVATE
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: error
