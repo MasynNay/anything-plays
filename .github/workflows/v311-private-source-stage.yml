@@ -12,6 +12,7 @@ on:
       - 'tools/verify_v311_source_stage.py'
       - 'tools/assemble_v311_full_linux.py'
       - 'tools/assemble_v311_full_windows.py'
+      - 'tools/assemble_v311_full_macos.py'
       - 'tests/test_v311_private_qa_identity.py'
       - 'packaging/build_linux_deb.sh'
       - 'packaging/build_windows.bat'
@@ -324,6 +325,99 @@ jobs:
           path: |
             fullqa/AnythingPlaysSetup-3.1.1-qa1.exe
             fullqa/V311_FULL_WINDOWS_QA_RECEIPT.json
+            fullqa/SDL_RUNTIME_AUDIT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-macos-18:
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Mac 18-console source-core QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: macos-arm64, arch: arm64, runner: macos-15, sha310: 'ddec3be8356e0b1729ff0a4131bc362128739fe39a1cdc48dfd83921feb8e49a'}
+          - {target: macos-x64, arch: x64, runner: macos-15-intel, sha310: 'ed7dd44e457b1a6c5458f7f6dce54089c98401418c1cc02d145e36f68494bae9'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Retrieve original same-run 3.1.1 Mac source candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-${{ matrix.target }}-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Verify original public same-architecture 3.1.0 native core source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > public310.json
+          export OLD_BASE_NAME='AnythingPlays-3.1.0-macos-${{ matrix.arch }}.dmg'
+          export OLD_BASE_SHA='${{ matrix.sha310 }}'
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          x=json.loads(Path('public310.json').read_text('utf-8'))
+          assert x['draft'] is False and x['prerelease'] is False
+          assert x['tag_name']=='v3.1.0'
+          assert x['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(x['assets'])==8
+          match=[a for a in x['assets'] if a['name']==os.environ['OLD_BASE_NAME']]
+          assert len(match)==1
+          assert match[0]['digest']=='sha256:'+os.environ['OLD_BASE_SHA']
+          print('Reusing exact original-source 3.1.0 Mac cores.')
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$OLD_BASE_NAME" --pattern SHA256SUMS.txt --dir stableqa
+          echo "$OLD_BASE_SHA  stableqa/$OLD_BASE_NAME" | shasum -a 256 -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Build verified 18-console signed, NONPUBLIC Mac QA installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_macos \
+            --arch '${{ matrix.arch }}' \
+            --stable 'stableqa/AnythingPlays-3.1.0-macos-${{ matrix.arch }}.dmg' \
+            --qa 'sourceqa/AnythingPlays-3.1.1-qa1-macos-${{ matrix.arch }}.dmg' \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads(Path('fullqa/V311_FULL_MACOS_QA_RECEIPT.json').read_text('utf-8'))
+          assert d['status']=='PRIVATE_3_1_1_FULL_18_MACOS_QA_NOT_APPROVED'
+          assert d['new_source_revision']==os.environ['QA_SOURCE_SHA']
+          assert d['native_core_count']==11 and d['console_profiles']==18
+          assert d['identity_channel']=='v311_candidate'
+          assert d['public_release_approved'] is False
+          assert d['full_four_platform_311_verified'] is False
+          print('Authentic same-source PRIVATE 3.1.1 Mac full candidate:',d['sha256'])
+          PY
+      - name: Retain one original full native Mac private QA installer and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-${{ matrix.target }}-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/AnythingPlays-3.1.1-qa1-macos-${{ matrix.arch }}.dmg
+            fullqa/V311_FULL_MACOS_QA_RECEIPT.json
             fullqa/SDL_RUNTIME_AUDIT.json
           retention-days: 30
           if-no-files-found: error
