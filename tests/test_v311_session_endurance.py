@@ -110,7 +110,9 @@ class SyntheticEnduranceTests(unittest.TestCase):
                     if api.pad is not None:
                         api.pad.present = False
                     api.pad = None
-                elif phase == 20 and tick:
+                elif phase == 20 and tick >= 2760:
+                    # Reconnect only after a planned detach, not at the
+                    # start of the test where the first pad is still live.
                     api.pad = VirtualPad()
                     reconnects += 1
                 if api.pad is not None:
@@ -156,7 +158,10 @@ class SyntheticEnduranceTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(sav.path.read_bytes()).digest(),
                              last_digest)
             self.assertEqual(list(Path(temp).glob("*.tmp")), [])
+            last_pad = api.pad
             reader.stop()
+            if last_pad is not None:
+                self.assertEqual(last_pad.closed, 1)
             self.assertIsNone(reader.api)
             self.assertIsNone(reader.controller)
             self.assertEqual(reader.physical_buttons, frozenset())
