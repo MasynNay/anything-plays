@@ -76,18 +76,29 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
         members=list(deps.rglob("*"))
         if not members or any(path.is_symlink() for path in members):
             raise ValueError("Missing or symlinked Mac native dependency inputs")
-        to_remove.extend(path for path in members if path.is_file())
-        if not to_remove:
-            raise ValueError("No native libraries in stock Mac OpenCV package")
+        # Other frozen modules, notably Pillow/libtiff, may legitimately
+        # resolve shared libraries through this directory. Deleting it
+        # wholesale broke Apple Silicon PIL when liblzma disappeared.
+        # Prune only libraries tied directly to the FFmpeg codec stack here.
+        # Any other optional native components remain visible to the
+        # independent license inventory and still require review.
+        ffmpeg_prefixes = (
+            "libavcodec.", "libavdevice.", "libavfilter.",
+            "libavformat.", "libavutil.", "libswresample.",
+            "libswscale.", "libpostproc.", "libx264.", "libx265.",
+        )
+        to_remove.extend(path for path in members
+                         if path.is_file()
+                         and path.name.lower().startswith(ffmpeg_prefixes))
+        if target == "macos-arm64" and not to_remove:
+            raise ValueError("Expected FFmpeg-bearing native ARM OpenCV runtime")
     previous = [{"path": str(f.relative_to(new_app)), "sha256":hash_file(f)}
                 for f in to_remove]
     # Only these original public v2.0.0 native bytes are copied into the
     # throwaway v3.1.0 extracted app; original downloads are untouched.
     shutil.copyfile(original,replaced)
-    if target=="windows-x64":
-        for file in to_remove: file.unlink()
-    else:
-        shutil.rmtree(deps)
+    for file in to_remove:
+        file.unlink()
     if hash_file(replaced)!=old_hash or any(path.exists() for path in to_remove):
         raise ValueError("Temporary camera-only swap was incomplete")
     return {
