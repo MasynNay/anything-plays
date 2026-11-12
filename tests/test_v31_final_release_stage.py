@@ -82,6 +82,79 @@ class StageV31FinalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 stage(full,installed,out,source_sha=SHA,qa_run_id=123456789)
 
+    def test_exact_clean_source_built_wheels_appear_in_source_access_notes(self):
+        from tools.stage_v31_final_for_review import (
+            CLEAN_SOURCE_RECEIPT, OPENCV_ORIGINAL_SOURCE_SHA,
+        )
+        with TemporaryDirectory() as tmp:
+            full,installed,out=self.fixture(tmp)
+            for i,target in enumerate(TARGETS):
+                data={
+                    "target":target,
+                    "source_sha256":OPENCV_ORIGINAL_SOURCE_SHA,
+                    "source_ci_run_id":43133383864+i,
+                    "native_wheel_sha256":format(i+1,"064x"),
+                    "native_camera_capture_backend_proven":True,
+                    "frozen_installer_tested":False,
+                    "redistribution_approved":False,
+                    "public_release_approved":False,
+                }
+                (full/target/CLEAN_SOURCE_RECEIPT).write_text(
+                    json.dumps(data),"utf-8"
+                )
+            report=stage(full,installed,out,source_sha=SHA,qa_run_id=123456789)
+            self.assertTrue(report["clean_original_camera_only_wheels_verified_on_four_hosts"])
+            self.assertEqual(
+                set(report["clean_source_built_opencv_wheel_receipts"]),set(TARGETS),
+            )
+            notes=(out/"FINAL_SOURCE_ACCESS_REVIEW.md").read_text("utf-8")
+            self.assertIn("Four independent native camera-only",notes)
+            self.assertIn(OPENCV_ORIGINAL_SOURCE_SHA,notes)
+            for target,value in report["clean_source_built_opencv_wheel_receipts"].items():
+                self.assertIn(target,notes)
+                self.assertIn(value["native_wheel_sha256"],notes)
+                self.assertFalse(value["redistribution_approved"])
+
+    def test_reject_partial_or_forged_source_built_wheel_provenance(self):
+        from tools.stage_v31_final_for_review import (
+            CLEAN_SOURCE_RECEIPT, OPENCV_ORIGINAL_SOURCE_SHA,
+        )
+        with TemporaryDirectory() as tmp:
+            full,installed,out=self.fixture(tmp)
+            valid={
+                "target":"linux-x64",
+                "source_sha256":OPENCV_ORIGINAL_SOURCE_SHA,
+                "source_ci_run_id":43133383864,
+                "native_wheel_sha256":"f"*64,
+                "native_camera_capture_backend_proven":True,
+                "frozen_installer_tested":False,
+                "redistribution_approved":False,
+                "public_release_approved":False,
+            }
+            evidence=full/"linux-x64"/CLEAN_SOURCE_RECEIPT
+            evidence.write_text(json.dumps(valid),"utf-8")
+            with self.assertRaises(ValueError):
+                stage(full,installed,out,source_sha=SHA,qa_run_id=1)
+            self.assertFalse(out.exists())
+            for target in TARGETS:
+                (full/target/CLEAN_SOURCE_RECEIPT).write_text(
+                    json.dumps({**valid,"target":target}),"utf-8"
+                )
+            for field,bad in (
+                ("public_release_approved",True),
+                ("redistribution_approved",True),
+                ("native_wheel_sha256","invalid"),
+                ("source_sha256","0"*64),
+                ("native_camera_capture_backend_proven",False),
+                ("source_ci_run_id",True),
+            ):
+                with self.subTest(field=field):
+                    evidence.write_text(json.dumps({**valid,field:bad}),"utf-8")
+                    with self.assertRaises(ValueError):
+                        stage(full,installed,out,source_sha=SHA,qa_run_id=1)
+                    self.assertFalse(out.exists())
+            evidence.write_text(json.dumps(valid),"utf-8")
+
     def test_reject_wrong_sha_workflow_and_absent_platform(self):
         with TemporaryDirectory() as tmp:
             full,installed,out=self.fixture(tmp)

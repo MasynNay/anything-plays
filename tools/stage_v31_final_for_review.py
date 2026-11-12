@@ -22,6 +22,8 @@ TARGETS = {
 }
 FULL_STATUS = "PRIVATE_FULL_3_1_0_FINAL_IDENTITY_QA"
 INSTALLED_STATUS = "PASSED_FINAL_REAL_FROZEN_TK_STARTUP_QA_ONLY"
+CLEAN_SOURCE_RECEIPT = "FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json"
+OPENCV_ORIGINAL_SOURCE_SHA = "4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577"
 
 
 def sha(path):
@@ -59,6 +61,7 @@ def stage(full_root, installed_root, output, *, source_sha, qa_run_id):
             or installed_root.is_symlink()):
         raise ValueError("Review output must be new and both source roots regular directories")
     found={}
+    clean_wheels={}
     for target,(filename,report_name) in TARGETS.items():
         full=full_root/target
         installed=installed_root/target
@@ -104,7 +107,38 @@ def stage(full_root, installed_root, output, *, source_sha, qa_run_id):
             "relinking_reviewed":False,
             "public_release_approved":False,
         },target)
+        clean_path=full/CLEAN_SOURCE_RECEIPT
+        if clean_path.is_file() or clean_path.is_symlink():
+            wheel=load_receipt(clean_path)
+            validate(wheel,{
+                "target":target,
+                "source_sha256":OPENCV_ORIGINAL_SOURCE_SHA,
+                "native_camera_capture_backend_proven":True,
+                "frozen_installer_tested":False,
+                "redistribution_approved":False,
+                "public_release_approved":False,
+            },target)
+            # Every camera-only wheel originated from a successful
+            # independent native OS source-build run, not the same full
+            # installer run; links and hashes must be retained accurately.
+            run=wheel.get("source_ci_run_id")
+            digest_wheel=wheel.get("native_wheel_sha256")
+            if (type(run) is not int or run<1
+                    or not isinstance(digest_wheel,str)
+                    or not re.fullmatch(r"[a-f0-9]{64}",digest_wheel)):
+                raise ValueError("Missing original source-built camera wheel proof: "+target)
+            clean_wheels[target]={
+                "upstream_source_sha256":OPENCV_ORIGINAL_SOURCE_SHA,
+                "native_wheel_sha256":digest_wheel,
+                "independent_source_build_run_id":run,
+                "independent_camera_backend_proven":True,
+                "physical_camera_tested":False,
+                "source_to_frozen_binary_correspondence_approved":False,
+                "redistribution_approved":False,
+            }
         found[target]=(installer,filename,digest)
+    if clean_wheels and len(clean_wheels)!=len(TARGETS):
+        raise ValueError("Cannot stage mixed stock-OpenCV and clean source-wheel final installers")
 
     output.mkdir(parents=True)
     summary={}
@@ -127,6 +161,8 @@ def stage(full_root, installed_root, output, *, source_sha, qa_run_id):
         "stable_3_1_0_published":False,
         "full_native_relinking_approved":False,
         "physical_gameplay_accepted":False,
+        "clean_source_built_opencv_wheel_receipts":clean_wheels,
+        "clean_original_camera_only_wheels_verified_on_four_hosts":len(clean_wheels)==4,
     }
     (output/"FINAL_QA_MANIFEST.json").write_text(json.dumps(manifest,indent=2)+"\n","utf-8")
     source=(
@@ -146,6 +182,29 @@ def stage(full_root, installed_root, output, *, source_sha, qa_run_id):
         "approved relinking options, or redistribution clearance. The four binaries "
         "are private QA artifacts, not published stable installers. No ROMs included.\n"
     )
+    if clean_wheels:
+        source += (
+            "\n## Four independent native camera-only source-built OpenCV wheel receipts\n\n"
+            "Each final installer was independently built with a wheel compiled "
+            "from the exact pinned opencv-python-headless 4.14.0.94 source "
+            "archive (original source SHA-256: `"+OPENCV_ORIGINAL_SOURCE_SHA+"`). "
+            "The source-build runs are separately reproducible and retained "
+            "as time-limited GitHub Actions artifacts; release source files "
+            "must be separately made available to end users before distribution.\n\n"
+        )
+        for target in sorted(clean_wheels):
+            value=clean_wheels[target]
+            source+=(
+                "- "+target+": source wheel SHA-256 `"
+                +value["native_wheel_sha256"]+"`; source/native-backend QA run "
+                "https://github.com/MasynNay/anything-plays/actions/runs/"
+                +str(value["independent_source_build_run_id"])+"\n"
+            )
+        source+=(
+            "\nFFmpeg-disabled and camera backend compile proof is NOT a physical "
+            "webcam test, confirmation of all pygame/SDL/source/relinking obligations, "
+            "or a public redistribution approval.\n"
+        )
     (output/"FINAL_SOURCE_ACCESS_REVIEW.md").write_text(source,"utf-8")
     assets=sorted(p for p in output.iterdir() if p.is_file())
     if len(assets)!=6:
