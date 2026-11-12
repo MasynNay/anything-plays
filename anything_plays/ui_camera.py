@@ -128,7 +128,7 @@ class CameraMixin:
                 index, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY
             )
             opened = self.cap is not None and self.cap.isOpened()
-        except (cv2.error, OSError) as exc:
+        except (cv2.error, OSError, RuntimeError):
             opened = False
         if not opened:
             self.stop_camera(keep_reconnect=reconnecting)
@@ -162,11 +162,15 @@ class CameraMixin:
         if not keep_reconnect:
             self.cancel_camera_reconnect()
         self.stop_controls()
-        if self.cap is not None:
+        # Detach the handle before calling into the native driver. Some
+        # drivers raise while closing a just-unplugged device; those errors
+        # must not strand the Tk preview, bezel or Stream Mode on screen.
+        cap, self.cap = self.cap, None
+        if cap is not None:
             try:
-                self.cap.release()
-            finally:
-                self.cap = None
+                cap.release()
+            except (cv2.error, OSError, RuntimeError):
+                pass
         if not self.reference_image:
             self.frame = None
             self.camera_photo = None

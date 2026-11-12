@@ -73,6 +73,21 @@ class GameplayMixin:
                 self.external_input.set_manual(button, False)
             return 'break'
 
+    def _camera_is_open(self):
+        """Handle native USB driver errors without crashing Tk callbacks.
+
+        Some capture backends throw from isOpened() on unplug rather than
+        returning False. Both the arm button and frame scheduler need a
+        reliable status without interrupting keyboard or gamepad play.
+        """
+        cap = getattr(self, "cap", None)
+        if cap is None:
+            return False
+        try:
+            return bool(cap.isOpened())
+        except (cv2.error, OSError, RuntimeError):
+            return False
+
     def toggle(self):
         if self.armed:
             self.stop_controls()
@@ -88,7 +103,7 @@ class GameplayMixin:
                 'controller bridge. Launch a GameCube game first.'
             )
             return
-        if self.cap is None or not self.cap.isOpened():
+        if not GameplayMixin._camera_is_open(self):
             messagebox.showinfo('Camera required', 'Choose and start a webcam first.')
             return
         if backend == "libretro" and not self.emu.running:
@@ -182,7 +197,7 @@ class GameplayMixin:
                 # without returning a failed read(). Treat both signals as
                 # the same disconnect, clearing the bezel and held controls
                 # through stop_camera() before queuing a bounded retry.
-                camera_open = self.cap.isOpened()
+                camera_open = GameplayMixin._camera_is_open(self)
                 ok, frame = self.cap.read() if camera_open else (False, None)
                 if ok:
                     self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
@@ -195,14 +210,14 @@ class GameplayMixin:
                 # a live camera, repeatedly detecting the same pixels wastes
                 # CPU and makes a week-long session unnecessarily expensive.
                 now = time.monotonic()
-                live = self.cap is not None and self.cap.isOpened()
+                live = GameplayMixin._camera_is_open(self)
                 if live or now >= getattr(self, "_static_preview_next_draw", 0):
                     self.draw_camera()
                     self._static_preview_next_draw = now + 0.5
             # Finish a user-requested arm only when the background native
             # core is actually ready. No global keyboard injection occurs.
             if getattr(self, "_pending_object_controls", False):
-                if self.emu.running and self.cap is not None and self.cap.isOpened():
+                if self.emu.running and GameplayMixin._camera_is_open(self):
                     self._pending_object_controls = False
                     self.toggle()
                 elif not getattr(self.emu, "launching", False):
@@ -255,7 +270,7 @@ class GameplayMixin:
             self.status.set('Tracking error: ' + str(exc)[:120])
         finally:
             if not self._closing:
-                active_camera = self.cap is not None and self.cap.isOpened()
+                active_camera = GameplayMixin._camera_is_open(self)
                 interval = 45 if active_camera else (
                     500 if self.reference_image else 200
                 )
