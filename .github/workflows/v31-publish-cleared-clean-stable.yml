@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   publish-cleared-v31:
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release/v31-private-draft-permission-and-final-rollout' && github.event.pull_request.base.ref == 'main') }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release/v31-publication-trigger' && github.event.pull_request.base.ref == 'main') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
