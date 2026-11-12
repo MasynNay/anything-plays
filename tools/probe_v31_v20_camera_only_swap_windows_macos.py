@@ -107,11 +107,11 @@ def swap(*, target, old_app, new_app, scratch, source_sha, environ=None):
         for path in old_app.rglob("*"):
             if not path.name.lower().startswith("libavif") or not path.name.endswith(".dylib"):
                 continue
-            target = path.resolve()
-            if (not target.is_relative_to(old_app.resolve()) or
-                    not target.is_file() or target.is_symlink()):
+            resolved_lib = path.resolve()
+            if (not resolved_lib.is_relative_to(old_app.resolve()) or
+                    not resolved_lib.is_file() or resolved_lib.is_symlink()):
                 raise ValueError("Untrusted external/symlinked native libavif")
-            candidates.append(target)
+            candidates.append(resolved_lib)
         matches = list(dict.fromkeys(candidates))
         if not matches:
             raise ValueError("Original 2.0 Intel app does not bundle libavif; cannot safely supply an OS library")
