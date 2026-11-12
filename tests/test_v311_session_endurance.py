@@ -79,7 +79,9 @@ class SyntheticEnduranceTests(unittest.TestCase):
             pumps[0] += 1
 
         reader.pygame = SimpleNamespace(
-            event=SimpleNamespace(pump=pump, get=lambda: [])
+            event=SimpleNamespace(pump=pump, get=lambda: []),
+            joystick=SimpleNamespace(quit=lambda: None),
+            display=SimpleNamespace(quit=lambda: None),
         )
         reader._sdl_constant = lambda name: name
         buffer = InputBuffer()
@@ -89,7 +91,7 @@ class SyntheticEnduranceTests(unittest.TestCase):
         samples_written = 0
 
         with tempfile.TemporaryDirectory(prefix="ap-311-virtual-soak-") as temp:
-            data = ctypes.create_string_buffer(b"00000000", 8)
+            data = ctypes.create_string_buffer(b"SEED0000", 8)
             sav = SaveRAM(Path(temp) / "synthetic-game.gba",
                           lambda kind: ctypes.addressof(data),
                           lambda kind: 8)
