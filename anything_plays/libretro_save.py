@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
@@ -154,7 +155,21 @@ class SaveRAM:
                 stream.write(snapshot)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, destination)
+            # Windows can briefly deny a replace when another app instance,
+            # filesystem scanner or antivirus holds the current destination.
+            # Retry only the known native sharing/access-violation codes; a
+            # read-only path or broken storage should still reach the normal
+            # user-writable fallback rather than spin indefinitely.
+            for attempt in range(4):
+                try:
+                    os.replace(temporary, destination)
+                    break
+                except PermissionError as exc:
+                    code = getattr(exc, "winerror", None)
+                    if (os.name != "nt" or code not in (5, 32, 33)
+                            or attempt == 3):
+                        raise
+                    time.sleep(0.025 * (attempt + 1))
         finally:
             # A failed or interrupted save must leave the previous committed
             # .sav untouched. Never unlink another writer's temporary file.
