@@ -137,6 +137,13 @@ jobs:
           codesign --verify "$second/AnythingPlays31.app"
           ditto "$first/AnythingPlays.app" "$PWD/sandbox/public20/AnythingPlays.app"
           ditto "$second/AnythingPlays31.app" "$PWD/sandbox/private31/AnythingPlays31.app"
+          if [[ '${{ matrix.target }}' == 'macos-x64' ]]; then
+            echo 'Original signed 2.0 Intel OpenCV shared library candidates:'
+            find "$PWD/sandbox/public20/AnythingPlays.app" -iname '*avif*' -print || true
+            echo 'Original Intel OpenCV cv2 Mach-O dynamic dependencies:'
+            otool -L "$PWD/sandbox/public20/AnythingPlays.app/Contents/Frameworks/cv2/cv2.abi3.so" \
+              | grep -Ei 'avif|rpath|sdl|opencv' || true
+          fi
           export AP_V31_QA_SANDBOX="$PWD/sandbox"
           python -m tools.probe_v31_v20_camera_only_swap_windows_macos \
             --target '${{ matrix.target }}' \
