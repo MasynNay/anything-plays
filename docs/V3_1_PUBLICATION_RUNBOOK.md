@@ -49,9 +49,15 @@ require their own independent evidence and explicit approval. Do not change a
    save/restore. Document OS, controller and known exceptions. The owner
    previously tested RC2 Linux installation and Stream Mode appearance;
    these are *not* controller, camera, OBS recording or real gameplay passes.
-2. **Third-party redistribution review.** Inventory the exact *frozen
-   final* Windows/Linux/Mac pygame-ce/SDL/OpenCV and transitive native
-   dependencies; preserve their own license texts and copyright notices;
+2. **Third-party redistribution review.** The exact frozen dependency
+   inventory is **now complete** on four OSes ([source-matched audit 43130496526](https://github.com/MasynNay/anything-plays/actions/runs/43130496526)),
+   as is the public 3.0 versus private 3.1 OpenCV byte comparison
+   ([43131176213](https://github.com/MasynNay/anything-plays/actions/runs/43131176213)).
+   Both stable 3.0 and final 3.1 carry OpenCV FFmpeg-named native files
+   on three OSes; Apple Silicon also includes x264 and x265. Review the
+   [exact OpenCV source/codec evidence](V3_1_OPENCV_EXACT_RUNTIME_REVIEW.md),
+   preserve the actual pygame-ce/SDL/OpenCV and transitive dependency
+   notices and copyright texts;
    compare observed binary build flags and exact source to uploaded source
    archives. Pay special attention to pygame-ce 2.5.8 LGPL obligations and
    macOS OpenCV/pygame SDL2 2.32.8/2.32.10 duplication. Technical code-section
@@ -116,11 +122,16 @@ that new byte stream needs a new receipt, installed-app QA and checksum.
    source archives, third-party notices and replacement instructions.
    Ensure `python -m tools.check_v31_release` succeeds against the
    approved manifest.
-2. Create a **draft** GitHub release for new tag `v3.1.0` at the independently
-   approved exact source revision/commit. Use the prepared release notes,
-   include the *four full* installer assets, `SHA256SUMS.txt`, the final
-   source/notice archive(s), and the source access manifest. Do not upload
-   partial mGBA-only source-stage packages or old RC2 files.
+2. An existing **private** GitHub Release draft already exists for
+   `v3.1.0`, with four full installers and three QA files (release ID
+   `442346875`, [private owner-only draft](https://github.com/MasynNay/anything-plays/releases/tag/untagged-293d7611aadb2e7f65f3)).
+   **Review and update that original draft**, do not create a competing
+   second draft or reuse RC2 binary files. At public approval time confirm
+   its exact tested source revision and all seven original asset hashes,
+   provide nonexpiring corresponding-source/third-party notices and applicable
+   replacement information, and reconcile any necessary new assets or rebuilt
+   binaries with a new QA receipt. Do not press Publish until every gate is
+   supported and explicitly approved.
 3. Review the draft asset list and exact SHA-256 **after GitHub upload**;
    GitHub may normalize asset names. Check the release tag's source hash,
    actual owner permissions and checksum file names, then publish stable

@@ -36,6 +36,14 @@ The release draft must also contain `FINAL_QA_MANIFEST.json`, `SHA256SUMS.txt` a
 
 ## Known limitations and review before public publication
 
+- **Bundled OpenCV codec provenance requires review.** Byte-level
+  [four-platform verification](https://github.com/MasynNay/anything-plays/actions/runs/43131176213)
+  confirms that final 3.1.0 includes the *same* OpenCV files shipped in public
+  3.0, including FFmpeg components on Windows/Linux/Apple Silicon and
+  libx264/libx265 on Apple Silicon. These are **not newly introduced 3.1
+  binaries**, but the current private release still needs exact codec source,
+  applicable licenses and downstream distribution/replacement review.
+  [Evidence and remediation options](V3_1_OPENCV_EXACT_RUNTIME_REVIEW.md).
 - Automated installed-GUI tests cannot certify actual controller hardware, live camera tracking, retail-game compatibility, audio, saving or extended real-world sessions. These requirements remain outstanding.
 - The macOS applications are ad-hoc signed and are **not Apple-notarized**. Windows packages are not necessarily publisher-signed.
 - The project's own source is MIT-licensed; included emulator cores, pygame-ce, SDL and transitive native dependencies retain their respective licenses. The exact application source is available at the commit linked above, with all eleven original emulator sources and notices in [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). The pygame/SDL upstream source candidates and technical replacement tests are documented in [the source companion](https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_SOURCE_COMPANION.md). **Complete native corresponding-source, replacement/relinking and redistribution review has not been finished.** This draft does not constitute legal approval.

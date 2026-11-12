@@ -5,6 +5,36 @@ Keep this file factual and current. This project has experienced interrupted
 conversations and expensive duplicated native builds. Always inspect actual
 GitHub Actions results before reporting a new pass or publishing an installer.
 
+## Current verified milestone and next dependency decision (November 11)
+
+**Complete source-pinned 3.1.0 build and private seven-asset draft are DONE;
+stable publication is NOT DONE.** All four final full 18-console/11-core
+installers and actual installed frozen GUI/Stream Mode smoke checks passed
+in [run 43120583726](https://github.com/MasynNay/anything-plays/actions/runs/43120583726).
+The [private four-installer staged bundle](https://github.com/MasynNay/anything-plays/actions/runs/43123263034)
+was SHA-verified; the GitHub Release draft exists as
+`v3.1.0`, release ID `442346875`, with all seven assets, and **is not public**.
+
+**Additional native distribution audit completed:** [PR #203](https://github.com/MasynNay/anything-plays/pull/203)
+found exact native/notice paths on all four OSes; [PR #204](https://github.com/MasynNay/anything-plays/pull/204)
+confirmed that the frozen OpenCV runtime in public 3.0 is **byte-identical**
+to final 3.1 on each corresponding OS. FFmpeg-named OpenCV binaries occur
+in both builds on Linux, Windows and Apple Silicon; the latter also includes
+libx264 and libx265. Intel Mac has no FFmpeg/x264/x265 names in the checked
+OpenCV subset. The earlier claim that public 3.0 was universally FFmpeg-free
+was incorrect (the separate historical *2.0* custom wheel claim may still
+apply only to 2.0). See
+[exact codec/source review](V3_1_OPENCV_EXACT_RUNTIME_REVIEW.md) and
+[distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md).
+
+**Still open:** independent native corresponding-source and redistributable
+license/relinking review, physical-device/gameplay acceptance, final rollout
+approval. The formal [release readiness manifest](../config/v3.1-release-readiness.json)
+correctly keeps approval `false`; 2/6 evidence gates are closed. No further
+full installer rebuild is needed **unless actual dependency remediation
+changes installer bytes**, in which case the relevant platforms require fresh
+source, native installed QA, receipts and checksums.
+
 ## Public release truth
 
 - **Latest stable:** [v3.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0), original sources [v3.0.0-sources](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources). Do not touch stable 3.0, 2.0 or 1.5 assets.
@@ -17,7 +47,7 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 - [Four-platform full-core QA and macOS Bash packaging fix #198](https://github.com/MasynNay/anything-plays/pull/198) merged. [Source checks 43094552640](https://github.com/MasynNay/anything-plays/actions/runs/43094552640) and [authentic 18-console installer + installed native GUI checks 43094552705](https://github.com/MasynNay/anything-plays/actions/runs/43094552705) **PASSED across Windows x64, Linux x64, macOS Intel, macOS Apple Silicon** for exact source revision `26fdc6cf9399ea0fd79665850089471f5ffec70d`. These packages still carry an isolated **RC2** QA identity and were never publicly promoted.
 - [Final artifact provenance/staging gate #200](https://github.com/MasynNay/anything-plays/pull/200) merged in main as `e6767d3a420f4af0cec53bc5ba21b32e60b48923`. Python 3.12 and 3.13 source checks passed, including `test_v31_final_release_stage.py`. The read-only workflow `.github/workflows/v31-stage-final-four-reviewed-qa.yml` runs **only after** the new final workflow succeeds, downloads four complete installers plus four installed-GUI receipts, rejects mismatched bytes/false approvals, and preserves a **private** package/checksum bundle.
 
-## Current 3.1.0 genuine-production-identity work — DO NOT RESTART FROM SCRATCH
+## Historical build timeline before the completed native release draft
 
 - **Open PR:** [#199 — Actual four-platform complete 3.1.0 installers, 18 profiles, full installed GUI acceptance](https://github.com/MasynNay/anything-plays/pull/199).
 - **Latest exact PR source head:** `d852de9a513f83a329c14647ddc86bf3690fb5f5` as of this checkpoint. Confirm the current PR head before checking or merging.
@@ -60,13 +90,35 @@ The private GitHub release draft and seven uploads have been independently
 rechecked through authenticated releases API. **The public latest release is
 still stable v3.0.0.** Keep both public RC2 and stable 3.0 untouched.
 
-## Exact next actions
+## Exact next actions after successful four-platform packaging
 
-1. Inspect PR #199's current head and [the native full workflow](https://github.com/MasynNay/anything-plays/actions/workflows/v31-final-identity-private-qa.yml). If a job fails, read its exact GitHub job logs, fix source/test bugs and run exact-head checks again. A previous macOS error was an intermittent `upload-artifact@v4` backend failure (invalid HTML); retry only failed jobs after checking it is infrastructure, not application failure.
-2. Require all four source stages, all four full 11-core/18-profile assemblies and all four **installed** frozen Stream Mode checks to pass before merging #199. Do not count a partial job matrix as all four.
-3. The merged trusted final staging workflow can then collect four exact full binaries plus source/QA manifest and SHA256 sums as `AnythingPlays-3.1.0-FINAL-FOUR-FULL-INSTALLERS-PRIVATE-REVIEW`. Confirm its actual successful run and the contents; it is NOT a release.
-4. Review third-party pygame-ce/SDL and OpenCV/FFmpeg transitive native notices, corresponding source and replacement/relinking obligations. The source-app revision, original 11 emulator sources, [six-source SDL/pygame candidate audit](V3_1_SOURCE_COMPANION.md) and [genuine modified pygame C replacement on all four OSes](V3_1_LGPL_ACTUAL_MODIFIED_PYGAME_WINDOWS_SOURCE_QA.md) are valuable but **not** complete native legal/source clearance.
-5. The owner has personally validated Linux installation and the visual DS Stream Mode layout. Physical controllers, camera tracking, games, audio and long-session behavior still have unknown coverage. Treat these as documented known limitations/acceptance decisions, not invented passed tests.
-6. Only after a truthful rights/source-first decision, exact production-version verified binaries, final notes and separate authorization should `v3.1.0` be published as **stable**. Preserve 3.0 and the RC2 prerelease. Update the portfolio and download links only after actual publication has succeeded.
+1. **Do not repeat the finished four-platform 18-console builds** or make a
+   second private draft. Existing exact source, SHA256 receipts, original
+   release draft and corresponding artifacts are listed above; verify
+   retention before relying on an artifact.
+2. Complete the OpenCV/FFmpeg/codec source and redistribution review against
+   [the actual four released-to-draft binaries](V3_1_OPENCV_EXACT_RUNTIME_REVIEW.md).
+   In particular inspect Apple Silicon x264/x265 linking and applicable
+   notices, original source and build flags. Options: independently clear
+   the actual bundled native code and user-modification requirements, or
+   source-build a verified camera-only OpenCV wheel and rerun the affected
+   native installers and GUI acceptance. Never claim matching old 3.0 bytes
+   equal legal clearance.
+3. Complete pygame/SDL and remaining native source/notice/relinking review,
+   including 11 original-core licenses. Leave the `pygame_sdl_redistribution_review`
+   and `corresponding_source_material` gates `false` until grounded in
+   independently reviewed complete evidence.
+4. Obtain or explicitly document real hardware/controller/camera, gameplay,
+   saves/audio/long-session acceptance. The owner confirmed only Linux RC2
+   installation and DS Stream Mode first-look. Do not claim physical
+   controller/gameplay/OBS recordings as passed.
+5. Review [prepared release notes](V3_1_RELEASE_DRAFT_NOTES.md) and
+   [exact publication runbook](V3_1_PUBLICATION_RUNBOOK.md), approve evidence
+   and run `python -m tools.check_v31_release`. Use the **existing private
+   seven-asset draft**, confirm original source SHA and asset bytes after any
+   adjustments, and publish stable `v3.1.0` only when permission and
+   acceptance are properly resolved. Preserve stable 3.0 and RC2 and update
+   the portfolio only after verifying the new public release.
 
-**Do not treat a GitHub Actions run that is merely queued, partial, cancelled, or still running as successful. Never claim stable 3.1.0 is public without verifying the GitHub Release and all exact assets.**
+**GitHub private QA/draft is NOT a public release. Do not assert otherwise,
+fabricate source correspondence or mark hardware testing as complete.**
