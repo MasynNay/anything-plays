@@ -1,0 +1,111 @@
+name: 3.1 | Compile source-pinned FFmpeg AVIF off OpenCV for both Macs
+
+# Native build feasibility only. No existing Mac .app, public installer or
+# v3.1 private release draft is modified; no package distribution approved.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-macos-camera-only-opencv-source.yml'
+      - 'tools/qa_v31_macos_camera_only_wheel.py'
+      - 'tests/test_v31_macos_camera_only_wheel.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v31-macos-camera-only-wheels-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  source-built-mac-camera-wheel:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Source-built camera-only OpenCV | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x86_64, runner: macos-15-intel}
+    env:
+      SOURCE_SHA256: 4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577
+      ENABLE_HEADLESS: '1'
+      ENABLE_CONTRIB: '0'
+      CMAKE_BUILD_PARALLEL_LEVEL: '3'
+      CMAKE_ARGS: '-DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_QT=OFF -DWITH_AVIF=OFF -DWITH_AVFOUNDATION=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF'
+      AP_REQUIRE_OPENCV_FFMPEG_OFF: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject fake source provenance, disabled camera, FFmpeg and AVIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p test_v31_macos_camera_only_wheel.py -v
+          python -m unittest discover -s tests -p test_custom_opencv_wheel.py -v
+      - name: Install native build prerequisites without using an unreviewed binary wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip==26.3
+          python -m pip install numpy==2.5.4
+          xcode-select -p
+          clang --version
+      - name: Obtain only immutable PyPI OpenCV 4.14.0.94 source and verify its SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sources wheels evidence
+          python -m pip download --no-deps --no-binary opencv-python-headless \
+            --dest sources 'opencv-python-headless==4.14.0.94'
+          test -s sources/opencv_python_headless-4.14.0.94.tar.gz
+          echo "$SOURCE_SHA256  sources/opencv_python_headless-4.14.0.94.tar.gz" | shasum -a 256 --check
+      - name: Build real architecture-native Mac camera-only wheel with FFmpeg/AVIF disabled
+        shell: bash
+        timeout-minutes: 160
+        run: |
+          set -euo pipefail
+          python -m pip wheel --no-deps --wheel-dir wheels \
+            sources/opencv_python_headless-4.14.0.94.tar.gz
+          test "$(find wheels -maxdepth 1 -type f -name 'opencv_python_headless-4.14.0.94-*.whl' | wc -l | tr -d ' ')" -eq 1
+      - name: Install newly compiled Mac wheel and prove native AVFoundation with FFmpeg/AVIF absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel="$(find wheels -maxdepth 1 -type f -name 'opencv_python_headless-4.14.0.94-*.whl' -print -quit)"
+          test -n "$wheel"
+          python -m pip install --no-deps --force-reinstall "$wheel"
+          python -m tools.qa_v31_macos_camera_only_wheel \
+            --source sources/opencv_python_headless-4.14.0.94.tar.gz \
+            --wheel "$wheel" --target '${{ matrix.target }}' \
+            --output evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json").read_text("utf-8"))
+          assert r["status"]=="PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED"
+          assert r["avfoundation_backend_compiled"] is True
+          assert r["avif_native_dependency_omitted"] is True
+          assert r["ffmpeg_disabled_in_native_wheel"] is True
+          assert r["public_release_approved"] is False
+          assert r["installed_frozen_app_tested"] is False
+          print("Pinned native Mac source wheel and AVFoundation backend PASS.")
+          PY
+      - name: Retain compiled FFmpeg AVIF off Mac wheel/source for private 3.1 installer candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1-${{ matrix.target }}-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+          path: |
+            sources/opencv_python_headless-4.14.0.94.tar.gz
+            wheels/opencv_python_headless-4.14.0.94-*.whl
+            evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 0
