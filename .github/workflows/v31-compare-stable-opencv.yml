@@ -1,0 +1,162 @@
+name: 3.1.0 | Compare stable 3.0 and final 3.1.0 frozen OpenCV
+
+# Read-only feasibility evidence, not a binary swap or release.
+# Preserve the stable 3.0 custom camera-only runtime and never rewrite draft.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-compare-stable-opencv.yml'
+      - 'tools/compare_v31_v30_opencv.py'
+      - 'tests/test_v31_opencv_runtime_comparison.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-stable-cv2-compare-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  compare-actual-native-packages:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Stable 3.0 vs final 3.1 exact OpenCV | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, stable: 'anything-plays_3.0.0_amd64.deb', final: 'anything-plays-31_3.1.0_amd64.deb'}
+          - {target: windows-x64, runner: windows-latest, stable: 'AnythingPlaysSetup-3.0.0.exe', final: 'AnythingPlaysSetup-3.1.0.exe'}
+          - {target: macos-arm64, runner: macos-15, stable: 'AnythingPlays-3.0.0-macos-arm64.dmg', final: 'AnythingPlays-3.1.0-macos-arm64.dmg'}
+          - {target: macos-x64, runner: macos-15-intel, stable: 'AnythingPlays-3.0.0-macos-x64.dmg', final: 'AnythingPlays-3.1.0-macos-x64.dmg'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SHA: d852de9a513f83a329c14647ddc86bf3690fb5f5
+      QA_RUN: '43120583726'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run source and comparison contract regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_opencv_runtime_comparison.py' -v
+      - name: Download SHA-pinned public 3.0 and exact private 3.1 original-core package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stableassets finalassets evidence
+          for asset in '${{ matrix.stable }}' SHA256SUMS.txt; do
+            success=0
+            for attempt in 1 2 3 4; do
+              if gh release download v3.0.0 --repo "$GITHUB_REPOSITORY" \
+                  --pattern "$asset" --dir stableassets --clobber \
+                  && test -s "stableassets/$asset"; then
+                success=1
+                break
+              fi
+              sleep "$((attempt * 8))"
+            done
+            test "$success" = 1
+          done
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1.0-FINAL-FULL-18-${{ matrix.target }}-QA-ONLY' \
+            --dir finalassets
+          test -s 'finalassets/${{ matrix.final }}'
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          stable=Path("stableassets/${{ matrix.stable }}")
+          lines=Path("stableassets/SHA256SUMS.txt").read_text("utf-8").splitlines()
+          matches=[row.partition("  ")[0] for row in lines
+                   if row.endswith("  "+stable.name)]
+          assert len(matches)==1
+          assert hashlib.sha256(stable.read_bytes()).hexdigest()==matches[0]
+          from tools.v31_final_source import FULL_STATUS
+          receipt_name={"linux-x64":"FULL_LIBRARY_QA_RECEIPT.json",
+             "windows-x64":"FULL_WINDOWS_QA_RECEIPT.json",
+             "macos-arm64":"FULL_MACOS_QA_RECEIPT.json",
+             "macos-x64":"FULL_MACOS_QA_RECEIPT.json"}["${{ matrix.target }}"]
+          receipt=json.loads((Path("finalassets")/receipt_name).read_text("utf-8"))
+          final=Path("finalassets/${{ matrix.final }}")
+          assert receipt["status"]==FULL_STATUS
+          assert receipt["target"]=="${{ matrix.target }}"
+          assert receipt["sha256"]==hashlib.sha256(final.read_bytes()).hexdigest()
+          assert receipt["source_preview_revision"]==os.environ["QA_SHA"]
+          assert receipt["native_core_count"]==11
+          assert receipt["public_release_approved"] is False
+          print("Original stable SHA256 and private final source/byte receipts checked.")
+          PY
+      - name: Compare genuine extracted Ubuntu final runtime against untouched stable 3.0
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'stableassets/${{ matrix.stable }}' stableextract
+          dpkg-deb -x 'finalassets/${{ matrix.final }}' finalextract
+          python -m tools.compare_v31_v30_opencv \
+            --target '${{ matrix.target }}' --source-sha "$QA_SHA" \
+            --stable stableextract/opt/anything-plays \
+            --final finalextract/opt/anything-plays-31 \
+            --output evidence/OPENCV_ORIGINAL_VS_FINAL.json
+      - name: Compare Windows Inno-installed copies with original checksum verification
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $stable=(Resolve-Path 'stableassets/${{ matrix.stable }}').Path
+          $final=(Resolve-Path 'finalassets/${{ matrix.final }}').Path
+          $oldDest=Join-Path $env:RUNNER_TEMP 'AnythingPlays-3.0-OpenCV-proof'
+          $newDest=Join-Path $env:RUNNER_TEMP 'AnythingPlays-3.1-OpenCV-proof'
+          python -c "import sys;from pathlib import Path;from tools.assemble_v31_full_windows import unpack;unpack(Path(sys.argv[1]),Path(sys.argv[2]));unpack(Path(sys.argv[3]),Path(sys.argv[4]))" $stable $oldDest $final $newDest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not extract both native Inno installers' }
+          python -m tools.compare_v31_v30_opencv --target '${{ matrix.target }}' --source-sha $env:QA_SHA --stable $oldDest --final $newDest --output evidence/OPENCV_ORIGINAL_VS_FINAL.json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows original frozen OpenCV comparison failed' }
+      - name: Compare genuine readonly 3.0 and 3.1 signed Mac apps
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          oldmount="$(mktemp -d /tmp/ap30-cv2.XXXXXX)"
+          newmount="$(mktemp -d /tmp/ap31-cv2.XXXXXX)"
+          trap 'hdiutil detach "$newmount" >/dev/null 2>&1 || true; hdiutil detach "$oldmount" >/dev/null 2>&1 || true; rmdir "$newmount" "$oldmount" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$oldmount" 'stableassets/${{ matrix.stable }}'
+          hdiutil attach -readonly -nobrowse -mountpoint "$newmount" 'finalassets/${{ matrix.final }}'
+          codesign --verify --verbose=2 "$oldmount/AnythingPlays.app"
+          codesign --verify --verbose=2 "$newmount/AnythingPlays31.app"
+          python -m tools.compare_v31_v30_opencv \
+            --target '${{ matrix.target }}' --source-sha "$QA_SHA" \
+            --stable "$oldmount/AnythingPlays.app" \
+            --final "$newmount/AnythingPlays31.app" \
+            --output evidence/OPENCV_ORIGINAL_VS_FINAL.json
+      - name: Do not mistake old OpenCV candidate for a confirmed binary swap or release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path("evidence/OPENCV_ORIGINAL_VS_FINAL.json").read_text("utf-8"))
+          assert x["status"]=="PRIVATE_3_0_VS_3_1_OPENCV_REUSE_FEASIBILITY_UNAPPROVED"
+          assert x["old_native_3_0_reusable_without_rebuild_or_test"] is False
+          assert x["technical_replacement_and_camera_verified"] is False
+          assert x["redistribution_approved"] is False
+          assert x["public_release_approved"] is False
+          print("Original stable OpenCV has risky codec candidates:",
+                x["stable_has_ffmpeg_or_gpl_codec_name_candidates"])
+          print("Exact private final OpenCV has risky codec candidates:",
+                x["final_has_ffmpeg_or_gpl_codec_name_candidates"])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-${{ matrix.target }}-OPENCV-3.0-VS-3.1-PRIVATE-COMPARISON
+          path: evidence/OPENCV_ORIGINAL_VS_FINAL.json
+          retention-days: 30
+          if-no-files-found: error
