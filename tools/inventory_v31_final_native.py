@@ -42,7 +42,7 @@ def native(name: str) -> bool:
     # metadata files like copying.cpython-313-darwin.so.yml masquerade
     # as binary objects merely because ".so." appears in the name.
     return (n.endswith(NATIVE_EXT)
-            or re.search(r"\\.so(?:\\.[0-9]+)+$", n) is not None
+            or re.search(r"\.so(?:\.[0-9]+)+$", n) is not None
             or n.endswith(".dylib.tbd"))
 
 
