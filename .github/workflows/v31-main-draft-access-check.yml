@@ -1,0 +1,68 @@
+name: 3.1 | Authenticate private release draft with main write token
+
+# Read-only check of actual owner-only v3.1.0 draft with a main-branch
+# contents:write token. Does not upload/delete/edit tags, assets or releases.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v31-main-draft-access-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  authenticate-private-draft:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_DRAFT: '442346875'
+      EXPECTED_OLD_SOURCE_SHA: d852de9a513f83a329c14647ddc86bf3690fb5f5
+      NEW_CLEAN_APP_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+    steps:
+      - name: Authenticate draft ID and exact original seven older assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/$EXPECTED_DRAFT" > owner-draft.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('owner-draft.json').read_text())
+          assert r['id']==int(os.environ['EXPECTED_DRAFT'])
+          assert r['tag_name']=='v3.1.0' and r['draft'] is True
+          assert r['prerelease'] is False
+          expected={
+              'AnythingPlaysSetup-3.1.0.exe',
+              'anything-plays-31_3.1.0_amd64.deb',
+              'AnythingPlays-3.1.0-macos-arm64.dmg',
+              'AnythingPlays-3.1.0-macos-x64.dmg',
+              'SHA256SUMS.txt','FINAL_QA_MANIFEST.json',
+              'FINAL_SOURCE_ACCESS_REVIEW.md'
+          }
+          assert {a['name'] for a in r['assets']}==expected
+          print('Private owner-only draft accessible with main write token.')
+          print('Existing older draft asset count:',len(expected))
+          print('No assets or public releases changed.')
+          PY
+      - name: Inspect the still-private v3.1.0 tag target, if a tag was already made
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > ref.json 2>/dev/null; then
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          ref=json.loads(Path("ref.json").read_text())
+          print('Existing private release tag ref:',ref['object']['type'],ref['object']['sha'])
+          assert ref['object']['type']=='commit'
+          assert ref['object']['sha'] in {
+              os.environ['EXPECTED_OLD_SOURCE_SHA'],os.environ['NEW_CLEAN_APP_SHA']
+          },'Unknown tag target requires human examination'
+          PY
+          else
+            echo "Release tag not created while draft is private; must target clean source at publication."
+          fi
