@@ -1,0 +1,142 @@
+name: 3.1.0 | Stage verified four-platform PRIVATE GitHub release draft
+
+# Publishing is expressly forbidden. This workflow creates an owner-visible
+# draft only from previously QA-verified exact bytes. A draft is NOT approval
+# of LGPL/native corresponding source or physical controller/gameplay testing.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v31-stage-reviewed-private-draft.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anythingplays-v31-private-draft-singleton
+  cancel-in-progress: false
+
+jobs:
+  stage-only:
+    if: ${{ github.repository == 'MasynNay/anything-plays' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_QA_RUN: '43120583726'
+      EXPECTED_REVIEW_RUN: '43123263034'
+      EXPECTED_SOURCE_SHA: 'd852de9a513f83a329c14647ddc86bf3690fb5f5'
+      REVIEW_ARTIFACT: AnythingPlays-3.1.0-FINAL-FOUR-FULL-INSTALLERS-PRIVATE-REVIEW
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Refuse overwrite, public promotion, source drift or missing audited QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          if gh release view v3.1.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release v3.1.0 already exists; never edit or publish it automatically"
+            exit 1
+          fi
+          if git ls-remote --tags origin 'refs/tags/v3.1.0' | grep -q '.'; then
+            echo "::error::3.1.0 tag already exists; refusing to overwrite"
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$EXPECTED_QA_RUN" > qa.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$EXPECTED_REVIEW_RUN" > staged.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          qa=json.loads(Path('qa.json').read_text('utf-8'))
+          review=json.loads(Path('staged.json').read_text('utf-8'))
+          assert qa['status']=='completed' and qa['conclusion']=='success'
+          assert qa['event']=='pull_request'
+          assert qa['name']=='3.1.0 | Private four-platform FINAL identity build QA'
+          assert qa['head_sha']==os.environ['EXPECTED_SOURCE_SHA']
+          assert qa['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert review['status']=='completed' and review['conclusion']=='success'
+          assert review['event']=='workflow_run'
+          assert review['name']=='3.1.0 | Preserve four verified full installers for private release review'
+          assert review['repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          print('Verified exact native acceptance and matching read-only staging workflow')
+          PY
+      - name: Download only the SHA-checked four-platform private review bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reviewed
+          gh run download "$EXPECTED_REVIEW_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$REVIEW_ARTIFACT" --dir reviewed
+          test -s reviewed/FINAL_QA_MANIFEST.json
+          test -s reviewed/SHA256SUMS.txt
+          (cd reviewed && sha256sum --check SHA256SUMS.txt)
+      - name: Independently reject missing or altered original 3.1.0 installers and false licensing claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from tools.stage_v31_final_for_review import TARGETS,sha
+          root=Path('reviewed')
+          manifest=json.loads((root/'FINAL_QA_MANIFEST.json').read_text('utf-8'))
+          expected={
+              'schema_version':1,
+              'status':'PASSED_3_1_0_PRIVATE_BINARY_QA_RELEASE_RIGHTS_OPEN',
+              'source_revision':os.environ['EXPECTED_SOURCE_SHA'],
+              'qa_run_id':int(os.environ['EXPECTED_QA_RUN']),
+              'native_core_count':11,
+              'console_profiles':18,
+              'actual_installed_gui_verified_on_four_platforms':True,
+              'public_release_approved':False,
+              'stable_3_1_0_published':False,
+              'full_native_relinking_approved':False,
+              'physical_gameplay_accepted':False,
+          }
+          for key,value in expected.items():
+              if type(manifest.get(key)) is not type(value) or manifest[key]!=value:
+                  raise SystemExit('Invalid private final review manifest field: '+key)
+          if set(manifest['installers'])!=set(TARGETS):
+              raise SystemExit('Missing platform in private full installer set')
+          names={name for name,_ in TARGETS.values()}
+          names.update(('FINAL_QA_MANIFEST.json','FINAL_SOURCE_ACCESS_REVIEW.md','SHA256SUMS.txt'))
+          if {p.name for p in root.iterdir()}!=names:
+              raise SystemExit('Extra or missing release assets; refusing private draft')
+          for platform,(name,_) in TARGETS.items():
+              binary=root/name
+              evidence=manifest['installers'][platform]
+              if binary.is_symlink() or not binary.is_file() or binary.stat().st_size<1024*1024:
+                  raise SystemExit('Invalid native binary '+name)
+              if evidence['filename']!=name or evidence['sha256']!=sha(binary) or evidence['bytes']!=binary.stat().st_size:
+                  raise SystemExit('Source-pinned native byte mismatch '+platform)
+          notes=Path('docs/V3_1_RELEASE_DRAFT_NOTES.md').read_text('utf-8')
+          for required in ('NOT APPROVED FOR PUBLIC RELEASE','Complete native corresponding-source','physical', 'Apple-notarized'):
+              if required not in notes:
+                  raise SystemExit('Missing public review limitation in draft notes: '+required)
+          print('Exact four installers + 3 supporting receipts passed owner-only draft gate')
+          PY
+      - name: Create new DRAFT ONLY with all four genuine 3.1.0 installers (not published)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v3.1.0 reviewed/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$EXPECTED_SOURCE_SHA" \
+            --draft \
+            --title 'Anything Plays 3.1.0 — PRIVATE FINAL REVIEW DRAFT (NOT PUBLIC)' \
+            --notes-file docs/V3_1_RELEASE_DRAFT_NOTES.md
+          gh release view v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,assets > verified-private-draft.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('verified-private-draft.json').read_text('utf-8'))
+          assert s['tagName']=='v3.1.0'
+          assert s['isDraft'] is True, 'Public promotion prohibited'
+          assert len(s['assets'])==7, 'Must retain all four binaries, checksum, source note and QA receipt'
+          print('Owner-only v3.1.0 DRAFT created with seven exact verified assets. NOT PUBLIC.')
+          PY
