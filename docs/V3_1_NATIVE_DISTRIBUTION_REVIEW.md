@@ -6,6 +6,12 @@ built from `d852de9a513f83a329c14647ddc86bf3690fb5f5`, not a historical
 RC1 or RC2 binary. The draft contains four verified complete installers and
 the immutable source/build QA receipts, but no public redistribution decision.
 
+## Four clean-source installed native inventories now verified on all targets
+
+The [new exact four-platform native/notice audit](https://github.com/MasynNay/anything-plays/actions/runs/43146068474) **passed 4/4** on the real Windows, Linux, Intel Mac and Apple Silicon GitHub runners. This directly supersedes the earlier stock-OpenCV native inventory for the proposed *new clean-source* installers. The [complete inventory summary](V3_1_CLEAN_FINAL_NATIVE_INVENTORY.md) records exact native counts, notice candidate counts, SHA-256 evidence artifacts and the still-open source, replacement and redistribution review.
+
+This closes the missing four-platform **inventory coverage**, not the underlying legal correspondence and end-user relinking requirements. SDL 2.x itself is zlib-licensed; pygame-ce is LGPL-2.1-or-later, and other transitive libraries require independent license classification. Do not mark release approval true solely because these package inventory jobs passed.
+
 ## Latest clean-source candidate (separate from the original draft)
 
 The source-verified candidate was built in [four-platform installed QA run 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755) at app revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed` and staged without changing the original draft in [run 43142249044](https://github.com/MasynNay/anything-plays/actions/runs/43142249044). Its exact original OpenCV source archive, Windows packaging patch, compile settings and independent native source-wheel provenance are documented in [Clean OpenCV source reproduction](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
