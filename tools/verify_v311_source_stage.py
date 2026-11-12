@@ -78,11 +78,18 @@ def verify(target, installer, bundle, expected_source_sha, *, checkout=None):
     if native[0].is_symlink() or native[0].stat().st_size < 1024:
         raise ValueError("Missing genuine native mGBA source artifact")
     if target == "linux-x64":
-        details = subprocess.check_output(
-            ["dpkg-deb", "-f", str(installer), "Package", "Version"],
+        # dpkg-deb labels BOTH values when multiple fields are requested
+        # ("Package: foo\\nVersion: bar"), while one field returns a value.
+        # Read each field separately to verify the real installed package ID.
+        package = subprocess.check_output(
+            ["dpkg-deb", "-f", str(installer), "Package"],
             text=True, timeout=15,
-        ).splitlines()
-        if details != ["anything-plays-311-candidate", "3.1.1~qa1"]:
+        ).strip()
+        version = subprocess.check_output(
+            ["dpkg-deb", "-f", str(installer), "Version"],
+            text=True, timeout=15,
+        ).strip()
+        if (package, version) != ("anything-plays-311-candidate", "3.1.1~qa1"):
             raise ValueError("Wrong Linux package/version metadata")
     return {
         "schema_version": 1,
