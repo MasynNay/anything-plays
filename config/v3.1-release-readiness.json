@@ -524,5 +524,11 @@
     "scope": "Publish stable v3.1.0 publicly with the four newly verified clean-source installers",
     "meaning": "Owner has approved the goal of public publication, not certified third-party redistribution or hardware checks",
     "still_blocked_by": "release_gates"
+  },
+  "hardware_acceptance_disclosure": {
+    "owner_accepts_uncertified_hardware": true,
+    "physical_controller_tested": false,
+    "evidence": "https://github.com/MasynNay/anything-plays/blob/main/docs/V3_1_HARDWARE_QA_SCOPE.md",
+    "scope": "Owner requested free public 3.1.0 with openly disclosed real controller/camera/retail-game/long-session QA gaps; synthetic runner tests cannot count as real hardware"
   }
 }
