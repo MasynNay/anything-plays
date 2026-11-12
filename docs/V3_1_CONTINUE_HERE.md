@@ -21,6 +21,19 @@ native full 18-console assembly and installed Tk/DS Stream Mode QA:**
   AVFoundation camera backend proven, and verified the real ad-hoc signed/mounted
   full 18-console GUI, Stream Mode and isolated first-run preferences.
 
+**Next-platform full package workflows are safely staged as branches, but NOT yet
+verified or released:** `qa/v31-windows-full-clean-opencv-exe` contains
+`.github/workflows/v31-windows-full-source-opencv-qa.yml`; and
+`qa/v31-macos-intel-full-clean-opencv-dmg` contains
+`.github/workflows/v31-macos-intel-full-source-opencv-qa.yml`. Both are
+prepared to consume independent pinned native source-built wheels, reassemble
+11 original-source cores/18 console profiles, inspect the real finished
+EXE/DMG and run installed frozen Tk/Stream Mode plus settings-isolation checks.
+Do **not** create their PRs before the supplier wheel runs below pass and
+retain their original artifacts; absent source-wheel evidence is a hard
+stop. Windows workflow passes native Windows paths into the CMD builder.
+These two staged source branches are *not* successful installer QA yet.
+
 **Still active, DO NOT CLAIM PASSED until current job results confirm:**
 - **Windows:** [PR #214](https://github.com/MasynNay/anything-plays/pull/214);
   original published 2.0 setup.py patch headers corrected in the workflow,
