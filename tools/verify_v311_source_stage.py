@@ -64,7 +64,7 @@ def verify(target, installer, bundle, expected_source_sha, *, checkout=None):
             plist = plistlib.load(inp)
         if (plist.get("CFBundleIdentifier") != "com.anythingplays.private311qa"
                 or plist.get("CFBundleShortVersionString") != "3.1.1"
-                or plist.get("CFBundleVersion") != "3.1.1.1"):
+                or plist.get("CFBundleVersion") != "3.1.1"):
             raise ValueError("3.1.1 macOS QA bundle identifier/version mismatch")
         cores = bundle / "Contents" / "Resources" / "cores"
         suffix = ".dylib"
