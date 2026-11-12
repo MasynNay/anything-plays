@@ -6,6 +6,12 @@ This is the release operator's ordered checklist. The goal is one genuine stable
 installers, the exact source and notices, integrity checks and a working
 portfolio link. This file does **not** approve third-party redistribution.
 
+## Current source-verified private release package
+
+The [private staging run 43142249044](https://github.com/MasynNay/anything-plays/actions/runs/43142249044) verified all four **clean-source** 3.1.0 installers built at exact app revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`, preserving matching SHA-256, native installed GUI receipts, and four platform-specific OpenCV source-wheel hashes. Its bundle name is `AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW`. This is **not** the original seven-file private GitHub Release draft, which still contains older stock-OpenCV installers.
+
+The original upstream OpenCV source, Windows patch, native build settings, public source links and reproducibility limitations are recorded in [Clean OpenCV source reproduction](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md). The old draft and the newer review ZIP must not be mixed. Physical real-device acceptance, pygame/SDL source and relinking review, exact recipient-accessible corresponding sources and final release authorization remain open. No public stable 3.1.0 exists yet.
+
 ## November 11/12 unified clean-source final QA update
 
 **More recent than the original staging instructions below:** [13/13
