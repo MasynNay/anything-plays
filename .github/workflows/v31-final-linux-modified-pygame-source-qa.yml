@@ -1,0 +1,206 @@
+name: 3.1 | Source-modified pygame in exact clean final Linux installed app
+
+# Independent NEW proof for the exact 3.1.0 clean-source 18-console package.
+# Only copy the app, compile changed LGPL pygame C, run real changed C native
+# method, then start the genuinely modified frozen Tk application. No release.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-final-linux-modified-pygame-source-qa.yml'
+      - 'tools/verify_v31_final_linux_pygame_modified_source.py'
+      - 'tests/test_v31_final_linux_pygame_modified_source.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-final-linux-source-replacement-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  actual-final-modified-pygame-linux:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_RUN: '43140637755'
+      SOURCE_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+      UPSTREAM_PYGAME_SHA: c8200a9eaa530f884a0a4c3384cefc48006e58be
+      ORIGINAL_WHEEL: pygame_ce-2.5.8-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+      ORIGINAL_WHEEL_SHA: 5bb966b610e161a8f6d908b4c62ef3a1f3e922bc7bed73bd70a3e15dc780b90e
+      ORIGINAL_DEB: anything-plays-31_3.1.0_amd64.deb
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test reject-forgery source extension and copied-app guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_final_linux_pygame_modified_source.py' -v
+
+      - name: Install isolated pygame build and real frozen Tk smoke dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            git gcc g++ pkg-config libsdl2-dev libfreetype6-dev \
+            xvfb xauth python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 libasound2t64 libx11-6
+          python -m pip install 'meson==1.9.1' 'ninja==1.13.0' 'cython==3.2.1'
+
+      - name: Clone exact LGPL 2.5.8 source, create observable new C method
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth 1 --branch 2.5.8 \
+            https://github.com/pygame-community/pygame-ce.git upstream-pygame-ce
+          test "$(git -C upstream-pygame-ce rev-parse HEAD)" = "$UPSTREAM_PYGAME_SHA"
+          mkdir -p evidence
+          python -m tools.build_v31_modified_pygame_probe \
+            --root upstream-pygame-ce \
+            --receipt evidence/EXACT_C_SOURCE_MODIFICATION.json
+          git -C upstream-pygame-ce diff -- src_c/base.c > evidence/ORIGINAL_TO_CHANGED_C.patch
+          test -s evidence/ORIGINAL_TO_CHANGED_C.patch
+
+      - name: Compile actual changed pygame C to independent CPython 3.13 ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          meson setup upstream-pygame-ce/build upstream-pygame-ce \
+            -Dstripped=true -Dimage=disabled -Dmixer=disabled \
+            -Dfont=disabled -Dfreetype=disabled -Dmidi=disabled \
+            -Derror_on_warns=false -Dsdl_api=2
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          build=Path('upstream-pygame-ce/build').resolve()
+          targets=json.loads(subprocess.check_output(['meson','introspect','--targets',str(build)],text=True))
+          matches=[]
+          for entry in targets:
+              names=entry.get('filename',[])
+              if isinstance(names,str):
+                  names=[names]
+              for name in names:
+                  p=Path(name)
+                  if p.name=='base.cpython-313-x86_64-linux-gnu.so' and p.parent.name=='src_c':
+                      matches.append(p)
+          assert len(matches)==1,matches
+          native=matches[0]
+          subprocess.run(['ninja','-C',str(build),str(native.relative_to(build))],check=True)
+          assert native.is_file() and native.stat().st_size>100_000
+          Path('evidence/COMPILED_CHANGED_NATIVE_PATH.txt').write_text(str(native.resolve())+'\n')
+          PY
+
+      - name: Authenticate original same-source 13-job final package and source wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > evidence/ORIGINAL_QA_RUN.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          j=json.loads(Path('evidence/ORIGINAL_QA_RUN.json').read_text())
+          assert j['id']==int(os.environ['QA_RUN'])
+          assert j['head_sha']==os.environ['SOURCE_SHA']
+          assert j['conclusion']=='success' and j['status']=='completed'
+          assert j['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          PY
+          mkdir -p original original-wheel
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name AnythingPlays-3.1.0-FINAL-FULL-18-linux-x64-QA-ONLY --dir original
+          test -s "original/$ORIGINAL_DEB"
+          test -s original/FULL_LIBRARY_QA_RECEIPT.json
+          test -s original/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
+          gh release download 2.5.8 --repo pygame-community/pygame-ce \
+            --pattern "$ORIGINAL_WHEEL" --dir original-wheel
+          echo "$ORIGINAL_WHEEL_SHA  original-wheel/$ORIGINAL_WHEEL" | sha256sum --check
+          dpkg-deb -x "original/$ORIGINAL_DEB" extracted
+          test -x extracted/opt/anything-plays-31/AnythingPlays
+
+      - name: Copy the full clean final desktop and replace ONLY the copied pygame C extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v31_final_linux_pygame_modified_source \
+            --bundle "$PWD/extracted/opt/anything-plays-31" \
+            --installer "original/$ORIGINAL_DEB" \
+            --receipt original/FULL_LIBRARY_QA_RECEIPT.json \
+            --wheel "original-wheel/$ORIGINAL_WHEEL" \
+            --source-change evidence/EXACT_C_SOURCE_MODIFICATION.json \
+            --compiled "$(cat evidence/COMPILED_CHANGED_NATIVE_PATH.txt)" \
+            --destination "$PWD/copied-clean-final-source-modified" \
+            --output evidence/FINAL_CHANGED_SOURCE_NATIVE_STAGED.json
+
+      - name: Import copied final native extension in a real Python process and invoke changed C method
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,sys,types
+          from pathlib import Path
+          from importlib import util
+          from tools.build_v31_modified_pygame_probe import PROBE_VALUE
+          p=Path('evidence/FINAL_CHANGED_SOURCE_NATIVE_STAGED.json')
+          report=json.loads(p.read_text('utf-8'))
+          root=Path('copied-clean-final-source-modified/_internal').resolve()
+          native=root/'pygame'/Path(report['native_replacement_path']).name
+          assert native.is_file()
+          pkg=types.ModuleType('pygame')
+          pkg.__path__=[str(root/'pygame')]
+          pkg.__package__='pygame'
+          sys.modules['pygame']=pkg
+          spec=util.spec_from_file_location('pygame.base',native)
+          assert spec is not None and spec.loader is not None
+          obj=util.module_from_spec(spec)
+          sys.modules['pygame.base']=obj
+          spec.loader.exec_module(obj)
+          assert obj._ap31_relink_probe()==PROBE_VALUE
+          report['changed_c_method_executed']=True
+          p.write_text(json.dumps(report,indent=2)+'\n','utf-8')
+          print('Actual clean final copied pygame CE C method executes:',PROBE_VALUE)
+          PY
+
+      - name: Start actual full 3.1.0 frozen Tk executable with modified pygame and isolated settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/user-home
+          timeout 120s xvfb-run -a -s '-screen 0 1600x900x24' \
+            env HOME="$PWD/evidence/user-home" XDG_CONFIG_HOME="$PWD/evidence/user-home/.config" \
+            SDL_AUDIODRIVER=dummy AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$PWD/evidence/CHANGED_NATIVE_FINAL_FROZEN_GUI_SMOKE.json" \
+            "$PWD/copied-clean-final-source-modified/AnythingPlays" --ap-v30-ui-smoke
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          app=json.loads(Path('evidence/FINAL_CHANGED_SOURCE_NATIVE_STAGED.json').read_text('utf-8'))
+          smoke=json.loads(Path('evidence/CHANGED_NATIVE_FINAL_FROZEN_GUI_SMOKE.json').read_text('utf-8'))
+          assert smoke['actual_tk_window_started'] is True
+          assert smoke['actual_tk_mainloop_ran'] is True
+          assert smoke['console_profile_count']==18
+          assert smoke['public_distribution_approved'] is False
+          assert app['changed_c_method_executed'] is True
+          assert app['public_release_approved'] is False
+          app['actual_frozen_final_tk_booted']=True
+          app['status']='CLEAN_FINAL_LINUX_CHANGED_SOURCE_PYGAME_NATIVE_METHOD_AND_DESKTOP_PASS_UNAPPROVED'
+          Path('evidence/FINAL_CHANGED_SOURCE_NATIVE_STAGED.json').write_text(
+              json.dumps(app,indent=2)+'\n','utf-8')
+          print('Exact clean final Linux native source modification and Tk startup PASSED.')
+          PY
+
+      - name: Preserve real original-source modification and clean final installed QA, never a binary release
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-CLEAN-FINAL-LINUX-MODIFIED-LGPL-PYGAME-NATIVE-SOURCE-EVIDENCE
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: warn
