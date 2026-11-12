@@ -1,0 +1,149 @@
+name: 3.1.0 | New clean-source exact final four-platform native/notice audit
+
+# A read-only audit of the newer FFmpeg-disabled OpenCV source-built,
+# COMPLETE 18-console 3.1.0 installers on all four native targets. It does NOT rebuild, alter, upload or publish any installer,
+# authorize licensing, or infer source correspondence from a filename.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v31-clean-final-native-source-inventory.yml'
+      - 'tools/inventory_v31_final_native.py'
+      - 'tests/test_v31_final_native_inventory.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v31-clean-final-native-notices-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  exact-frozen-native-inventory:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Clean source-built final package library/notice inventory | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31_3.1.0_amd64.deb', receipt: 'FULL_LIBRARY_QA_RECEIPT.json'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.0.exe', receipt: 'FULL_WINDOWS_QA_RECEIPT.json'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-macos-arm64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-macos-x64.dmg', receipt: 'FULL_MACOS_QA_RECEIPT.json'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+      QA_RUN: '43140637755'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Adversarial receipt / license inventory unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v31_final_native_inventory.py' -v
+      - name: Verify the original same-source four-platform QA run passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > qa-run.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("qa-run.json").read_text("utf-8"))
+          assert r["id"]==int(os.environ["QA_RUN"])
+          assert r["head_sha"]==os.environ["SOURCE_SHA"]
+          assert r["status"]=="completed" and r["conclusion"]=="success"
+          assert r["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          assert r["name"]=="3.1.0 | Private four-platform FINAL identity build QA"
+          print("Verified original clean-source native QA:",r["html_url"])
+          PY
+      - name: Download actual clean-source 18-console complete final package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa review
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'AnythingPlays-3.1.0-FINAL-FULL-18-${{ matrix.target }}-QA-ONLY' \
+            --dir qa
+          test -s 'qa/${{ matrix.installer }}'
+          test -s 'qa/${{ matrix.receipt }}'
+          test -s 'qa/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json'
+      - name: Extract unchanged clean-source Linux final package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb -x 'qa/${{ matrix.installer }}' installed
+          test -d installed/opt/anything-plays-31/licenses
+          python -m tools.inventory_v31_final_native \
+            --target '${{ matrix.target }}' --bundle installed/opt/anything-plays-31 \
+            --installer 'qa/${{ matrix.installer }}' \
+            --receipt 'qa/${{ matrix.receipt }}' --source-sha "$SOURCE_SHA" \
+            --output review/FINAL_NATIVE_NOTICE_INVENTORY.json
+      - name: Extract unchanged clean-source Windows Inno final package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'qa/${{ matrix.installer }}').Path
+          $destination=Join-Path $env:RUNNER_TEMP 'AP31-final-native-audit'
+          python -c "from pathlib import Path;import sys;from tools.assemble_v31_full_windows import unpack;unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $destination
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot extract exact Inno final installer' }
+          python -m tools.inventory_v31_final_native --target '${{ matrix.target }}' --bundle $destination --installer $installer --receipt 'qa/${{ matrix.receipt }}' --source-sha $env:SOURCE_SHA --output review/FINAL_NATIVE_NOTICE_INVENTORY.json
+          if ($LASTEXITCODE -ne 0) { throw 'Exact final Windows native audit failed' }
+      - name: Inspect unchanged mounted clean-source signed final Mac app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mountpoint="$(mktemp -d /tmp/ap31-notices.XXXXXX)"
+          trap 'hdiutil detach "$mountpoint" >/dev/null 2>&1 || true; rmdir "$mountpoint" >/dev/null 2>&1 || true' EXIT
+          hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" 'qa/${{ matrix.installer }}'
+          test -d "$mountpoint/AnythingPlays31.app/Contents/Resources/licenses"
+          codesign --verify --verbose=2 "$mountpoint/AnythingPlays31.app"
+          python -m tools.inventory_v31_final_native \
+            --target '${{ matrix.target }}' \
+            --bundle "$mountpoint/AnythingPlays31.app" \
+            --installer 'qa/${{ matrix.installer }}' \
+            --receipt 'qa/${{ matrix.receipt }}' --source-sha "$SOURCE_SHA" \
+            --output review/FINAL_NATIVE_NOTICE_INVENTORY.json
+      - name: Require exact technical scope and no invented public approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("review/FINAL_NATIVE_NOTICE_INVENTORY.json").read_text("utf-8"))
+          assert r["source_revision"]==os.environ["SOURCE_SHA"]
+          assert r["status"]=="UNAPPROVED_EXACT_FINAL_3_1_NATIVE_AND_NOTICE_INVENTORY"
+          assert r["native_file_count"] > 0 and r["notice_file_count"] > 0
+          for flag in ("source_to_binary_correspondence_verified",
+                       "all_native_library_replacement_paths_verified",
+                       "all_redistribution_rights_reviewed",
+                       "public_release_approved"):
+              assert r[flag] is False
+          print("Exact final native files:",r["native_file_count"],
+                "notice candidates:",r["notice_file_count"])
+          print("Licensing and library replacement review remain OPEN.")
+          # These are exact as-built technical reports, not proof that every
+          # frozen native object corresponds to an available source archive.
+          assert r["target"] in {"linux-x64","windows-x64","macos-arm64","macos-x64"}
+          assert r["public_release_approved"] is False
+          print("Clean-source native inventory evidence retained for source correspondence.")
+          PY
+      - name: Retain exact native/notice inventory for independent review
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.0-CLEAN-FINAL-${{ matrix.target }}-NATIVE-NOTICE-INVENTORY-UNAPPROVED
+          path: review/FINAL_NATIVE_NOTICE_INVENTORY.json
+          retention-days: 30
+          if-no-files-found: error

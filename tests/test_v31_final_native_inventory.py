@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from tools.inventory_v31_final_native import EXPECTED, STATUS, digest, inspect
+from tools.inventory_v31_final_native import EXPECTED, STATUS, digest, inspect, native
 
 SHA = "a" * 40
 
@@ -66,6 +66,25 @@ class FinalNativeInventoryTests(unittest.TestCase):
             self.assertEqual(out["native_family_counts"]["libretro_core"], 1)
             self.assertTrue(all(out["notice_presence_signals_not_legal_conclusions"].values()))
             self.assertTrue(all(not x["path"].startswith("/") for x in out["native_files"]))
+
+    def test_versioned_elf_soname_is_native_but_license_metadata_is_not(self):
+        for filename in ("libSDL2-2.so.0.3200.10", "libSDL2.so.0",
+                         "pygame/base.cpython-313-darwin.so", "sound.dll",
+                         "core.dylib", "SDL.pyd"):
+            with self.subTest(native=filename):
+                self.assertTrue(native(filename))
+        for filename in ("001_copying.cpython-313-darwin.so.yml",
+                         "libSDL2.so.0.json", "libSDL2.so.backup",
+                         "README.txt", "NOTICE.md", "LICENSE.so.yml"):
+            with self.subTest(metadata=filename):
+                self.assertFalse(native(filename))
+        with TemporaryDirectory() as temp:
+            bundle, installer, receipt = self.setup_fixture(temp)
+            (bundle/"licenses"/"001_copying.cpython-313-darwin.so.yml").write_text(
+                "Metadata, not a compiled extension", "utf-8")
+            report = inspect(target="windows-x64", bundle=bundle,
+                             installer=installer, receipt=receipt, source_sha=SHA)
+            self.assertEqual(report["native_file_count"], 5)
 
     def test_reject_tampered_binary_and_receipt_fields(self):
         with TemporaryDirectory() as temp:

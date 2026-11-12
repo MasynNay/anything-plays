@@ -38,7 +38,12 @@ def digest(path: Path) -> str:
 
 def native(name: str) -> bool:
     n = name.lower()
-    return n.endswith(NATIVE_EXT) or ".so." in n or n.endswith(".dylib.tbd")
+    # Accept ELF sonames such as libSDL2.so.0.3200.10, but never let
+    # metadata files like copying.cpython-313-darwin.so.yml masquerade
+    # as binary objects merely because ".so." appears in the name.
+    return (n.endswith(NATIVE_EXT)
+            or re.search(r"\.so(?:\.[0-9]+)+$", n) is not None
+            or n.endswith(".dylib.tbd"))
 
 
 def family(relative: str) -> str:
