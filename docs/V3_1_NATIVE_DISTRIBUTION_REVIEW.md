@@ -1,10 +1,21 @@
 # Anything Plays 3.1.0 — native dependency distribution review
 
 **Review state: OPEN. This is an evidence index and remediation plan, not legal approval.**
-Last updated: November 11, 2026. Review the exact **private v3.1.0 draft**
-built from `d852de9a513f83a329c14647ddc86bf3690fb5f5`, not a historical
-RC1 or RC2 binary. The draft contains four verified complete installers and
-the immutable source/build QA receipts, but no public redistribution decision.
+Last updated: November 11/12, 2026. The newest **clean candidate**
+has [13 passing exact-source native full/installed QA
+jobs](https://github.com/MasynNay/anything-plays/actions/runs/43140637755),
+source revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`, and a
+[private reverified four-installer source provenance
+bundle](https://github.com/MasynNay/anything-plays/actions/runs/43142249044).
+The original private `v3.1.0` GitHub Release draft still has the
+**older stock OpenCV** packages from
+`d852de9a513f83a329c14647ddc86bf3690fb5f5`.
+Do not combine those older exact installer hashes with the new clean OpenCV
+candidate or describe a private bundle as a published stable release.
+[Permanent original OpenCV source archive and Windows patch, exact per-OS
+build recipe and SHA receipts](V3_1_CLEAN_OPENCV_SOURCE_REPRODUCTION.md).
+Native LGPL/source/relinking rights and actual hardware acceptance remain
+independent open requirements.
 
 ## 1. Exact frozen binaries under review
 
