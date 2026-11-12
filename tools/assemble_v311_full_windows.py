@@ -19,6 +19,9 @@ from anything_plays.v30_gpl_trial import (
 )
 from tools.assemble_v31_full_windows import unpack, source_app, iscc
 from tools.verify_v311_source_stage import INSTALLERS, STATUS, digest
+from tools.verify_v311_stable_source_stage import (
+    INSTALLERS as STABLE_INSTALLERS, STATUS as STABLE_STATUS,
+)
 from tools.verify_v31_rc import validate_staged_identity
 from tools.v311_camera_source_gate import require_pinned_native_camera_wheel
 from tools.audit_v31_sdl_runtime import UPSTREAM_LGPL_SHA256, inspect_bundle
@@ -28,28 +31,36 @@ TARGET = "windows-x64"
 OLD = "AnythingPlaysSetup-3.1.0.exe"
 NEW = INSTALLERS[TARGET]
 FULL_STATUS = "PRIVATE_3_1_1_FULL_18_WINDOWS_QA_NOT_APPROVED"
+STABLE_FULL_STATUS = "PRIVATE_3_1_1_FULL_STABLE_UPDATE_WINDOWS_NOT_APPROVED"
 
 
-def _check_receipt(receipt, *, source, digest_of_installer, size):
+def _check_receipt(receipt, *, source, digest_of_installer, size,
+                   stable_update=False):
     expected = {
-        "status": STATUS, "target": TARGET, "installer": NEW,
+        "status": STABLE_STATUS if stable_update else STATUS,
+        "target": TARGET,
+        "installer": STABLE_INSTALLERS[TARGET] if stable_update else NEW,
         "sha256": digest_of_installer,
         "source_revision": source,
         "size_bytes": size, "native_core_count": 1,
         "full_18_console_installer": False,
         "public_release_approved": False,
-        "identity_channel": "v311_candidate",
-        "settings_namespace": "anything-plays-311-candidate",
+        "identity_channel": "v311_stable_candidate" if stable_update else "v311_candidate",
+        "settings_namespace": "anything-plays-31" if stable_update else "anything-plays-311-candidate",
     }
     for key, value in expected.items():
         if type(receipt.get(key)) is not type(value) or receipt.get(key) != value:
             raise ValueError("Not exact original 3.1.1 Windows source: "+key)
 
 
-def build(stable, preview, checksums, receipt, camera_receipt, expected_source_sha, output):
+def build(stable, preview, checksums, receipt, camera_receipt,
+          expected_source_sha, output, *, stable_update=False):
     stable, preview, checksums, receipt, output = map(
         Path, (stable, preview, checksums, receipt, output))
-    if (stable.name != OLD or preview.name != NEW
+    new_name = STABLE_INSTALLERS[TARGET] if stable_update else NEW
+    channel = "v311_stable_candidate" if stable_update else "v311_candidate"
+    namespace = "anything-plays-31" if stable_update else "anything-plays-311-candidate"
+    if (stable.name != OLD or preview.name != new_name
             or stable.is_symlink() or preview.is_symlink()
             or not stable.is_file() or not preview.is_file()
             or min(stable.stat().st_size, preview.stat().st_size) <= 1024*1024):
@@ -63,7 +74,7 @@ def build(stable, preview, checksums, receipt, camera_receipt, expected_source_s
     meta = json.loads(receipt.read_text("utf-8"))
     _check_receipt(meta, source=expected_source_sha,
                    digest_of_installer=digest(preview),
-                   size=preview.stat().st_size)
+                   size=preview.stat().st_size, stable_update=stable_update)
     if output.exists() or output.is_symlink():
         raise ValueError("No overwrite of package destination")
     camera = require_pinned_native_camera_wheel(camera_receipt, TARGET)
@@ -75,7 +86,7 @@ def build(stable, preview, checksums, receipt, camera_receipt, expected_source_s
         unpack(preview, scratch/"source")
         old = source_app(scratch/"stable", "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json")
         new = source_app(scratch/"source", "AnythingPlays.exe")
-        validate_staged_identity(new, channel="v311_candidate")
+        validate_staged_identity(new, channel=channel)
         original = validate_trial_core_directory(old/"cores", ".dll")
         if (original.get("total_source_built_core_families") != 11
                 or original.get("source_built_dolphin") is None
@@ -110,16 +121,17 @@ def build(stable, preview, checksums, receipt, camera_receipt, expected_source_s
         subprocess.run([__import__("sys").executable,
                         str(root/"tools/render_v21_icon.py")],
                        cwd=root, check=True, timeout=120)
-        subprocess.run([iscc(), "/DV311QABuild=1",
-                        "/DAppVersion=3.1.1-qa1",
+        subprocess.run([iscc(),
+                        "/DV31FinalBuild=1" if stable_update else "/DV311QABuild=1",
+                        "/DAppVersion=3.1.1" if stable_update else "/DAppVersion=3.1.1-qa1",
                         str(root/"packaging/installer.iss")],
                        cwd=root, check=True, timeout=600)
-        produced = root/"release"/NEW
+        produced = root/"release"/new_name
         if not produced.is_file():
             raise ValueError("Original source-built full 3.1.1 setup not created")
         unpack(produced, scratch/"installed")
         installed = source_app(scratch/"installed", "V30_GPL_TRIAL_PREVIEW_UNAPPROVED.json")
-        validate_staged_identity(installed, channel="v311_candidate")
+        validate_staged_identity(installed, channel=channel)
         # Keep Windows native DLL loads confined to a disposable process
         # so the runner can delete its scratch install afterward.
         subprocess.run([
@@ -137,19 +149,21 @@ def build(stable, preview, checksums, receipt, camera_receipt, expected_source_s
         audit = inspect_bundle(installed, TARGET)
         (output/"SDL_RUNTIME_AUDIT.json").write_text(
             json.dumps(audit, indent=2)+"\n", "utf-8")
-        final = output/NEW
+        final = output/new_name
         shutil.copyfile(produced, final)
         report = {
             "schema_version": 1,
-            "status": FULL_STATUS, "target": TARGET,
-            "installer": NEW, "sha256": digest(final),
+            "status": STABLE_FULL_STATUS if stable_update else FULL_STATUS,
+            "target": TARGET,
+            "installer": new_name, "sha256": digest(final),
             "size_bytes": final.stat().st_size,
             "old_stable_sha256": digest(stable),
             "new_source_sha256": digest(preview),
             "sourcebuilt_ffmpeg_off_camera_wheel_sha256": camera["native_wheel_sha256"],
             "new_source_revision": expected_source_sha,
-            "version": "3.1.1", "identity_channel": "v311_candidate",
-            "settings_namespace": "anything-plays-311-candidate",
+            "version": "3.1.1", "identity_channel": channel,
+            "settings_namespace": namespace,
+            "stable_in_place_update": stable_update,
             "native_core_count": 11, "console_profiles": 18,
             "original_core_families": original["total_source_built_core_families"],
             "sdl_audit": "SDL_RUNTIME_AUDIT.json",
@@ -167,9 +181,11 @@ def main():
     for key in ("stable", "qa", "checksums", "source-receipt", "camera-receipt", "expected-source-sha", "output"):
         p.add_argument("--"+key, required=True,
                        type=Path if key != "expected-source-sha" else str)
+    p.add_argument("--stable-update", action="store_true",
+                   help="Assemble true stable 3.1.1 Inno upgrade, NOT a release")
     a = p.parse_args()
     report = build(a.stable, a.qa, a.checksums, a.source_receipt, a.camera_receipt,
-                   a.expected_source_sha, a.output)
+                   a.expected_source_sha, a.output, stable_update=a.stable_update)
     print(json.dumps(report, indent=2))
 
 
