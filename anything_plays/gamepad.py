@@ -131,6 +131,7 @@ class GamepadReader:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
         pg = self.loader()
+        api = None
         try:
             pg.display.init()
             pg.joystick.init()
@@ -138,12 +139,19 @@ class GamepadReader:
             api.init()
             self.pygame, self.api = pg, api
         except Exception:
-            # A failed SDL initialization must never prevent keyboard play.
-            try:
-                pg.joystick.quit()
-                pg.display.quit()
-            except Exception:
-                pass
+            # A partial SDL start can leave a native controller context or
+            # dummy-video device open. Shut down EACH initialized component
+            # even when a USB driver or one quit() raises; an exception from
+            # the cleanup must not mask the original startup failure.
+            callbacks = []
+            if api is not None:
+                callbacks.append(api.quit)
+            callbacks.extend((pg.joystick.quit, pg.display.quit))
+            for callback in callbacks:
+                try:
+                    callback()
+                except Exception:
+                    pass
             raise
 
     def _sdl_constant(self, name):
