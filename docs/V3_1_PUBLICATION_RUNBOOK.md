@@ -1,10 +1,16 @@
 # Anything Plays 3.1.0 — Publication runbook
 
-**State (November 11, 2026): PREPARED, NOT AUTHORIZED OR PUBLISHED.**
+**State (November 11, 2026): OWNER REQUESTED PUBLICATION; FOUR TECHNICAL CANDIDATES VERIFIED; RELEASE COMPLIANCE STILL OPEN, NOT PUBLISHED.**
 This is the release operator's ordered checklist. The goal is one genuine stable
 `v3.1.0` GitHub Release with four already-built, version-correct full
 installers, the exact source and notices, integrity checks and a working
 portfolio link. This file does **not** approve third-party redistribution.
+
+## Fail-closed stable publication automation
+
+The [3.1 stable publication workflow](../.github/workflows/v31-publish-cleared-clean-stable.yml) is a separate **manual** release operator action; the legacy `release.yml` remains disabled and is not a 3.1 installer source. This workflow checks `config/v3.1-release-readiness.json` before downloading or touching the original draft. Only after all review gates and final public release approval are grounded and recorded will it validate the original native QA, download the exact private source-verified 43142249044 staging artifact, check `SHA256SUMS.txt`, compare all seven uploaded release asset digests, and publish the original draft from the true `104b96621ec4cb8dc39fde8c3fe96fc854c406ed` source using [prepared public release notes](V3_1_PUBLIC_RELEASE_NOTES.md).
+
+Owner intent to publish is recorded separately and **does not automatically prove third-party redistribution or physical hardware acceptance**. The workflow is currently expected to fail its release preflight while those checks remain false. Do not manually bypass it, upload mismatched installers, or use the old draft bytes.
 
 ## Current source-verified private release package
 
