@@ -111,10 +111,12 @@ jobs:
           $ErrorActionPreference='Stop'
           $exe=Join-Path (Resolve-Path 'sandbox/private31').Path 'AnythingPlays.exe'
           if (-not (Test-Path $exe)) { throw 'Swapped frozen 3.1 executable missing' }
-          $home=Join-Path $env:RUNNER_TEMP 'AP31-v2-cv2-frozen-smoke'
-          New-Item -ItemType Directory -Path $home -ErrorAction Stop | Out-Null
-          $env:USERPROFILE=$home
-          $env:HOME=$home
+          # PowerShell $HOME is a reserved read-only automatic variable.
+          # Use a distinct name for our disposable synthetic profile.
+          $qaHome=Join-Path $env:RUNNER_TEMP 'AP31-v2-cv2-frozen-smoke'
+          New-Item -ItemType Directory -Path $qaHome -ErrorAction Stop | Out-Null
+          $env:USERPROFILE=$qaHome
+          $env:HOME=$qaHome
           $env:AP_V30_UI_SMOKE_CHECK='1'
           $env:AP_V31_STREAM_SMOKE_CHECK='1'
           $env:AP_V30_UI_SMOKE_REPORT=Join-Path (Resolve-Path 'evidence').Path 'FROZEN_SWAP_UI.json'
