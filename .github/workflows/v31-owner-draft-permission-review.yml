@@ -41,3 +41,22 @@ jobs:
           assert names==expected
           print('Private draft accessible to release-scoped CI. Old 7 assets stay untouched.')
           PY
+      - name: Inspect tag state without modifying existing public refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > ref.json 2>/dev/null; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          ref=json.loads(Path("ref.json").read_text())
+          print("Existing v3.1.0 Git tag:",ref['object']['type'],ref['object']['sha'])
+          assert ref['object']['type']=='commit'
+          assert ref['object']['sha'] in {
+            '104b96621ec4cb8dc39fde8c3fe96fc854c406ed',
+            'd852de9a513f83a329c14647ddc86bf3690fb5f5'
+          },'Unexpected v3.1.0 tag source!'
+          PY
+          else
+            echo "Draft release does not yet have a Git tag ref; publishing must create an exact new source tag."
+          fi
