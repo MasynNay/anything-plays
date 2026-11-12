@@ -36,6 +36,16 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 
 **Latest full 3.1.0 private identity run 43120583726:** genuine 3.1.0 Windows, Linux and Intel macOS source-stage installers **PASSED and uploaded source-stage artifacts**. Apple Silicon was queued at last check. This is 3/4 source stages, **not 3/4 full 11-core installers**. Full original-core assembly and final installed desktop jobs are **not yet verified** in this run. Never merge PR #199 based only on source stage or this checkpoint. [Run](https://github.com/MasynNay/anything-plays/actions/runs/43120583726).
 
+## November 11 verified completion: genuine 3.1.0 draft with four installers
+
+**PR #199 MERGED**: `2b1567e86cb305a7bd10fc76c494d81b39aa77bd` after the exact source SHA `d852de9a513f83a329c14647ddc86bf3690fb5f5` passed [all 13 final native jobs](https://github.com/MasynNay/anything-plays/actions/runs/43120583726): 4 original source-stage app identities, 4 complete 11-core/18-console native installers, 4 installed frozen Stream Mode/Tk settings-isolation jobs and 1 installed-receipt/fixture contract job. The companion [full source checks](https://github.com/MasynNay/anything-plays/actions/runs/43120583722) passed.
+
+**Private four-platform release staging succeeded** at [run 43123263034](https://github.com/MasynNay/anything-plays/actions/runs/43123263034) from the *same exact QA run*, producing `AnythingPlays-3.1.0-FINAL-FOUR-FULL-INSTALLERS-PRIVATE-REVIEW` with four byte-matched verified binaries, manifest, source note and checksum.
+
+**Private GitHub Release draft CREATED** by [run 43128235685](https://github.com/MasynNay/anything-plays/actions/runs/43128235685). Authenticated GitHub Releases API confirms `id=442346875`, `tag_name=v3.1.0`, `draft=true`, `prerelease=false`, `target_commitish=d852de9a513f83a329c14647ddc86bf3690fb5f5`, with **seven** exact assets: `anything-plays-31_3.1.0_amd64.deb`, `AnythingPlaysSetup-3.1.0.exe`, `AnythingPlays-3.1.0-macos-arm64.dmg`, `AnythingPlays-3.1.0-macos-x64.dmg`, `FINAL_QA_MANIFEST.json`, `FINAL_SOURCE_ACCESS_REVIEW.md`, and `SHA256SUMS.txt`. Owner-only link: https://github.com/MasynNay/anything-plays/releases/tag/untagged-293d7611aadb2e7f65f3.
+
+**Do not redo full package builds just to stage installers. They are in the GitHub draft now.** Do not publish the draft until a genuine redistribution/source/relinking review is complete, physical-device acceptance requirements are resolved or explicitly documented and accepted, and the owner makes a final release decision. The formal manifest closes only 2 of 6 gates (`full_eighteen_console_installer`, `four_platform_full_installer_verification`). `public_release_approved` remains false. Stable `3.0`, public `3.1-rc2`, and the portfolio public stable link remain untouched.
+
 ## Exact next actions
 
 1. Inspect PR #199's current head and [the native full workflow](https://github.com/MasynNay/anything-plays/actions/workflows/v31-final-identity-private-qa.yml). If a job fails, read its exact GitHub job logs, fix source/test bugs and run exact-head checks again. A previous macOS error was an intermittent `upload-artifact@v4` backend failure (invalid HTML); retry only failed jobs after checking it is infrastructure, not application failure.
