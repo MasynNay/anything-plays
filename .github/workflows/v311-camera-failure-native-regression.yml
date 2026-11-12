@@ -1,0 +1,72 @@
+name: 3.1.1 | Four-platform native webcam failure recovery
+
+# Source-only QA for the actual 3.1.1 webcam/unplug/shutdown changes.
+# Do NOT package RC2 or release any binaries. Uses synthetic faulty devices,
+# not a physical webcam, camera permission prompt, game ROM or recording.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-camera-failure-native-regression.yml'
+      - 'anything_plays/cameras.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_gameplay.py'
+      - 'tests/test_v311_camera_failure_isolation.py'
+      - 'tests/test_v311_camera_timer_unplug.py'
+
+permissions:
+  contents: read
+
+jobs:
+  source-camera-errors:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: OpenCV and camera fault isolation | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      OPENCV_VIDEOIO_PRIORITY_FFMPEG: '0'
+      AP_TEST_CAMERA_HARDWARE: '0'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Ensure Tk bindings are available on Ubuntu CI
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3-tk libgl1 libglib2.0-0
+      - name: Import actual native OpenCV and Tk bindings
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check 'opencv-python-headless==4.14.0.94' 'Pillow>=10,<13'
+          python - <<'PY'
+          import cv2
+          import tkinter
+          import platform
+          print("Target OS:",platform.platform())
+          print("OpenCV:",cv2.__version__)
+          assert cv2.__version__=="4.14.0"
+          print("Tk:",tkinter.TkVersion)
+          print("No physical camera or personal files accessed.")
+          PY
+      - name: Exercise unplugged driver, failed open/read/close and safe UI tick
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v311_camera_failure_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_v311_camera_timer_unplug.py' -v
+          echo '4OS camera handling verified with fault injection; live hardware remains untested.'
