@@ -31,6 +31,23 @@ and final 3.1.0 stable identities are separate, open release requirements.
 Do not label these files approved source correspondence, rename RC1
 installers as stable, or modify the existing public 3.0.0 release.
 
+## Exact clean-final 3.1.0 native source replacement evidence (all four OSes)
+
+The following source-modification tests target the **new, original, immutable, complete 18-console/11-core 3.1.0 installers** from the single source revision `104b96621ec4cb8dc39fde8c3fe96fc854c406ed` in [final original build 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755). They are more recent and more relevant than the older RC1 replacement evidence below.
+
+| Final native OS | Exact technical result |
+| --- | --- |
+| Linux x64 | [Passed actual final Linux modified C method and frozen Tk](https://github.com/MasynNay/anything-plays/actions/runs/43148388829) |
+| Windows x64 | [Passed actual final Windows modified MSVC C method and frozen Tk](https://github.com/MasynNay/anything-plays/actions/runs/43149732092) |
+| macOS Apple Silicon | [Passed actual final signed Mac modified C method and frozen Tk](https://github.com/MasynNay/anything-plays/actions/runs/43149191077) |
+| macOS Intel | [Passed separate actual final signed Intel Mac modified C method and frozen Tk](https://github.com/MasynNay/anything-plays/actions/runs/43149191077) |
+
+The independently compiled modified native `pygame.base` library was installed **only into a disposable copied original app**. The source was the exact tagged pygame-ce 2.5.8 original, with observable C changes. The copied native function executed and the real frozen 18-console Tk desktop opened successfully. Original installers remained unchanged. Mac app copies were re-signed after native modification. The corrected [exact four-platform final native library and notice inventory](https://github.com/MasynNay/anything-plays/actions/runs/43147036559) passed separately.
+
+**This is one covered C extension per platform, not independent proof of all pygame/SDL/transitive binary-to-source correspondence, build options, modified-library replacement for every relevant object, complete user-supplied build/relink materials, notice duties or redistribution permission.** pygame-ce 2.5.8 is LGPL; bundled SDL 2.x is zlib-licensed, but every transitive dependency must be reviewed according to its own license. Source archives and CI evidence can expire, so a public binary release needs durable source and notice access satisfying actual applicable terms. None of the physical gamepad, camera, game save, audio, sustained gameplay and independent legal/rollout checks is silently approved by the native code tests.
+
+See [the native distribution review](V3_1_NATIVE_DISTRIBUTION_REVIEW.md), [exact final release acceptance record](V3_1_RELEASE_ACCEPTANCE.md) and [publication runbook](V3_1_PUBLICATION_RUNBOOK.md). The owner has requested public 3.1.0, but the exact distribution rights/source/relinking and hardware release gates are still explicitly false.
+
 ## Subsequent verified native-replacement evidence
 
 The technical source-companion candidate archives above have since been
