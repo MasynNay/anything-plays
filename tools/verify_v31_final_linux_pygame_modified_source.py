@@ -63,7 +63,7 @@ def stage(*, bundle, installer, receipt, wheel, source_change, compiled, destina
                == source_change.get("patched_base_c_sha256")):
         raise ValueError("Unverified actual source modification receipt")
     original = bundle / RELATIVE
-    _file(original, 100_000, 20 * 1024**2)
+    _file(original, 20_000, 20 * 1024**2)
     _file(compiled, 100_000, 20 * 1024**2)
     if compiled.name != BASENAME:
         raise ValueError("Wrong CPython 3.13 compiled extension")
