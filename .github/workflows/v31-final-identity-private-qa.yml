@@ -47,6 +47,7 @@ jobs:
           - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.0-macos-arm64.dmg', bundle: 'dist/AnythingPlays31.app'}
           - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.0-macos-x64.dmg', bundle: 'dist/AnythingPlays31.app'}
     env:
+      GH_TOKEN: ${{ github.token }}
       AP_V31_FINAL_CANDIDATE: '1'
       AP_V31_PREVIEW: '0'
       AP_V31_RC: '0'
