@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
 from anything_plays.gamepad import GamepadReader
 
@@ -161,6 +162,64 @@ class BadDeviceIsolationTests(unittest.TestCase):
         self.assertEqual(api.opened, [0])
         self.assertEqual(first.closes, 0)
         self.assertEqual(second.closes, 0)
+
+
+
+class PartialSDLInitializationTests(unittest.TestCase):
+    def test_failed_joystick_init_still_closes_display_when_joystick_quit_raises(self):
+        pg = SimpleNamespace(display=Mock(), joystick=Mock())
+        pg.joystick.init.side_effect = RuntimeError("controller backend unavailable")
+        pg.joystick.quit.side_effect = OSError("driver already unplugged")
+        reader = GamepadReader(loader=lambda: pg)
+
+        with self.assertRaisesRegex(RuntimeError, "controller backend unavailable"):
+            reader.start()
+        pg.display.init.assert_called_once()
+        pg.joystick.init.assert_called_once()
+        pg.joystick.quit.assert_called_once()
+        pg.display.quit.assert_called_once()
+        self.assertIsNone(reader.api)
+        self.assertIsNone(reader.pygame)
+        self.assertIsNone(reader.controller)
+
+    def test_partial_sdl_controller_init_frees_controller_and_both_pg_subsystems(self):
+        pg = SimpleNamespace(display=Mock(), joystick=Mock())
+        api = Mock()
+        api.init.side_effect = ValueError("SDL controller failed to initialize")
+        api.quit.side_effect = OSError("native controller cleanup failed")
+        pg.joystick.quit.side_effect = RuntimeError("native joystick close failed")
+        reader = GamepadReader(loader=lambda: pg)
+
+        with patch("anything_plays.gamepad.importlib.import_module", return_value=api):
+            with self.assertRaisesRegex(ValueError, "SDL controller failed"):
+                reader.start()
+        api.init.assert_called_once()
+        api.quit.assert_called_once()
+        pg.joystick.quit.assert_called_once()
+        pg.display.quit.assert_called_once()
+        self.assertIsNone(reader.api)
+        self.assertIsNone(reader.pygame)
+
+    def test_failed_start_can_retry_and_normal_stop_closes_each_subsystem(self):
+        pg = SimpleNamespace(display=Mock(), joystick=Mock())
+        pg.joystick.init.side_effect = [OSError("temporary HID error"), None]
+        api = Mock()
+        reader = GamepadReader(loader=lambda: pg)
+
+        with patch("anything_plays.gamepad.importlib.import_module", return_value=api):
+            with self.assertRaisesRegex(OSError, "temporary HID error"):
+                reader.start()
+            self.assertIsNone(reader.api)
+            reader.start()
+
+        self.assertIs(reader.api, api)
+        self.assertIs(reader.pygame, pg)
+        reader.stop()
+        self.assertIsNone(reader.api)
+        self.assertIsNone(reader.pygame)
+        self.assertEqual(pg.display.quit.call_count, 2)
+        self.assertEqual(pg.joystick.quit.call_count, 2)
+        api.quit.assert_called_once()
 
 
 if __name__ == "__main__":
