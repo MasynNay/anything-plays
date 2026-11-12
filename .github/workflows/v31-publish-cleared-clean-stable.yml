@@ -1,0 +1,195 @@
+name: 3.1.0 | Publish exact clean installers after release clearance
+
+# This workflow is intentionally MANUAL and FAILS CLOSED until the exact
+# release-readiness file has real evidence for every legal, hardware and
+# rollout gate. It never builds different installer bytes or releases RC2.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: anything-plays-v31-publication
+  cancel-in-progress: false
+
+jobs:
+  publish-cleared-v31:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APP_SOURCE_SHA: 104b96621ec4cb8dc39fde8c3fe96fc854c406ed
+      ORIGINAL_QA_RUN: '43140637755'
+      VERIFIED_STAGE_RUN: '43142249044'
+      VERIFIED_STAGE_HEAD_SHA: f77fed1894075866468e7388a83c8fef800dcd50
+      REVIEW_ARTIFACT: AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW
+      EXISTING_DRAFT_ID: '442346875'
+    steps:
+      - name: Check out reviewed main and release gates
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Fail closed on any missing acceptance, source or approval evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          python -m tools.check_v31_release
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("config/v3.1-release-readiness.json").read_text("utf-8"))
+          assert r["version"]=="3.1.0"
+          assert r["owner_publication_request"]["requested"] is True
+          assert r["public_release_approved"] is True
+          assert all(v["verified"] is True for v in r["release_gates"].values())
+          print("Release source, hardware and redistribution approvals are recorded.")
+          PY
+
+      - name: Authenticate original completed same-source final and provenance stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_QA_RUN" > qa-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STAGE_RUN" > stage-run.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          qa=json.loads(Path("qa-run.json").read_text("utf-8"))
+          stage=json.loads(Path("stage-run.json").read_text("utf-8"))
+          assert qa["head_sha"]==os.environ["APP_SOURCE_SHA"]
+          assert qa["status"]=="completed" and qa["conclusion"]=="success"
+          assert qa["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          assert stage["head_sha"]==os.environ["VERIFIED_STAGE_HEAD_SHA"]
+          assert stage["status"]=="completed" and stage["conclusion"]=="success"
+          assert stage["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          print("Original immutable QA and private release staging verified.")
+          PY
+
+      - name: Download only the original SHA-proven private seven-asset bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir reviewed
+          gh run download "$VERIFIED_STAGE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$REVIEW_ARTIFACT" --dir reviewed
+          (cd reviewed && sha256sum --check SHA256SUMS.txt)
+
+      - name: Verify full four-platform identity and the seven exact assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path("reviewed")
+          m=json.loads((p/"FINAL_QA_MANIFEST.json").read_text("utf-8"))
+          files={
+            "AnythingPlaysSetup-3.1.0.exe",
+            "anything-plays-31_3.1.0_amd64.deb",
+            "AnythingPlays-3.1.0-macos-arm64.dmg",
+            "AnythingPlays-3.1.0-macos-x64.dmg",
+            "SHA256SUMS.txt","FINAL_QA_MANIFEST.json",
+            "FINAL_SOURCE_ACCESS_REVIEW.md",
+          }
+          assert {f.name for f in p.iterdir()}==files
+          assert m["source_revision"]==os.environ["APP_SOURCE_SHA"]
+          assert m["qa_run_id"]==int(os.environ["ORIGINAL_QA_RUN"])
+          assert len(m["installers"])==4
+          assert m["native_core_count"]==11 and m["console_profiles"]==18
+          assert m["actual_installed_gui_verified_on_four_platforms"] is True
+          assert m["clean_original_camera_only_wheels_verified_on_four_hosts"] is True
+          assert m["stable_3_1_0_published"] is False
+          assert m["public_release_approved"] is False
+          assert m["full_native_relinking_approved"] is False
+          fingerprints=m["clean_source_built_opencv_wheel_receipts"]
+          assert set(fingerprints)=={"linux-x64","windows-x64","macos-arm64","macos-x64"}
+          for platform,w in fingerprints.items():
+            assert w["upstream_source_sha256"]=="4afa2ea1214453648be88259f035712454faa9039b686de7753569ba8eec1577"
+            assert w["independent_camera_backend_proven"] is True
+            assert w["redistribution_approved"] is False
+          names={v["filename"] for v in m["installers"].values()}
+          assert names==files-{"SHA256SUMS.txt","FINAL_QA_MANIFEST.json","FINAL_SOURCE_ACCESS_REVIEW.md"}
+          print("Validated four exact source-built installers and all seven staged files.")
+          PY
+
+      - name: Require the original private draft, never replace a public release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > draft.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("draft.json").read_text("utf-8"))
+          assert r["id"]==int(os.environ["EXISTING_DRAFT_ID"])
+          assert r["tag_name"]=="v3.1.0"
+          assert r["draft"] is True and r["prerelease"] is False
+          expected={
+            "AnythingPlaysSetup-3.1.0.exe",
+            "anything-plays-31_3.1.0_amd64.deb",
+            "AnythingPlays-3.1.0-macos-arm64.dmg",
+            "AnythingPlays-3.1.0-macos-x64.dmg",
+            "SHA256SUMS.txt","FINAL_QA_MANIFEST.json",
+            "FINAL_SOURCE_ACCESS_REVIEW.md",
+          }
+          assert {a["name"] for a in r["assets"]}==expected
+          print("Confirmed original owner-only seven-asset draft; no public release overwritten.")
+          PY
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > existing-tag.json 2>/dev/null; then
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          ref=json.loads(Path("existing-tag.json").read_text("utf-8"))
+          assert ref["object"]["type"]=="commit", "Annotated tag needs independent verification"
+          assert ref["object"]["sha"]==os.environ["APP_SOURCE_SHA"], "Existing release tag points to different source!"
+          PY
+          fi
+
+      - name: Replace only the reviewed seven private draft assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload v3.1.0 reviewed/* --clobber --repo "$GITHUB_REPOSITORY"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$EXISTING_DRAFT_ID/assets?per_page=100" > uploaded-assets.json
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          a=json.loads(Path("uploaded-assets.json").read_text("utf-8"))
+          local={p.name:"sha256:"+hashlib.sha256(p.read_bytes()).hexdigest()
+                 for p in Path("reviewed").iterdir() if p.is_file()}
+          assert len(a)==len(local)==7
+          assert {x["name"] for x in a}==set(local)
+          for x in a:
+            assert x["state"]=="uploaded"
+            assert x["digest"]==local[x["name"]],(x["name"],x.get("digest"))
+          print("GitHub-uploaded SHA256 digests match all seven original local bytes.")
+          PY
+
+      - name: Publish only after every matching asset digest and gate passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit v3.1.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$APP_SOURCE_SHA" \
+            --title "Anything Plays 3.1.0" \
+            --notes-file docs/V3_1_PUBLIC_RELEASE_NOTES.md \
+            --draft=false --prerelease=false --latest
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > published.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path("published.json").read_text("utf-8"))
+          assert r["id"]==int(os.environ["EXISTING_DRAFT_ID"])
+          assert r["draft"] is False and r["prerelease"] is False
+          assert len(r["assets"])==7
+          assert r["tag_name"]=="v3.1.0"
+          print("Public stable 3.1.0 verified:",r["html_url"])
+          PY
