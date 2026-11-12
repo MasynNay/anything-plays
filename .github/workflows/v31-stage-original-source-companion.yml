@@ -83,7 +83,7 @@ jobs:
             fi
           done
           test "$verified" = 1
-          tar -tjf mpg-original/mpg123-1.33.7.tar.bz2 | grep '/src/libmpg123/frame.c
+          tar -tjf mpg-original/mpg123-1.33.7.tar.bz2 | grep -F src/libmpg123/frame.c
       - name: Stage full original source/notice candidate materials, keep release unapproved
         run: |
           set -euo pipefail
