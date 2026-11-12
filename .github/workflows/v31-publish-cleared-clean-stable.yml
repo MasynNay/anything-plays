@@ -1,8 +1,9 @@
 name: 3.1.0 | Publish exact clean installers after release clearance
 
-# This workflow is intentionally MANUAL and FAILS CLOSED until the exact
-# release-readiness file has real evidence for every legal, hardware and
-# rollout gate. It never builds different installer bytes or releases RC2.
+# This workflow FAILS CLOSED until the exact release-readiness file has
+# real evidence for every legal, hardware and rollout gate. It may be run
+# manually or from an approved readiness change on main. It never builds
+# different installer bytes or releases RC2.
 on:
   workflow_dispatch:
   # When the independently verified release gates are updated on main,
