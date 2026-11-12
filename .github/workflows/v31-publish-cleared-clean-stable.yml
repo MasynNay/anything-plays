@@ -12,6 +12,11 @@ on:
     branches: [main]
     paths:
       - 'config/v3.1-release-readiness.json'
+  # GitHub release permissions are tested separately. On the exact authorized
+  # release-approval PR merge, deploy from main even if API-authored push
+  # events do not start another Actions run. Do NOT run on other PR closures.
+  pull_request:
+    types: [closed]
 
 permissions:
   contents: write
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   publish-cleared-v31:
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'release/v31-private-draft-permission-and-final-rollout' && github.event.pull_request.base.ref == 'main') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
