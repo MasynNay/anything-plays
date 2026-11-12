@@ -1,0 +1,270 @@
+name: 3.1.1 | Genuine stable-upgrade identity four native source builds
+
+# Fresh true-version 3.1.1 builds for all user platforms; private CI ONLY.
+# These use the public 3.1.0 application/namespace/AppId and original 3.1
+# FFmpeg-disabled source-built OpenCV. They are mGBA-only source-stage app
+# shells: NOT 18-console installers, release approvals, or public artifacts.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-stable-upgrade-source-stage.yml'
+      - 'anything_plays/build_identity.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v311_stable_source_stage.py'
+      - 'tests/test_v311_stable_upgrade_identity.py'
+      - 'tests/test_v311_source_stage_native_contracts.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v311-source-stable-upgrade-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-built-stable-upgrade:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 239 && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: 3.1.1 same-install-identity source package | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-31_3.1.1_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.1.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.1-macos-arm64.dmg', bundle: 'dist/AnythingPlays31.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.1-macos-x64.dmg', bundle: 'dist/AnythingPlays31.app'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V311_STABLE_CANDIDATE: '1'
+      AP_V311_CANDIDATE: '0'
+      AP_V31_FINAL_CANDIDATE: '0'
+      AP_V31_RC2: '0'
+      AP_V31_RC: '0'
+      AP_V31_PREVIEW: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact 3.1.1 stable upgrade contracts and source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v311_stable_upgrade_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v311_source_stage_native_contracts.py' -v
+          python -m unittest discover -s tests -p 'test_v311_camera_source_gate.py' -v
+          python - <<'PY'
+          from anything_plays.build_identity import make_identity
+          a=make_identity('v311_stable_candidate')
+          b=make_identity('final_candidate')
+          assert a['version']=='3.1.1'
+          assert a['settings_namespace']==b['settings_namespace']=='anything-plays-31'
+          assert a['public_release_approved'] is False
+          print('Stable version and source compile; public 3.1.0 untouched')
+          PY
+      - name: Restore official Ubuntu mirror if GitHub-hosted mirror fails
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+      - name: Install native Linux build and Tk dependencies with retries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+              -o Acquire::http::Timeout=15 install -y --no-install-recommends \
+              python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1; break
+            fi
+            sleep "$((attempt * 20))"
+          done
+          test "$ok" = 1
+      - name: Install native Windows Inno installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+      - name: Download original verified camera-only OpenCV wheel for exact native target
+        shell: bash
+        env:
+          AP_CLEAN_NATIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p customcamera
+          case "$AP_CLEAN_NATIVE_TARGET" in
+            linux-x64)
+              run_id=43133383864
+              artifact=AnythingPlays-3.1-LINUX-FROM-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=linux-x86_64
+              ;;
+            windows-x64)
+              run_id=43138596964
+              artifact=AnythingPlays-3.1-WINDOWS-SOURCE-DIRECTSHOW-OPENCV-UNAPPROVED
+              native_tag=windows-x86_64
+              ;;
+            macos-arm64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-arm64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-arm64
+              ;;
+            macos-x64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-x86_64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-x86_64
+              ;;
+            *)
+              echo "::error::Unsupported clean camera source wheel target $AP_CLEAN_NATIVE_TARGET"
+              exit 1
+              ;;
+          esac
+          # Source wheels must ALREADY be built successfully in independent
+          # native runners. A job still building or a failed source probe is
+          # not an acceptable input for a unified four-platform public release.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > customcamera/source-run.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('customcamera/source-run.json').read_text('utf-8'))
+          assert r['status']=='completed' and r['conclusion']=='success',r
+          assert r['event']=='pull_request'
+          print('Original independent source-wheel native CI PASS:',r['html_url'])
+          PY
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact" --dir customcamera
+          python - "$AP_CLEAN_NATIVE_TARGET" "$native_tag" <<'PY'
+          from pathlib import Path
+          import hashlib,json,sys
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          platform,tag=sys.argv[1:]
+          root=Path('customcamera')
+          source=(root/'published20/opencv_python_headless-4.14.0.94.tar.gz'
+                  if platform=='windows-x64' else
+                  root/'sources/opencv_python_headless-4.14.0.94.tar.gz')
+          assert source.is_file(),source
+          assert hashlib.sha256(source.read_bytes()).hexdigest()==SOURCE_SHA256
+          wheels=list(root.glob('wheels/*.whl'))
+          assert len(wheels)==1,wheels
+          wheel=wheels[0]
+          manifest_path={
+              'linux-x64':'evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'windows-x64':'evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-arm64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-x64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+          }[platform]
+          receipt=json.loads((root/manifest_path).read_text('utf-8'))
+          expected_status={
+              'linux-x64':'PRIVATE_SOURCE_BUILT_LINUX_V4L2_ONLY_WHEEL_QA_NO_RELEASE',
+              'windows-x64':'PRIVATE_SOURCE_BUILT_WINDOWS_DIRECTSHOW_FFMPEG_OFF_UNAPPROVED',
+              'macos-arm64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+              'macos-x64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+          }[platform]
+          assert receipt['status']==expected_status,receipt
+          expected_receipt_target='macos-x86_64' if platform=='macos-x64' else platform
+          assert receipt['target']==expected_receipt_target
+          assert receipt['source_sha256']==SOURCE_SHA256
+          assert receipt['wheel_sha256']==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert receipt['public_release_approved'] is False
+          assert receipt['redistribution_approved'] is False
+          if platform=='linux-x64':
+              assert receipt['opencv_linux_v4l2_backend_available']
+              assert receipt['opencv_ffmpeg_backend_disabled']
+          elif platform=='windows-x64':
+              patch=root/'published20/WINDOWS_OPENCV_SETUP_PATCH.diff'
+              assert patch.is_file()
+              assert receipt['windows_source_patch_sha256']==hashlib.sha256(patch.read_bytes()).hexdigest()
+              assert receipt['directshow_backend_compiled']
+              assert receipt['opencv_ffmpeg_disabled']
+          else:
+              assert receipt['avfoundation_backend_compiled']
+              assert receipt['ffmpeg_disabled_in_native_wheel']
+              assert receipt['avif_native_dependency_omitted']
+          verify_custom_wheel(wheel,receipt['wheel_sha256'],tag)
+          Path('customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json').write_text(
+             json.dumps({'source_ci_run_id':json.loads(Path('customcamera/source-run.json').read_text('utf-8'))['id'],
+                        'source_sha256':SOURCE_SHA256,'target':platform,
+                        'native_wheel_sha256':receipt['wheel_sha256'],
+                        'native_camera_capture_backend_proven':True,
+                        'frozen_installer_tested':False,
+                        'redistribution_approved':False,
+                        'public_release_approved':False},indent=2)+'\n','utf-8')
+          print('Trusted original-source camera-only wheel for:',platform,wheel.name)
+          PY
+          wheel="$(find customcamera/wheels -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          case "$RUNNER_OS" in
+            Windows) wheel_native="$(cygpath -w "$PWD/$wheel")" ;;
+            *) wheel_native="$PWD/$wheel" ;;
+          esac
+          echo "AP_CUSTOM_OPENCV_WHEEL=$wheel_native" >> "$GITHUB_ENV"
+          wheel_hash="$(python -c 'from pathlib import Path;import hashlib,sys;print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())' "$wheel")"
+          echo "AP_CUSTOM_OPENCV_SHA256=$wheel_hash" >> "$GITHUB_ENV"
+
+      - name: Freeze exact 3.1.1 stable-version Linux upgrade source shell
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Freeze exact 3.1.1 stable-version Windows update setup
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Freeze exact 3.1.1 stable-version Apple/Intel upgrade DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify embedded 3.1.1 stable identity and native original-source receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v311_stable_source_stage \
+            --target '${{ matrix.target }}' \
+            --installer 'release/${{ matrix.installer }}' \
+            --bundle '${{ matrix.bundle }}' \
+            --camera-receipt customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json \
+            --source-sha "$SOURCE_SHA" \
+            --output release/V311_STABLE_SOURCE_STAGE_RECEIPT.json
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          r=json.loads(Path('release/V311_STABLE_SOURCE_STAGE_RECEIPT.json').read_text())
+          assert r['status']=='PRIVATE_STABLE_3_1_1_SOURCE_SHELL_ONE_CORE_NOT_RELEASED'
+          assert r['source_revision']==os.environ['SOURCE_SHA']
+          assert r['version']=='3.1.1' and r['identity_channel']=='v311_stable_candidate'
+          assert r['settings_namespace']=='anything-plays-31'
+          assert r['native_core_count']==1 and r['full_18_console_installer'] is False
+          assert r['redistribution_approved'] is False and r['public_release_approved'] is False
+          print('Verified true-version 3.1.1 stable update source:',r['target'],r['sha256'])
+          PY
+      - name: Preserve isolated stable-identity native proof (not public download)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-STABLE-IDENTITY-SOURCE-${{ matrix.target }}-ONE-CORE-NOT-PUBLIC
+          path: |
+            release/${{ matrix.installer }}
+            release/V311_STABLE_SOURCE_STAGE_RECEIPT.json
+            customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
