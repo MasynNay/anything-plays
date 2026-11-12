@@ -185,16 +185,20 @@ class GamepadReader:
             return
         self.last_scan = now
         for index in range(min(16, self.api.get_count())):
-            if self.api.is_controller(index):
-                try:
-                    device = self.api.Controller(index)
-                    if not device.attached():
-                        device.quit()
-                        continue
-                except (OSError, RuntimeError, ValueError):
+            # A faulty device may throw during SDL's per-index probe. Do not
+            # let it hide a healthy controller at a later USB/Bluetooth index.
+            try:
+                if not self.api.is_controller(index):
                     continue
-                # SDL can lose the optional friendly name during hotplug;
-                # a healthy controller must still be usable in that case.
+            except Exception:
+                continue
+            device = None
+            try:
+                device = self.api.Controller(index)
+                if device is None or not device.attached():
+                    continue
+                # Friendly names are optional during hotplug. Keep a working
+                # controller even when its name has briefly disappeared.
                 try:
                     label = self.api.name_forindex(index)
                 except Exception:
@@ -202,6 +206,18 @@ class GamepadReader:
                 self.controller = device
                 self.name = str(label or "Gamepad")
                 return
+            except Exception:
+                # Controller(index) and attached() can race with unplug. An
+                # unusable handle must be closed before probing the next pad.
+                continue
+            finally:
+                if device is not None and device is not self.controller:
+                    try:
+                        device.quit()
+                    except Exception:
+                        # The failed native handle must never break discovery
+                        # or leave the rest of the emulator inputs stuck.
+                        pass
 
     def poll(self, system, bindings=None):
         """Return (held emulated buttons, human-readable connection status)."""
