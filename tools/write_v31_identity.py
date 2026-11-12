@@ -19,7 +19,8 @@ def choose_channel(env):
     candidate2 = env.get("AP_V31_RC2") == "1"
     final_candidate = env.get("AP_V31_FINAL_CANDIDATE") == "1"
     v311_candidate = env.get("AP_V311_CANDIDATE") == "1"
-    if sum((preview, candidate, candidate2, final_candidate, v311_candidate)) != 1:
+    v311_stable_candidate = env.get("AP_V311_STABLE_CANDIDATE") == "1"
+    if sum((preview, candidate, candidate2, final_candidate, v311_candidate, v311_stable_candidate)) != 1:
         raise ValueError("Select exactly one 3.1 or 3.1.1 build channel")
     if env.get("AP_V30_MINIMAL_CORE_BUILD") != "1":
         raise ValueError("Only isolated mGBA source-build stage allowed")
@@ -30,7 +31,8 @@ def choose_channel(env):
     ):
         if env.get(forbidden) == "1":
             raise ValueError("3.1 candidate cannot use release/native approval flags")
-    return ("v311_candidate" if v311_candidate
+    return ("v311_stable_candidate" if v311_stable_candidate
+            else "v311_candidate" if v311_candidate
             else "final_candidate" if final_candidate else "rc2" if candidate2
             else "rc1" if candidate else "preview1")
 
