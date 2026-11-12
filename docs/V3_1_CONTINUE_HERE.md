@@ -7,6 +7,8 @@ GitHub Actions results before reporting a new pass or publishing an installer.
 
 ## Current verified milestone and next dependency decision (November 11)
 
+**New camera-only OpenCV remediation experiment:** [PR #209](https://github.com/MasynNay/anything-plays/pull/209) adds a **disposable Linux-only source-build** of `opencv-python-headless==4.14.0.94`, with the exact published PyPI sdist SHA-256, FFmpeg/GStreamer/Qt disabled and V4L2 enabled. [Actions 43133383864](https://github.com/MasynNay/anything-plays/actions/runs/43133383864) had verified the sdist and passed its private receipt tests; actual native wheel compilation was **IN PROGRESS** at this checkpoint. The accompanying [source tests 43133383667](https://github.com/MasynNay/anything-plays/actions/runs/43133383667) passed on Python 3.12/3.13 plus native mGBA. No frozen installer, camera hardware, third-party source/relinking clearance or public release result follows until future native evidence is checked. Do not merge it or repeat heavy builds just because this report says queued/in progress.
+
 **Complete source-pinned 3.1.0 build and private seven-asset draft are DONE;
 stable publication is NOT DONE.** All four final full 18-console/11-core
 installers and actual installed frozen GUI/Stream Mode smoke checks passed
