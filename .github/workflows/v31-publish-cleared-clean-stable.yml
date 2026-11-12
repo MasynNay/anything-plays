@@ -32,6 +32,10 @@ jobs:
       VERIFIED_STAGE_RUN: '43142249044'
       VERIFIED_STAGE_HEAD_SHA: f77fed1894075866468e7388a83c8fef800dcd50
       REVIEW_ARTIFACT: AnythingPlays-3.1.0-FOUR-CLEAN-FULL-18-SOURCE-VERIFIED-PRIVATE-REVIEW
+      SOURCE_COMPANION_RUN: '43152661067'
+      SOURCE_COMPANION_HEAD_SHA: 83535378f5f8c534c4e0b3d8276d491da65e60f4
+      SOURCE_COMPANION_ARTIFACT: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE-PRIVATE-REVIEW
+      SOURCE_COMPANION_FILE: AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip
       EXISTING_DRAFT_ID: '442346875'
     steps:
       - name: Check out reviewed main and release gates
@@ -70,17 +74,23 @@ jobs:
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_QA_RUN" > qa-run.json
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_STAGE_RUN" > stage-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_COMPANION_RUN" > source-companion-run.json
           python - <<'PY'
           import json,os
           from pathlib import Path
           qa=json.loads(Path("qa-run.json").read_text("utf-8"))
           stage=json.loads(Path("stage-run.json").read_text("utf-8"))
+          source=json.loads(Path("source-companion-run.json").read_text("utf-8"))
           assert qa["head_sha"]==os.environ["APP_SOURCE_SHA"]
           assert qa["status"]=="completed" and qa["conclusion"]=="success"
           assert qa["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
           assert stage["head_sha"]==os.environ["VERIFIED_STAGE_HEAD_SHA"]
           assert stage["status"]=="completed" and stage["conclusion"]=="success"
           assert stage["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          assert source["id"]==int(os.environ["SOURCE_COMPANION_RUN"])
+          assert source["head_sha"]==os.environ["SOURCE_COMPANION_HEAD_SHA"]
+          assert source["status"]=="completed" and source["conclusion"]=="success"
+          assert source["head_repository"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
           print("Original immutable QA and private release staging verified.")
           PY
 
@@ -131,6 +141,44 @@ jobs:
           print("Validated four exact source-built installers and all seven staged files.")
           PY
 
+      - name: Attach exactly one verified pygame SDL mpg123 source companion before release review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir source-review
+          gh run download "$SOURCE_COMPANION_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$SOURCE_COMPANION_ARTIFACT" --dir source-review
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,shutil,zipfile
+          source=Path("source-review")
+          name=os.environ["SOURCE_COMPANION_FILE"]
+          package=source/name
+          assert package.is_file() and package.stat().st_size>1000000
+          checks=(source/"SOURCE_COMPANION_SHA256SUMS.txt").read_text("ascii").strip().split("  ",1)
+          assert len(checks)==2 and checks[1].endswith(name)
+          with package.open("rb") as handle:
+            assert hashlib.file_digest(handle,"sha256").hexdigest()==checks[0]
+          with zipfile.ZipFile(package) as z:
+            manifest=json.loads(z.read("SOURCE_RECEIPT.json"))
+            assert manifest["exact_application_source_revision"]==os.environ["APP_SOURCE_SHA"]
+            assert set(manifest["source_archives"])=={
+              "pygame-ce-2.5.8-tagged-upstream-source.tar.gz",
+              "sdl2-2.32.10.tar.gz","sdl2-2.32.8.tar.gz",
+              "sdl2-image-2.8.12.tar.gz","sdl2-mixer-2.8.2.tar.gz",
+              "sdl2-ttf-2.24.0.tar.gz","mpg123-1.33.7.tar.bz2",
+            }
+            assert manifest["public_release_approved"] is False
+            assert manifest["complete_lgpl_redistribution_approved"] is False
+            for original in manifest["source_archives"]:
+              data=z.read("original-sources/"+original)
+              assert hashlib.sha256(data).hexdigest()==manifest["source_archives"][original]
+            assert "notices-and-manifests/Pygame-CE-LGPL-2.1.txt" in z.namelist()
+          assert not (Path("reviewed")/name).exists()
+          shutil.copyfile(package,Path("reviewed")/name)
+          print("Verified new original upstream source companion; eight proposed release files.")
+          PY
+
       - name: Require the original private draft, never replace a public release
         shell: bash
         run: |
@@ -164,7 +212,7 @@ jobs:
           PY
           fi
 
-      - name: Replace only the reviewed seven private draft assets
+      - name: Replace only the reviewed eight private draft assets including original sources
         shell: bash
         run: |
           set -euo pipefail
@@ -179,12 +227,12 @@ jobs:
               return "sha256:"+hashlib.file_digest(handle, "sha256").hexdigest()
           local={p.name:file_hash(p)
                  for p in Path("reviewed").iterdir() if p.is_file()}
-          assert len(a)==len(local)==7
+          assert len(a)==len(local)==8
           assert {x["name"] for x in a}==set(local)
           for x in a:
             assert x["state"]=="uploaded"
             assert x["digest"]==local[x["name"]],(x["name"],x.get("digest"))
-          print("GitHub-uploaded SHA256 digests match all seven original local bytes.")
+          print("GitHub-uploaded SHA256 digests match eight immutable installer, checksum, manifest and source assets.")
           PY
 
       - name: Publish only after every matching asset digest and gate passed
@@ -204,7 +252,7 @@ jobs:
           r=json.loads(Path("published.json").read_text("utf-8"))
           assert r["id"]==int(os.environ["EXISTING_DRAFT_ID"])
           assert r["draft"] is False and r["prerelease"] is False
-          assert len(r["assets"])==7
+          assert len(r["assets"])==8
           assert r["tag_name"]=="v3.1.0"
           assert r["target_commitish"]==os.environ["APP_SOURCE_SHA"], "Release source target mismatch"
           print("Public stable 3.1.0 verified:",r["html_url"])
