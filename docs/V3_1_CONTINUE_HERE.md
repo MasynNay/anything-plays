@@ -5,7 +5,48 @@ Keep this file factual and current. This project has experienced interrupted
 conversations and expensive duplicated native builds. Always inspect actual
 GitHub Actions results before reporting a new pass or publishing an installer.
 
-## Latest verified technical state — fresh clean 3.1.0 installers
+## Latest verified final source-built 3.1.0 state (November 11/12)
+
+**FINAL TECHNICAL MILESTONE COMPLETED AND MERGED: 13/13 native jobs PASS,
+including source builds, genuine full 18-console/11-core installers and actual
+frozen desktop/DS Stream Mode/settings QA on Linux, Windows, Apple Silicon
+and Intel Mac.** [Run 43140637755](https://github.com/MasynNay/anything-plays/actions/runs/43140637755),
+[PR #219](https://github.com/MasynNay/anything-plays/pull/219), exact original
+app source SHA `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`, merged as
+`b1f63f1b60c33e4c126f27d146ab14b92ec28179`. Four new **private**
+`AnythingPlays-3.1.0-FINAL-FULL-18-{target}-QA-ONLY` artifacts and full
+source-stage and installed desktop receipts were retained. Existing original
+seven-asset private `v3.1.0` draft (release ID `442346875`, source SHA
+`d852de9a513f83a329c14647ddc86bf3690fb5f5`) is **not updated**.
+Do **not** conflate this draft's old stock OpenCV bytes with the newer
+FFmpeg-disabled source-built native full installers.
+
+**All native OpenCV source wheels compiled and verified** with V4L2, DirectShow,
+and both native AVFoundation backends. Native FFmpeg disabled, optional AVIF
+disabled in the Mac source wheels. [PR #213](https://github.com/MasynNay/anything-plays/pull/213)
+and [PR #214](https://github.com/MasynNay/anything-plays/pull/214) merged.
+All four independent clean full builds/installed QA passed, including Linux
+[PR #212](https://github.com/MasynNay/anything-plays/pull/212), Windows
+[PR #218](https://github.com/MasynNay/anything-plays/pull/218), Apple Silicon
+[PR #215](https://github.com/MasynNay/anything-plays/pull/215), Intel Mac
+[PR #217](https://github.com/MasynNay/anything-plays/pull/217).
+Separate fresh Linux/Apple Silicon native notice inventories also passed
+([PR #216](https://github.com/MasynNay/anything-plays/pull/216),
+[run 43141091687](https://github.com/MasynNay/anything-plays/actions/runs/43141091687)).
+
+**Still NOT a public stable release.** Only 2/6 formal readiness gates are
+verified. Physical camera/controller/gameplay/audio/saves/endurance, exact
+pygame/SDL LGPL and other native corresponding-source/relinking and
+redistribution review, and owner final rollout approval remain open. Source
+wheels and frozen launch smoke do not prove these facts.
+Public stable 3.0 and RC2 remain unchanged. Next steps are source/relinking and
+hardware acceptance, accurate new-byte staging/checksums, owner approval,
+public release and portfolio rollout. See the **authoritative current**
+[unified clean source-build acceptance record](V3_1_UNIFIED_SOURCE_BUILT_FINAL_QA.md).
+**Do not rerun the completed 13-job four-platform matrix solely to repeat QA.**
+
+## Historical earlier milestone (superseded by successful unified run above)
+
 
 **TWO complete, genuine source-built FFmpeg-disabled 3.1.0 installers passed
 native full 18-console assembly and installed Tk/DS Stream Mode QA:**
