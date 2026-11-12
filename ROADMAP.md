@@ -6,7 +6,7 @@
 **Stable:** [v2.0.0](https://github.com/MasynNay/anything-plays/releases/tag/v2.0.0)  
 **Active development:** [`feature/v3.0-unified-test`](https://github.com/MasynNay/anything-plays/tree/feature/v3.0-unified-test)  
 **Current focus:** Complete exact 44-native source review evidence, third-party GPL compatibility and source obligations, and final four-platform release acceptance  
-**Source evidence hardening:** Strict rejection of nonstandard NaN/Infinity preserved-native JSON constants is proposed on a focused branch; CI pending. This does not clear Dolphin binary/source correspondence, rights, or installer acceptance.
+**Source evidence hardening:** Nonstandard NaN/Infinity preserved-native JSON constants are rejected by verified and merged PR #208 (source checks 43133369393). This does not clear Dolphin binary/source correspondence, rights, or installer acceptance. This does not clear Dolphin binary/source correspondence, rights, or installer acceptance.
 **Tracking:** [3.0 engineering issue #24](https://github.com/MasynNay/anything-plays/issues/24) · [Open work](https://github.com/MasynNay/anything-plays/issues)
 
 > **Status matters:** A passing CI run means its stated automated checks passed. It does **not** imply every game, camera, or GPU has been tested. Full 3.0 installers are **developer previews**, not a published, licensed-and-signed stable 3.0 release. No artificial ship dates or activity claims are used here.
@@ -356,3 +356,6 @@ A focused 3.0 source-evidence hardening change rejects repeated JSON keys, inclu
 
 
 **November 11, 2026 — duplicate-key evidence hardening verified and merged:** [PR #201](https://github.com/MasynNay/anything-plays/pull/201) merged as `4c568624` after [exact-head source checks 43116272050](https://github.com/MasynNay/anything-plays/actions/runs/43116272050) passed Python 3.12, Python 3.13 and native mGBA compatibility. Four synthetic regressions verify valid manifests and reject ambiguous duplicate JSON keys at both top-level and archive-record depth without changing archived bytes. Production packaging was skipped. Dolphin production source correspondence, combined third-party licensing and final four-platform installer acceptance remain unresolved; public 3.0 gated, stable 2.0 unchanged.
+
+
+**November 12, 2026 — source evidence parser hardened:** [PR #208](https://github.com/MasynNay/anything-plays/pull/208) merged (`b3c8e01d`) after [exact-head CI 43133369393](https://github.com/MasynNay/anything-plays/actions/runs/43133369393) passed Python 3.12/3.13 regression and headless GUI checks and native mGBA compatibility. Non-finite JSON constants at all depths now fail closed. Production packaging skipped; exact source-built Dolphin distribution, corresponding source, licensing and final four-platform installer acceptance remain outstanding. Stable 2.0 preserved; public 3.0 not authorized.
