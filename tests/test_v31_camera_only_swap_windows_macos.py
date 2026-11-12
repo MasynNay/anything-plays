@@ -29,8 +29,14 @@ class WinMacCameraSwapContracts(unittest.TestCase):
         else:
             libs=new/"Contents/Frameworks/cv2/__dot__dylibs"
             libs.mkdir()
-            (libs/"libavcodec.dylib").write_bytes(b"codec")
-            (libs/"libSDL2.dylib").write_bytes(b"SDL codec folder")
+            if target=="macos-arm64":
+                (libs/"libavcodec.dylib").write_bytes(b"codec")
+            (libs/"libSDL2.dylib").write_bytes(b"shared SDL library")
+            (libs/"liblzma.5.dylib").write_bytes(b"needed by PIL/libtiff")
+            if target=="macos-x64":
+                (old/"Contents/Frameworks/libavif.16.dylib").write_bytes(
+                    b"original 2.0 source camera wheel native libavif" * 50
+                )
         return old,new,a,b
 
     def env(self,root):
@@ -47,10 +53,31 @@ class WinMacCameraSwapContracts(unittest.TestCase):
                 self.assertEqual(result["status"],STATUS)
                 self.assertEqual(hash_file(a),before)
                 self.assertEqual(hash_file(b),before)
-                self.assertGreater(result["removed_library_count"],0)
+                if target=="macos-x64":
+                    self.assertEqual(result["removed_library_count"],0)
+                    avif=result["copied_original_camera_only_shared_dependency"]
+                    self.assertEqual(avif["filename"],"libavif.16.dylib")
+                    self.assertEqual(
+                        hash_file(old/"Contents/Frameworks/libavif.16.dylib"),
+                        hash_file(new/"Contents/Frameworks/libavif.16.dylib")
+                    )
+                else:
+                    self.assertGreater(result["removed_library_count"],0)
+                    self.assertIsNone(result["copied_original_camera_only_shared_dependency"])
+                if target.startswith("macos"):
+                    self.assertTrue((new/"Contents/Frameworks/cv2/__dot__dylibs/liblzma.5.dylib").is_file())
                 self.assertFalse(result["actual_frozen_app_smoke_passed"])
                 self.assertFalse(result["public_release_approved"])
                 self.assertFalse(result["redistribution_approved"])
+
+    def test_mac_intel_requires_original_v2_shared_libavif(self):
+        with TemporaryDirectory() as temp:
+            old,new,a,b=self.fixture(temp,"macos-x64")
+            (old/"Contents/Frameworks/libavif.16.dylib").unlink()
+            with self.assertRaises(ValueError):
+                swap(target="macos-x64",old_app=old,new_app=new,
+                     scratch=temp,source_sha=SOURCE_SHA,environ=self.env(temp))
+            self.assertFalse((new/"Contents/Frameworks/libavif.16.dylib").exists())
 
     def test_unsafe_source_and_missing_originals_are_rejected(self):
         with TemporaryDirectory() as temp:
