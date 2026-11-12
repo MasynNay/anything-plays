@@ -213,7 +213,8 @@ jobs:
             *) wheel_native="$PWD/$wheel" ;;
           esac
           echo "AP_CUSTOM_OPENCV_WHEEL=$wheel_native" >> "$GITHUB_ENV"
-          echo "AP_CUSTOM_OPENCV_SHA256=$(sha256sum "$wheel" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          wheel_hash="$(python -c 'from pathlib import Path;import hashlib,sys;print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())' "$wheel")"
+          echo "AP_CUSTOM_OPENCV_SHA256=$wheel_hash" >> "$GITHUB_ENV"
       - name: Build real final-version Linux package
         if: runner.os == 'Linux'
         shell: bash
@@ -270,6 +271,26 @@ jobs:
           Path("release/FINAL_IDENTITY_SOURCE_QA.json").write_text(json.dumps(r,indent=2)+"\n","utf-8")
           print("Version-correct independent 3.1 candidate built:",target,digest)
           PY
+      - name: Preserve exact native camera source/build proof with version-correct application
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/FINAL_IDENTITY_SOURCE_QA.json
+          test -s customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json
+          cp customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json \
+            release/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          s=json.loads(Path('release/FINAL_IDENTITY_SOURCE_QA.json').read_text('utf-8'))
+          w=json.loads(Path('release/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json').read_text('utf-8'))
+          assert s['source_revision']==os.environ['AP_V31_FINAL_SOURCE_SHA']
+          assert s['target']==w['target']
+          assert w['native_camera_capture_backend_proven'] is True
+          assert w['redistribution_approved'] is False
+          assert w['public_release_approved'] is False
+          print('Source-built, version-matched clean wheel receipt retained with source installer.')
+          PY
       - name: Keep private final-identity binaries and checksum proofs for full-core review
         uses: actions/upload-artifact@v4
         with:
@@ -277,6 +298,7 @@ jobs:
           path: |
             release/${{ matrix.installer }}
             release/FINAL_IDENTITY_SOURCE_QA.json
+            release/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
@@ -364,6 +386,7 @@ jobs:
           test -s original30/SHA256SUMS.txt
           test -s 'finalsource/${{ matrix.installer }}'
           test -s finalsource/FINAL_IDENTITY_SOURCE_QA.json
+          test -s finalsource/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
       - name: Install Linux authenticated original-core QA dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -422,6 +445,12 @@ jobs:
             --preview finalsource/${{ matrix.installer }} \
             --checksums original30/SHA256SUMS.txt \
             --receipt finalsource/FINAL_IDENTITY_SOURCE_QA.json --output fullfinal
+      - name: Attach unchanged clean OpenCV upstream source receipt to final installer evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s 'fullfinal/${{ matrix.result }}'
+          cp finalsource/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json fullfinal/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
       - name: Fail if any final installer alters frozen identity, count or SHA256
         shell: bash
         run: |
@@ -458,6 +487,7 @@ jobs:
             fullfinal/${{ matrix.result }}
             fullfinal/${{ matrix.receipt }}
             fullfinal/SDL_RUNTIME_AUDIT.json
+            fullfinal/FINAL_CAMERA_ONLY_OPENCV_SOURCE_QA.json
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
