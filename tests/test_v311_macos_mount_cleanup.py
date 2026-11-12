@@ -13,7 +13,8 @@ from tools.assemble_v31_full_macos import _detach_owned_ci_mount, mount
 
 class ScopedDmgMountCleanupTests(unittest.TestCase):
     def test_already_unmounted_ci_path_never_calls_hdiutil(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.os.path.ismount", return_value=False),
             patch("tools.assemble_v31_full_macos.subprocess.run") as runner,
         ):
@@ -21,7 +22,8 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
             runner.assert_not_called()
 
     def test_hdiutil_error_is_acceptable_only_when_volume_actually_gone(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.os.path.ismount",
                   side_effect=[True, False]) as mounted,
             patch("tools.assemble_v31_full_macos.subprocess.run",
@@ -36,7 +38,8 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
                              ["hdiutil", "detach"])
 
     def test_successful_detach_and_actual_unmount(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.os.path.ismount",
                   side_effect=[True, False]),
             patch("tools.assemble_v31_full_macos.subprocess.run",
@@ -47,7 +50,8 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
             self.assertEqual(runner.call_count, 1)
 
     def test_attached_busy_volume_raises_after_bounded_force_attempt(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.os.path.ismount", return_value=True),
             patch("tools.assemble_v31_full_macos.subprocess.run",
                   return_value=SimpleNamespace(returncode=1,
@@ -62,7 +66,8 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
             self.assertEqual(runner.call_args.args[0][2], "-force")
 
     def test_force_failure_can_succeed_if_ci_mount_disappears(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.os.path.ismount",
                   side_effect=[True, True, False]),
             patch("tools.assemble_v31_full_macos.subprocess.run",
@@ -74,7 +79,8 @@ class ScopedDmgMountCleanupTests(unittest.TestCase):
             self.assertEqual(runner.call_count, 2)
 
     def test_mount_context_always_cleans_up_after_body_error(self):
-        with TemporaryDirectory() as home, (
+        with (
+            TemporaryDirectory() as home,
             patch("tools.assemble_v31_full_macos.command") as attach,
             patch("tools.assemble_v31_full_macos._detach_owned_ci_mount") as detach,
         ):
