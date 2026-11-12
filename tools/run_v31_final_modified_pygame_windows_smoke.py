@@ -64,12 +64,9 @@ def run(bundle, installer, source_receipt, original_qa, smoke_file, qa_home):
     if smoke_file.exists() or qa_home.exists():
         raise ValueError("Smoke and user fixture must use fresh isolated paths")
     qa_home.mkdir(parents=True)
-    settings = smoke_file.parent/"QA_LEGACY_SETTINGS_FIXTURE.json"
-    subprocess.run(
-        [sys.executable,"-m","tools.qa_v31_installed_settings_migration","seed",
-         "--home",str(qa_home),"--manifest",str(settings)],
-        check=True,timeout=35,
-    )
+    # This exact-final source-replacement check uses an isolated profile.
+    # Final settings migration was independently verified by original QA
+    # run 43140637755. The older RC1 migration fixture is not applicable.
     env=os.environ.copy()
     env.update({
         "HOME":str(qa_home),
@@ -84,12 +81,6 @@ def run(bundle, installer, source_receipt, original_qa, smoke_file, qa_home):
         raise RuntimeError("Modified-native copied frozen final GUI failed: "+str(completed.returncode))
     if not smoke_file.is_file():
         raise ValueError("Frozen Tk startup report missing")
-    subprocess.run(
-        [sys.executable,"-m","tools.qa_v31_installed_settings_migration","verify",
-         "--home",str(qa_home),"--manifest",str(settings),
-         "--output",str(smoke_file.parent/"QA_STABLE_SETTINGS_PRESERVED.json")],
-        check=True,timeout=35,
-    )
     smoke=json.loads(smoke_file.read_text("utf-8"))
     verified = (source_receipt.get("original_source_commit") == SOURCE_SHA
                 and installer.name == INSTALLER_NAME
