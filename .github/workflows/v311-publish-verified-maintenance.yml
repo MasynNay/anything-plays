@@ -1,0 +1,285 @@
+name: 3.1.1 | Publish EXACT source-reviewed stable after merged approval
+
+# Only one exact merged PR can authorize this action. Source installers are
+# already built and frozen on four native hosts; DO NOT rebuild or silently
+# substitute artifacts from a different commit, and NEVER clobber v3.1.0.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-anything-plays-311-exact-reviewed-stable
+  cancel-in-progress: false
+
+jobs:
+  verified-maintenance-release:
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.number == 239 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Only eight original full 3.1.1 assets, verify SHA before public
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: e433d4475e22ce2b39d79cf4d656b027c17d9ef7
+      QA_RUN: '43355665931'
+      REVIEW_ARTIFACT: AnythingPlays-3.1.1-EIGHT-ASSET-PRIVATE-RELEASE-REVIEW-UNPUBLISHED
+      REVIEW_ARTIFACT_ID: '14005812985'
+      REVIEW_ARTIFACT_SHA256: d4c0b539168b19e3a4df62a45ad81c398fc662d383f988b6d42fa3af978b162f
+      MERGED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      RELEASE_TAG: v3.1.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require approved merger, exact earlier verified source, and unchanged application
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || test "${{ github.event.pull_request.merged }}" = true
+          git merge-base --is-ancestor "$QA_SOURCE_SHA" HEAD
+          git merge-base --is-ancestor "$MERGED_HEAD_SHA" HEAD
+          # No application, original packaging, or native source change
+          # may have slipped into the PR after original 4/4 native QA.
+          while IFS= read -r changed; do
+            case "$changed" in
+              anything_plays/*|packaging/*|fetch_mgba_core.py|verify_bundle.py)
+                echo "::error::Application code moved after verified native build: $changed"
+                exit 1 ;;
+            esac
+          done < <(git diff --name-only "$QA_SOURCE_SHA" "$MERGED_HEAD_SHA")
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          a=json.loads(Path('config/v3.1.1-publication-authorization.json').read_text('utf-8'))
+          required={
+            'schema_version':1,
+            'version':'3.1.1',
+            'expected_tested_source_sha':os.environ['QA_SOURCE_SHA'],
+            'accepted_four_platform_qa_run':int(os.environ['QA_RUN']),
+            'accepted_exact_review_artifact_id':int(os.environ['REVIEW_ARTIFACT_ID']),
+            'accepted_exact_review_artifact_sha256':os.environ['REVIEW_ARTIFACT_SHA256'],
+            'owner_explicitly_requested_public_release':True,
+            'scope':'free-noncommercial-nonpromotional',
+            'use_full_stable_upgrade_identity_only':True,
+            'retain_original_public_3_1_0_unmodified':True,
+            'carry_forward_source_companion_from_3_1_0_with_verbatim_sha':True,
+            'require_four_native_full_installed_gui_passes':True,
+            'disclose_physical_controller_webcam_retail_gameplay_unverified':True,
+            'physical_hardware_verification_complete':False,
+            'all_transitive_lgpl_binary_source_correspondence_independently_proven':False,
+          }
+          for name,value in required.items():
+              if type(a.get(name)) is not type(value) or a[name]!=value:
+                  raise SystemExit('Exact scoped public v3.1.1 authorization missing: '+name)
+          print('Explicit owner-authorized free 3.1.1 scope checked; physical tests remain disclosed')
+          PY
+      - name: Require successful same-revision four-platform frozen-GUI/18-console release QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN" > original-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN/jobs?per_page=100" > original-jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QA_RUN/artifacts?per_page=100" > original-artifacts.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          get=lambda n:json.loads(Path(n).read_text('utf-8'))
+          run=get('original-run.json')
+          assert run['head_sha']==os.environ['QA_SOURCE_SHA']
+          assert run['status']=='completed' and run['conclusion']=='success'
+          assert run['event']=='pull_request' and run['head_branch']=='feature/v3.1.1-integration-qa'
+          assert run['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert run['name']=='3.1.1 | Genuine stable-upgrade identity four native source builds'
+          js=get('original-jobs.json')['jobs']
+          names={j['name']:j['conclusion'] for j in js}
+          expected={
+            *(f'3.1.1 same-install-identity source package | {x}' for x in
+              ('linux-x64','windows-x64','macos-arm64','macos-x64')),
+            *(f'Real 3.1.1 stable upgrade with 18 consoles | {x}' for x in
+              ('linux-x64','windows-x64','macos-arm64','macos-x64')),
+            'Private v3.1.1 full installer, original source and SHA256 preflight',
+          }
+          assert expected<=names.keys() and all(names[n]=='success' for n in expected)
+          arts=get('original-artifacts.json')['artifacts']
+          chosen=[a for a in arts if a['id']==int(os.environ['REVIEW_ARTIFACT_ID'])
+                  and a['name']==os.environ['REVIEW_ARTIFACT']]
+          assert len(chosen)==1
+          a=chosen[0]
+          assert a['digest']=='sha256:'+os.environ['REVIEW_ARTIFACT_SHA256']
+          assert a['expired'] is False
+          assert a['workflow_run']['id']==int(os.environ['QA_RUN'])
+          assert a['workflow_run']['head_sha']==os.environ['QA_SOURCE_SHA']
+          print('Nine exact same-source native+GUI+SHA full release jobs and review archive verified')
+          PY
+      - name: Download original eight SHA-verified private release assets, never QA shells
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir private-review
+          gh run download "$QA_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$REVIEW_ARTIFACT" --dir private-review
+          (cd private-review && sha256sum --check SHA256SUMS.txt)
+          python -m unittest discover -s tests -p 'test_v311_public_release_assembly.py' -v
+          python -m tools.prepare_v311_public_release \
+            --review private-review --output release-ready \
+            --source-sha "$QA_SOURCE_SHA" --qa-run "$QA_RUN" --authorized
+          (cd release-ready && sha256sum --check SHA256SUMS.txt)
+          test "$(find release-ready -maxdepth 1 -type f | wc -l)" -eq 8
+      - name: Preserve public v3.1.0 original bytes and check existing v3.1.1 tag ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > stable310.json
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.1.0" > stable310tag.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          release=json.loads(Path('stable310.json').read_text())
+          tag=json.loads(Path('stable310tag.json').read_text())
+          expected={
+            'AnythingPlaysSetup-3.1.0.exe':'574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0',
+            'anything-plays-31_3.1.0_amd64.deb':'e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e',
+            'AnythingPlays-3.1.0-macos-arm64.dmg':'ddec3be8356e0b1729ff0a4131bc362128739fe39a1cdc48dfd83921feb8e49a',
+            'AnythingPlays-3.1.0-macos-x64.dmg':'ed7dd44e457b1a6c5458f7f6dce54089c98401418c1cc02d145e36f68494bae9',
+            'AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip':'469b75685b385a7992f018d04bc4ddb1ffa06b061b6471cf50ae4fcda6e746d8',
+            'SHA256SUMS.txt':'017f55c988353572ddc3630f4b3505c48945cb4007a96b5656b4444b84fb3f19',
+            'FINAL_QA_MANIFEST.json':'8d387e9d341b841c6705a2ad6de0cc457a92bb3b8cc72076b7f65a79abaacbdc',
+            'FINAL_SOURCE_ACCESS_REVIEW.md':'8998e9a606e30b90b852319355b7527329f10d8c9045abac77cc657b15f78c4f',
+          }
+          assert release['tag_name']=='v3.1.0'
+          assert release['draft'] is False and release['prerelease'] is False
+          assert release['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert tag['object']['sha']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert {a['name']:a['digest'] for a in release['assets']}=={
+              n:'sha256:'+s for n,s in expected.items()
+          }
+          print('Public v3.1.0 remains byte-identical and available for rollback')
+          PY
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > existing-tag.json 2>/dev/null; then
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          record=json.loads(Path('existing-tag.json').read_text('utf-8'))
+          assert record['object']['type']=='commit'
+          assert record['object']['sha']==os.environ['QA_SOURCE_SHA']
+          print('Existing v3.1.1 tag owned by exact original verified source')
+          PY
+          fi
+      - name: Start private draft or safely resume only original matching private asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > existing-release.json 2>/dev/null; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft --target "$QA_SOURCE_SHA" --title 'Anything Plays 3.1.1' \
+              --notes-file docs/releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > source-draft.json
+          python - <<'PY'
+          import json,os,hashlib
+          from pathlib import Path
+          r=json.loads(Path('source-draft.json').read_text('utf-8'))
+          assert r['tag_name']==os.environ['RELEASE_TAG']
+          assert r['target_commitish']==os.environ['QA_SOURCE_SHA']
+          assert r['prerelease'] is False
+          expected={p.name:'sha256:'+hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path('release-ready').iterdir() if p.is_file()}
+          assert len(expected)==8
+          found={a['name']:a['digest'] for a in r['assets']}
+          assert set(found)<=set(expected)
+          for name,sha in found.items():
+              assert sha==expected[name], 'An existing release asset differs: '+name
+          if not r['draft']:
+              assert found==expected, 'Public v3.1.1 exists with incomplete assets'
+          missing=sorted(set(expected)-set(found))
+          Path('missing-release-assets.txt').write_text(
+              ''.join(name+'\n' for name in missing),'utf-8')
+          Path('already-public.txt').write_text(
+              'true' if not r['draft'] else 'false','ascii')
+          print('Verified owner-controlled draft state; missing assets:',missing)
+          PY
+      - name: Attach and verify exactly eight original new native/notice assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r filename; do
+            test -n "$filename" || continue
+            gh release upload "$RELEASE_TAG" "release-ready/$filename" \
+              --repo "$GITHUB_REPOSITORY"
+          done < missing-release-assets.txt
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > uploaded.json
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          r=json.loads(Path('uploaded.json').read_text())
+          expected={p.name:'sha256:'+hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path('release-ready').iterdir() if p.is_file()}
+          assert len(expected)==8
+          actual={a['name']:a['digest'] for a in r['assets']}
+          assert actual==expected, 'GitHub did not persist the exact eight reviewed 3.1.1 bytes'
+          assert r['tag_name']==os.environ['RELEASE_TAG']
+          assert r['target_commitish']==os.environ['QA_SOURCE_SHA']
+          assert all(a['state']=='uploaded' for a in r['assets'])
+          print('All EIGHT exact 3.1.1 assets independently verified on GitHub before publishing')
+          PY
+      - name: Publish verified stable 3.1.1 and preserve existing 3.1.0 rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "$(cat already-public.txt)" != 'true'; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft=false --prerelease=false --latest
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > published.json
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > published-tag.json
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          r=json.loads(Path('published.json').read_text())
+          t=json.loads(Path('published-tag.json').read_text())
+          expected={p.name:'sha256:'+hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path('release-ready').iterdir() if p.is_file()}
+          assert r['tag_name']==os.environ['RELEASE_TAG']
+          assert r['target_commitish']==os.environ['QA_SOURCE_SHA']
+          assert not r['draft'] and not r['prerelease']
+          assert {a['name']:a['digest'] for a in r['assets']}==expected
+          assert t['object']['type']=='commit'
+          assert t['object']['sha']==os.environ['QA_SOURCE_SHA']
+          print('Verified public release URL:',r['html_url'])
+          print('Retained original v3.1.0 rollback; no release file overwritten')
+          PY
+      - name: Confirm real anonymous GitHub users can see full stable 3.1.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os,time,urllib.request
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/releases/tags/'+os.environ['RELEASE_TAG']
+          for attempt in range(6):
+              try:
+                  req=urllib.request.Request(url,headers={'User-Agent':'anything-plays-release-public-verifier'})
+                  with urllib.request.urlopen(req,timeout=15) as res:
+                      release=json.load(res)
+                  assert release['tag_name']=='v3.1.1'
+                  assert release['draft'] is False and release['prerelease'] is False
+                  assert len(release['assets'])==8
+                  assert release['target_commitish']==os.environ['QA_SOURCE_SHA']
+                  assert all(a['state']=='uploaded' and a['digest'].startswith('sha256:')
+                             for a in release['assets'])
+                  print('Anonymous eight-asset public stable release is live:',release['html_url'])
+                  break
+              except Exception:
+                  if attempt==5: raise
+                  time.sleep(5)
+          PY
