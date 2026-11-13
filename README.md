@@ -10,7 +10,7 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Previous 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Previous 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
@@ -24,9 +24,9 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **New in 3.1: customizable Stream Mode and optional controller support.** One resizable, Nintendo DS-inspired window displays the current game beside the annotated camera for OBS Window Capture. Separate controls adjust stacked or side-by-side screens, 16 themes, customizable bezels, proportions and 15/24/30 FPS display presets. 3.1 also adds per-console gamepad mapping, a controller tester, improved reconnect/focus safety, and isolated settings. [Learn about Stream Mode](docs/V3_1_STREAM_MODE.md).
 
-All four complete installers ship the same **18 console profiles and 11 original-source emulator core families** as stable 3.0. The [same-source four-platform 3.1.1 native builds, full 18-console packages, installed desktop tests and eight-asset private review passed](https://github.com/MasynNay/anything-plays/actions/runs/43355665931), and the [release's eight assets](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) include original pygame/SDL/mpg123 sources, SHA256 checksums, source access notes, and the build manifest.
+All four complete installers ship the same **18 console profiles and 11 original-source emulator core families** as stable 3.1.0. The [same-source four-platform 3.1.1 native builds, full 18-console packages, installed desktop tests and eight-asset private review passed](https://github.com/MasynNay/anything-plays/actions/runs/43355665931), and the [release's eight assets](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) include original pygame/SDL/mpg123 sources, SHA256 checksums, source access notes, and the build manifest.
 
-**Hardware scope:** these tests do not certify connected real controllers, webcams, retail-game save/audio behavior or multi-hour sessions on every platform. See [hardware QA disclosure](docs/V3_1_HARDWARE_QA_SCOPE.md). The complete installer is free for noncommercial use, with separately licensed emulator cores and runtime dependencies. [Original LGPL source and rebuild instructions](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) are available. Stable 3.1.0, stable 3.0 and public 3.1 RC2 remain accessible as earlier downloads.
+**Hardware scope:** these tests do not certify connected real controllers, webcams, retail-game save/audio behavior or multi-hour sessions on every platform. See [3.1.1 QA limitations](docs/releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md). The complete installer is free for noncommercial use, with separately licensed emulator cores and runtime dependencies. [Original LGPL source and rebuild instructions](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) are available. Stable 3.1.0, stable 3.0 and public 3.1 RC2 remain accessible as earlier downloads.
 
 ## Screenshots
 
