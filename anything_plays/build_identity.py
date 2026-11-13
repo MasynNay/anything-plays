@@ -42,6 +42,23 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-31",
         "public_release_approved": False,
     },
+    "v311_candidate": {
+        "version": "3.1.1",
+        "channel": "v311_candidate",
+        "title": "Anything Plays 3.1.1 · Private QA",
+        # No user stable/RC settings may be touched by a test installer.
+        "settings_namespace": "anything-plays-311-candidate",
+        "public_release_approved": False,
+    },
+    # 3.1.1 will update 3.1.0 in-place, but this source marker cannot grant
+    # permission to publish a release without the complete final QA.
+    "v311_stable_candidate": {
+        "version": "3.1.1",
+        "channel": "v311_stable_candidate",
+        "title": "Anything Plays 3.1.1",
+        "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
 }
 FALLBACK_CHANNEL = "preview1"
 

@@ -1,0 +1,118 @@
+name: 3.1.1 | Sustained input/save and real Tk synthetic camera soak
+
+# DEVELOPMENT QA ONLY. 30 virtual minutes of mocked controller hotplug and
+# real filesystem writes on all four native host architectures, plus 180
+# wall-clock seconds of real Tk/OpenCV/pygame SDL under Linux Xvfb. No
+# commercial ROM, hardware controller, webcam, installer, or public release.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-sustained-session-qa.yml'
+      - 'tests/test_v311_session_endurance.py'
+      - 'tests/test_v311_soak_health.py'
+      - 'anything_plays/soak_health.py'
+      - 'tests/soak_gui.py'
+      - 'anything_plays/gamepad.py'
+      - 'anything_plays/libretro_input.py'
+      - 'anything_plays/libretro_save.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_gameplay.py'
+      - 'anything_plays/ui_gamepad.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v311-soak-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  simulated-thirty-minutes:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: 1800 virtual seconds and native SRAM | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify synthetic hotplug, bounded frame inputs and durable save checkpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v311_session_endurance.py' -v
+          python -m unittest discover -s tests -p 'test_v311_soak_health.py' -v
+          python -m unittest discover -s tests -p 'test_save_ram.py' -v
+          echo "Synthetic 1,800-second virtual time passed on ${{ matrix.target }}; not real 30-minute or device testing."
+
+  wall-clock-tk-smoke:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Actual 180-second Tk OpenCV SDL UI memory soak | Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: '1'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux Tk native runtime, Xvfb and gamepad/camera dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk xvfb xauth libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Measure actual Tk timers, OpenCV preview rendering and SDL input polling
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py --seconds 180 --enable-gamepad \
+              --max-growth-mb 96 --report test-evidence/v311-tk-180s.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path("test-evidence/v311-tk-180s.json").read_text("utf-8"))
+          assert result["passed"] is True, result["errors"]
+          assert result["seconds_requested"] == 180
+          assert result["elapsed_real_seconds"] >= 179.0
+          assert result["tk_callback_exception_count"] == 0
+          assert result["gamepad_sdl_polling_requested"] is True
+          assert result["sdl_initialized_samples"] >= 2
+          assert result["real_controller_hardware_tested"] is False
+          assert result["physical_camera_tested"] is False
+          assert result["frames_emitted"] > 100
+          assert result["resident_growth_mb"] <= 96
+          print("Actual 180s native Tk/SDL/OpenCV soak passed. This is not real controller/camera/ROM testing.")
+          PY
+      - name: Preserve read-only synthetic soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-REAL-TK-180SEC-SYNTHETIC-CAMERA-SDL-QA-NOT-RELEASE
+          path: test-evidence/v311-tk-180s.json
+          retention-days: 21
+          if-no-files-found: warn

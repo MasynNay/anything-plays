@@ -25,6 +25,7 @@ from unittest.mock import patch
 import numpy as np
 
 from app import App
+from anything_plays.soak_health import completion_failures
 
 
 def rss_megabytes():
@@ -89,6 +90,20 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
                            lambda self, automatic=False: None)):
             root = tk.Tk()
             app = App(root)
+            # Tk logs callback errors by default and continues mainloop;
+            # without this hook a broken timer can look like a green soak.
+            callback_errors = []
+
+            def capture_tk_callback_error(error_type, error, traceback):
+                callback_errors.append(
+                    "Tk callback raised "
+                    + getattr(error_type, "__name__", "Exception")
+                    + ": " + str(error)[:160]
+                )
+                if not app._closing:
+                    app.close()
+
+            root.report_callback_exception = capture_tk_callback_error
             # Exercise the real 3.1 SDL poll timer with synthetic video.
             # No USB/Bluetooth hardware, controller window or ROM is needed.
             if enable_gamepad:
@@ -164,6 +179,12 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
             report["frames_emitted"] = frame_number
             report["camera_frames"] = camera.frame_number
 
+    elapsed_real_seconds = time.monotonic() - started
+    report["elapsed_real_seconds"] = round(elapsed_real_seconds, 2)
+    report["tk_callback_exception_count"] = len(callback_errors)
+    failures.extend(completion_failures(
+        seconds, elapsed_real_seconds, report["samples"], callback_errors,
+    ))
     samples = report["samples"]
     report["sdl_initialized_samples"] = sum(
         1 for sample in samples if sample["sdl_backend_initialized"])

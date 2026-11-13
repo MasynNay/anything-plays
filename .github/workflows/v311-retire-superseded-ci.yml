@@ -1,0 +1,109 @@
+name: 3.1.1 | Retire superseded integration CI runs
+
+# CI queue hygiene for the ONE active 3.1.1 integration branch.
+# NEVER cancel main, other PRs, a public release or latest-head checks.
+# No scheduling, publishing, repository contents mutation or user hardware.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-retire-superseded-ci.yml'
+      - '.github/workflows/v311-private-source-stage.yml'
+      - 'tools/assemble_v311_full_linux.py'
+      - 'tools/assemble_v311_full_windows.py'
+      - 'tools/assemble_v311_full_macos.py'
+      - 'docs/development/V311_RELEASE_CANDIDATE_CHECKLIST.md'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: v311-queue-cleanup-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retire-obsolete-ci:
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'MasynNay/anything-plays' && github.event.pull_request.number == 239 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      BRANCH_NAME: feature/v3.1.1-integration-qa
+    steps:
+      - name: Only retire OLD hashes on this one PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          test "$repo" = "MasynNay/anything-plays"
+          test -n "$SOURCE_SHA"
+          # This cleanup run might have sat in a queue while the PR advanced.
+          # Never cancel a run from the LATEST commit using a stale event SHA.
+          live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+          if test "$live_sha" != "$SOURCE_SHA"; then
+            echo "This cleanup job is stale ($SOURCE_SHA vs $live_sha); leaving all workflow runs untouched."
+            exit 0
+          fi
+          count=0
+          # Re-fetch page one as cancellations remove queued entries.
+          for pass in 1 2 3 4 5; do
+            gh api "repos/$repo/actions/runs?branch=$BRANCH_NAME&status=queued&per_page=100" > queued.json
+            python - queued.json "$SOURCE_SHA" "$BRANCH_NAME" <<'PY' > stale-ids.txt
+          import json,sys
+          from pathlib import Path
+          path,sha,branch=sys.argv[1:]
+          obj=json.loads(Path(path).read_text('utf-8'))
+          for r in obj.get('workflow_runs',[]):
+              if (r['event']=='pull_request'
+                  and r['head_branch']==branch
+                  and r['head_sha']!=sha
+                  and r['status'] in ('queued','pending')):
+                  print(r['id'])
+          PY
+            live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+            if test "$live_sha" != "$SOURCE_SHA"; then
+              echo "PR advanced during queue cleanup; stop without canceling anything further."
+              exit 0
+            fi
+            if test ! -s stale-ids.txt; then
+              echo "No further stale queued runs found"
+              break
+            fi
+            while IFS= read -r run; do
+              test -n "$run" || continue
+              # This cancels workflows only, never jobs on main or another PR.
+              if gh api -X POST "repos/$repo/actions/runs/$run/cancel" >/dev/null 2>&1; then
+                count=$((count + 1))
+              else
+                echo "::warning::Could not cancel stale run $run (already finished or permission denied)"
+              fi
+            done < stale-ids.txt
+            echo "Completed obsolete queue cleanup pass $pass"
+          done
+          # Retire still-executing work only if it is from an older branch SHA.
+          gh api "repos/$repo/actions/runs?branch=$BRANCH_NAME&status=in_progress&per_page=100" > running.json
+          python - running.json "$SOURCE_SHA" "$BRANCH_NAME" <<'PY' > old-running.txt
+          import json,sys
+          from pathlib import Path
+          path,sha,branch=sys.argv[1:]
+          obj=json.loads(Path(path).read_text('utf-8'))
+          for r in obj.get('workflow_runs',[]):
+              if (r['event']=='pull_request'
+                  and r['head_branch']==branch
+                  and r['head_sha']!=sha
+                  and r['status']=='in_progress'):
+                  print(r['id'])
+          PY
+          live_sha="$(gh api "repos/$repo/pulls/239" --jq '.head.sha')"
+          if test "$live_sha" != "$SOURCE_SHA"; then
+            echo "PR head changed; do not cancel any currently running jobs."
+            exit 0
+          fi
+          while IFS= read -r run; do
+            test -n "$run" || continue
+            if gh api -X POST "repos/$repo/actions/runs/$run/cancel" >/dev/null 2>&1; then
+              count=$((count+1))
+            fi
+          done < old-running.txt
+          echo "Retired $count superseded runs. All newest source-head checks retained."

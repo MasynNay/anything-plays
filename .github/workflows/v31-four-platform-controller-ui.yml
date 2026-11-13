@@ -9,6 +9,7 @@ on:
       - 'anything_plays/ui_gamepad.py'
       - 'anything_plays/ui_controller_art.py'
       - 'tests/test_v31_gamepad.py'
+      - 'tests/test_v311_controller_per_device_recovery.py'
       - 'tests/test_v31_reactive_controller_art.py'
       - 'tests/test_v31_controller_gui.py'
       - '.github/workflows/v31-four-platform-controller-ui.yml'
@@ -58,6 +59,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_v31_gamepad.py' -v
           python -m unittest discover -s tests -p 'test_v31_live_controller.py' -v
+          python -m unittest discover -s tests -p 'test_v311_controller_per_device_recovery.py' -v
       - name: Verify both themed controller GUI states with synthetic active buttons
         shell: bash
         run: |

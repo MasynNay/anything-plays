@@ -9,6 +9,9 @@ on:
       - 'packaging/build_windows.bat'
       - 'tools/assemble_v31_full_windows.py'
 
+# PR #239 builds full version-correct 3.1.1 artifacts in its dedicated
+# workflow, rather than wasting runner capacity on superseded 3.1/RC2 builds.
+# All other pull requests and the 3.1.0 public release remain unaffected.
 permissions:
   contents: read
   actions: read
@@ -19,7 +22,7 @@ concurrency:
 
 jobs:
   full-clean-windows-setup:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: windows-latest
     timeout-minutes: 130
     env:

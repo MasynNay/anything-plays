@@ -51,20 +51,26 @@ def core_names_for_build():
         candidate = os.environ.get("AP_V31_RC") == "1"
         candidate2 = os.environ.get("AP_V31_RC2") == "1"
         final_candidate = os.environ.get("AP_V31_FINAL_CANDIDATE") == "1"
-        # The final-identity build is still PRIVATE QA: only a distinct
-        # channel with exact pinned source and no 3.0 release approval.
-        if (sum((preview, candidate, candidate2, final_candidate)) != 1
+        # Exactly one 3.1/3.1.1 full-package source identity is permitted.
+        # A 3.1.1 mGBA source shell must NOT pretend to be a full package;
+        # its 11-core validation is enabled only for assembly jobs with
+        # both an immutable source revision and an explicit QA permit.
+        v311_qa = os.environ.get("AP_V311_CANDIDATE") == "1"
+        v311_stable = os.environ.get("AP_V311_STABLE_CANDIDATE") == "1"
+        # No public release rights flow from any of these flags.
+        if (sum((preview, candidate, candidate2, final_candidate,
+                 v311_qa, v311_stable)) != 1
                 or os.environ.get("AP_RELEASE_BUILD") == "1"
                 or os.environ.get("AP_V30_APPROVED_RELEASE") == "1"
                 or os.environ.get("AP_V30_STABLE_CANDIDATE") == "1"
-                or ((candidate2 or final_candidate) and (
+                or ((candidate2 or final_candidate or v311_qa or v311_stable) and (
                     os.environ.get("AP_V31_NEXT_QA") != "1"
                     or not re.fullmatch(r"[a-f0-9]{40}",
                                         os.environ.get("AP_V31_QA_CHECKOUT_SHA", ""))
                 ))):
             raise ValueError(
                 "3.1 full original-source core reuse requires exactly one "
-                "unreleased preview or isolated RC candidate channel"
+                "unreleased preview, RC or 3.1.1 private full-QA channel"
             )
         from tools.v30_release_lock import ALTERNATIVE_TIA_CORE_ORDER
         return ALTERNATIVE_TIA_CORE_ORDER

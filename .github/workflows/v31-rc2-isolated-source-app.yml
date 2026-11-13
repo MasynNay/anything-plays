@@ -35,6 +35,9 @@ on:
       - 'tests/test_v31_rc2_installed_ui.py'
   workflow_dispatch:
 
+# PR #239 builds full version-correct 3.1.1 artifacts in its dedicated
+# workflow, rather than wasting runner capacity on superseded 3.1/RC2 builds.
+# All other pull requests and the 3.1.0 public release remain unaffected.
 permissions:
   contents: read
   actions: read
@@ -48,7 +51,7 @@ concurrency:
 
 jobs:
   rc2-isolated-shell:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     name: True independent RC2 identity | ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -166,7 +169,7 @@ jobs:
     # One Ubuntu mirror/DNS failure must not discard authentic Windows/Mac
     # sources: every OS leg still must download its OWN source-stage artifact
     # and verify the exact recorded source revision and native core hashes.
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
     needs: rc2-isolated-shell
     name: Original-core full RC2 | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -359,7 +362,7 @@ jobs:
     # Reusable read-only workflow executes only after ALL four original-core
     # packages are verified and uploaded. It runs their REAL installed GUI
     # in disposable settings homes and cannot authorize public distribution.
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.full-rc2-18-console.result == 'success' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && needs.full-rc2-18-console.result == 'success' }}
     needs: full-rc2-18-console
     name: Installed RC2 GUI and preferences | all four native hosts
     uses: ./.github/workflows/v31-rc2-installed-desktop.yml

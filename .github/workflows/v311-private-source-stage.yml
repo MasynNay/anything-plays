@@ -1,0 +1,590 @@
+name: 3.1.1 | Four source-built PRIVATE native QA installers
+
+# First real, version-correct 3.1.1 packaging stage.
+# mGBA-only and NOT releasable: no full 18-console original-core assembly,
+# physical hardware acceptance, LGPL clearance or public publication here.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v311-private-source-stage.yml'
+      - 'anything_plays/build_identity.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v311_source_stage.py'
+      - 'tools/assemble_v311_full_linux.py'
+      - 'tools/assemble_v311_full_windows.py'
+      - 'tools/assemble_v311_full_macos.py'
+      - 'tools/v311_camera_source_gate.py'
+      - 'tests/test_v311_camera_source_gate.py'
+      - 'tests/test_v311_private_qa_identity.py'
+      - 'packaging/build_linux_deb.sh'
+      - 'packaging/build_windows.bat'
+      - 'packaging/build_macos_dmg.sh'
+      - 'packaging/installer.iss'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v311-private-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actual-311-source-build:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Real 3.1.1 source-built installer | ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04, installer: 'anything-plays-311-candidate_3.1.1~qa1_amd64.deb', bundle: 'dist/AnythingPlays'}
+          - {target: windows-x64, runner: windows-latest, installer: 'AnythingPlaysSetup-3.1.1-qa1.exe', bundle: 'dist/AnythingPlays'}
+          - {target: macos-arm64, runner: macos-15, installer: 'AnythingPlays-3.1.1-qa1-macos-arm64.dmg', bundle: 'dist/AnythingPlays311QA.app'}
+          - {target: macos-x64, runner: macos-15-intel, installer: 'AnythingPlays-3.1.1-qa1-macos-x64.dmg', bundle: 'dist/AnythingPlays311QA.app'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 110
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AP_V311_CANDIDATE: '1'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_FINAL_CANDIDATE: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify 3.1.1 source checkout and fail-closed candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v311_private_qa_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v311_camera_source_gate.py' -v
+          python - <<'PY'
+          from anything_plays.build_identity import make_identity
+          value=make_identity('v311_candidate')
+          assert value['version']=='3.1.1'
+          assert value['public_release_approved'] is False
+          assert value['settings_namespace']!='anything-plays-31'
+          print('QA source and version distinct from public stable 3.1.0')
+          PY
+      - name: Restore official Ubuntu mirror if GitHub-hosted mirror fails
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+      - name: Install native Linux build and Tk dependencies with retries
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            sudo apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 update || true
+            if sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 \
+              -o Acquire::http::Timeout=15 install -y --no-install-recommends \
+              python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb; then
+              ok=1; break
+            fi
+            sleep "$((attempt * 20))"
+          done
+          test "$ok" = 1
+      - name: Install native Windows Inno installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+      - name: Download original verified camera-only OpenCV wheel for exact native target
+        shell: bash
+        env:
+          AP_CLEAN_NATIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p customcamera
+          case "$AP_CLEAN_NATIVE_TARGET" in
+            linux-x64)
+              run_id=43133383864
+              artifact=AnythingPlays-3.1-LINUX-FROM-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=linux-x86_64
+              ;;
+            windows-x64)
+              run_id=43138596964
+              artifact=AnythingPlays-3.1-WINDOWS-SOURCE-DIRECTSHOW-OPENCV-UNAPPROVED
+              native_tag=windows-x86_64
+              ;;
+            macos-arm64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-arm64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-arm64
+              ;;
+            macos-x64)
+              run_id=43137079614
+              artifact=AnythingPlays-3.1-macos-x86_64-SOURCE-CAMERA-ONLY-OPENCV-UNAPPROVED
+              native_tag=macos-x86_64
+              ;;
+            *)
+              echo "::error::Unsupported clean camera source wheel target $AP_CLEAN_NATIVE_TARGET"
+              exit 1
+              ;;
+          esac
+          # Source wheels must ALREADY be built successfully in independent
+          # native runners. A job still building or a failed source probe is
+          # not an acceptable input for a unified four-platform public release.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > customcamera/source-run.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('customcamera/source-run.json').read_text('utf-8'))
+          assert r['status']=='completed' and r['conclusion']=='success',r
+          assert r['event']=='pull_request'
+          print('Original independent source-wheel native CI PASS:',r['html_url'])
+          PY
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact" --dir customcamera
+          python - "$AP_CLEAN_NATIVE_TARGET" "$native_tag" <<'PY'
+          from pathlib import Path
+          import hashlib,json,sys
+          from tools.qa_v31_linux_camera_only_wheel import SOURCE_SHA256
+          from tools.verify_custom_opencv_wheel import verify_custom_wheel
+          platform,tag=sys.argv[1:]
+          root=Path('customcamera')
+          source=(root/'published20/opencv_python_headless-4.14.0.94.tar.gz'
+                  if platform=='windows-x64' else
+                  root/'sources/opencv_python_headless-4.14.0.94.tar.gz')
+          assert source.is_file(),source
+          assert hashlib.sha256(source.read_bytes()).hexdigest()==SOURCE_SHA256
+          wheels=list(root.glob('wheels/*.whl'))
+          assert len(wheels)==1,wheels
+          wheel=wheels[0]
+          manifest_path={
+              'linux-x64':'evidence/LINUX_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'windows-x64':'evidence/WINDOWS_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-arm64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+              'macos-x64':'evidence/MAC_CAMERA_ONLY_OPENCV_SOURCE_QA_UNAPPROVED.json',
+          }[platform]
+          receipt=json.loads((root/manifest_path).read_text('utf-8'))
+          expected_status={
+              'linux-x64':'PRIVATE_SOURCE_BUILT_LINUX_V4L2_ONLY_WHEEL_QA_NO_RELEASE',
+              'windows-x64':'PRIVATE_SOURCE_BUILT_WINDOWS_DIRECTSHOW_FFMPEG_OFF_UNAPPROVED',
+              'macos-arm64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+              'macos-x64':'PRIVATE_NATIVE_MAC_CAMERA_ONLY_FFMPEG_AVIF_OFF_SOURCE_WHEEL_UNAPPROVED',
+          }[platform]
+          assert receipt['status']==expected_status,receipt
+          expected_receipt_target='macos-x86_64' if platform=='macos-x64' else platform
+          assert receipt['target']==expected_receipt_target
+          assert receipt['source_sha256']==SOURCE_SHA256
+          assert receipt['wheel_sha256']==hashlib.sha256(wheel.read_bytes()).hexdigest()
+          assert receipt['public_release_approved'] is False
+          assert receipt['redistribution_approved'] is False
+          if platform=='linux-x64':
+              assert receipt['opencv_linux_v4l2_backend_available']
+              assert receipt['opencv_ffmpeg_backend_disabled']
+          elif platform=='windows-x64':
+              patch=root/'published20/WINDOWS_OPENCV_SETUP_PATCH.diff'
+              assert patch.is_file()
+              assert receipt['windows_source_patch_sha256']==hashlib.sha256(patch.read_bytes()).hexdigest()
+              assert receipt['directshow_backend_compiled']
+              assert receipt['opencv_ffmpeg_disabled']
+          else:
+              assert receipt['avfoundation_backend_compiled']
+              assert receipt['ffmpeg_disabled_in_native_wheel']
+              assert receipt['avif_native_dependency_omitted']
+          verify_custom_wheel(wheel,receipt['wheel_sha256'],tag)
+          Path('customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json').write_text(
+             json.dumps({'source_ci_run_id':json.loads(Path('customcamera/source-run.json').read_text('utf-8'))['id'],
+                        'source_sha256':SOURCE_SHA256,'target':platform,
+                        'native_wheel_sha256':receipt['wheel_sha256'],
+                        'native_camera_capture_backend_proven':True,
+                        'frozen_installer_tested':False,
+                        'redistribution_approved':False,
+                        'public_release_approved':False},indent=2)+'\n','utf-8')
+          print('Trusted original-source camera-only wheel for:',platform,wheel.name)
+          PY
+          wheel="$(find customcamera/wheels -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          case "$RUNNER_OS" in
+            Windows) wheel_native="$(cygpath -w "$PWD/$wheel")" ;;
+            *) wheel_native="$PWD/$wheel" ;;
+          esac
+          echo "AP_CUSTOM_OPENCV_WHEEL=$wheel_native" >> "$GITHUB_ENV"
+          wheel_hash="$(python -c 'from pathlib import Path;import hashlib,sys;print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())' "$wheel")"
+          echo "AP_CUSTOM_OPENCV_SHA256=$wheel_hash" >> "$GITHUB_ENV"
+      - name: Freeze true-version Linux 3.1.1 QA app
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Freeze true-version Windows 3.1.1 QA app
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Freeze true-version Apple/Intel 3.1.1 QA app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Authenticate original package, native core, version and exact SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v311_source_stage \
+            --target '${{ matrix.target }}' \
+            --installer 'release/${{ matrix.installer }}' \
+            --bundle '${{ matrix.bundle }}' \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output release/V311_SOURCE_QA_RECEIPT.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('release/V311_SOURCE_QA_RECEIPT.json').read_text('utf-8'))
+          assert r['status']=='PRIVATE_3_1_1_MGBA_ONLY_SOURCE_SHELL_NOT_RELEASE'
+          assert r['source_revision']==os.environ['QA_SOURCE_SHA']
+          assert r['settings_namespace']=='anything-plays-311-candidate'
+          assert r['native_core_count']==1
+          assert r['full_18_console_installer'] is False
+          assert r['public_release_approved'] is False
+          print('Actual 3.1.1 source-built native artifact:',r['target'],r['sha256'])
+          PY
+      - name: Copy verified native OpenCV source provenance into the private QA artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json
+          cp customcamera/INDEPENDENT_NATIVE_WHEEL_RECEIPT.json \
+            release/V311_NATIVE_OPENCV_WHEEL_QA.json
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          r=json.loads(Path('release/V311_NATIVE_OPENCV_WHEEL_QA.json').read_text())
+          assert r['target']=='${{ matrix.target }}'
+          assert r['native_camera_capture_backend_proven'] is True
+          assert r['redistribution_approved'] is False
+          assert r['public_release_approved'] is False
+          print('FFmpeg-off source-built OpenCV wheel provenance retained.')
+          PY
+      - name: Preserve private version-correct QA packages and original receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-${{ matrix.target }}-ONE-CORE-UNRELEASED
+          path: |
+            release/${{ matrix.installer }}
+            release/V311_SOURCE_QA_RECEIPT.json
+            release/V311_NATIVE_OPENCV_WHEEL_QA.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-linux-18:
+    # Assemble and inspect a true 18-console 3.1.1 Linux app using the
+    # PUBLIC, SHA-pinned 3.1.0 original source cores. Other OSes must
+    # independently pass their own full-core assembly before release.
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Linux 18-console source-core QA | not release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      EXPECTED_310_SHA: e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install read-only Linux native core validation runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y \
+            --no-install-recommends dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2
+      - name: Download exact same-run 3.1.1 source-built Linux installer
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-linux-x64-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Authenticate actual public 3.1.0 Linux core baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > baseline-release.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('baseline-release.json').read_text('utf-8'))
+          assert r['draft'] is False and r['prerelease'] is False
+          assert r['tag_name']=='v3.1.0'
+          assert r['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(r['assets'])==8
+          old=[a for a in r['assets']
+               if a['name']=='anything-plays-31_3.1.0_amd64.deb']
+          assert len(old)==1 and old[0]['digest']=='sha256:'+os.environ['EXPECTED_310_SHA']
+          print('Using exact published old stable core baseline, not guessed release files.')
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'anything-plays-31_3.1.0_amd64.deb' \
+            --pattern SHA256SUMS.txt --dir stableqa
+          echo "$EXPECTED_310_SHA  stableqa/anything-plays-31_3.1.0_amd64.deb" | sha256sum -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Assemble authentic 3.1.1 full 18-console Linux test installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_linux \
+            --stable stableqa/anything-plays-31_3.1.0_amd64.deb \
+            --qa 'sourceqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb' \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
+            --expected-source-sha "$QA_SOURCE_SHA" --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          report=json.loads(Path('fullqa/V311_FULL_LINUX_QA_RECEIPT.json').read_text())
+          assert report['status']=='PRIVATE_3_1_1_FULL_18_LINUX_QA_NOT_APPROVED'
+          assert report['app_source_sha']==os.environ['QA_SOURCE_SHA']
+          assert report['native_core_count']==11 and report['console_profiles']==18
+          assert report['public_release_approved'] is False
+          assert report['full_four_platform_311_verified'] is False
+          print('3.1.1 Linux private full-18 native QA:',report['installer_sha256'])
+          PY
+      - name: Preserve full native test installer and original source provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-LINUX-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/anything-plays-311-candidate_3.1.1~qa1_amd64.deb
+            fullqa/V311_FULL_LINUX_QA_RECEIPT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-windows-18:
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Windows 18-console source-core QA | not release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      EXPECTED_310_SHA: 574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install official Inno compiler and source icon renderer runtime
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup unavailable' }
+          python -m pip install 'Pillow>=10,<13' 'numpy>=2,<3' 'opencv-python-headless==4.14.0.94'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install Python original icon dependencies' }
+          python -c "from PIL import Image; import numpy,cv2; from anything_plays.icon_cleanup import clean_icon_background; print('Native Windows full-icon build ready:',numpy.__version__)"
+          if ($LASTEXITCODE -ne 0) { throw 'NumPy/Pillow/OpenCV original icon builder could not initialize' }
+      - name: Recover exact original same-run 3.1.1 Windows source app
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-windows-x64-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Confirm public 3.1.0 core binary and download source-reviewed old stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > stable.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads(Path('stable.json').read_text('utf-8'))
+          assert data['draft'] is False and data['prerelease'] is False
+          assert data['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(data['assets'])==8
+          match=[e for e in data['assets'] if e['name']=='AnythingPlaysSetup-3.1.0.exe']
+          assert len(match)==1
+          assert match[0]['digest']=='sha256:'+os.environ['EXPECTED_310_SHA']
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern AnythingPlaysSetup-3.1.0.exe \
+            --pattern SHA256SUMS.txt --dir stableqa
+          echo "$EXPECTED_310_SHA  stableqa/AnythingPlaysSetup-3.1.0.exe" | sha256sum -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Assemble genuine 11 original cores and verify installed Windows program
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_windows \
+            --stable stableqa/AnythingPlaysSetup-3.1.0.exe \
+            --qa sourceqa/AnythingPlaysSetup-3.1.1-qa1.exe \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('fullqa/V311_FULL_WINDOWS_QA_RECEIPT.json').read_text('utf-8'))
+          assert r['status']=='PRIVATE_3_1_1_FULL_18_WINDOWS_QA_NOT_APPROVED'
+          assert r['new_source_revision']==os.environ['QA_SOURCE_SHA']
+          assert r['native_core_count']==11 and r['console_profiles']==18
+          assert r['identity_channel']=='v311_candidate'
+          assert r['public_release_approved'] is False
+          assert r['full_four_platform_311_verified'] is False
+          print('Actual full 3.1.1 Windows private QA receipt:',r['sha256'])
+          PY
+      - name: Preserve private installed-full-Windows evidence, NOT public
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-WINDOWS-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/AnythingPlaysSetup-3.1.1-qa1.exe
+            fullqa/V311_FULL_WINDOWS_QA_RECEIPT.json
+            fullqa/SDL_RUNTIME_AUDIT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  genuine-full-macos-18:
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: actual-311-source-build
+    name: Actual 3.1.1 Mac 18-console source-core QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: macos-arm64, arch: arm64, runner: macos-15, sha310: 'ddec3be8356e0b1729ff0a4131bc362128739fe39a1cdc48dfd83921feb8e49a'}
+          - {target: macos-x64, arch: x64, runner: macos-15-intel, sha310: 'ed7dd44e457b1a6c5458f7f6dce54089c98401418c1cc02d145e36f68494bae9'}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Retrieve original same-run 3.1.1 Mac source candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-SOURCE-SHELL-${{ matrix.target }}-ONE-CORE-UNRELEASED
+          path: sourceqa
+      - name: Verify original public same-architecture 3.1.0 native core source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.1.0" > public310.json
+          export OLD_BASE_NAME='AnythingPlays-3.1.0-macos-${{ matrix.arch }}.dmg'
+          export OLD_BASE_SHA='${{ matrix.sha310 }}'
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          x=json.loads(Path('public310.json').read_text('utf-8'))
+          assert x['draft'] is False and x['prerelease'] is False
+          assert x['tag_name']=='v3.1.0'
+          assert x['target_commitish']=='104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
+          assert len(x['assets'])==8
+          match=[a for a in x['assets'] if a['name']==os.environ['OLD_BASE_NAME']]
+          assert len(match)==1
+          assert match[0]['digest']=='sha256:'+os.environ['OLD_BASE_SHA']
+          print('Reusing exact original-source 3.1.0 Mac cores.')
+          PY
+          mkdir -p stableqa
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$OLD_BASE_NAME" --pattern SHA256SUMS.txt --dir stableqa
+          echo "$OLD_BASE_SHA  stableqa/$OLD_BASE_NAME" | shasum -a 256 -c -
+          test -s sourceqa/V311_SOURCE_QA_RECEIPT.json
+      - name: Build verified 18-console signed, NONPUBLIC Mac QA installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.assemble_v311_full_macos \
+            --arch '${{ matrix.arch }}' \
+            --stable 'stableqa/AnythingPlays-3.1.0-macos-${{ matrix.arch }}.dmg' \
+            --qa 'sourceqa/AnythingPlays-3.1.1-qa1-macos-${{ matrix.arch }}.dmg' \
+            --checksums stableqa/SHA256SUMS.txt \
+            --source-receipt sourceqa/V311_SOURCE_QA_RECEIPT.json \
+            --camera-receipt sourceqa/V311_NATIVE_OPENCV_WHEEL_QA.json \
+            --expected-source-sha "$QA_SOURCE_SHA" \
+            --output fullqa
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads(Path('fullqa/V311_FULL_MACOS_QA_RECEIPT.json').read_text('utf-8'))
+          assert d['status']=='PRIVATE_3_1_1_FULL_18_MACOS_QA_NOT_APPROVED'
+          assert d['new_source_revision']==os.environ['QA_SOURCE_SHA']
+          assert d['native_core_count']==11 and d['console_profiles']==18
+          assert d['identity_channel']=='v311_candidate'
+          assert d['public_release_approved'] is False
+          assert d['full_four_platform_311_verified'] is False
+          print('Authentic same-source PRIVATE 3.1.1 Mac full candidate:',d['sha256'])
+          PY
+      - name: Retain one original full native Mac private QA installer and receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-PRIVATE-FULL-${{ matrix.target }}-18-CONSOLE-UNRELEASED
+          path: |
+            fullqa/AnythingPlays-3.1.1-qa1-macos-${{ matrix.arch }}.dmg
+            fullqa/V311_FULL_MACOS_QA_RECEIPT.json
+            fullqa/SDL_RUNTIME_AUDIT.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0

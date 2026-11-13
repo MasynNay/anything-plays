@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "version": "3.1.1",
+  "expected_tested_source_sha": "e433d4475e22ce2b39d79cf4d656b027c17d9ef7",
+  "accepted_four_platform_qa_run": 43355665931,
+  "accepted_exact_review_artifact_id": 14005812985,
+  "accepted_exact_review_artifact_sha256": "d4c0b539168b19e3a4df62a45ad81c398fc662d383f988b6d42fa3af978b162f",
+  "owner_explicitly_requested_public_release": true,
+  "scope": "free-noncommercial-nonpromotional",
+  "use_full_stable_upgrade_identity_only": true,
+  "retain_original_public_3_1_0_unmodified": true,
+  "carry_forward_source_companion_from_3_1_0_with_verbatim_sha": true,
+  "require_four_native_full_installed_gui_passes": true,
+  "disclose_physical_controller_webcam_retail_gameplay_unverified": true,
+  "physical_hardware_verification_complete": false,
+  "all_transitive_lgpl_binary_source_correspondence_independently_proven": false,
+  "do_not_redistribute_new_source_falsely_as_verified": true,
+  "note": "Maintainer explicitly requested public v3.1.1 after verified QA. Scope carries forward free 3.1.0 source-access review and discloses all remaining physical/native replacement limitations. Approval of this exact package is not a separate legal opinion."
+}
