@@ -6,6 +6,12 @@ name: 3.1.1 | Publish EXACT source-reviewed stable after merged approval
 on:
   pull_request:
     types: [closed]
+  # Retry the exact same owner-authorized merge when this workflow file is
+  # repaired on main; never trigger publication from arbitrary app commits.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v311-publish-verified-maintenance.yml'
 
 permissions:
   contents: read
@@ -16,7 +22,7 @@ concurrency:
 
 jobs:
   verified-maintenance-release:
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.number == 239 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.number == 239 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'fix(release): resume verified 3.1.1 draft by release ID') }}
     name: Only eight original full 3.1.1 assets, verify SHA before public
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -31,7 +37,7 @@ jobs:
       REVIEW_ARTIFACT: AnythingPlays-3.1.1-EIGHT-ASSET-PRIVATE-RELEASE-REVIEW-UNPUBLISHED
       REVIEW_ARTIFACT_ID: '14005812985'
       REVIEW_ARTIFACT_SHA256: d4c0b539168b19e3a4df62a45ad81c398fc662d383f988b6d42fa3af978b162f
-      MERGED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      MERGED_HEAD_SHA: ${{ github.event.pull_request.head.sha || '43f0e04dbf4da256155462a31f3029cbf1b24c7b' }}
       RELEASE_TAG: v3.1.1
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +55,17 @@ jobs:
           test "$GITHUB_REF" = "refs/heads/main" || test "${{ github.event.pull_request.merged }}" = true
           git merge-base --is-ancestor "$QA_SOURCE_SHA" HEAD
           git merge-base --is-ancestor "$MERGED_HEAD_SHA" HEAD
+          gh api "repos/$GITHUB_REPOSITORY/pulls/239" > original-merged-pr.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('original-merged-pr.json').read_text())
+          assert r['number']==239 and r['base']['ref']=='main'
+          assert r['head']['sha']==os.environ['MERGED_HEAD_SHA']
+          assert r['merged_at'] is not None
+          assert r['merge_commit_sha']=='7a7fb03549ce82cadf3af97e89456bb9b8cad494'
+          print('Original owner-authorized integration PR #239 merged, exact source preserved')
+          PY
           # No application, original packaging, or native source change
           # may have slipped into the PR after original 4/4 native QA.
           while IFS= read -r changed; do
@@ -180,12 +197,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > existing-release.json 2>/dev/null; then
+          # GitHub's private draft URL is /tag/untagged-UUID; REST
+          # /releases/tags/v3.1.1 returns 404 until the tag is public.
+          # Find the exact private draft by tagged release identity and
+          # operate through its stable numeric release ID instead.
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > releases-list.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          all_releases=json.loads(Path('releases-list.json').read_text('utf-8'))
+          matches=[x for x in all_releases if x['tag_name']==os.environ['RELEASE_TAG']]
+          assert len(matches)<=1, 'Duplicate 3.1.1 draft candidates'
+          if matches:
+              r=matches[0]
+              assert r['target_commitish']==os.environ['QA_SOURCE_SHA']
+              assert r['name']=='Anything Plays 3.1.1'
+              assert r['prerelease'] is False
+          Path('release-exists.txt').write_text('true' if matches else 'false','ascii')
+          PY
+          if test "$(cat release-exists.txt)" = 'false'; then
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --draft --target "$QA_SOURCE_SHA" --title 'Anything Plays 3.1.1' \
               --notes-file docs/releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md
           fi
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > source-draft.json
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > releases-list.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          all_releases=json.loads(Path('releases-list.json').read_text('utf-8'))
+          matches=[x for x in all_releases if x['tag_name']==os.environ['RELEASE_TAG']]
+          assert len(matches)==1,'Exact target release draft not found by listing'
+          r=matches[0]
+          assert r['target_commitish']==os.environ['QA_SOURCE_SHA']
+          assert r['name']=='Anything Plays 3.1.1'
+          assert isinstance(r['id'],int) and r['id']>0
+          Path('release-id.txt').write_text(str(r['id']),'ascii')
+          Path('source-draft.json').write_text(json.dumps(r),'utf-8')
+          print('Verified actual draft by numeric release ID:',r['id'],'draft:',r['draft'])
+          PY
           python - <<'PY'
           import json,os,hashlib
           from pathlib import Path
@@ -218,7 +267,7 @@ jobs:
             gh release upload "$RELEASE_TAG" "release-ready/$filename" \
               --repo "$GITHUB_REPOSITORY"
           done < missing-release-assets.txt
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > uploaded.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/$(cat release-id.txt)" > uploaded.json
           python - <<'PY'
           import hashlib,json,os
           from pathlib import Path
@@ -241,7 +290,7 @@ jobs:
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --draft=false --prerelease=false --latest
           fi
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > published.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/$(cat release-id.txt)" > published.json
           gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > published-tag.json
           python - <<'PY'
           import hashlib,json,os
