@@ -22,7 +22,8 @@ concurrency:
 
 jobs:
   verified-maintenance-release:
-    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.number == 239 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'fix(release): resume verified 3.1.1 draft by release ID') }}
+    if: >-
+      ${{ (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.number == 239 && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'feature/v3.1.1-integration-qa' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'fix(release)')) }}
     name: Only eight original full 3.1.1 assets, verify SHA before public
     runs-on: ubuntu-24.04
     timeout-minutes: 35
