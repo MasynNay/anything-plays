@@ -17,10 +17,10 @@ class WindowsOriginalIconDependencies(unittest.TestCase):
                 text=(BASE/workflow).read_text("utf-8")
                 # Require both dependencies, the exact importer preflight and
                 # its native full assembler after the dependency installation.
-                self.assertIn("python -m pip install 'Pillow>=10,<13' 'numpy>=2,<3'",text)
+                self.assertIn("python -m pip install 'Pillow>=10,<13' 'numpy>=2,<3' 'opencv-python-headless==4.14.0.94'",text)
                 self.assertIn("anything_plays.icon_cleanup import clean_icon_background",text)
                 self.assertIn("python -m tools.assemble_v311_full_windows",text)
-                setup=text.index("python -m pip install 'Pillow>=10,<13' 'numpy>=2,<3'")
+                setup=text.index("python -m pip install 'Pillow>=10,<13' 'numpy>=2,<3' 'opencv-python-headless==4.14.0.94'")
                 build=text.index("python -m tools.assemble_v311_full_windows")
                 self.assertLess(setup,build)
 
