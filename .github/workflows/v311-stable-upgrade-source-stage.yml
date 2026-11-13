@@ -24,6 +24,8 @@ on:
       - 'tools/run_v311_stable_installed_smoke.py'
       - 'tests/test_v311_installed_desktop_verifier.py'
       - 'tests/test_v311_installed_smoke_runner.py'
+      - 'tools/stage_v311_private_release_review.py'
+      - 'tests/test_v311_stage_private_release_review.py'
 permissions:
   contents: read
   actions: read
@@ -79,6 +81,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v311_source_stage_native_contracts.py' -v
           python -m unittest discover -s tests -p 'test_v311_installed_desktop_verifier.py' -v
           python -m unittest discover -s tests -p 'test_v311_installed_smoke_runner.py' -v
+          python -m unittest discover -s tests -p 'test_v311_stage_private_release_review.py' -v
           python -m unittest discover -s tests -p 'test_v311_camera_source_gate.py' -v
           python - <<'PY'
           from anything_plays.build_identity import make_identity
@@ -467,6 +470,107 @@ jobs:
             fullqa/SDL_RUNTIME_AUDIT.json
             installed-evidence/V311_INSTALLED_FULL_GUI_RECEIPT.json
             installed-evidence/V311_ACTUAL_FROZEN_TK_SMOKE.json
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0
+
+  private-review-eight-assets:
+    # Strictly read-only release-review collection, not a publication trigger.
+    # 'needs' blocks this stage unless ALL FOUR full native installers and
+    # actual frozen Tk/Stream Mode tests completed successfully this SAME run.
+    needs: full-user-stable-311
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 239 && github.event.pull_request.head.repo.full_name == github.repository && needs.full-user-stable-311.result == 'success' }}
+    name: Private v3.1.1 full installer, original source and SHA256 preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject false release readiness or tampered source/installer receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v311_stage_private_release_review.py' -v
+          python -m unittest discover -s tests -p 'test_v311_installed_desktop_verifier.py' -v
+      - name: Authenticate the full four-platform release-shape build success on this source
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > origin.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          run=json.loads(Path('origin.json').read_text('utf-8'))
+          assert run['head_sha']==os.environ['SOURCE_SHA']
+          assert run['head_repository']['full_name']==os.environ['GITHUB_REPOSITORY']
+          assert run['event']=='pull_request'
+          assert run['name']=='3.1.1 \\| Genuine stable-upgrade identity four native source builds' or run['name']=='3.1.1 | Genuine stable-upgrade identity four native source builds'
+          print('This origin workflow assembled and installed all four native 3.1.1 stable updates.')
+          PY
+      - name: Retrieve exactly four full native and installed GUI receipts from this run
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            mkdir -p "all-four/$target"
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.1.1-FULL-STABLE-UPGRADE-$target-NOT-PUBLIC" \
+              --dir "all-four/$target"
+          done
+          for target in linux-x64 windows-x64 macos-arm64 macos-x64; do
+            test -s "all-four/$target/V311_INSTALLED_FULL_GUI_RECEIPT.json" || \
+              find "all-four/$target" -type f -name V311_INSTALLED_FULL_GUI_RECEIPT.json | grep -q .
+          done
+      - name: Download and independently hash public 3.1.0 original LGPL sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p original-sources
+          gh release download v3.1.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip' \
+            --dir original-sources
+          echo '469b75685b385a7992f018d04bc4ddb1ffa06b061b6471cf50ae4fcda6e746d8  original-sources/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip' \
+            | sha256sum -c -
+      - name: Stage eight SHA-verified private release-review assets, no GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v311_private_release_review \
+            --root all-four \
+            --original-source original-sources/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip \
+            --source-sha "$SOURCE_SHA" \
+            --output review
+          (cd review && sha256sum --check SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          r=json.loads(Path('review/V311_PRIVATE_RELEASE_REVIEW_MANIFEST.json').read_text('utf-8'))
+          assert r['source_revision']==os.environ['SOURCE_SHA']
+          assert r['status']=='PRIVATE_3_1_1_EIGHT_ORIGINAL_ASSETS_FOR_REVIEW_NOT_RELEASED'
+          assert len(r['native_installers'])==4
+          assert r['real_frozen_gui_tests_passed_on_four_native_hosts'] is True
+          assert r['complete_corresponding_source_and_relink_review_approved'] is False
+          assert r['public_release_approved'] is False
+          assert len(tuple(Path('review').iterdir()))==8
+          print('Four original full native binaries, shared source, checksums verified; NOT PUBLISHED')
+          PY
+      - name: Preserve source and exact binary SHA256 receipts for separate release decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.1.1-EIGHT-ASSET-PRIVATE-RELEASE-REVIEW-UNPUBLISHED
+          path: review/*
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
