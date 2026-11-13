@@ -300,6 +300,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
       EXPECTED_310_SHA: e91bdb3be315a86a37144cf8480822d9677bd06a013712bc128bc4b12915f55e
     steps:
       - uses: actions/checkout@v4
@@ -392,6 +399,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
       EXPECTED_310_SHA: 574b5fda1e6cb1a708fb910271dc80fb6671f12c2013fb69076755b6c0a12bb0
     steps:
       - uses: actions/checkout@v4
@@ -488,6 +502,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
     steps:
       - uses: actions/checkout@v4
         with:

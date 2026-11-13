@@ -295,6 +295,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V31_FULL_TEST_CORES: '1'
+      AP_V31_NEXT_QA: '1'
+      AP_V31_QA_CHECKOUT_SHA: ${{ github.event.pull_request.head.sha }}
+      AP_V311_STABLE_CANDIDATE: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
       OLD_SOURCE_SHA: '104b96621ec4cb8dc39fde8c3fe96fc854c406ed'
       OLD_PACKAGE: ${{ matrix.oldname }}
       OLD_SHA: ${{ matrix.oldsha }}
