@@ -20,6 +20,10 @@ on:
       - 'tools/assemble_v311_full_linux.py'
       - 'tools/assemble_v311_full_windows.py'
       - 'tools/assemble_v311_full_macos.py'
+      - 'tools/verify_v311_installed_smoke.py'
+      - 'tools/run_v311_stable_installed_smoke.py'
+      - 'tests/test_v311_installed_desktop_verifier.py'
+      - 'tests/test_v311_installed_smoke_runner.py'
 permissions:
   contents: read
   actions: read
@@ -73,6 +77,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           python -m unittest discover -s tests -p 'test_v311_stable_upgrade_identity.py' -v
           python -m unittest discover -s tests -p 'test_v311_source_stage_native_contracts.py' -v
+          python -m unittest discover -s tests -p 'test_v311_installed_desktop_verifier.py' -v
+          python -m unittest discover -s tests -p 'test_v311_installed_smoke_runner.py' -v
           python -m unittest discover -s tests -p 'test_v311_camera_source_gate.py' -v
           python - <<'PY'
           from anything_plays.build_identity import make_identity
@@ -321,7 +327,7 @@ jobs:
           sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
           sudo apt-get -o Acquire::Retries=2 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y \
-            --no-install-recommends dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2
+            --no-install-recommends dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb xauth libx11-6
       - name: Install exact Windows installer/compiler and icon requirements
         if: runner.os == 'Windows'
         shell: pwsh
@@ -427,6 +433,30 @@ jobs:
           print("Real complete 3.1.1 native source-built stable upgrade QA:",report["target"])
           PY
           test -s 'fullqa/${{ matrix.newname }}'
+      - name: Execute actual installed frozen 3.1.1 Tk GUI and Stream Mode on this host
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.run_v311_stable_installed_smoke \
+            --target '${{ matrix.target }}' \
+            --installer 'fullqa/${{ matrix.newname }}' \
+            --receipt 'fullqa/${{ matrix.report }}' \
+            --source-sha "$SOURCE_SHA" \
+            --output installed-evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          report=json.loads(Path('installed-evidence/V311_INSTALLED_FULL_GUI_RECEIPT.json').read_text('utf-8'))
+          assert report['status']=='PASSED_PRIVATE_3_1_1_REAL_FROZEN_18_CONSOLE_TK_SMOKE_NOT_RELEASE'
+          assert report['source_revision']==os.environ['SOURCE_SHA']
+          assert report['console_profiles']==18 and report['native_core_count']==11
+          assert report['frozen_desktop_started'] is True
+          assert report['stream_mode_started_and_closed'] is True
+          assert report['stable_settings_namespace_retained'] is True
+          assert report['hardware_gameplay_verified'] is False
+          assert report['public_release_approved'] is False
+          print('ACTUAL frozen 3.1.1 native GUI ran on', report['target'])
+          PY
       - name: Preserve authentic full 18-console 3.1.1 update only as PRIVATE QA
         uses: actions/upload-artifact@v4
         with:
@@ -435,6 +465,8 @@ jobs:
             fullqa/${{ matrix.newname }}
             fullqa/${{ matrix.report }}
             fullqa/SDL_RUNTIME_AUDIT.json
+            installed-evidence/V311_INSTALLED_FULL_GUI_RECEIPT.json
+            installed-evidence/V311_ACTUAL_FROZEN_TK_SMOKE.json
           retention-days: 30
           if-no-files-found: error
           compression-level: 0
