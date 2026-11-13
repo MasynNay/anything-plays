@@ -1,8 +1,8 @@
 # Anything Plays — Product roadmap
 
-**If it moves, it plays.** Anything Plays is a free desktop application that turns locally tracked camera movement into controls for classic games. This is the current **post-3.1 stable** product plan, not a list of unverified feature promises.
+**If it moves, it plays.** Anything Plays is a free desktop application that turns locally tracked camera movement into controls for classic games. This is the current **post-3.1.1 stable** product plan, not a list of unverified feature promises.
 
-[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) · [Report an issue](https://github.com/MasynNay/anything-plays/issues) · [Architecture](ARCHITECTURE.md)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Report an issue](https://github.com/MasynNay/anything-plays/issues) · [Architecture](ARCHITECTURE.md)
 
 ## Release history and current status
 
@@ -12,27 +12,27 @@
 | **2.0** | Released | Four consoles, flexible control zones, themes, local ROM libraries |
 | **3.0** | Released, November 9, 2026 | 18 console profiles, 11 native emulator core families, Windows/Linux/Apple Silicon/Intel Mac installers |
 | **3.1.0** | **Public stable, November 11, 2026 (Mountain Time)** | OBS-friendly two-screen Stream Mode, 16 themes, configurable bezels, optional SDL gamepad mapping/tester, safer reconnect/focus handling, isolated preferences, all 18 consoles |
-| **3.1.1** | **Next proposed maintenance release** | Reliability, real-device regression fixes, install and save diagnostics |
+| **3.1.1** | **Public stable, November 12, 2026 (Mountain Time)** | Camera recovery, controller/SDL resilience, atomic game-save reliability, ROM/art shelf fault isolation, expanded four-platform tests; same 18 consoles |
 | **3.2** | Proposed | Camera calibration, simpler controller onboarding, portable control profiles |
 | **3.3** | Proposed | GameCube and 3D performance, smoother streaming capture, lower latency and extended-session optimization |
 
-The public [3.1.0 release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) contains four full installers, matching SHA256 checksums, native build/source-access evidence and an original pygame/SDL/mpg123 source companion. The exact original application source revision is `104b96621ec4cb8dc39fde8c3fe96fc854c406ed`. All 13 original [four-platform final native build and installed GUI tests passed](https://github.com/MasynNay/anything-plays/actions/runs/43140637755). The [public release run](https://github.com/MasynNay/anything-plays/actions/runs/43154682911) succeeded, and the [public site verification](https://github.com/MasynNay/anything-plays/actions/runs/43155487330) passed.
+The current [3.1.1 release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) provides four full installers, matching SHA256 checksums, per-platform native build and installed GUI evidence, a source-access review, and the byte-identical original pygame/SDL/mpg123 source companion from 3.1.0. The **exact tested application revision** is `e433d4475e22ce2b39d79cf4d656b027c17d9ef7`. All nine source/package/real-Tk+Stream-Mode review jobs passed in [native run 43355665931](https://github.com/MasynNay/anything-plays/actions/runs/43355665931), and the [eight-asset publication and anonymous-access verification passed](https://github.com/MasynNay/anything-plays/actions/runs/43358855767). The earlier [3.1.0 stable release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) remains available unchanged.
 
-**Quality distinction:** Native UI, Stream Mode and synthetic controller/camera QA passed; this is **not** certification that the final installed release has passed physical controller, live webcam, retail game/save/audio, 30-minute gameplay or every GPU combination. These checks remain real-world support work, honestly disclosed in [3.1 hardware QA scope](V3_1_HARDWARE_QA_SCOPE.md). A gamepad or Intel Mac is not required to download or run the application. The complete emulator-bundled installer is distributed free for noncommercial use under the individual native core and library licenses.
+**Quality distinction:** All four 3.1.1 native installers and their actual frozen Tk/Stream Mode launches passed; virtual-time controller/save checks and a real timed Linux UI soak also passed. This is **not** certification of physical controller pairing, live webcam capture, every retail-game save/audio combination, multiple hours of real gameplay or every GPU. These remain field-validation work disclosed in the [3.1.1 release notes](releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md). The complete app is free and noncommercial, with independent emulator/library licensing and original source access; an actual gamepad is optional.
 
-## First: 3.1.1 — Stability and compatibility
+## Continuing: 3.1.1 — Field compatibility and maintenance
 
-**Goal:** Make the version people just downloaded trustworthy before expanding its feature surface.
+**Goal:** Support the now-released 3.1.1 with practical hardware reports and targeted fixes, without presenting synthetic tests as physical-device certification.
 
 | Workstream | Definition of done |
 | --- | --- |
 | Real controller acceptance | Exercise Xbox/PlayStation-style USB/Bluetooth connect, mapping, game input, unplug/reconnect, focus loss and safe release on actual machines. Mark untested hardware explicitly instead of counting simulated events as devices. |
 | Camera and control reliability | Confirm first-use camera permissions, target loss/reacquisition, primary and secondary object behavior, STOP safety and no stuck buttons. Keep footage local and exclude private camera recordings from reports. |
 | ROM switching, saves and startup | Reproduce load → unload → load, failed ROM recovery, save persistence, shutdown and relaunch across GB/GBC/GBA/SNES/N64 and targeted GameCube sessions. No game/BIOS files in CI artifacts. |
-| Windows/Linux/Mac packaging | Verify one clean installation per practical native OS, updates without overwriting 3.0 settings, clear unsigned/notarization warnings and installer integrity. |
+| Windows/Linux/Mac packaging | Verify one clean installation per practical native OS, updates without overwriting 3.1.0 settings, clear unsigned/notarization warnings and installer integrity. |
 | Crash and memory hygiene | Test repeated launches/switches, camera/controller disconnects and at least a 30-minute representative session; quantify resource growth and regressions. |
 
-Ship **3.1.1 only after actual fixes and focused regression evidence**, not merely to increment a version number. Track real Windows and Linux setup coverage in [#26](https://github.com/MasynNay/anything-plays/issues/26) and [#25](https://github.com/MasynNay/anything-plays/issues/25). Some earlier 3.0 installations were tested successfully by the maintainer; those are not automatically new 3.1.0 acceptance results.
+**3.1.1 shipped after actual fixes and focused regression evidence**, not merely a version-number change. Real-device, licensed-game and host-specific diagnostics remain ongoing; collect issue reports in [Windows #26](https://github.com/MasynNay/anything-plays/issues/26) and [Linux #25](https://github.com/MasynNay/anything-plays/issues/25). A later 3.1.2 hotfix should only ship for a demonstrated issue with its own platform-specific tests. Do not confuse earlier owner 3.0/3.1 RC tests with acceptance of every new device.
 
 ## Next: 3.2 — Setup and control experience
 
@@ -65,8 +65,8 @@ After stability, usability and performance improve, explore more accessible mult
 - Keep builds, camera tracking, save handling and game ROM files **local by design**. Do not include ROMs or commercial firmware with the app.
 - Preserve exact platform-native builds, SHA256 checksums, dependency notices and recipient source/rebuild rights; do not conflate LGPL obligations with physical hardware testing. See [the scoped 3.1 release decision](V3_1_SCOPED_DISTRIBUTION_DECISION.md) and [LGPL rebuild instructions](V3_1_LGPL_REBUILD_REPLACEMENT.md).
 - The complete emulator installers remain free and **noncommercial** because bundled core licenses can be more restrictive than the MIT-licensed original application source.
-- Keep earlier [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) available for rollback.
-- No dates are committed for 3.1.1, 3.2 or 3.3. Triage bugs through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and publish incremental releases when they are ready.
+- Keep earlier [stable 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0), [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) available for rollback.
+- No dates are committed for 3.2 or 3.3. Triage 3.1.1 issues through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and only publish incremental fixes when verified.
 
 ## Historical engineering log
 
