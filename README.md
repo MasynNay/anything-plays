@@ -10,21 +10,23 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) · [Previous 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Previous 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
 ---
 
-## Anything Plays 3.1.0 — public stable release
+## Anything Plays 3.1.1 — public stable maintenance release
 
-**[Download the official Anything Plays 3.1.0 release for Windows, Linux and both Macs](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0)**
+**[Download the official Anything Plays 3.1.1 release for Windows, Linux and both Macs](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1)**
+
+**3.1.1 reliability improvements:** safer camera reconnect/disconnect, resilient controller enumeration and SDL recovery, atomic game save writes and Windows sharing-conflict retries, plus ROM/art library fault isolation. Four native platform builds, complete 18-console installers and real frozen Tk/Stream Mode startup passed in [release QA](https://github.com/MasynNay/anything-plays/actions/runs/43355665931). The update retains the 3.1 installation identity and settings. [Read 3.1.1 maintenance notes](docs/releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md).
 
 **New in 3.1: customizable Stream Mode and optional controller support.** One resizable, Nintendo DS-inspired window displays the current game beside the annotated camera for OBS Window Capture. Separate controls adjust stacked or side-by-side screens, 16 themes, customizable bezels, proportions and 15/24/30 FPS display presets. 3.1 also adds per-console gamepad mapping, a controller tester, improved reconnect/focus safety, and isolated settings. [Learn about Stream Mode](docs/V3_1_STREAM_MODE.md).
 
-All four complete installers ship the same **18 console profiles and 11 original-source emulator core families** as stable 3.0. The [13/13 native build and installed application QA jobs passed](https://github.com/MasynNay/anything-plays/actions/runs/43140637755), and the [release's eight assets](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) include original pygame/SDL/mpg123 sources, SHA256 checksums, source access notes, and the build manifest.
+All four complete installers ship the same **18 console profiles and 11 original-source emulator core families** as stable 3.0. The [same-source four-platform 3.1.1 native builds, full 18-console packages, installed desktop tests and eight-asset private review passed](https://github.com/MasynNay/anything-plays/actions/runs/43355665931), and the [release's eight assets](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) include original pygame/SDL/mpg123 sources, SHA256 checksums, source access notes, and the build manifest.
 
-**Hardware scope:** these tests do not certify connected real controllers, webcams, retail-game save/audio behavior or multi-hour sessions on every platform. See [hardware QA disclosure](docs/V3_1_HARDWARE_QA_SCOPE.md). The complete installer is free for noncommercial use, with separately licensed emulator cores and runtime dependencies. [Original LGPL source and rebuild instructions](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) are available. Stable 3.0 and public 3.1 RC2 remain accessible as earlier downloads.
+**Hardware scope:** these tests do not certify connected real controllers, webcams, retail-game save/audio behavior or multi-hour sessions on every platform. See [hardware QA disclosure](docs/V3_1_HARDWARE_QA_SCOPE.md). The complete installer is free for noncommercial use, with separately licensed emulator cores and runtime dependencies. [Original LGPL source and rebuild instructions](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md) are available. Stable 3.1.0, stable 3.0 and public 3.1 RC2 remain accessible as earlier downloads.
 
 ## Screenshots
 
@@ -132,24 +134,24 @@ The desktop software is built with Python, Tkinter, OpenCV, NumPy and native Lib
 
 ### Download the desktop app
 
-**[Anything Plays 3.1.0 — latest stable GitHub release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0)**
+**[Anything Plays 3.1.1 — latest stable GitHub release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1)**
 
-| Computer | Official 3.1.0 installer |
+| Computer | Official 3.1.1 installer |
 | :-- | :-- |
-| Windows 10/11 x64 | [AnythingPlaysSetup-3.1.0.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlaysSetup-3.1.0.exe) |
-| Mac with Apple Silicon | [AnythingPlays-3.1.0-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-arm64.dmg) |
-| Mac with Intel | [AnythingPlays-3.1.0-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-x64.dmg) |
-| Ubuntu / Debian Linux x64 | [anything-plays-31_3.1.0_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/anything-plays-31_3.1.0_amd64.deb) |
+| Windows 10/11 x64 | [AnythingPlaysSetup-3.1.1.exe](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlaysSetup-3.1.1.exe) |
+| Mac with Apple Silicon | [AnythingPlays-3.1.1-macos-arm64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlays-3.1.1-macos-arm64.dmg) |
+| Mac with Intel | [AnythingPlays-3.1.1-macos-x64.dmg](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlays-3.1.1-macos-x64.dmg) |
+| Ubuntu / Debian Linux x64 | [anything-plays-31_3.1.1_amd64.deb](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/anything-plays-31_3.1.1_amd64.deb) |
 
-Download **one** installer for your computer. Verify it with the [3.1 SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/SHA256SUMS.txt). The same release includes the [original controller-runtime source ZIP](https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip) and [native library replacement guide](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md).
+Download **one** installer for your computer. Verify it with the [3.1.1 SHA256SUMS.txt](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/SHA256SUMS.txt). The same release includes the [original, unchanged 3.1.0 controller-runtime source ZIP](https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip) and [native library replacement guide](docs/V3_1_LGPL_REBUILD_REPLACEMENT.md).
 
 **Windows:** Run the setup program. SmartScreen may display a warning because the installer is not commercially signed.
 
 **macOS:** Open the DMG and copy the app into Applications. The app is ad hoc signed, not Apple-notarized, so macOS may request approval in System Settings → Privacy & Security.
 
-**Linux:** Install the DEB with your package manager or run `sudo apt install ./anything-plays-31_3.1.0_amd64.deb` from its downloaded folder.
+**Linux:** Install the DEB with your package manager or run `sudo apt install ./anything-plays-31_3.1.1_amd64.deb` from its downloaded folder.
 
-**Previous versions:** [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) remain available for rollback.
+**Previous versions:** [stable 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0), [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) remain available for rollback.
 
 ### Your first five minutes
 

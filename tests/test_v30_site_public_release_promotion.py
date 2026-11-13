@@ -31,10 +31,10 @@ class PublicThreeOhSiteTests(unittest.TestCase):
     def test_stable_3_release_is_visible_in_static_html(self):
         self.assertIn('id="public-stable-download-31"', self.html)
         self.assertIn('id="public-previous-stable-download"', self.html)
-        self.assertIn('releases/tag/v3.1.0', self.html)
+        self.assertIn('releases/tag/v3.1.1', self.html)
         self.assertIn('releases/tag/v3.0.0', self.html)
-        self.assertIn("Download stable 3.1", self.html)
-        self.assertIn("STABLE 3.1.0 AVAILABLE", self.html)
+        self.assertIn("Download stable 3.1.1", self.html)
+        self.assertIn("STABLE 3.1.1 AVAILABLE", self.html)
         self.assertIn("18 offline console profiles", self.html)
         self.assertIn("03 / RELEASED", self.html)
         self.assertNotIn("STABLE 2.0 AVAILABLE", self.html)
@@ -44,12 +44,12 @@ class PublicThreeOhSiteTests(unittest.TestCase):
 
     def test_stable_3_1_and_previous_3_0_release_links_are_public_urls(self):
         expected = {
+            "https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1",
             "https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0",
-            "https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0",
-            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlaysSetup-3.1.0.exe",
-            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/anything-plays-31_3.1.0_amd64.deb",
-            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-arm64.dmg",
-            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.0/AnythingPlays-3.1.0-macos-x64.dmg",
+            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlaysSetup-3.1.1.exe",
+            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/anything-plays-31_3.1.1_amd64.deb",
+            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlays-3.1.1-macos-arm64.dmg",
+            "https://github.com/MasynNay/anything-plays/releases/download/v3.1.1/AnythingPlays-3.1.1-macos-x64.dmg",
         }
         self.assertTrue(expected.issubset(set(self.links.links)))
         # A public website must not point visitors at an owner-only draft
