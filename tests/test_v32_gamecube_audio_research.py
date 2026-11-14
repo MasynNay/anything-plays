@@ -24,6 +24,10 @@ def fixture(sha="a"*64):
             "native_controller_polls": 900,
             "nonzero_controller_polls": 70,
             "error": None,
+            "native_startup_phase": "game_loaded",
+            "native_boot_failure_category": "none",
+            "native_hw_context_request_count": 1,
+            "native_hw_context_accepted": True,
             "native_pcm_frame_samples": 180000,
             "native_pcm_nonzero_values": 39000,
             "native_pcm_sample_rate": 48000.0,
@@ -170,6 +174,48 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
                 self.assertFalse(report["owned_program_native_video_observed"])
                 self.assertFalse(report["native_gpu_homebrew_rendering_verified"])
                 self.assertFalse(report["core_generated_nonzero_pcm_verified"])
+
+    def test_startup_diagnostics_use_fixed_safe_categories(self):
+        from tools.probe_gamecube_app import classify_gamecube_boot_failure
+        self.assertEqual(classify_gamecube_boot_failure(
+            "GameCube core (Dolphin) rejected /private/owned.dol "
+            "(need_fullpath=True)", "libretro_load_rejected",
+        ), "retro_load_game_rejected")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "Dolphin did not register a supported accelerated render context",
+            "game_loaded_postload_failure",
+        ), "unsupported_hw_render_context")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /Users/secret/mygame.dol", "libretro_loading_game",
+        ), "game_load_failure")
+        self.assertEqual(
+            classify_gamecube_boot_failure(None, "game_loaded"), "none",
+        )
+
+    def test_original_research_receipt_redacts_unknown_boot_stage(self):
+        raw = fixture()
+        raw["details"]["native_startup_phase"] = "/Users/private/mygame.dol"
+        raw["details"]["native_boot_failure_category"] = "something private"
+        raw["details"]["native_hw_context_request_count"] = True
+        out = qa.evaluate_evidence(raw, 0, "a"*64, "b"*40, True)
+        self.assertEqual(out["native_startup_phase"], "unavailable")
+        self.assertEqual(out["native_boot_failure_category"], "unavailable")
+        self.assertEqual(out["native_hw_context_request_count"], 0)
+        self.assertNotIn("Users/private", json.dumps(out))
+
+    def test_authenticated_boot_stage_survives_audio_only_failure(self):
+        raw = fixture()
+        raw["passed"] = False
+        raw["native_exit_code"] = 1
+        raw["details"]["passed"] = False
+        raw["details"]["native_pcm_nonzero_values"] = 0
+        raw["details"]["native_nonzero_pcm_requirement_met"] = False
+        out = qa.evaluate_evidence(raw, 1, "a"*64, "b"*40, True)
+        self.assertEqual(out["native_startup_phase"], "game_loaded")
+        self.assertEqual(out["native_boot_failure_category"], "none")
+        self.assertTrue(out["native_hw_context_accepted"])
+        self.assertFalse(out["core_generated_nonzero_pcm_verified"])
+        self.assertFalse(out["public_release_approved"])
 
     def test_missing_docker_is_documented_not_hidden_as_sound_success(self):
         with TemporaryDirectory() as td:

@@ -30,6 +30,42 @@ from tools.gamecube_homebrew_fixture import verified_homebrew
 
 MAX_LOG = 15000
 
+# Only these fixed, privacy-safe identifiers may reach private CI receipts.
+GC_BOOT_PHASES = frozenset((
+    "pre_libretro_load", "libretro_loading_game", "libretro_load_rejected",
+    "game_loaded_postload_failure", "game_loaded",
+))
+GC_FAILURE_CODES = frozenset((
+    "none", "retro_load_game_rejected", "unsupported_hw_render_context",
+    "controller_port_api_missing", "gpu_surface_readback_failed",
+    "native_core_missing", "pre_game_load_failure", "game_load_failure",
+    "post_game_load_failure",
+))
+
+
+def classify_gamecube_boot_failure(error, phase):
+    """Classify an error by constant code, never expose its raw message."""
+    if error is None:
+        return "none"
+    message = str(error)
+    if "need_fullpath=" in message and " rejected " in message:
+        return "retro_load_game_rejected"
+    if "did not register a supported accelerated render context" in message:
+        return "unsupported_hw_render_context"
+    if "has no controller-port API" in message:
+        return "controller_port_api_missing"
+    if "bundled emulator core not found" in message:
+        return "native_core_missing"
+    if "GPU" in message and "readback" in message:
+        return "gpu_surface_readback_failed"
+    return {
+        "pre_libretro_load": "pre_game_load_failure",
+        "libretro_loading_game": "game_load_failure",
+        "libretro_load_rejected": "game_load_failure",
+        "game_loaded_postload_failure": "post_game_load_failure",
+        "game_loaded": "post_game_load_failure",
+    }.get(phase, "pre_game_load_failure")
+
 def linux_rss_mb():
     """Sample the actual native Dolphin worker's resident memory."""
     if not sys.platform.startswith("linux"):
@@ -81,11 +117,31 @@ def _child(core, rom, report, seconds, require_audio=False,
                 self.pcm_nonzero += int(np.count_nonzero(raw))
             return super().batch(pointer, frames)
 
+    class ResearchGameCubeHardwareSession(GameCubeHardwareSession):
+        # Track production loader boundaries without modifying the loader.
+        # CoreSession.close() can clear native.loaded after an exception.
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.qa_boot_phase = "pre_libretro_load"
+
+        def _load_game(self):
+            self.qa_boot_phase = "libretro_loading_game"
+            try:
+                super()._load_game()
+            except Exception:
+                self.qa_boot_phase = (
+                    "game_loaded_postload_failure"
+                    if self.native is not None and self.native.loaded
+                    else "libretro_load_rejected"
+                )
+                raise
+            self.qa_boot_phase = "game_loaded"
+
     emu = Emulator()
     emu.system = "gamecube"
     emu.core_path = str(core)
     emu.inputs.system = "gamecube"
-    session = GameCubeHardwareSession(emu, rom, str(core))
+    session = ResearchGameCubeHardwareSession(emu, rom, str(core))
     session.audio.close()
     session.audio = ObservedActualAudioSink()
     original_video = session.video
@@ -215,6 +271,15 @@ def _child(core, rom, report, seconds, require_audio=False,
     evidence = {
         "system": "gamecube",
         "backend": "production GameCubeHardwareSession + platform GPU host",
+        "native_startup_phase": session.qa_boot_phase,
+        "native_boot_failure_category": classify_gamecube_boot_failure(
+            error, session.qa_boot_phase
+        ),
+        "native_hw_context_request_count": len(session.hardware_requests),
+        "native_hw_context_accepted": any(
+            request.get("granted") is True
+            for request in session.hardware_requests
+        ),
         "core": core.name,
         "uses_external_dolphin": False,
         "uses_separate_game_window": False,

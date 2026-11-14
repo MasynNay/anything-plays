@@ -160,6 +160,18 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
             exception = "other_native_exception"
     else:
         exception = None
+    # Only an authenticated, bounded stage identifier is preserved.
+    from tools.probe_gamecube_app import GC_BOOT_PHASES, GC_FAILURE_CODES
+    phase = details.get("native_startup_phase")
+    category = details.get("native_boot_failure_category")
+    phase = (
+        phase if source_matches and type(phase) is str
+        and phase in GC_BOOT_PHASES else "unavailable"
+    )
+    category = (
+        category if source_matches and type(category) is str
+        and category in GC_FAILURE_CODES else "unavailable"
+    )
     result = {
         "schema_version": 1,
         "status": STATUS,
@@ -171,6 +183,18 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
         ),
         "source_program_kind": source_kind,
         "native_child_exception_class": exception,
+        "native_startup_phase": phase,
+        "native_boot_failure_category": category,
+        "native_hw_context_request_count": (
+            details.get("native_hw_context_request_count")
+            if source_matches
+            and type(details.get("native_hw_context_request_count")) is int
+            and 0 <= details["native_hw_context_request_count"] <= 16 else 0
+        ),
+        "native_hw_context_accepted": (
+            details.get("native_hw_context_accepted") is True
+            if source_matches else False
+        ),
         "original_program_compiled_in_private_ci": built,
         "program_sha256": dol_digest if built else None,
         "parent_report_received": bool(raw),
