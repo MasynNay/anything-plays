@@ -268,6 +268,80 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
             self.assertEqual(result["layout_code"], "header_unreadable")
             self.assertNotIn("private-contents", json.dumps(result))
 
+    def test_gpu_host_stages_do_not_suppress_cleanup_or_exceptions(self):
+        from tools.probe_gamecube_app import make_tracked_gpu_context
+        stages, calls = [], []
+        class Host:
+            def __enter__(self):
+                calls.append("enter")
+                return self
+            def __exit__(self, exc_type, exc, tb):
+                calls.append("exit")
+                return False
+        with make_tracked_gpu_context(lambda **kwargs: Host(), stages.append):
+            calls.append("body")
+        self.assertEqual(stages, [
+            "gpu_context_constructing", "gpu_context_opening",
+            "gpu_context_ready",
+        ])
+        self.assertEqual(calls, ["enter", "body", "exit"])
+
+    def test_gpu_host_factory_and_enter_failures_are_distinguished(self):
+        from tools.probe_gamecube_app import (
+            make_tracked_gpu_context, classify_gamecube_boot_failure
+        )
+        stages = []
+        def fail_factory(**kwargs):
+            raise RuntimeError("/home/private/gpu")
+        with self.assertRaises(RuntimeError):
+            make_tracked_gpu_context(fail_factory, stages.append)
+        self.assertEqual(stages[-1], "gpu_context_construct_failed")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /home/private/gpu", stages[-1],
+        ), "gpu_factory_failure")
+        class BadContext:
+            def __enter__(self):
+                raise RuntimeError("/home/private/context")
+            def __exit__(self, *args):
+                return False
+        stages.clear()
+        with self.assertRaises(RuntimeError):
+            with make_tracked_gpu_context(
+                lambda **kwargs: BadContext(), stages.append,
+            ):
+                pass
+        self.assertEqual(stages[-1], "gpu_context_open_failed")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /home/private/context", stages[-1],
+        ), "gpu_open_failure")
+        self.assertNotIn("/home/private", json.dumps(stages))
+
+    def test_native_hw_context_stage_has_bounded_diagnostic_code(self):
+        from tools.probe_gamecube_app import classify_gamecube_boot_failure
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /private/dol", "gpu_context_ready",
+        ), "native_core_init_failure")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /private/dol", "gpu_render_rejected",
+        ), "native_hw_context_rejected")
+        self.assertEqual(classify_gamecube_boot_failure(
+            "RuntimeError: /private/dol", "gpu_render_accepted",
+        ), "native_core_init_failure_after_hw_accept")
+        raw = fixture()
+        raw["passed"] = False
+        raw["native_exit_code"] = 1
+        raw["details"]["passed"] = False
+        raw["details"]["error"] = "RuntimeError: /private/dol"
+        raw["details"]["native_startup_phase"] = "gpu_context_open_failed"
+        raw["details"]["native_boot_failure_category"] = "gpu_open_failure"
+        report = qa.evaluate_evidence(raw, 1, "a"*64, "b"*40, True)
+        self.assertEqual(report["native_startup_phase"],
+                         "gpu_context_open_failed")
+        self.assertEqual(report["native_boot_failure_category"],
+                         "gpu_open_failure")
+        self.assertFalse(report["core_generated_nonzero_pcm_verified"])
+        self.assertNotIn("/private/dol", json.dumps(report))
+
     def test_missing_docker_is_documented_not_hidden_as_sound_success(self):
         with TemporaryDirectory() as td:
             root = Path(td)

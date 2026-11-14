@@ -32,14 +32,20 @@ MAX_LOG = 15000
 
 # Only these fixed, privacy-safe identifiers may reach private CI receipts.
 GC_BOOT_PHASES = frozenset((
-    "pre_libretro_load", "libretro_loading_game", "libretro_load_rejected",
+    "pre_libretro_load", "gpu_context_constructing",
+    "gpu_context_construct_failed", "gpu_context_opening",
+    "gpu_context_open_failed", "gpu_context_ready",
+    "gpu_render_negotiating", "gpu_render_rejected", "gpu_render_accepted",
+    "libretro_loading_game", "libretro_load_rejected",
     "game_loaded_postload_failure", "game_loaded",
 ))
 GC_FAILURE_CODES = frozenset((
     "none", "retro_load_game_rejected", "unsupported_hw_render_context",
     "controller_port_api_missing", "gpu_surface_readback_failed",
     "native_core_missing", "pre_game_load_failure", "game_load_failure",
-    "post_game_load_failure",
+    "post_game_load_failure", "gpu_factory_failure", "gpu_open_failure",
+    "native_core_init_failure", "native_hw_context_rejected",
+    "native_core_init_failure_after_hw_accept",
 ))
 
 
@@ -60,11 +66,52 @@ def classify_gamecube_boot_failure(error, phase):
         return "gpu_surface_readback_failed"
     return {
         "pre_libretro_load": "pre_game_load_failure",
+        "gpu_context_constructing": "gpu_factory_failure",
+        "gpu_context_construct_failed": "gpu_factory_failure",
+        "gpu_context_opening": "gpu_open_failure",
+        "gpu_context_open_failed": "gpu_open_failure",
+        "gpu_context_ready": "native_core_init_failure",
+        "gpu_render_negotiating": "native_hw_context_rejected",
+        "gpu_render_rejected": "native_hw_context_rejected",
+        "gpu_render_accepted": "native_core_init_failure_after_hw_accept",
         "libretro_loading_game": "game_load_failure",
         "libretro_load_rejected": "game_load_failure",
         "game_loaded_postload_failure": "post_game_load_failure",
         "game_loaded": "post_game_load_failure",
     }.get(phase, "pre_game_load_failure")
+
+class BootTrackedGPUContext:
+    """Research-only wrapper: preserve real GPU host lifecycle semantics."""
+
+    def __init__(self, delegate, phase_callback):
+        self._delegate = delegate
+        self._phase_callback = phase_callback
+
+    def __enter__(self):
+        self._phase_callback("gpu_context_opening")
+        try:
+            host = self._delegate.__enter__()
+        except Exception:
+            self._phase_callback("gpu_context_open_failed")
+            raise
+        self._phase_callback("gpu_context_ready")
+        return host
+
+    def __exit__(self, exc_type, exc, tb):
+        # Never intercept or suppress production context cleanup exceptions.
+        return self._delegate.__exit__(exc_type, exc, tb)
+
+
+def make_tracked_gpu_context(factory, phase_callback, **kwargs):
+    """Observe GPU factory vs context-entry failure, with no raw logs."""
+    phase_callback("gpu_context_constructing")
+    try:
+        context = factory(**kwargs)
+    except Exception:
+        phase_callback("gpu_context_construct_failed")
+        raise
+    return BootTrackedGPUContext(context, phase_callback)
+
 
 def linux_rss_mb():
     """Sample the actual native Dolphin worker's resident memory."""
@@ -123,6 +170,23 @@ def _child(core, rom, report, seconds, require_audio=False,
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.qa_boot_phase = "pre_libretro_load"
+            production_factory = self._host_factory
+            self._host_factory = lambda **options: make_tracked_gpu_context(
+                production_factory, self._record_qa_phase, **options
+            )
+
+        def _record_qa_phase(self, phase):
+            self.qa_boot_phase = phase
+
+        def environment(self, command, data):
+            if command != 14:
+                return super().environment(command, data)
+            self.qa_boot_phase = "gpu_render_negotiating"
+            granted = super().environment(command, data)
+            self.qa_boot_phase = (
+                "gpu_render_accepted" if granted else "gpu_render_rejected"
+            )
+            return granted
 
         def _load_game(self):
             self.qa_boot_phase = "libretro_loading_game"
