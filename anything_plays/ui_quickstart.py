@@ -49,6 +49,18 @@ def show_quick_start(app):
         style="Helper.TLabel", wraplength=520, justify="left",
     ).pack(anchor="w", pady=(4, 10))
 
+    from anything_plays.build_identity import current_identity
+    if current_identity()["channel"] == "v32_preview":
+        ttk.Label(
+            shell,
+            text="DEVELOPMENT PREVIEW · Only GB, GBC and GBA are bundled "
+                 "in the test installers. Other console profiles may need "
+                 "a separate native core. Your stable installation and "
+                 "settings stay separate.",
+            style="Helper.TLabel",
+            wraplength=510, justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
     holder = ttk.Frame(shell)
     holder.pack(fill="both", expand=True)
     surface = app.THEMES.get(
