@@ -26,11 +26,28 @@ def show_controller_guide(app):
     app._controller_guide_job = None
     window.title("Controller & keyboard setup · Anything Plays 3.2")
     window.transient(app.root)
-    window.geometry("570x445")
+    window.geometry("570x525")
     window.minsize(460, 400)
 
-    wrapper = ttk.Frame(window, padding=16)
-    wrapper.pack(fill="both", expand=True)
+    shell = ttk.Frame(window, padding=12)
+    shell.pack(fill="both", expand=True)
+    scroller = ttk.Frame(shell)
+    scroller.pack(fill="both", expand=True)
+    canvas = tk.Canvas(scroller, highlightthickness=0, borderwidth=0)
+    bar = ttk.Scrollbar(scroller, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=bar.set)
+    bar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    wrapper = ttk.Frame(canvas, padding=(5, 4))
+    content_id = canvas.create_window((0, 0), window=wrapper, anchor="nw")
+    wrapper.bind(
+        "<Configure>",
+        lambda _event: canvas.configure(scrollregion=canvas.bbox("all")),
+    )
+    canvas.bind(
+        "<Configure>",
+        lambda event: canvas.itemconfigure(content_id, width=event.width),
+    )
     ttk.Label(
         wrapper, text="Get your controls working",
         font=("TkDefaultFont", 17, "bold"),
@@ -91,7 +108,7 @@ def show_controller_guide(app):
     ttk.Button(
         rows, text="Copy safe diagnostics",
         command=app.copy_gamepad_diagnostics,
-    ).grid(row=2, column=0, sticky="ew", padx=(0, 5))
+    ).grid(row=2, column=0, columnspan=2, sticky="ew")
 
     ttk.Label(
         wrapper, textvariable=app.gamepad_diagnostics_status,
@@ -121,9 +138,11 @@ def show_controller_guide(app):
             pass
 
     app._controller_guide_close = close
+    footer = ttk.Frame(shell)
+    footer.pack(fill="x", pady=(10, 0))
     ttk.Button(
-        rows, text="Done", command=close, style="Accent.TButton",
-    ).grid(row=2, column=1, sticky="ew", padx=(5, 0))
+        footer, text="Done", command=close, style="Accent.TButton",
+    ).pack(side="right")
     window.protocol("WM_DELETE_WINDOW", close)
 
     def update():
