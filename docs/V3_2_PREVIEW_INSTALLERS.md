@@ -161,6 +161,27 @@ distinction now appears in the local **Check my setup** troubleshooting
 report, not only the main emulator-status strip. If a matching native core
 really is installed, diagnostics correctly recognize it instead.
 
+## Missing-core behavior in the limited preview
+
+The console picker still exposes all **18 control profiles** because setup,
+mapping and portable profile work should remain usable even when a native
+emulator is not included. The test installer currently packages **mGBA only**
+for GB, GBC and GBA. In a frozen 3.2 preview, attempting to open a ROM for
+an unbundled console now displays **Not bundled in this 3.2 preview**, returns
+to the game shelf and does **not** invoke a native emulator. It does not claim
+the installation is corrupt or tell the user to reinstall the public 3.1.1
+package. An independently verified compatible core already installed by the
+user is still recognized normally.
+
+If the mGBA core itself is missing, 3.2 says the **preview mGBA emulator file
+is missing**, distinct from the intentionally unbundled consoles. The main
+window uses concise status labels; **Check my setup** and the blocked-launch
+popup supply detailed guidance. Tests exercise all 18 profiles, stable
+missing-core behavior, and matching privacy-safe diagnostics. The four-platform
+frozen-app acceptance includes a synthetic unbundled SNES attempt to verify
+the real installer never tries to open a ROM or starts a native core. No
+retail-game file is accessed, and this does not count as 18-console QA.
+
 ## Human acceptance still required
 
 On a disposable/test account before considering a public release:
