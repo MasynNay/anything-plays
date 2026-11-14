@@ -17,6 +17,7 @@ ROOT_FILES = frozenset({
     ".gitattributes", ".gitignore",
     "LICENSE", "README.md", "app.py", "fetch_mgba_core.py",
     "requirements-build.txt", "requirements.txt", "verify_bundle.py",
+    "run_v32_preview.py",  # reviewed source-only launcher; no bundled native files
 })
 ROOT_DIRECTORIES = frozenset({
     ".github", "anything_plays", "assets", "config", "cores",
