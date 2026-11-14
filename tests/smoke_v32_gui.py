@@ -87,6 +87,23 @@ def smoke():
                         app._controller_guide_close()
                         assert app._controller_guide_window is None
 
+                        # Real Tk controller remapping window must work even
+                        # with SDL disabled and NO controller attached.
+                        app.open_controller_settings()
+                        root.update_idletasks()
+                        remap = app._gamepad_setup_window
+                        assert remap is not None and remap.winfo_exists()
+                        assert any(
+                            isinstance(item, ttk.LabelFrame)
+                            and "QUICK REMAP" in item.cget("text")
+                            for item in all_widgets(remap)
+                        )
+                        click_named_button(remap, "Press to assign")
+                        assert app._controller_capture is None
+                        click_named_button(remap, "Done")
+                        assert app._gamepad_setup_window is None
+                        assert app.gamepad_setup_canvas is None
+
                         # Local setup check may copy an allowlisted JSON report.
                         click_named_button(launchpad, "Check my setup")
                         root.update_idletasks()
