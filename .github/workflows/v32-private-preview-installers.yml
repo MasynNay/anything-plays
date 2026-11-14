@@ -122,6 +122,38 @@ jobs:
         run: |
           set -euo pipefail
           python tools/verify_v32_preview.py             --target '${{ matrix.target }}'             --installer '${{ matrix.installer }}'             --bundle '${{ matrix.bundle }}'             --output 'release/V32_PRIVATE_PREVIEW_RECEIPT.json'
+      - name: Linux installed Debian application startup smoke (isolated)
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_HOME="$(mktemp -d)"
+          trap 'rm -rf "$QA_HOME"' EXIT
+          mkdir -p "$QA_HOME/payload" "$QA_HOME/home"
+          dpkg-deb -x '${{ matrix.installer }}' "$QA_HOME/payload"
+          ENTRY="$QA_HOME/payload/opt/anything-plays-32-preview/AnythingPlays"
+          test -x "$ENTRY"
+          HOME="$QA_HOME/home" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA_HOME/v32-installed-gui.json" \
+          SDL_VIDEODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          timeout 65 xvfb-run -a "$ENTRY" --ap-v30-ui-smoke
+          python - "$QA_HOME/v32-installed-gui.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["passed"] is True
+          assert data["actual_tk_window_started"] is True
+          assert data["actual_app_initialized"] is True
+          assert data["actual_tk_mainloop_ran"] is True
+          assert data["frozen_binary"] is True
+          assert data["public_distribution_approved"] is False
+          assert data["camera_hardware_tested"] is False
+          assert data["gameplay_hardware_tested"] is False
+          print("Verified actual extracted 3.2 Debian App GUI startup")
+          PY
       - name: Describe accurate testing limitations
         shell: bash
         run: |
