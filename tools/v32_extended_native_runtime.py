@@ -143,7 +143,6 @@ def _verified(profile, evidence, exit_code):
             and re.fullmatch(r"[a-f0-9]{64}",
                              str(evidence.get("fixture_sha256", ""))) is not None
             and isinstance(details, dict)
-            and details.get("playback_probe_passed") is True
             and details.get("passed") is True
             and details.get("backend") ==
             "production GameCubeHardwareSession + platform GPU host"

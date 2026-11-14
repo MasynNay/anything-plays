@@ -51,7 +51,6 @@ def valid_raw(profile):
             "passed": True,
             "fixture_sha256": "a" * 64,
             "details": {
-                "playback_probe_passed": True,
                 "passed": True,
                 "backend": "production GameCubeHardwareSession + platform GPU host",
                 "uses_external_dolphin": False,
