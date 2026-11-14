@@ -135,13 +135,16 @@ def show_setup_diagnostics(app):
     def copy():
         # Do not copy until explicitly clicked; always use our allowlisted,
         # locally reconstructed report, not arbitrary status/exception text.
-        if snapshot["value"] is None:
-            refresh()
-        if snapshot["value"] is None:
+        # A camera or controller may have changed since opening the dialog.
+        # Copy a fresh, allowlisted snapshot rather than stale state.
+        try:
+            report = _snapshot(app)
+        except (ValueError, tk.TclError):
+            status.set("Cannot copy setup checks until they can be refreshed.")
             return
         try:
             app.root.clipboard_clear()
-            app.root.clipboard_append(json.dumps(snapshot["value"], indent=2) + "\n")
+            app.root.clipboard_append(json.dumps(report, indent=2) + "\n")
             app.root.update_idletasks()
         except (OSError, RuntimeError, tk.TclError):
             messagebox.showerror(
