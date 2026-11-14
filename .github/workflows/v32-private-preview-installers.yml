@@ -107,6 +107,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_full_linux_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_windows_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_macos_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_original_native_runtime.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -320,6 +321,30 @@ jobs:
           assert smoke["public_distribution_approved"] is False
           print("Full native 3.2 Linux candidate installed-GUI PASS; hardware and real gameplay NOT certified")
           PY
+          # Native software execution: original source-generated legal
+          # homebrew, exact repacked 3.2 native core bytes. No real games,
+          # hardware, BIOS downloads, network, or stable user save directory.
+          AP_V32_PREVIEW=1 \
+          SDL_AUDIODRIVER=dummy \
+          timeout 220 .build-venv/bin/python -m tools.v32_original_native_runtime \
+            --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
+            --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --seconds 4 \
+            --report "$FULL/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json"
+          python - "$FULL/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          report = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+          assert report["passed"] is True
+          assert report["required_profiles_tested"] == ["gb", "gbc", "gba", "nes"]
+          assert report["required_profiles_passed"] == 4
+          assert report["original_source_generated_homebrew_only"] is True
+          assert report["all_18_consoles_gameplay_verified"] is False
+          assert report["commercial_game_compatibility_verified"] is False
+          assert report["public_release_approved"] is False
+          print("4 original-source Libretro A/V homebrew profiles passed on installed Linux 3.2; 18 retail games NOT verified")
+          PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
@@ -329,6 +354,7 @@ jobs:
             release/v32-full-linux/anything-plays-32-preview_3.2.0~fullqa1_amd64.deb
             release/v32-full-linux/V32_FULL_LINUX_QA_RECEIPT.json
             release/v32-full-linux/V32_FULL_LINUX_GUI_SMOKE.json
+            release/v32-full-linux/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

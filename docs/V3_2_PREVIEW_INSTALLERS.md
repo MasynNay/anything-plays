@@ -256,3 +256,28 @@ Separate private 7-day Actions artifacts retain both Mac DMGs and their
 native provenance / GUI smoke receipts. They are NOT public releases,
 redistribution approval, physical camera/controller testing or evidence
 that all 18 console profiles play retail games correctly.
+
+
+## First original-homebrew native runtime acceptance (Linux)
+
+The full-core Linux runner now performs **actual Libretro execution** using
+short original console test programs generated from source at QA time. The
+probe opens native libraries from the *re-extracted full-core 3.2 DEB*, not
+from an unrelated installed RetroArch copy. It checks real decoded/changing
+video frames and core-generated PCM using existing original GB, GBC, GBA,
+NES, SNES and Genesis probe programs with individual crash/time limits.
+Four mature profiles (GB, GBC, GBA, NES) are strict acceptance gates;
+Supafaust SNES and BlastEm Genesis are **exploratory** until their new
+source-built alternative cores pass independent, repeatable evidence.
+Individual exploratory failures are explicitly listed in the same report;
+they are never relabeled as passing. The runner verifies the 11-core source
+manifest, the 3.2 exact Git SHA, and the private build receipt *before*
+executing any native module. It uses a disposable home, no network, no
+firmware and no commercial or user-supplied games; native crashes are
+isolated in subprocesses. Only a sanitized, per-system JSON summary is
+retained alongside the full Linux QA installer and other receipts.
+
+This is the start of **software runtime acceptance**, not evidence that
+all 18 systems or actual retail games work. Real USB/Bluetooth gamepads,
+physical cameras, sound output, sustained saves and four-OS play testing
+remain independent acceptance requirements.
