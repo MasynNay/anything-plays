@@ -281,7 +281,8 @@ else
       /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.2.0" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.2.0.1" "$PLIST" ||
       /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.2.0.1" "$PLIST"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.2 Private Preview" "$PLIST" || true
+    /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Anything Plays 3.2 Private Preview" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.2 Private Preview" "$PLIST"
   elif [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.release31" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.1" "$PLIST" ||
