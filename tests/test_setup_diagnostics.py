@@ -71,5 +71,66 @@ class SetupDiagnosticsTests(unittest.TestCase):
             self.evaluate(system="../../secrets")
 
 
+
+class FakeSetting:
+    def __init__(self, value):
+        self.value = value
+    def get(self):
+        return self.value
+
+
+class PrivateApp:
+    """Deliberately include data no setup report may disclose."""
+    def __init__(self, core_path):
+        self.camera_name = FakeSetting("Private Office Webcam (device 7)")
+        self.camera_options = {
+            "Private Office Webcam (device 7)": 7,
+        }
+        self.cap = type("Capture", (), {"isOpened": lambda _self: True})()
+        self.emu = type("Emulator", (), {"core_path": core_path})()
+        self._gamepad = type("Reader", (), {
+            "controller": object(),
+            "name": "Private Bluetooth Serial 123456",
+        })()
+        self.gamepad_enabled = FakeSetting(True)
+        self.system_key = FakeSetting("gba")
+
+    def uses_embedded_emulator(self):
+        return True
+
+
+class SnapshotPrivacyTests(unittest.TestCase):
+    def test_private_device_names_and_core_paths_never_enter_report(self):
+        import tempfile
+        from pathlib import Path
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        with tempfile.TemporaryDirectory(prefix="private-local-core-") as d:
+            core = Path(d) / "licensed-native-test.so"
+            core.write_bytes(b"synthetic test only")
+            app = PrivateApp(core)
+            report = _snapshot(app)
+        encoded = json.dumps(report)
+        self.assertIn("Core file located", encoded)
+        for private in (
+            "Private Office Webcam", "Private Bluetooth",
+            "private-local-core", "licensed-native-test.so", "device 7",
+        ):
+            self.assertNotIn(private, encoded)
+
+    def test_bad_camera_driver_does_not_break_report(self):
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        def fail_open():
+            raise OSError("private /home/alex/camera-driver")
+        app.cap = type("Capture", (), {"isOpened": lambda _self: fail_open()})()
+        report = _snapshot(app)
+        self.assertIn(
+            "not running", report["checks"]["camera"]["status"],
+        )
+        self.assertNotIn("/home/alex", json.dumps(report))
+
+
 if __name__ == "__main__":
     unittest.main()
