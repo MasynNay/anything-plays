@@ -205,9 +205,27 @@ class GameplayMixin:
                 # the same disconnect, clearing the bezel and held controls
                 # through stop_camera() before queuing a bounded retry.
                 camera_open = GameplayMixin._camera_is_open(self)
-                ok, frame = self.cap.read() if camera_open else (False, None)
+                try:
+                    ok, frame = self.cap.read() if camera_open else (False, None)
+                    # Native camera backends sometimes report success while
+                    # returning None/empty pixels during a USB transition.
+                    # Treat this just like a failed read, not a tracking
+                    # exception that silently disables future reconnects.
+                    shape = getattr(frame, "shape", ())
+                    ok = (
+                        bool(ok) and frame is not None and len(shape) >= 2
+                        and shape[0] > 0 and shape[1] > 0
+                    )
+                    if ok:
+                        frame = cv2.flip(frame, 1) if self.mirror.get() else frame
+                except (cv2.error, OSError, RuntimeError, ValueError, TypeError):
+                    # read() and flip() can raise after camera.isOpened()
+                    # returned True. Re-enter the same bounded reconnect
+                    # path used for False/None frames instead of leaving
+                    # the camera silently stopped for the rest of the session.
+                    ok, frame = False, None
                 if ok:
-                    self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
+                    self.frame = frame
                 else:
                     chosen = self.camera_name.get()
                     self.stop_camera()
