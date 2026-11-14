@@ -148,6 +148,7 @@ jobs:
           HOME="$QA_HOME/home" \
           AP_V30_UI_SMOKE_CHECK=1 \
           AP_V32_GUI_SMOKE_CHECK=1 \
+          AP_V32_SETUP_SMOKE_CHECK=1 \
           AP_V30_UI_SMOKE_REPORT="$QA_HOME/v32-installed-gui.json" \
           SDL_VIDEODRIVER=dummy \
           PYGAME_HIDE_SUPPORT_PROMPT=1 \
@@ -200,6 +201,7 @@ jobs:
           $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
           $env:AP_V30_UI_SMOKE_CHECK = '1'
           $env:AP_V32_GUI_SMOKE_CHECK = '1'
+          $env:AP_V32_SETUP_SMOKE_CHECK = '1'
           $env:AP_V30_UI_SMOKE_REPORT = Join-Path $PWD 'release/V32_FROZEN_GUI_SMOKE.json'
           $env:SDL_AUDIODRIVER = 'dummy'
           $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
@@ -237,6 +239,7 @@ jobs:
           XDG_CONFIG_HOME="$QA/home/.config" \
           AP_V30_UI_SMOKE_CHECK=1 \
           AP_V32_GUI_SMOKE_CHECK=1 \
+          AP_V32_SETUP_SMOKE_CHECK=1 \
           AP_V30_UI_SMOKE_REPORT="$PWD/release/V32_FROZEN_GUI_SMOKE.json" \
           SDL_AUDIODRIVER=dummy \
           PYGAME_HIDE_SUPPORT_PROMPT=1 \
