@@ -337,13 +337,13 @@ jobs:
           from pathlib import Path
           report = json.loads(Path(sys.argv[1]).read_text("utf-8"))
           assert report["passed"] is True
-          assert report["required_profiles_tested"] == ["gb", "gbc", "gba", "nes"]
-          assert report["required_profiles_passed"] == 4
+          assert report["required_profiles_tested"] == ["gb", "gbc", "gba", "nes", "snes"]
+          assert report["required_profiles_passed"] == 5
           assert report["original_source_generated_homebrew_only"] is True
           assert report["all_18_consoles_gameplay_verified"] is False
           assert report["commercial_game_compatibility_verified"] is False
           assert report["public_release_approved"] is False
-          print("4 original-source Libretro A/V homebrew profiles passed on installed Linux 3.2; 18 retail games NOT verified")
+          print("5 original-source Libretro A/V homebrew profiles passed on installed Linux 3.2; 18 retail games NOT verified")
           PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'

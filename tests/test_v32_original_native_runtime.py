@@ -26,9 +26,13 @@ def success(system):
 
 class V32OriginalHomebrewNativeTests(unittest.TestCase):
     def test_four_required_origins_do_not_rely_on_legacy_core_names(self):
-        self.assertEqual(qa.REQUIRED, ("gb", "gbc", "gba", "nes"))
+        self.assertEqual(qa.REQUIRED, ("gb", "gbc", "gba", "nes", "snes"))
         self.assertEqual(qa.CASES["snes"][0], "mednafen_supafaust")
         self.assertEqual(qa.CASES["genesis"][0], "blastem")
+        self.assertEqual(
+            qa.CASES["genesis"][1],
+            "tools.probe_v30_blastem_genesis_variant",
+        )
         self.assertEqual(qa.CASES["nes"][0], "fceumm")
         self.assertEqual(qa.CASES["gbc"][0], "mgba")
         self.assertEqual(set(qa.CASES), set(qa.REQUIRED) | set(qa.EXPLORATORY))
@@ -38,8 +42,8 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
         reports = [success(system) for system in systems]
         result = qa.analyze_results(reports, systems)
         self.assertTrue(result["passed"])
-        self.assertEqual(result["required_profiles_passed"], 4)
-        self.assertEqual(result["exploratory_profiles_passed"], 2)
+        self.assertEqual(result["required_profiles_passed"], 5)
+        self.assertEqual(result["exploratory_profiles_passed"], 1)
         self.assertEqual(result["profiles_in_native_inventory"], 18)
         for key in ("all_18_consoles_gameplay_verified",
                     "commercial_game_compatibility_verified",
@@ -58,7 +62,7 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
         )
         result = qa.analyze_results(reports, systems)
         self.assertTrue(result["passed"])
-        self.assertEqual(result["exploratory_profiles_passed"], 1)
+        self.assertEqual(result["exploratory_profiles_passed"], 0)
         self.assertFalse(result["probes"][-1]["probe_passed"])
 
     def test_any_required_native_crash_fails_the_gate(self):
@@ -67,7 +71,7 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
         reports[2] = qa.safe_summary("gba", {}, -11, False)
         result = qa.analyze_results(reports, systems)
         self.assertFalse(result["passed"])
-        self.assertEqual(result["required_profiles_passed"], 3)
+        self.assertEqual(result["required_profiles_passed"], 4)
 
     def test_no_sensitive_console_tail_or_core_path_is_in_output(self):
         report = success("gb")

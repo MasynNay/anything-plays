@@ -5,9 +5,11 @@ actually executes the installed native .so through production Libretro, and
 checks decoded changing RGB and core-generated PCM with strict subprocess
 timeouts. NO proprietary game assets, BIOS, devices or network are accessed.
 
-Four mature homebrew profiles gate this incremental runtime checkpoint;
-the newer Supafaust/BlastEm alternative ports are collected as explicit
-EXPLORATORY diagnostics until independently proven on each architecture.
+Five source-generated homebrew profiles gate this incremental runtime
+checkpoint, including the proven Supafaust SNES alternative. BlastEm Genesis
+remains EXPLORATORY until its hardware-model-safe fixture is independently
+proven. It must use the original non-TMSS source-authored variant: the old
+unconditional $A14000 unlock halts a Genesis model without TMSS circuitry.
 Do not relabel this as 18/18 real-game compatibility or public approval.
 """
 from __future__ import annotations
@@ -25,15 +27,18 @@ from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.stage_v32_full_linux import FULL, STATUS as FULL_STATUS, no_links
 from tools.verify_v31_rc import validate_staged_identity
 
-REQUIRED = ("gb", "gbc", "gba", "nes")
-EXPLORATORY = ("snes", "genesis")
+REQUIRED = ("gb", "gbc", "gba", "nes", "snes")
+EXPLORATORY = ("genesis",)
 CASES = {
     "gb": ("mgba", "tools.probe_gb_homebrew", ("--system", "gb")),
     "gbc": ("mgba", "tools.probe_gb_homebrew", ("--system", "gbc")),
     "gba": ("mgba", "tools.probe_gba_homebrew", ()),
     "nes": ("fceumm", "tools.probe_nes_homebrew", ()),
     "snes": ("mednafen_supafaust", "tools.probe_snes_homebrew", ()),
-    "genesis": ("blastem", "tools.probe_genesis_homebrew", ()),
+    # BlastEm emulates non-TMSS Genesis hardware. The project's original
+    # variant retains its cartridge's video/audio program, replacing only
+    # an unconditional TMSS register write with M68000 NOP instructions.
+    "genesis": ("blastem", "tools.probe_v30_blastem_genesis_variant", ()),
 }
 STATUS = "PRIVATE_V32_FULL_NATIVE_ORIGINAL_HOMEBREW_RUNTIME_RESEARCH_NOT_RELEASE"
 SOURCE_ROOT = Path(__file__).resolve().parents[1]

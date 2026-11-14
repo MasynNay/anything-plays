@@ -266,9 +266,16 @@ probe opens native libraries from the *re-extracted full-core 3.2 DEB*, not
 from an unrelated installed RetroArch copy. It checks real decoded/changing
 video frames and core-generated PCM using existing original GB, GBC, GBA,
 NES, SNES and Genesis probe programs with individual crash/time limits.
-Four mature profiles (GB, GBC, GBA, NES) are strict acceptance gates;
-Supafaust SNES and BlastEm Genesis are **exploratory** until their new
-source-built alternative cores pass independent, repeatable evidence.
+Five profiles (GB, GBC, GBA, NES and the source-built Supafaust SNES)
+are now strict acceptance gates after successful native frame and PCM
+verification. BlastEm Genesis remains **exploratory** and uses the
+repository's existing source-generated *non-TMSS* original homebrew
+variant: the default original Genesis Plus GX fixture performed an
+unconditional TMSS hardware register write that could halt BlastEm's
+non-TMSS console configuration. Only that optional startup write is
+replaced with five M68000 NOPs, leaving the original video/PSG code
+unchanged. This change tests the correct hardware startup behavior,
+not a modification or patch of any commercial game.
 Individual exploratory failures are explicitly listed in the same report;
 they are never relabeled as passing. The runner verifies the 11-core source
 manifest, the 3.2 exact Git SHA, and the private build receipt *before*
