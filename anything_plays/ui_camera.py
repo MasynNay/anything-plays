@@ -299,6 +299,9 @@ class CameraMixin:
                 self.status.set('Secondary object color sampled. Choose its player.')
             else:
                 self.status.set('Primary object color sampled. Multi-object tracking is optional.')
+                sampled = getattr(self, 'calibration_color_sampled', None)
+                if callable(sampled):
+                    sampled()
         elif self.custom_draw_enabled.get():
             self.drag_start = point
 
@@ -422,6 +425,12 @@ class CameraMixin:
                 )
             if self.action.get() != message:
                 self.action.set(message)
+
+        # Calibration consumes observations from the same tracking pass.
+        # Never open another webcam or duplicate color processing.
+        note = getattr(self, "calibration_note_frame", None)
+        if callable(note):
+            note(primary, mapping, (w, h))
 
         frame = self.render_zones(frame, active_zones)
         # Reuse this already-annotated camera frame in the OBS capture view.
