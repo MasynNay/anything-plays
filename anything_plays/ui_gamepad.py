@@ -10,6 +10,7 @@ from anything_plays.gamepad import (
 )
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 from anything_plays.ui_controller_art import draw_gamepad
+from anything_plays.controller_capture import newly_pressed_source
 
 
 class GamepadMixin:
@@ -109,9 +110,12 @@ class GamepadMixin:
         )
         settings = preferences.get("gamepad_bindings", {})
         self._gamepad_bindings = settings if isinstance(settings, dict) else {}
+        self._controller_capture = None
+        self._controller_capture_release_pending = False
 
     def close_gamepad(self):
         """Release gamepad state even for partially constructed App objects."""
+        self._cancel_controller_capture()
         close_guide = getattr(self, "_controller_guide_close", None)
         if callable(close_guide):
             close_guide()
@@ -140,11 +144,14 @@ class GamepadMixin:
             self.emu.release_gamepad()
             self._gamepad.stop()
             self.gamepad_status.set("Controller disabled")
+        if not self.gamepad_enabled.get():
+            self._cancel_controller_capture("Controller disabled; mapping canceled.")
         self.save_preferences()
         self._refresh_gamepad_live_input()
         self.refresh_controller_artwork()
 
     def refresh_gamepad(self):
+        self._cancel_controller_capture("Controller rescan; choose Press to assign again.")
         # Rescanning closes the previous SDL handle immediately. Also clear
         # its emulated held buttons now, rather than waiting for the next tick.
         self.emu.release_gamepad()
@@ -231,6 +238,15 @@ class GamepadMixin:
                 system = self.system_key.get()
                 settings = self._gamepad_bindings.get(system)
                 buttons, status = self._gamepad.poll(system, settings)
+                self._controller_capture_tick(system)
+                if (self._controller_capture is not None
+                        or self._controller_capture_release_pending):
+                    # Remapping must never inject the captured press into a
+                    # running game, including the frame after assignment.
+                    buttons = frozenset()
+                    if (self._controller_capture is None
+                            and not self._gamepad.physical_buttons):
+                        self._controller_capture_release_pending = False
                 if not self.uses_embedded_emulator():
                     buttons = frozenset()
                     status += " · Embedded emulators only"
@@ -255,6 +271,7 @@ class GamepadMixin:
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception as exc:
+            self._cancel_controller_capture("Controller error; mapping canceled.")
             self.emu.release_gamepad()
             self._gamepad.stop()
             self.gamepad_enabled.set(False)
@@ -267,6 +284,45 @@ class GamepadMixin:
         finally:
             if not self._closing:
                 self._gamepad_tick_job = self.root.after(65, self.gamepad_tick)
+
+    def _cancel_controller_capture(self, message=None):
+        capture = getattr(self, "_controller_capture", None)
+        self._controller_capture = None
+        if capture is not None:
+            self._controller_capture_release_pending = True
+            if message:
+                capture["status"].set(message)
+
+    def _controller_capture_tick(self, system):
+        """Use an SDL physical-input edge to assign a game action safely."""
+        capture = getattr(self, "_controller_capture", None)
+        if capture is None:
+            return
+        if (capture["system"] != system
+                or self._gamepad.controller is None):
+            self._cancel_controller_capture(
+                "Console changed or controller disconnected; mapping canceled."
+            )
+            return
+        source, baseline, ambiguous = newly_pressed_source(
+            capture["baseline"], self._gamepad.physical_buttons
+        )
+        capture["baseline"] = baseline
+        if ambiguous:
+            capture["status"].set(
+                "Multiple inputs detected. Release them, then press one control."
+            )
+        if source is not None:
+            target = capture["target"]
+            self._save_gamepad_binding(system, source, target)
+            row = capture["rows"].get(source)
+            if row is not None:
+                row.set(target)
+            capture["status"].set(
+                f"{source.replace('_', ' ').title()} assigned to {target}. "
+                "Release the controller input before playing."
+            )
+            self._controller_capture = None
 
     def open_controller_settings(self, system=None, parent=None):
         """Show a visual controller setup for one console.
@@ -294,6 +350,7 @@ class GamepadMixin:
         window.minsize(455, 485)
 
         def close():
+            self._cancel_controller_capture()
             self.gamepad_setup_canvas = None
             self._gamepad_setup_window = None
             window.destroy()
@@ -357,6 +414,70 @@ class GamepadMixin:
             style="Helper.TLabel", wraplength=490
         ).pack(anchor="w")
         self._refresh_gamepad_live_input()
+
+        quick = ttk.LabelFrame(
+            content, text="QUICK REMAP · PRESS A BUTTON", padding=(9, 7),
+        )
+        quick.pack(fill="x", pady=(0, 9))
+        ttk.Label(
+            quick, text="Choose a game action, then press ONE physical "
+                        "button, D-pad direction, trigger or stick direction.",
+            style="Helper.TLabel", wraplength=500,
+        ).pack(anchor="w", pady=(0, 6))
+        remap_actions = ttk.Frame(quick)
+        remap_actions.pack(fill="x")
+        target_action = tk.StringVar(
+            master=window,
+            value="A" if "A" in BUTTONS_BY_SYSTEM[system]
+            else BUTTONS_BY_SYSTEM[system][0],
+        )
+        ttk.Combobox(
+            remap_actions, textvariable=target_action, state="readonly",
+            values=BUTTONS_BY_SYSTEM[system], width=15,
+        ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        capture_feedback = tk.StringVar(
+            master=window,
+            value="Enable a controller, then choose Press to assign.",
+        )
+        remap_rows = {}
+
+        def begin_capture():
+            if (not self.gamepad_enabled.get()
+                    or self._gamepad.controller is None):
+                capture_feedback.set(
+                    "Controller not connected. Enable it and press Rescan."
+                )
+                return
+            if self.system_key.get() != system:
+                capture_feedback.set(
+                    "This console has changed. Close and reopen its controls."
+                )
+                return
+            self._controller_capture = {
+                "system": system, "target": target_action.get(),
+                "baseline": frozenset(self._gamepad.physical_buttons),
+                "status": capture_feedback, "rows": remap_rows,
+            }
+            self._controller_capture_release_pending = True
+            self.emu.release_gamepad()
+            capture_feedback.set(
+                "Waiting for ONE new press. Release any held controls first."
+            )
+
+        ttk.Button(
+            remap_actions, text="Press to assign", command=begin_capture,
+            style="Accent.TButton",
+        ).pack(side="left")
+        ttk.Button(
+            remap_actions, text="Cancel",
+            command=lambda: self._cancel_controller_capture(
+                "Mapping canceled; existing settings kept."
+            ),
+        ).pack(side="left", padx=(7, 0))
+        ttk.Label(
+            quick, textvariable=capture_feedback, style="Helper.TLabel",
+            wraplength=500,
+        ).pack(anchor="w", pady=(7, 0))
 
         group = ttk.LabelFrame(
             content, text="BUTTON MAPPING · " + system.upper(), padding=(8, 7)
@@ -427,6 +548,7 @@ class GamepadMixin:
                 value = tk.StringVar(
                     master=window, value=selected.get(physical, DISABLED)
                 )
+                remap_rows[physical] = value
                 choice = ttk.Combobox(
                     row, textvariable=value, state="readonly",
                     values=available, width=18
