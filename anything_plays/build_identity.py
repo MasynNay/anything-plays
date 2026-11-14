@@ -7,6 +7,7 @@ development defaults to the existing safe Preview 1 settings namespace.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -40,6 +41,14 @@ IDENTITIES = {
         "channel": "final_candidate",
         "title": "Anything Plays 3.1",
         "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
+    "v32_preview": {
+        "version": "3.2.0-preview",
+        "channel": "v32_preview",
+        "title": "Anything Plays 3.2 · Development Preview",
+        # No previous public/RC app uses this folder.
+        "settings_namespace": "anything-plays-32-preview",
         "public_release_approved": False,
     },
     "v311_candidate": {
@@ -92,6 +101,11 @@ def current_identity(path=None):
     """Fail closed on a corrupt embedded marker; never guess an RC identity."""
     marker = Path(path) if path is not None else embedded_identity_path()
     if not marker.is_file():
+        # Explicit source-only preview launcher; frozen installers always
+        # require their embedded, reviewed identity, never an env override.
+        if (not getattr(sys, "frozen", False)
+                and os.environ.get("AP_V32_PREVIEW") == "1"):
+            return make_identity("v32_preview")
         return make_identity(FALLBACK_CHANNEL)
     return validate_identity(json.loads(marker.read_text(encoding="utf-8")))
 
