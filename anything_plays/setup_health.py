@@ -11,6 +11,7 @@ from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 def build_setup_report(
     *, system, camera_count, camera_selected, camera_active,
     core_found, controller_enabled, controller_detected, embedded_mode,
+    preview_minimal=False,
 ):
     """Describe observed setup state, without claiming hardware acceptance."""
     if system not in BUTTONS_BY_SYSTEM:
@@ -50,6 +51,13 @@ def build_setup_report(
         core = (
             "Core file located",
             "An emulator core file is present. This does not verify game compatibility."
+        )
+    elif preview_minimal and system not in ("gb", "gbc", "gba"):
+        core = (
+            "Not bundled in this 3.2 preview",
+            "This test installer includes mGBA for GB, GBC and GBA only. "
+            "Other console profiles are visible, but their native emulator "
+            "cores are not bundled. This is not a damaged installation."
         )
     else:
         core = (
