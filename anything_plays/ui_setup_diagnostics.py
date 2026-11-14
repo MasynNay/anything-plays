@@ -84,7 +84,9 @@ def show_setup_diagnostics(app):
 
     holder = ttk.Frame(shell)
     holder.pack(fill="both", expand=True)
-    canvas = tk.Canvas(holder, highlightthickness=0, borderwidth=0)
+    canvas = tk.Canvas(holder, highlightthickness=0, borderwidth=0,
+                       bg=app.THEMES.get(app.theme_name.get(),
+                                         app.THEMES["Dark"])[1])
     scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scroll.set)
     scroll.pack(side="right", fill="y")
