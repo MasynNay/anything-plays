@@ -104,7 +104,18 @@ class AuxiliaryPanelsMixin:
         ttk.Button(controls, text='Keyboard Shortcuts', command=self.configure_shortcuts).pack(fill='x', pady=(8, 2))
         profiles = ttk.Frame(right)
         profiles.pack(fill='x', padx=(12, 2), pady=(0, 16))
-        ttk.Button(profiles, text='Save profile', command=self.save_profile).pack(side='left')
-        ttk.Button(profiles, text='Load profile', command=self.load_profile).pack(side='left', padx=5)
+        ttk.Button(profiles, text='Export controls', command=self.save_profile).pack(side='left')
+        ttk.Button(profiles, text='Import controls', command=self.load_profile).pack(side='left', padx=5)
         ttk.Button(profiles, text='Reset', command=self.reset_profile).pack(side='left')
+        self._undo_import_button = ttk.Button(
+            profiles, text='Undo import', command=self.undo_profile_import,
+            state='disabled',
+        )
+        self._undo_import_button.pack(side='left', padx=(5, 0))
+        ttk.Label(
+            right,
+            text='Exported profiles contain controls and theme only. '
+                 'No ROMs, saves or personal paths.',
+            style='Helper.TLabel', wraplength=400,
+        ).pack(anchor='w', padx=(12, 2), pady=(0, 12))
 
