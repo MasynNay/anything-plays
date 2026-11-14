@@ -9,6 +9,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from anything_plays.build_identity import current_identity
 from anything_plays.setup_health import build_setup_report
 from anything_plays.ui_setup_theme import bind_theme_canvas
 
@@ -40,6 +41,7 @@ def _snapshot(app):
         controller_enabled=enabled,
         controller_detected=connected,
         embedded_mode=bool(app.uses_embedded_emulator()),
+        preview_minimal=current_identity()["channel"] == "v32_preview",
     )
 
 
