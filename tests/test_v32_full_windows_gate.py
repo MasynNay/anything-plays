@@ -58,12 +58,12 @@ class V32FullWindowsGateTests(unittest.TestCase):
         self.assertIn("NOT_RELEASE", STATUS)
 
     def test_published_stable_bytes_must_match_SHA256SUMS(self):
-        self.old.write_bytes(b"tampered" * 120000)
+        self.old.write_bytes(b"!" + self.old.read_bytes()[1:])
         with self.assertRaisesRegex(ValueError, "checksum mismatch"):
             self.check()
 
     def test_private_source_bytes_and_commit_cannot_change(self):
-        self.new.write_bytes(b"tampered" * 120000)
+        self.new.write_bytes(b"!" + self.new.read_bytes()[1:])
         with self.assertRaisesRegex(ValueError, "receipt"):
             self.check()
         with self.assertRaisesRegex(ValueError, "Git source"):
