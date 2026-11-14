@@ -86,6 +86,10 @@ def build_tracking_panel(app, right):
         "any object, not just animals.",
     )
     _color_row(app, primary, secondary=False)
+    ttk.Button(
+        primary, text="Guided camera calibration…",
+        command=app.open_calibration_wizard, style="Accent.TButton",
+    ).pack(fill="x", pady=(5, 9))
     _actions(primary, (
         ("Pick from camera", app.pick_color),
         ("Pick from image", app.pick_image),

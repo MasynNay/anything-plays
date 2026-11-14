@@ -143,6 +143,28 @@ if [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
     *) echo "Unsupported 3.1.1 Mac source architecture" >&2; exit 1 ;;
   esac
 fi
+# 3.2 preview: an independent private mGBA-only app, never stable.
+if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+  for forbidden in AP_V31_PREVIEW AP_V31_RC AP_V31_RC2 \
+      AP_V31_FINAL_CANDIDATE AP_V311_CANDIDATE AP_V311_STABLE_CANDIDATE \
+      AP_RELEASE_BUILD AP_V30_APPROVED_RELEASE AP_V30_STABLE_CANDIDATE \
+      AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL; do
+    [[ "${!forbidden:-0}" != "1" ]] || {
+      echo "3.2 private preview cannot combine release or native trial flags" >&2
+      exit 1
+    }
+  done
+  [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.2 private preview requires minimal mGBA-only build" >&2; exit 1
+  }
+  BUNDLE_FILE="AnythingPlays32Preview.app"
+  DMG_VOLUME="Anything Plays 3.2 Private Preview"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.2.0-preview1-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.2.0-preview1-macos-x64.dmg" ;;
+    *) echo "Unsupported 3.2 private preview architecture" >&2; exit 1 ;;
+  esac
+fi
 APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
@@ -178,7 +200,7 @@ fi
 # is treated as unset. Positional arguments expand safely to zero arguments.
 # These arguments are only consumed by this PyInstaller invocation.
 set --
-if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
   set -- --add-data "build/v31_build_identity.json:assets"
 fi
@@ -253,7 +275,15 @@ if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.0.0" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
 else
-  if [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.privatepreview32" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.2.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.2.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.2.0.1" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.2.0.1" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Anything Plays 3.2 Private Preview" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.2 Private Preview" "$PLIST"
+  elif [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.release31" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.1.1" "$PLIST" ||
       /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.1.1" "$PLIST"

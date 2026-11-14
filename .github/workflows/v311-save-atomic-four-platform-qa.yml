@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   native-save-durability:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: Atomic SRAM snapshots | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15

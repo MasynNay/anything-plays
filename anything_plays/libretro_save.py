@@ -13,22 +13,32 @@ import sys
 import tempfile
 import time
 
+from anything_plays.preview_storage import is_v32_preview, checked_preview_directory
+
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
 MAX_SAVE_RAM_BYTES = 64 * 1024 * 1024
 
 
 def _user_save_directory():
-    """Use a user-writable data directory, not the application's install."""
+    """Writable user saves; 3.2 private QA must never touch stable progress."""
+    preview = is_v32_preview()
     if sys.platform == "win32":
         root = os.environ.get("APPDATA")
         base = Path(root) if root else Path.home() / "AppData" / "Roaming"
-        return base / "AnythingPlays" / "Saves"
+        return (checked_preview_directory(
+            base / "AnythingPlays" / "Preview-3.2" / "Saves", "Preview-3.2",
+        ) if preview else base / "AnythingPlays" / "Saves")
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "AnythingPlays" / "Saves"
+        base = Path.home() / "Library" / "Application Support" / "AnythingPlays"
+        return (checked_preview_directory(
+            base / "Preview-3.2" / "Saves", "Preview-3.2",
+        ) if preview else base / "Saves")
     root = os.environ.get("XDG_DATA_HOME")
     base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local" / "share"
-    return base / "anything-plays" / "saves"
+    return (checked_preview_directory(
+        base / "anything-plays" / "3.2-preview" / "saves", "3.2-preview",
+    ) if preview else base / "anything-plays" / "saves")
 
 
 def _fallback_path(rom_path):
@@ -65,9 +75,13 @@ class SaveRAM:
     """Read and write memory type 0 (RETRO_MEMORY_SAVE_RAM)."""
 
     def __init__(self, rom_path, get_data, get_size):
-        self.path = Path(rom_path).with_suffix(".sav")
-        self.legacy_path = self.path
+        self.legacy_path = Path(rom_path).with_suffix(".sav")
         self.fallback_path = _fallback_path(rom_path)
+        # Stable versions preserve the traditional ROM-adjacent save path.
+        # Only the unreleased 3.2 preview starts in its own user data store.
+        # This also means Restore NEVER reads an existing stable .sav file.
+        self.path = (self.fallback_path
+                     if is_v32_preview() else self.legacy_path)
         self.get_data = get_data
         self.get_size = get_size
         # A fixed-size digest prevents unbounded snapshot history and avoids
@@ -89,6 +103,17 @@ class SaveRAM:
         # never replace it by an older legacy file from beside the ROM.
         if pointer and size and self.fallback_path.is_file():
             self.path = self.fallback_path
+        if pointer and size and is_v32_preview():
+            # A preview save may be created/replaced after the SaveRAM
+            # constructor ran. Refuse linked destinations before reading.
+            _user_save_directory()
+            if self.path.is_symlink():
+                raise ValueError("Preview save must not link to a stable file")
+            if self.path.is_file() and self.path.stat().st_nlink != 1:
+                # A regular-looking hardlink can point to an existing
+                # stable SRAM file. Never import someone else's progress
+                # through a linked preview destination.
+                raise ValueError("Preview save must not share a stable file")
         if pointer and size and self.path.is_file():
             # Read only as much as this core can hold, plus one byte to
             # detect oversized/partial legacy saves. A corrupt multi-GB save
@@ -122,6 +147,10 @@ class SaveRAM:
         if digest == self._last_saved_digest and self.path.is_file():
             return False
         destination = self.path
+        if is_v32_preview():
+            # Re-validate the preview parent immediately before replacing
+            # files. No preview SRAM may follow a redirected stable directory.
+            _user_save_directory()
         try:
             self._write_atomic(destination, snapshot,
                                create_directory=(destination == self.fallback_path))

@@ -101,10 +101,38 @@ class AuxiliaryPanelsMixin:
         self.arm_button.pack(fill='x')
         ttk.Button(controls, text='STOP ALL OBJECT CONTROLS  (Esc)', command=self.stop_controls, style='Danger.TButton').pack(fill='x', pady=5)
         ttk.Label(controls, text='F11 fullscreen · F10 borderless · Esc exit fullscreen and stop controls · Ctrl+Alt+F11 start/stop camera controls. No global keyboard injection.', wraplength=315).pack(anchor='w')
+        ttk.Button(
+            controls, text='Check my setup · camera, game, controller',
+            command=self.open_setup_diagnostics, style='Compact.TButton',
+        ).pack(fill='x', pady=(8, 2))
         ttk.Button(controls, text='Keyboard Shortcuts', command=self.configure_shortcuts).pack(fill='x', pady=(8, 2))
         profiles = ttk.Frame(right)
         profiles.pack(fill='x', padx=(12, 2), pady=(0, 16))
-        ttk.Button(profiles, text='Save profile', command=self.save_profile).pack(side='left')
-        ttk.Button(profiles, text='Load profile', command=self.load_profile).pack(side='left', padx=5)
-        ttk.Button(profiles, text='Reset', command=self.reset_profile).pack(side='left')
+        profiles.columnconfigure(0, weight=1, uniform='profile_actions')
+        profiles.columnconfigure(1, weight=1, uniform='profile_actions')
+        ttk.Button(
+            profiles, text='Export controls', command=self.save_profile,
+        ).grid(row=0, column=0, sticky='ew', padx=(0, 4), pady=(0, 5))
+        ttk.Button(
+            profiles, text='Import controls', command=self.load_profile,
+        ).grid(row=0, column=1, sticky='ew', padx=(4, 0), pady=(0, 5))
+        ttk.Button(
+            profiles, text='Reset controls', command=self.reset_profile,
+        ).grid(row=1, column=0, sticky='ew', padx=(0, 4))
+        self._undo_import_button = ttk.Button(
+            profiles, text='Undo import', command=self.undo_profile_import,
+            state='disabled',
+        )
+        self._undo_import_button.grid(row=1, column=1, sticky='ew', padx=(4, 0))
+        ttk.Label(
+            right,
+            text='Exported profiles contain controls and theme only. '
+                 'No ROMs, saves or personal paths.',
+            style='Helper.TLabel', wraplength=400,
+        ).pack(anchor='w', padx=(12, 2), pady=(0, 12))
 
+
+    def open_setup_diagnostics(self):
+        """Show read-only local troubleshooting and redacted setup checks."""
+        from anything_plays.ui_setup_diagnostics import show_setup_diagnostics
+        return show_setup_diagnostics(self)

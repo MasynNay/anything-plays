@@ -1,0 +1,208 @@
+name: 3.2 | Isolated four-platform preview installers (unreleased)
+
+# A build-only owner-QA workflow. No tag, GitHub release, deployment, or
+# stable installer update. Each output ships only the minimal mGBA core.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v32-private-preview-installers.yml'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'packaging/**'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v32_preview.py'
+      - 'requirements-build.txt'
+      - 'verify_bundle.py'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v32-unreleased-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-isolated-preview:
+    # Never run for another PR or a stable/default branch dispatch.
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/v3.2-integration' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.2-integration') }}
+    name: 3.2 mGBA-only QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 115
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            installer: release/anything-plays-32-preview_3.2.0~preview1_amd64.deb
+            bundle: dist/AnythingPlays
+          - target: windows-x64
+            runner: windows-latest
+            installer: release/AnythingPlaysSetup-3.2.0-preview1.exe
+            bundle: dist/AnythingPlays
+          - target: macos-arm64
+            runner: macos-15
+            installer: release/AnythingPlays-3.2.0-preview1-macos-arm64.dmg
+            bundle: dist/AnythingPlays32Preview.app
+          - target: macos-x64
+            runner: macos-15-intel
+            installer: release/AnythingPlays-3.2.0-preview1-macos-x64.dmg
+            bundle: dist/AnythingPlays32Preview.app
+    env:
+      AP_V32_PREVIEW_BUILD: '1'
+      AP_V32_PREVIEW: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      AP_V31_PREVIEW: '0'
+      AP_V31_RC: '0'
+      AP_V31_RC2: '0'
+      AP_V31_FINAL_CANDIDATE: '0'
+      AP_V311_CANDIDATE: '0'
+      AP_V311_STABLE_CANDIDATE: '0'
+      AP_V32_QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate exact source revision and review-only build flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$AP_V32_QA_SOURCE_SHA"
+          test "$AP_V32_PREVIEW_BUILD" = "1"
+          test "$AP_V30_MINIMAL_CORE_BUILD" = "1"
+          test "$AP_RELEASE_BUILD" = "0"
+          python - <<'PY'
+          from anything_plays.build_identity import make_identity
+          from tools.write_v31_identity import choose_channel
+          import os
+          assert choose_channel(os.environ) == "v32_preview"
+          assert make_identity("v32_preview")["public_release_approved"] is False
+          print("3.2 preview exclusively selected; public release disabled")
+          PY
+      - name: Verify preview save/core isolation on this actual OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v32_native_storage.py' -v
+          python -m unittest discover -s tests -p 'test_v32_preview_startup_gate.py' -v
+      - name: Install Linux native Debian tooling
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=25 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2             -o Acquire::http::Timeout=25 install -y --no-install-recommends             python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup not available" }
+      - name: Package Linux DEB
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Package Windows EXE
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Package macOS DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify frozen 3.2 preview identity and artifact checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v32_preview             --target '${{ matrix.target }}'             --installer '${{ matrix.installer }}'             --bundle '${{ matrix.bundle }}'             --output 'release/V32_PRIVATE_PREVIEW_RECEIPT.json'
+      - name: Linux installed Debian application startup smoke (isolated)
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_HOME="$(mktemp -d)"
+          trap 'rm -rf "$QA_HOME"' EXIT
+          mkdir -p "$QA_HOME/payload" "$QA_HOME/home"
+          # Simulate an already-installed public 3.1 profile. Preview
+          # startup must leave stable bytes unchanged and create only its
+          # own settings namespace.
+          mkdir -p "$QA_HOME/home/.config/anything-plays-31"
+          printf '{"stable_test_canary": "do-not-change"}\n' > \
+            "$QA_HOME/home/.config/anything-plays-31/preferences.json"
+          cp "$QA_HOME/home/.config/anything-plays-31/preferences.json" \
+             "$QA_HOME/stable-before.json"
+          dpkg-deb -x '${{ matrix.installer }}' "$QA_HOME/payload"
+          ENTRY="$QA_HOME/payload/opt/anything-plays-32-preview/AnythingPlays"
+          test -x "$ENTRY"
+          HOME="$QA_HOME/home" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V32_GUI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA_HOME/v32-installed-gui.json" \
+          SDL_VIDEODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          timeout 65 xvfb-run -a "$ENTRY" --ap-v30-ui-smoke
+          cmp "$QA_HOME/stable-before.json" \
+              "$QA_HOME/home/.config/anything-plays-31/preferences.json"
+          test -f "$QA_HOME/home/.config/anything-plays-32-preview/system_profiles.json"
+          python - "$QA_HOME/v32-installed-gui.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert data["passed"] is True
+          assert data["actual_tk_window_started"] is True
+          assert data["actual_app_initialized"] is True
+          assert data["actual_tk_mainloop_ran"] is True
+          assert data["frozen_binary"] is True
+          assert data["v32_frozen_isolation_verified"] is True
+          assert data["v32_settings_namespace"] == "anything-plays-32-preview"
+          assert data["public_distribution_approved"] is False
+          assert data["camera_hardware_tested"] is False
+          assert data["gameplay_hardware_tested"] is False
+          print("Verified actual extracted 3.2 Debian App GUI startup")
+          PY
+      - name: Describe accurate testing limitations
+        shell: bash
+        run: |
+          cat > release/README_V32_PREVIEW.txt <<'EOF'
+          Anything Plays 3.2 Preview 1 — UNRELEASED TEST BUILD
+
+          This is a development test artifact, not the public stable app.
+          It uses a different installer identity and a fresh settings folder:
+          anything-plays-32-preview. It never imports your old preferences.
+
+          This starter build includes only the mGBA native core for GB/GBC/GBA.
+          The 18 console profiles are not evidence of 18 bundled native cores.
+          Bring only your own legally obtained game files. No ROMs included.
+
+          These checks do NOT verify a physical webcam, USB/Bluetooth gamepad,
+          every native emulator, macOS notarization or public redistribution.
+          Some macOS builds are ad-hoc signed and may require user approval.
+
+          Compare the binary SHA256 with V32_PRIVATE_PREVIEW_RECEIPT.json.
+          Never publish this artifact as a stable release or re-label it.
+          EOF
+      - name: Retain temporary QA artifacts (no GitHub Release or tag)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2-${{ matrix.target }}-UNRELEASED-QA
+          path: |
+            ${{ matrix.installer }}
+            release/V32_PRIVATE_PREVIEW_RECEIPT.json
+            release/README_V32_PREVIEW.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

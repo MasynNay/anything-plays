@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   actual-311-source-build:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: Real 3.1.1 source-built installer | ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -289,7 +289,7 @@ jobs:
     # Assemble and inspect a true 18-console 3.1.1 Linux app using the
     # PUBLIC, SHA-pinned 3.1.0 original source cores. Other OSes must
     # independently pass their own full-core assembly before release.
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     needs: actual-311-source-build
     name: Actual 3.1.1 Linux 18-console source-core QA | not release
     runs-on: ubuntu-24.04
@@ -388,7 +388,7 @@ jobs:
           compression-level: 0
 
   genuine-full-windows-18:
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     needs: actual-311-source-build
     name: Actual 3.1.1 Windows 18-console source-core QA | not release
     runs-on: windows-latest
@@ -489,7 +489,7 @@ jobs:
           compression-level: 0
 
   genuine-full-macos-18:
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     needs: actual-311-source-build
     name: Actual 3.1.1 Mac 18-console source-core QA | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}

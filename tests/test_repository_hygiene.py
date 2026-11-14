@@ -10,12 +10,14 @@ class RepositoryHygieneTests(unittest.TestCase):
     def test_allowlist_matches_source_root_and_not_experimental_outputs(self):
         self.assertIn("app.py", ROOT_FILES)
         self.assertIn("README.md", ROOT_FILES)
+        self.assertIn("run_v32_preview.py", ROOT_FILES)
         self.assertIn("packaging", ROOT_DIRECTORIES)
         self.assertIn("anything_plays", ROOT_DIRECTORIES)
         self.assertIn("site", ROOT_DIRECTORIES)
         self.assertEqual(scan_tracked_paths([
             "README.md",
             "app.py",
+            "run_v32_preview.py",
             ".github/workflows/v30-full-bundle.yml",
             "docs/ARCHITECTURE.md",
             "anything_plays/zone_rendering.py",
@@ -28,6 +30,16 @@ class RepositoryHygieneTests(unittest.TestCase):
             "site/assets/anything-plays-original.webp",
             "site/CNAME",
         ]), [])
+
+    def test_preview_launcher_allowlist_does_not_allow_other_root_scripts(self):
+        violations = scan_tracked_paths([
+            "run_v32_preview.py",
+            "run_v33_preview.py",
+            "unapproved_native_driver.py",
+        ])
+        self.assertNotIn("Unexpected root file: run_v32_preview.py", violations)
+        self.assertIn("Unexpected root file: run_v33_preview.py", violations)
+        self.assertIn("Unexpected root file: unapproved_native_driver.py", violations)
 
     def test_reject_unorganized_files_and_directories(self):
         violations = scan_tracked_paths([

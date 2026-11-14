@@ -108,6 +108,25 @@ if [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
   PACKAGE_NAME="anything-plays-31"
   INSTALL_ID="anything-plays-31"
 fi
+# Isolated 3.2 owner-only QA package: mGBA only, no publication.
+if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+  for forbidden in AP_V31_PREVIEW AP_V31_RC AP_V31_RC2 \
+      AP_V31_FINAL_CANDIDATE AP_V311_CANDIDATE AP_V311_STABLE_CANDIDATE \
+      AP_RELEASE_BUILD AP_V30_APPROVED_RELEASE AP_V30_STABLE_CANDIDATE \
+      AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL; do
+    [[ "${!forbidden:-0}" != "1" ]] || {
+      echo "3.2 preview cannot combine legacy/release/core-trial flags: $forbidden" >&2
+      exit 1
+    }
+  done
+  [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "3.2 private QA must build only the minimal mGBA source stage" >&2
+    exit 1
+  }
+  VERSION="3.2.0~preview1"
+  PACKAGE_NAME="anything-plays-32-preview"
+  INSTALL_ID="anything-plays-32-preview"
+fi
 OUTPUT_DEB="release/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 python3 fetch_mgba_core.py
 python3 -m venv .build-venv
@@ -124,7 +143,7 @@ fi
 # Preserve stable source art and generate corrected test-only Linux icons.
 .build-venv/bin/python tools/render_v21_icon.py
 V31_IDENTITY_ARGS=()
-if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
   V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
 fi
@@ -324,6 +343,27 @@ Icon=anything-plays-preview
 Terminal=false
 Categories=Game;Emulator;
 DESKTOP
+# 3.2 private preview has its own Debian package, launcher and icon.
+if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+  # Do not advertise consoles whose native cores are absent from this preview.
+  sed -i \
+    -e 's@Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores\.@Contains only mGBA for GB/GBC/GBA; other consoles not bundled.@g' \
+    "$PKG/DEBIAN/control"
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays-32-preview@g' \
+    -e 's@anything-plays-preview@anything-plays-32-preview@g' \
+    -e 's@Anything Plays 3.0@Anything Plays 3.2@g' \
+    "$PKG/usr/bin/$INSTALL_ID"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays 3.2 Private Preview@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays-32-preview@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays-32-preview@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays-32-preview.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-32-preview.png"
+fi
 # 3.1 gets a third distinct Linux installation and launcher.
 if [[ "${AP_V31_PREVIEW:-0}" == "1" ]]; then
   sed -i \

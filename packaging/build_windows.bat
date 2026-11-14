@@ -95,6 +95,23 @@ if "%AP_V311_STABLE_CANDIDATE%"=="1" (
 )
 REM Both CI preview and fully approved 3.0 builds include all 11 cores.
 REM A 3.0 approval flag is rejected by fetch_mgba_core.py until its lock passes.
+REM 3.2 private mGBA-only source-preview installer. NEVER publish.
+if "%AP_V32_PREVIEW_BUILD%"=="1" (
+  if "%AP_V31_PREVIEW%"=="1" exit /b 1
+  if "%AP_V31_RC%"=="1" exit /b 1
+  if "%AP_V31_RC2%"=="1" exit /b 1
+  if "%AP_V31_FINAL_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V311_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V311_STABLE_CANDIDATE%"=="1" exit /b 1
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  if "%AP_V30_STABLE_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V30_TEST_CORES%"=="1" exit /b 1
+  if "%AP_V30_GPL_TRIAL%"=="1" exit /b 1
+  if "%AP_V30_TIA_TRIAL%"=="1" exit /b 1
+  if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
+  set "VERSION=3.2.0-preview1"
+)
 set "AP_FULL_CORE_BUILD=0"
 if "%AP_V30_TEST_CORES%"=="1" set "AP_FULL_CORE_BUILD=1"
 if "%AP_V30_APPROVED_RELEASE%"=="1" set "AP_FULL_CORE_BUILD=1"
@@ -140,6 +157,7 @@ if "%AP_V31_RC2%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity
 if "%AP_V31_FINAL_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if "%AP_V311_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if "%AP_V311_STABLE_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
+if "%AP_V32_PREVIEW_BUILD%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if defined V31_IDENTITY_ARG (
   .build-venv\Scripts\python.exe -m tools.write_v31_identity build\v31_build_identity.json
   if errorlevel 1 exit /b 1
@@ -310,7 +328,9 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-if "%AP_V311_STABLE_CANDIDATE%"=="1" (
+if "%AP_V32_PREVIEW_BUILD%"=="1" (
+  "%ISCC%" /DV32PreviewBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else if "%AP_V311_STABLE_CANDIDATE%"=="1" (
   "%ISCC%" /DV31FinalBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
 ) else if "%AP_V311_CANDIDATE%"=="1" (
   "%ISCC%" /DV311QABuild=1 /DAppVersion=%VERSION% packaging\installer.iss

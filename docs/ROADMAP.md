@@ -36,6 +36,8 @@ The current [3.1.1 release](https://github.com/MasynNay/anything-plays/releases/
 
 ## Next: 3.2 — Setup and control experience
 
+**Integrated source-only candidate (NOT publicly released):** The 3.2 integration branch brings together versioned control-profile export/import and undo ([guide](V3_2_SETUP_CONTROLS.md)), guided camera calibration ([guide](V3_2_CAMERA_CALIBRATION.md)), controller/keyboard onboarding including press-to-remap ([guide](V3_2_CONTROLLER_ONBOARDING.md)), and redacted local setup diagnostics ([guide](V3_2_SETUP_DIAGNOSTICS.md)). The **Get started** launchpad, real Tk UI smoke test, and fail-closed `python run_v32_preview.py` launcher use a separate, fresh settings directory ([first-run guide](V3_2_FIRST_RUN.md)). Automated source/GUI checks and real-device acceptance remain the merge and release gates; no physical hardware compatibility is implied.
+
 **Goal:** A first-time user should be able to go from installation to a working camera or keyboard-controlled game without reading technical documentation.
 
 1. **Local camera calibration wizard.** Guide camera selection, color sampling, lighting, live zone feedback and target stability in a small flow, with an expert path still available. Show measurable jitter, lost tracking and zone-trigger events; avoid false accuracy promises. [Feature issue #29](https://github.com/MasynNay/anything-plays/issues/29).

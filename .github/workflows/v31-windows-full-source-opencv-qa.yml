@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   full-clean-windows-setup:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     runs-on: windows-latest
     timeout-minutes: 130
     env:

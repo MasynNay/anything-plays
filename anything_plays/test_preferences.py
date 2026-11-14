@@ -107,6 +107,24 @@ def prepare_test_preferences(home=None, *, channel=None):
     identity = make_identity(channel)  # Reject unknown channels; isolate 3.0.
     root = home / ".config"
     _checked_directory(root)
+    if channel == "v32_preview":
+        # An unreleased development preview must never read/copy settings
+        # from stable, 3.0, 3.1, 3.1.1 or any prior RC installation.
+        destination = root / identity["settings_namespace"]
+        _checked_directory(destination)
+        for name in MIGRATED_FILENAMES:
+            candidate = destination / name
+            if candidate.is_symlink():
+                raise ValueError("Preview settings cannot be linked to stable files")
+            if candidate.exists():
+                if not candidate.is_file():
+                    raise ValueError("Preview settings must be regular files")
+                # Refuse pre-existing hardlinks as well as symlinks. A
+                # hardlinked destination can silently overwrite stable
+                # settings when a legacy write path modifies it in place.
+                if candidate.stat().st_nlink != 1:
+                    raise ValueError("Preview settings cannot share stable files")
+        return destination / "preferences.json"
     previous_preview = home / PREVIOUS_PREVIEW_DIR
     preview = home / TEST_DIR
     # RC2 is a clean installation but may carry forward settings from RC1

@@ -16,6 +16,7 @@ from anything_plays.test_preferences import prepare_test_preferences
 from anything_plays.build_identity import app_title
 from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
+from anything_plays.ui_calibration import CalibrationMixin
 from anything_plays.ui_gameplay import GameplayMixin
 from anything_plays.ui_volume import VolumeMixin
 from anything_plays.ui_layout import LayoutMixin
@@ -32,8 +33,7 @@ from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 from anything_plays.ui_icon import IconMixin
 
-
-class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
+class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, CalibrationMixin, GameplayMixin,
           VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin, StreamMixin,
           ShortcutsMixin, GamepadMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
@@ -194,7 +194,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         if pending_rom_scan is not None:
             pending_rom_scan.set()
         try:
-            self.persist_system_profile()
+            self.persist_on_exit()
         except (OSError, ValueError, tk.TclError):
             pass
         # Cleanup each driver separately: a USB camera can fail while
