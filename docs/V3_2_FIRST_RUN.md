@@ -55,6 +55,16 @@ emulator, arms camera input, reads or copies game files, or phones home.
 All actions are explicit buttons. Each separate guide remains non-modal so a
 user can interact with the existing camera, console and input panes.
 
+## Webcam refresh keeps the user's choice
+
+Refreshing the camera list now retains the previously selected webcam when
+the exact enumerated device is still present, even if discovery order changes.
+When that webcam disappears, the interface selects the first available device
+but asks the user to verify it before clicking **Use camera**. Refresh stops
+capture and camera-based gameplay input; it never automatically starts a
+newly discovered or substituted camera. Selection regression tests and real
+source/installed Tk GUI smoke cover this behavior without opening a webcam.
+
 ## Calibration safety and guidance
 
 The calibration guide monitors the existing camera feed, with at most 90

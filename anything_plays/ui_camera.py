@@ -57,15 +57,44 @@ class CameraMixin:
             self.finish_scan(cameras, error)
 
     def finish_scan(self, found, error=None):
+        """Refresh devices without silently switching away from a USB camera.
+
+        The scan already stops capture and disarms camera controls. Preserve
+        the selected name/index only if it remains present; otherwise choose
+        a visible fallback but require the user to click Use camera again.
+        """
+        previous = self.camera_name.get()
         self.camera_scanning = False
-        self.camera_options = {f'{name} (device {index})': index for index, name in found}
+        self.camera_options = {
+            f'{name} (device {index})': index for index, name in found
+        }
         self.camera_combo['values'] = list(self.camera_options)
         if found:
-            self.camera_name.set(next(iter(self.camera_options)))
-            self.status.set(f'{len(found)} camera(s) found. Select one, then click Use camera.')
+            if previous in self.camera_options:
+                self.camera_name.set(previous)
+                self.status.set(
+                    f'{len(found)} camera(s) found. {previous} is still '
+                    'selected. Click Use camera to reconnect.'
+                )
+            else:
+                self.camera_name.set(next(iter(self.camera_options)))
+                if previous:
+                    self.status.set(
+                        'Previously selected webcam is no longer listed. '
+                        'Verify the new selection, then click Use camera.'
+                    )
+                else:
+                    self.status.set(
+                        f'{len(found)} camera(s) found. Select one, then '
+                        'click Use camera.'
+                    )
         else:
             self.camera_name.set('')
-            self.status.set('No usable cameras found.' + (f' {error}' if error else ' Check permissions or click Refresh cameras.'))
+            self.status.set(
+                'No usable cameras found.'
+                + (f' {error}' if error
+                   else ' Check permissions or click Refresh cameras.')
+            )
 
     def cancel_camera_reconnect(self):
         """Cancel any pending retry when the user chooses Stop or another camera."""

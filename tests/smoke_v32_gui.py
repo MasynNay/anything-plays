@@ -58,6 +58,25 @@ def smoke():
                         assert app.cap is None
                         assert app._gamepad.api is None
 
+                        # Camera refresh keeps a chosen device even if
+                        # enumeration order changes. These names are mock
+                        # data; no actual VideoCapture is ever created.
+                        app.finish_scan([
+                            (0, "Built-in camera"), (2, "USB camera"),
+                        ])
+                        app.camera_name.set("USB camera (device 2)")
+                        app.finish_scan([
+                            (2, "USB camera"), (0, "Built-in camera"),
+                        ])
+                        assert app.camera_name.get() == "USB camera (device 2)"
+                        assert app.cap is None and not app.armed
+                        app.finish_scan([(0, "Built-in camera")])
+                        assert app.camera_name.get() == "Built-in camera (device 0)"
+                        assert "no longer listed" in app.status.get()
+                        app.finish_scan([])
+                        assert not app.camera_name.get()
+                        assert app.cap is None and not app.armed
+
                         # A single visible entry opens the unified first-run path.
                         click_named_button(root, "Get started")
                         root.update_idletasks()

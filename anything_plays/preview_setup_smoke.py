@@ -118,6 +118,21 @@ def exercise_installed_preview_setup(app, root):
             or getattr(getattr(app, "_gamepad", None), "api", None) is not None):
         raise RuntimeError("Installed 3.2 setup must begin with devices disarmed")
 
+    # Frozen installation, not just source mocks: changing the discovery
+    # order cannot replace a user's selected USB webcam. Do not open devices.
+    app.finish_scan([(0, "Built-in camera"), (2, "USB camera")])
+    app.camera_name.set("USB camera (device 2)")
+    app.finish_scan([(2, "USB camera"), (0, "Built-in camera")])
+    if app.camera_name.get() != "USB camera (device 2)":
+        raise RuntimeError("Camera refresh changed an existing chosen webcam")
+    app.finish_scan([(0, "Built-in camera")])
+    if (app.camera_name.get() != "Built-in camera (device 0)"
+            or "no longer listed" not in app.status.get()):
+        raise RuntimeError("Missing webcam was not clearly marked")
+    app.finish_scan([])
+    if app.camera_name.get() or app.cap is not None or app.armed:
+        raise RuntimeError("Camera refresh opened or armed a substitute device")
+
     initial_windows = _live_toplevels(root)
     original_traces = len(app.theme_name.trace_info())
     for round_number in range(SETUP_LIFECYCLE_ROUNDS):

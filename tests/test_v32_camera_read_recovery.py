@@ -51,6 +51,59 @@ class CameraHarness(CameraMixin, GameplayMixin):
         self.emu.armed = False
 
 
+class CameraName:
+    def __init__(self, name):
+        self.name = name
+
+    def get(self):
+        return self.name
+
+    def set(self, name):
+        self.name = name
+
+
+class CameraSelectionRefreshTests(unittest.TestCase):
+    def setUp(self):
+        self.app = CameraHarness()
+        self.app.camera_combo = {}
+        self.app.camera_name = CameraName("USB webcam (device 2)")
+
+    def test_refresh_keeps_selected_usb_webcam_if_order_changes(self):
+        app = self.app
+        app.finish_scan([(0, "Built-in webcam"), (2, "USB webcam")])
+        self.assertEqual(app.camera_name.get(), "USB webcam (device 2)")
+        self.assertEqual(app.camera_combo["values"], [
+            "Built-in webcam (device 0)", "USB webcam (device 2)",
+        ])
+        app.finish_scan([(2, "USB webcam"), (0, "Built-in webcam")])
+        self.assertEqual(app.camera_name.get(), "USB webcam (device 2)")
+        self.assertIn("still selected", app.status.set.call_args.args[0])
+        self.assertTrue(app.armed)  # enumeration never touches capture
+        app.cap.release.assert_not_called()
+
+    def test_unplugged_usb_does_not_keep_stale_selection(self):
+        app = self.app
+        app.finish_scan([(0, "Built-in webcam")])
+        self.assertEqual(app.camera_name.get(), "Built-in webcam (device 0)")
+        self.assertIn("no longer listed", app.status.set.call_args.args[0])
+        self.assertIn("Verify the new selection", app.status.set.call_args.args[0])
+
+    def test_no_cameras_clears_selection(self):
+        app = self.app
+        app.finish_scan([])
+        self.assertEqual(app.camera_name.get(), "")
+        self.assertEqual(app.camera_combo["values"], [])
+        self.assertIn("No usable cameras", app.status.set.call_args.args[0])
+
+    def test_initial_discovery_uses_first_device_without_starting_camera(self):
+        app = self.app
+        app.camera_name.set("")
+        app.finish_scan([(1, "Plugged-in webcam"), (0, "Built-in webcam")])
+        self.assertEqual(app.camera_name.get(), "Plugged-in webcam (device 1)")
+        app.cap.release.assert_not_called()
+        self.assertIn("click Use camera", app.status.set.call_args.args[0])
+
+
 class CameraDriverReadRecoveryTests(unittest.TestCase):
     def assert_recovers(self, app, old):
         app.tick()
