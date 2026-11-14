@@ -105,6 +105,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_stationary_calibration.py' -v
           python -m unittest discover -s tests -p 'test_v32_controller_capture.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_linux_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_full_windows_gate.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -327,6 +328,60 @@ jobs:
             release/v32-full-linux/anything-plays-32-preview_3.2.0~fullqa1_amd64.deb
             release/v32-full-linux/V32_FULL_LINUX_QA_RECEIPT.json
             release/v32-full-linux/V32_FULL_LINUX_GUI_SMOKE.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Assemble private Windows full-native QA Inno from published 3.1.1 native cores
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stableDir = Join-Path $PWD 'baseline311'
+          New-Item -ItemType Directory -Force -Path $stableDir | Out-Null
+          gh release download v3.1.1 --repo $env:GITHUB_REPOSITORY --pattern 'AnythingPlaysSetup-3.1.1.exe' --dir $stableDir
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot get published Windows 3.1.1 installer' }
+          gh release download v3.1.1 --repo $env:GITHUB_REPOSITORY --pattern 'SHA256SUMS.txt' --dir $stableDir
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot verify public Windows 3.1.1 SHA256' }
+          python -m tools.stage_v32_full_windows --stable (Join-Path $stableDir 'AnythingPlaysSetup-3.1.1.exe') --preview 'release/AnythingPlaysSetup-3.2.0-preview1.exe' --checksums (Join-Path $stableDir 'SHA256SUMS.txt') --source-receipt 'release/V32_PRIVATE_PREVIEW_RECEIPT.json' --source-sha $env:AP_V32_QA_SOURCE_SHA --output 'release/v32-full-windows'
+          if ($LASTEXITCODE -ne 0) { throw '3.2 full Windows native-core stage failed' }
+          $full = Join-Path $PWD 'release/v32-full-windows'
+          $installer = Join-Path $full 'AnythingPlaysSetup-3.2.0-fullqa1.exe'
+          $qa = Join-Path $env:RUNNER_TEMP "AP32-Full-Windows-$env:GITHUB_RUN_ID"
+          $home = Join-Path $qa 'home'
+          $installed = Join-Path $qa 'installed'
+          New-Item -ItemType Directory -Force -Path $home | Out-Null
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Full QA Inno installation failed' }
+          $exe = Join-Path $installed 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Full-core 3.2 QA executable missing' }
+          $env:HOME = $home
+          $env:USERPROFILE = $home
+          $env:APPDATA = Join-Path $home 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $home 'AppData/Local'
+          $env:AP_V30_UI_SMOKE_CHECK = '1'
+          $env:AP_V32_GUI_SMOKE_CHECK = '1'
+          $env:AP_V32_SETUP_SMOKE_CHECK = '0'
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $full 'V32_FULL_WINDOWS_GUI_SMOKE.json'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
+          $process = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
+          if ($process.ExitCode -ne 0) { throw "Installed full Windows GUI failed: $($process.ExitCode)" }
+          $receipt = Get-Content -Raw (Join-Path $full 'V32_FULL_WINDOWS_QA_RECEIPT.json') | ConvertFrom-Json
+          $smoke = Get-Content -Raw $env:AP_V30_UI_SMOKE_REPORT | ConvertFrom-Json
+          if ($receipt.native_core_count -ne 11 -or $receipt.console_profiles -ne 18 -or $receipt.public_release_approved -ne $false -or $receipt.all_18_consoles_gameplay_verified -ne $false) { throw 'Windows QA receipt falsely claimed acceptance' }
+          if ($smoke.passed -ne $true -or $smoke.frozen_binary -ne $true -or $smoke.v32_frozen_isolation_verified -ne $true -or $smoke.console_profile_count -ne 18 -or $smoke.public_distribution_approved -ne $false) { throw 'Full Windows installed GUI did not pass private QA' }
+          Write-Output 'Private Windows full-native QA passed installed GUI; hardware and real games NOT certified'
+      - name: Retain Windows full-native-core research QA separately (never public)
+        if: matrix.target == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2-windows-x64-18-PROFILE-FULL-NATIVE-PRIVATE-QA
+          path: |
+            release/v32-full-windows/AnythingPlaysSetup-3.2.0-fullqa1.exe
+            release/v32-full-windows/V32_FULL_WINDOWS_QA_RECEIPT.json
+            release/v32-full-windows/V32_FULL_WINDOWS_GUI_SMOKE.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

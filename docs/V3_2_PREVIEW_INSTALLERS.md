@@ -233,3 +233,8 @@ This demonstrates an 18-profile / 11-core **technical inventory**, not
 clearance or production readiness. Windows and both Mac native full-core
 assemblies remain separate future tasks. The regular mGBA-only preview
 artifacts and public stable 3.1.1 are unchanged.
+
+
+## Private full-native Windows 3.2 QA staging
+
+The Windows runner now builds a separate private 3.2 Inno Setup candidate using the published v3.1.1 Windows native payload and the exact new 3.2 frozen application. It verifies the public checksum, the 3.2 source receipt, the original 11-core source-build hashes and original notices, then repacks and re-installs the 3.2 application without copying old Python runtime or stable settings. The Windows setup keeps the private 3.2 AppId and creates version `3.2.0-fullqa1`. After installation, an independent frozen Tk GUI smoke verifies that the executable starts with all 18 console profiles and preview settings isolation. The Windows full-native receipt and installer are kept in a separate seven-day Actions artifact, never uploaded as a release. This is technical inventory evidence, not certification for real gameplay, hardware, redistribution or macOS.
