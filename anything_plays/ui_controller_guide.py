@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from anything_plays.controller_onboarding import setup_guidance
+from anything_plays.ui_setup_theme import bind_theme_canvas
 
 
 def show_controller_guide(app):
@@ -36,6 +37,7 @@ def show_controller_guide(app):
     canvas = tk.Canvas(scroller, highlightthickness=0, borderwidth=0,
                        bg=app.THEMES.get(app.theme_name.get(),
                                          app.THEMES["Dark"])[1])
+    bind_theme_canvas(app, window, canvas)
     bar = ttk.Scrollbar(scroller, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=bar.set)
     bar.pack(side="right", fill="y")
