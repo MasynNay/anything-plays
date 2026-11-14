@@ -238,3 +238,21 @@ artifacts and public stable 3.1.1 are unchanged.
 ## Private full-native Windows 3.2 QA staging
 
 The Windows runner now builds a separate private 3.2 Inno Setup candidate using the published v3.1.1 Windows native payload and the exact new 3.2 frozen application. It verifies the public checksum, the 3.2 source receipt, the original 11-core source-build hashes and original notices, then repacks and re-installs the 3.2 application without copying old Python runtime or stable settings. The Windows setup keeps the private 3.2 AppId and creates version `3.2.0-fullqa1`. After installation, an independent frozen Tk GUI smoke verifies that the executable starts with all 18 console profiles and preview settings isolation. The Windows full-native receipt and installer are kept in a separate seven-day Actions artifact, never uploaded as a release. This is technical inventory evidence, not certification for real gameplay, hardware, redistribution or macOS.
+
+
+## Full-native macOS review candidates (Apple Silicon and Intel)
+
+The 3.2 private workflow now stages both arm64 and x64 full-native QA DMGs.
+Each architecture verifies the published 3.1.1 DMG SHA256 and 11 original
+source-built core hashes, then copies only native core files and original
+license notices into the exact-head 3.2 private preview app. The old
+Python, SDL, OpenCV application, game data and user settings are excluded.
+The 3.2 bundle ID and private settings namespace remain unchanged. The
+full-size candidate is ad-hoc signed (NOT notarized) and packed into a
+distinct fullqa1 DMG. The workflow mounts it again, verifies its signature
+and original core bytes, starts the actual frozen Tk executable, checks
+all 18 console profiles, and confirms dummy stable settings are unchanged.
+Separate private 7-day Actions artifacts retain both Mac DMGs and their
+native provenance / GUI smoke receipts. They are NOT public releases,
+redistribution approval, physical camera/controller testing or evidence
+that all 18 console profiles play retail games correctly.

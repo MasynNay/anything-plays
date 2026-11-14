@@ -106,6 +106,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_controller_capture.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_linux_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_windows_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_full_macos_gate.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -382,6 +383,48 @@ jobs:
             release/v32-full-windows/AnythingPlaysSetup-3.2.0-fullqa1.exe
             release/v32-full-windows/V32_FULL_WINDOWS_QA_RECEIPT.json
             release/v32-full-windows/V32_FULL_WINDOWS_GUI_SMOKE.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Assemble separate 3.2 Mac full-native QA from published pinned 3.1.1 cores
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline311
+          ARCH="${{ matrix.target }}"
+          ARCH="$(echo "$ARCH" | sed 's/^macos-//')"
+          STABLE="AnythingPlays-3.1.1-macos-$ARCH.dmg"
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$STABLE" --dir baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS.txt --dir baseline311
+          python -m tools.stage_v32_full_macos \
+            --arch "$ARCH" \
+            --stable "baseline311/$STABLE" \
+            --preview '${{ matrix.installer }}' \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_PREVIEW_RECEIPT.json \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output release/v32-full-macos
+          QA="release/v32-full-macos"
+          python -m tools.smoke_v32_full_macos \
+            --arch "$ARCH" \
+            --installer "$QA/AnythingPlays-3.2.0-fullqa1-macos-$ARCH.dmg" \
+            --receipt "$QA/V32_FULL_MACOS_QA_RECEIPT.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output "$QA/V32_FULL_MACOS_GUI_SMOKE.json"
+      - name: Retain Mac full-native research QA separately without publishing
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2-${{ matrix.target }}-18-PROFILE-FULL-NATIVE-PRIVATE-QA
+          path: |
+            release/v32-full-macos/AnythingPlays-3.2.0-fullqa1-macos-*.dmg
+            release/v32-full-macos/V32_FULL_MACOS_QA_RECEIPT.json
+            release/v32-full-macos/V32_FULL_MACOS_GUI_SMOKE.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
