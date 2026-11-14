@@ -9,9 +9,15 @@ from collections import deque
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from anything_plays.calibration_metrics import calibration_advice, calibration_summary
+from anything_plays.calibration_metrics import (
+    calibration_advice, calibration_summary, stationary_tracking_summary,
+)
 from anything_plays.tracking import zone_at
 
+
+# At ~30 camera FPS, collect about 1.5 seconds of position-only samples.
+# This is intentionally NOT a timed frame-rate or device performance claim.
+STATIONARY_SAMPLE_FRAMES = 45
 
 _STEPS = (
     (
@@ -66,6 +72,11 @@ class CalibrationMixin:
             "min_area": int(self.min_area.get()),
         }
         self._calibration_history = deque(maxlen=90)
+        self._calibration_stability_history = deque(
+            maxlen=STATIONARY_SAMPLE_FRAMES
+        )
+        self._calibration_stability_running = False
+        self._calibration_stability_result = None
         self._calibration_sampled = False
         self._calibration_step = 0
         self._calibration_after = None
@@ -73,8 +84,8 @@ class CalibrationMixin:
         window = tk.Toplevel(self.root)
         self._calibration_window = window
         window.title("Guided camera calibration · Anything Plays 3.2")
-        window.geometry("560x460")
-        window.minsize(460, 405)
+        window.geometry("560x520")
+        window.minsize(460, 430)
         window.protocol(
             "WM_DELETE_WINDOW",
             lambda: self.close_camera_calibration(restore=True),
@@ -134,6 +145,20 @@ class CalibrationMixin:
                  "Motion per frame is not a measurement of tracking accuracy.",
             style="Helper.TLabel", wraplength=480, justify="left",
         ).pack(anchor="w", pady=(9, 0))
+        ttk.Button(
+            diagnostics, text="Check stationary jitter",
+            command=self._calibration_begin_stability,
+            style="Compact.TButton",
+        ).pack(anchor="w", pady=(9, 0))
+        self._calibration_stability_status = tk.StringVar(
+            master=window,
+            value="Optional: hold your sampled target still to measure "
+                  "observed pixel variation. No camera images are stored.",
+        )
+        ttk.Label(
+            diagnostics, textvariable=self._calibration_stability_status,
+            style="Helper.TLabel", wraplength=480, justify="left",
+        ).pack(anchor="w", pady=(4, 0))
 
         footer = ttk.Frame(content)
         footer.pack(fill="x", pady=(15, 0))
@@ -230,12 +255,44 @@ class CalibrationMixin:
         self._calibration_step += 1
         self._calibration_render_step()
 
+    def _calibration_reset_stability(self, message=None):
+        """Discard unfinished/old still-target measurements on device changes."""
+        self._calibration_stability_running = False
+        self._calibration_stability_result = None
+        history = getattr(self, "_calibration_stability_history", None)
+        if history is not None:
+            history.clear()
+        status = getattr(self, "_calibration_stability_status", None)
+        if status is not None and message:
+            status.set(message)
+
+    def _calibration_begin_stability(self):
+        """Start a new, explicitly requested live stationary-target probe."""
+        if getattr(self, "_calibration_window", None) is None:
+            return
+        status = self._calibration_stability_status
+        if self.cap is None:
+            status.set("Start the webcam first; no stationary check is running.")
+            return
+        if not self._calibration_sampled:
+            status.set("Sample the target color first, then keep it still.")
+            return
+        self._calibration_reset_stability()
+        self._calibration_stability_running = True
+        status.set(
+            f"Keep the target still for {STATIONARY_SAMPLE_FRAMES} live frames. "
+            "The app observes positions only; it does not record video."
+        )
+
     def calibration_camera_changed(self):
         """Drop stale observations after camera stop, switch or reconnect."""
         if getattr(self, "_calibration_window", None) is None:
             return
         self._calibration_sampled = False
         self._calibration_history.clear()
+        CalibrationMixin._calibration_reset_stability(
+            self, "Camera changed. Restart the still-target check after sampling.",
+        )
         self._calibration_step = min(self._calibration_step, 1)
         self._calibration_render_step()
         self._calibration_diagnostics.set(
@@ -248,6 +305,9 @@ class CalibrationMixin:
             return
         self._calibration_sampled = True
         self._calibration_history.clear()
+        CalibrationMixin._calibration_reset_stability(
+            self, "Color sampled. Keep it still and choose Check stationary jitter.",
+        )
         self._calibration_diagnostics.set(
             "Target sampled. Watch the green tracking outline in the main "
             "preview, then move the object across the zones."
@@ -264,6 +324,27 @@ class CalibrationMixin:
             if center is not None else None
         )
         self._calibration_history.append((center, zone))
+        if getattr(self, "_calibration_stability_running", False):
+            samples = self._calibration_stability_history
+            samples.append(center)
+            if len(samples) >= STATIONARY_SAMPLE_FRAMES:
+                self._calibration_stability_running = False
+                result = stationary_tracking_summary(samples)
+                self._calibration_stability_result = result
+                if result["median_deviation_px"] is None:
+                    self._calibration_stability_status.set(
+                        f"Only {result['seen']}/{result['frames']} frames had a "
+                        "target match. Check lighting and contrast, then retry."
+                    )
+                else:
+                    self._calibration_stability_status.set(
+                        f"Still-target observation: {result['seen']}/"
+                        f"{result['frames']} matched frames. Median position "
+                        f"variation {result['median_deviation_px']} px; "
+                        f"95th percentile {result['p95_deviation_px']} px. "
+                        "Movement during the hold also affects these numbers; "
+                        "this is not a tracking accuracy score."
+                    )
 
     def _calibration_refresh(self):
         window = getattr(self, "_calibration_window", None)
@@ -367,6 +448,7 @@ class CalibrationMixin:
                     "Calibration canceled. Previous control settings restored."
                 )
         self._calibration_history.clear()
+        CalibrationMixin._calibration_reset_stability(self)
         try:
             window.destroy()
         except tk.TclError:
