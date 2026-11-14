@@ -383,6 +383,29 @@ class LibraryMixin:
                 # restart; an already-loaded native DLL is never replaced.
                 self.emu.core_path = self.emu.find_system_core()
                 if not self.emu.core_path:
+                    # Public 3.1.1 contains the full approved console set,
+                    # but the 3.2 QA installer intentionally contains only
+                    # mGBA. An unbundled preview core is NOT file corruption.
+                    # Reject the attempted launch before opening any native
+                    # library, and return the user to the game shelf instead
+                    # of offering a Restart action that cannot succeed.
+                    from anything_plays.preview_storage import is_v32_preview
+                    if is_v32_preview():
+                        from anything_plays.setup_health import (
+                            preview_missing_core_guidance,
+                        )
+                        title, guidance = preview_missing_core_guidance(
+                            self.system_key.get()
+                        )
+                        self.current_rom = None
+                        self.game_status.set(title)
+                        self.show_library()
+                        messagebox.showinfo(
+                            "3.2 preview emulator availability",
+                            guidance,
+                            parent=self.root,
+                        )
+                        return
                     if self.system_key.get() == 'gamecube':
                         raise RuntimeError(
                             'The installed GameCube emulator or its required '
