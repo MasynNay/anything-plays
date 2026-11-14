@@ -97,6 +97,7 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v32_native_storage.py' -v
           python -m unittest discover -s tests -p 'test_v32_preview_startup_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_installed_gui.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -136,12 +137,9 @@ jobs:
           QA_HOME="$(mktemp -d)"
           trap 'rm -rf "$QA_HOME"' EXIT
           mkdir -p "$QA_HOME/payload" "$QA_HOME/home"
-          # Simulate an already-installed public 3.1 profile. Preview
-          # startup must leave stable bytes unchanged and create only its
-          # own settings namespace.
-          mkdir -p "$QA_HOME/home/.config/anything-plays-31"
-          printf '{"stable_test_canary": "do-not-change"}\n' > \
-            "$QA_HOME/home/.config/anything-plays-31/preferences.json"
+          # Seed dummy public 3.1 preferences AND profiles; the same native
+          # verifier guards both files on Linux, Windows and both Macs.
+          python -m tools.verify_v32_installed_gui seed --home "$QA_HOME/home"
           cp "$QA_HOME/home/.config/anything-plays-31/preferences.json" \
              "$QA_HOME/stable-before.json"
           dpkg-deb -x '${{ matrix.installer }}' "$QA_HOME/payload"
@@ -174,6 +172,93 @@ jobs:
           assert data["gameplay_hardware_tested"] is False
           print("Verified actual extracted 3.2 Debian App GUI startup")
           PY
+          python -m tools.verify_v32_installed_gui verify \
+            --home "$QA_HOME/home" \
+            --report "$QA_HOME/v32-installed-gui.json" \
+            --output release/V32_INSTALLED_GUI_RECEIPT.json
+      - name: Windows real Inno install and frozen 3.2 GUI startup
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $qa = Join-Path $env:RUNNER_TEMP "AP32-Installed-GUI-$env:GITHUB_RUN_ID"
+          $homeDir = Join-Path $qa 'home'
+          $installDir = Join-Path $qa 'installed'
+          New-Item -ItemType Directory -Force -Path $homeDir | Out-Null
+          $installer = (Resolve-Path '${{ matrix.installer }}').Path
+          # Use the same genuine silent Inno installer exercised by 3.1's
+          # installed-app workflow; never just execute the build directory.
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $installDir
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated Inno install failed' }
+          $exe = Join-Path $installDir 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Installed 3.2 executable missing' }
+          python -m tools.verify_v32_installed_gui seed --home $homeDir
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to seed dummy stable fixtures' }
+          $env:USERPROFILE = $homeDir
+          $env:HOME = $homeDir
+          $env:APPDATA = Join-Path $homeDir 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
+          $env:AP_V30_UI_SMOKE_CHECK = '1'
+          $env:AP_V32_GUI_SMOKE_CHECK = '1'
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $PWD 'release/V32_FROZEN_GUI_SMOKE.json'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
+          $process = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru -ErrorAction Stop
+          if ($process.ExitCode -ne 0) { throw "Installed 3.2 frozen GUI exit: $($process.ExitCode)" }
+          python -m tools.verify_v32_installed_gui verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output (Join-Path $PWD 'release/V32_INSTALLED_GUI_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Installed 3.2 GUI or stable-settings verifier failed' }
+      - name: macOS genuine mounted preview DMG frozen GUI startup
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA="$(mktemp -d /tmp/ap32-frozen-gui.XXXXXX)"
+          MOUNT="$(mktemp -d /tmp/ap32-preview-dmg.XXXXXX)"
+          trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rm -rf "$QA"; rmdir "$MOUNT" >/dev/null 2>&1 || true' EXIT
+          mkdir -p "$QA/home"
+          python -m tools.verify_v32_installed_gui seed --home "$QA/home"
+          # macOS 3.1's installed GUI jobs also launch a mounted DMG. A
+          # bounded retry handles transient hosted DiskImages resource locks.
+          mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" '${{ matrix.installer }}'; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$MOUNT" >/dev/null 2>&1 || true
+            sleep "$((attempt * 3))"
+          done
+          test "$mounted" = 1
+          BUNDLE="$MOUNT/AnythingPlays32Preview.app"
+          ENTRY="$BUNDLE/Contents/MacOS/AnythingPlays"
+          test -x "$ENTRY"
+          codesign --verify --verbose=2 "$BUNDLE"
+          HOME="$QA/home" \
+          XDG_CONFIG_HOME="$QA/home/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V32_GUI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$PWD/release/V32_FROZEN_GUI_SMOKE.json" \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          python - "$ENTRY" <<'PY'
+          import os
+          import subprocess
+          import sys
+          task = subprocess.run(
+              [sys.argv[1], "--ap-v30-ui-smoke"],
+              env=os.environ.copy(), capture_output=True, text=True,
+              timeout=120,
+          )
+          if task.returncode:
+              print(task.stderr[-4000:])
+              print(task.stdout[-1000:])
+              raise SystemExit(f"Mounted 3.2 DMG frozen GUI exit: {task.returncode}")
+          print("Verified actual signed mounted preview Tk executable started")
+          PY
+          python -m tools.verify_v32_installed_gui verify \
+            --home "$QA/home" \
+            --report release/V32_FROZEN_GUI_SMOKE.json \
+            --output release/V32_INSTALLED_GUI_RECEIPT.json
       - name: Describe accurate testing limitations
         shell: bash
         run: |
@@ -202,6 +287,7 @@ jobs:
           path: |
             ${{ matrix.installer }}
             release/V32_PRIVATE_PREVIEW_RECEIPT.json
+            release/V32_INSTALLED_GUI_RECEIPT.json
             release/README_V32_PREVIEW.txt
           if-no-files-found: error
           retention-days: 7
