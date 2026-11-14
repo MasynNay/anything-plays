@@ -84,6 +84,24 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=Non
         and type(details.get("native_pcm_sample_rate")) in (float, int)
         and 8000 <= details["native_pcm_sample_rate"] <= 192000
     )
+    # A failed *optional* sound test must still explain which stage failed
+    # without uploading stdout, ROM paths, native stack traces or personal
+    # device names from upstream error strings.
+    reason_code = reason
+    child_code = raw.get("native_exit_code")
+    if not reason_code and not audio:
+        if not raw:
+            reason_code = "native_parent_report_absent"
+        elif raw.get("timed_out") is True:
+            reason_code = "native_child_timed_out"
+        elif not isinstance(raw.get("details"), dict):
+            reason_code = "native_child_details_absent"
+        elif type(child_code) is int and child_code != 0:
+            reason_code = "native_child_nonzero_exit"
+        elif not rendered:
+            reason_code = "native_gpu_video_conditions_not_met"
+        else:
+            reason_code = "nonzero_pcm_conditions_not_met"
     result = {
         "schema_version": 1,
         "status": STATUS,
@@ -91,6 +109,13 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=Non
         "fixture": "original_source_generated_gx_3d_and_asnd_stereo_pcm",
         "original_program_compiled_in_private_ci": built,
         "program_sha256": dol_digest if built else None,
+        "parent_report_received": bool(raw),
+        "native_child_details_received": bool(details),
+        "native_child_exit_code": (
+            child_code if type(child_code) is int and -255 <= child_code <= 255
+            else None
+        ),
+        "native_subprocess_timed_out": raw.get("timed_out") is True,
         "native_gpu_homebrew_rendering_verified": rendered,
         "core_generated_nonzero_pcm_verified": audio,
         "core_generated_pcm_sample_frames": (
@@ -109,8 +134,7 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=Non
             and details["continuous_render_fps"] >= 20
         ),
         "experiment_outcome": (
-            "observed_original_tone_pcm" if audio else
-            reason or "original_tone_not_yet_verified"
+            "observed_original_tone_pcm" if audio else reason_code
         ),
         "speaker_hardware_tested": False,
         "physical_gamepad_tested": False,

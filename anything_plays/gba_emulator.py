@@ -397,6 +397,8 @@ class CoreSession:
             # timing includes GPU callback/readback time; all other systems
             # retain their historical loop without profiling overhead.
             gamecube_timing = getattr(self, "native_run_timing", None)
+            if gamecube_timing is not None:
+                gamecube_timing.reported_core_fps = frames_per_second
             while not self.emulator.stop_event.is_set():
                 self.emulator.inputs.before_frame(self.emulator.armed)
                 native_start = time.perf_counter() if gamecube_timing else None

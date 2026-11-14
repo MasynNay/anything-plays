@@ -54,6 +54,19 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
         self.assertTrue(report["native_gpu_homebrew_rendering_verified"])
         self.assertFalse(report["core_generated_nonzero_pcm_verified"])
 
+    def test_failed_audio_reports_stage_without_exposing_native_logs(self):
+        raw = fixture()
+        raw["native_exit_code"] = -11
+        raw["error"] = "/Users/private/ROMs/secret-game.dol"
+        raw["details"] = None
+        report = qa.evaluate_evidence(raw, 1, "a"*64, "b"*40, True)
+        self.assertEqual(report["experiment_outcome"],
+                         "native_child_details_absent")
+        self.assertEqual(report["native_child_exit_code"], -11)
+        self.assertTrue(report["parent_report_received"])
+        self.assertFalse(report["native_child_details_received"])
+        self.assertNotIn("Users/private", str(report))
+
     def test_crash_bad_fixture_or_missing_parent_cannot_claim_sound(self):
         for wrong in ("bad-parent", "bad-child", "wrong-rom", "no-audio", "no-frames"):
             with self.subTest(wrong=wrong):

@@ -220,7 +220,18 @@ def _child(core, rom, report, seconds, require_audio=False,
         "uses_separate_game_window": False,
         "passes_in_app_frame_queue": True,
         "seconds": round(elapsed, 3),
+        # 'continuous_render_fps' below is HISTORICAL preview readback
+        # throughput, not emulated-game FPS. Count the distinct pipeline
+        # stages so a synthetic menu with sparse video callbacks cannot
+        # be misinterpreted as a 5-FPS emulator.
         "gamecube_rgb_callback_frames": frame_callbacks,
+        "raw_libretro_video_callbacks": session.raw_video_callbacks,
+        "null_libretro_video_callbacks": session.null_video_callbacks,
+        "preview_readback_skips": session.preview_readback_skips,
+        "native_run_loop_fps": round(
+            session.native_run_timing.native_run_calls / elapsed, 2
+        ),
+        "gamecube_preview_capture_fps": round(frame_callbacks / elapsed, 2),
         "sampled_nonblank_frames": sampled_nonblank,
         "distinct_rgb_frame_hashes": len(unique_frames),
         "native_controller_polls": polls,

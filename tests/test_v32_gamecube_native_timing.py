@@ -55,7 +55,7 @@ class NativeLoopTimingTests(unittest.TestCase):
         for _ in range(10000):
             t.record_native_run(0.006)
         self.assertEqual(t.native_run_calls, 10000)
-        self.assertLessEqual(len(vars(t)), 8)
+        self.assertLessEqual(len(vars(t)), 9)
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):
@@ -110,6 +110,9 @@ class NativeLoopTimingTests(unittest.TestCase):
                 session.run()
             self.assertEqual(len(calls), 4)
             self.assertEqual(session.native_run_timing.native_run_calls, 4)
+            self.assertGreater(
+                session.native_run_timing.reported_core_fps, 20
+            )
             self.assertEqual(fake.close.call_count, 1)
             self.assertEqual(emu.audio_sink, None)
             self.assertTrue(emu.running)
@@ -131,6 +134,12 @@ class NativeLoopTimingTests(unittest.TestCase):
                 "native_controller_polls": 2000,
                 "native_pcm_frame_samples": 5000,
                 "native_run_calls": 120,
+                "native_reported_core_fps": 59.7,
+                "native_run_loop_fps": 49.0,
+                "gamecube_preview_capture_fps": 5.8,
+                "raw_libretro_video_callbacks": 150,
+                "null_libretro_video_callbacks": 3,
+                "preview_readback_skips": 1,
                 "native_run_mean_ms": 160.0,
                 "native_run_non_readback_mean_ms": 157.0,
                 "gpu_readback_share_of_native_run": 0.01875,
@@ -140,6 +149,10 @@ class NativeLoopTimingTests(unittest.TestCase):
         record = safe_evidence("gamecube", raw, 0, False)
         self.assertTrue(record["native_probe_verified"])
         self.assertEqual(record["native_run_calls"], 120)
+        self.assertEqual(record["native_run_loop_fps"], 49.0)
+        self.assertEqual(record["gamecube_preview_capture_fps"], 5.8)
+        self.assertEqual(record["raw_libretro_video_callbacks"], 150)
+        self.assertEqual(record["null_libretro_video_callbacks"], 3)
         self.assertEqual(record["native_run_mean_ms"], 160.0)
         self.assertEqual(record["gpu_readback_share_of_native_run"], 0.01875)
         self.assertNotIn("console_tail", record)

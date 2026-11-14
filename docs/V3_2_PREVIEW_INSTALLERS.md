@@ -446,3 +446,24 @@ allow private core redistribution. Consumer GPU performance, extended
 GameCube sessions, save recovery, physical cameras/controllers, speaker
 playback and independent redistribution/legal review remain separate
 blocked release requirements.
+
+
+### Measured native GameCube loop versus preview capture rate
+
+The `4cf999ca` exact-head private Linux experiment measured **1,233
+`retro_run()` calls** over roughly 25 seconds (about 49 calls/sec), with
+**3.935 ms average native execution per call**, 19.70 seconds of scheduler
+wait and only 146 captured RGB frames (5.8 preview images/sec). This
+**does not demonstrate a 5.8-FPS emulator simulation**: the sparse video
+callback/capture path is a different measurement from native core calls.
+The report now separately records the core-advertised FPS, native loop
+FPS, raw/null Libretro callbacks, intentionally skipped preview copies,
+and actual displayed image capture FPS. Original source/GPU/audio tests
+remain bounded, independently checkable, and unapproved for release.
+
+The original GameCube GX+stereo-tone DOL **compiled in CI** at this head
+but did **not** satisfy its native video+sound probe. Compiler success
+alone cannot imply stereo sound works. A sanitized diagnostic now reports
+whether a parent or child native result exists, bounded native exit code,
+timeout and a narrow failure-stage identifier, without leaking raw logs,
+fixture paths, devices or user data. Actual sound output remains open.

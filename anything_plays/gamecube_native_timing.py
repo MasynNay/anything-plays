@@ -20,6 +20,7 @@ class GameCubeNativeTiming:
         self.native_run_over_100ms = 0
         self.scheduler_wait_total_seconds = 0.0
         self.scheduler_wait_calls = 0
+        self.reported_core_fps = None
 
     def record_native_run(self, duration):
         if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
@@ -38,6 +39,10 @@ class GameCubeNativeTiming:
         self.scheduler_wait_total_seconds += duration
 
     def snapshot(self, *, gpu_readback_seconds=0.0):
+        reported = self.reported_core_fps
+        if (type(reported) not in (int, float)
+                or not math.isfinite(reported) or not 20 < reported < 240):
+            reported = 0.0
         native = self.native_run_total_seconds
         count = self.native_run_calls
         readback = float(gpu_readback_seconds)
@@ -47,6 +52,7 @@ class GameCubeNativeTiming:
         readback = min(native, readback)
         return {
             "native_run_calls": count,
+            "native_reported_core_fps": round(reported, 3),
             "native_run_mean_ms": round(1000 * native / count, 3) if count else 0.0,
             "native_run_max_ms": round(self.native_run_max_seconds * 1000, 3),
             "native_run_total_seconds": round(native, 4),
