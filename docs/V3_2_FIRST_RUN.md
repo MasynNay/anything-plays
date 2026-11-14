@@ -45,6 +45,19 @@ rejects ambiguous simultaneous new inputs, requires focus, and suppresses
 controller-to-game input during capture **and until release**. Other consoles'
 controller mappings are unchanged.
 
+## Automated real Tk setup smoke
+
+The integration branch now adds `tests/smoke_v32_gui.py` to the standard
+source-check workflow, executed under Xvfb on Python 3.12 and 3.13. Unlike a
+pure source-contract test, this starts the real App and Tk root with temporary
+preferences, opens the Get started launchpad, calibration wizard, controller
+helper and setup troubleshooter, checks that calibration cannot arm object
+controls, copies and checks a redacted diagnostic report, and closes each UI.
+Device enumeration is suppressed and no physical hardware is used.
+
+The smoke is an **automated GUI lifecycle check only**; it is not evidence
+that USB cameras, Bluetooth controllers or commercial game files work.
+
 ## Release acceptance remaining
 
 - Full source and four-platform synthetic UI/soak tests on the integrated
