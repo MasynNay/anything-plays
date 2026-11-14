@@ -49,7 +49,11 @@ class SetupDiagnosticsTests(unittest.TestCase):
         report = self.evaluate(embedded_mode=False, core_found=True)
         self.assertIn("external", report["checks"]["input_backend"]["status"].lower())
         self.assertIn("may not reach", report["checks"]["input_backend"]["next"])
-        self.assertIn("does not verify", report["checks"]["emulator"]["next"])
+        self.assertEqual(
+            report["checks"]["emulator"]["status"], "External emulator mode"
+        )
+        self.assertIn("not a valid readiness test",
+                      report["checks"]["emulator"]["next"])
 
     def test_report_is_allowlisted_and_does_not_expose_private_data(self):
         report = self.evaluate(
