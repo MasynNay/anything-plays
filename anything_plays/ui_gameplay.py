@@ -92,6 +92,13 @@ class GameplayMixin:
         if self.armed:
             self.stop_controls()
             return
+        if getattr(self, "_calibration_window", None) is not None:
+            # Calibration is intentionally non-modal so users can click the
+            # camera preview. Never arm gameplay input during that workflow.
+            self.action.set(
+                "Finish or cancel calibration before enabling object controls."
+            )
+            return
         backend = (
             "libretro" if self.uses_embedded_emulator()
             else SYSTEMS[self.system_key.get()].backend
