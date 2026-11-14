@@ -15,6 +15,8 @@ on:
       - 'tools/stage_v32_full_windows.py'
       - 'tools/stage_v32_full_macos.py'
       - 'tools/v32_*native_runtime.py'
+      - 'tools/v32_acceptance_matrix.py'
+      - 'tests/test_v32_acceptance_matrix.py'
       - 'tools/probe_gamecube_app.py'
       - 'tools/probe_ngp_mit_homebrew.py'
       - 'tools/probe_n64_homebrew.py'
@@ -121,6 +123,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_full_macos_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_original_native_runtime.py' -v
           python -m unittest discover -s tests -p 'test_v32_extended_native_runtime.py' -v
+          python -m unittest discover -s tests -p 'test_v32_acceptance_matrix.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -386,6 +389,29 @@ jobs:
           assert all(row["is_exploratory"] is True for row in evidence["probe_results"])
           print("Four remaining homebrew research probes recorded with individual fail/pass; no general retail compatibility claimed")
           PY
+          # Merge only authentic, exact-head original-homebrew evidence.
+          # 18/18 positive short software probes do NOT override pending
+          # USB/camera hardware, save/audio/performance, licensing review,
+          # macOS notarization or real commercial-game testing.
+          python -m tools.v32_acceptance_matrix \
+            --original-receipt "$FULL/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json" \
+            --extended-receipt "$FULL/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output "$FULL/V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json"
+          python - "$FULL/V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          result = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+          assert result["source_revision"] == __import__("os").environ["AP_V32_QA_SOURCE_SHA"]
+          assert result["native_software_profiles_tested"] == 18
+          assert len(result["per_console_results"]) == 18
+          assert result["ready_for_public_3_2_release"] is False
+          assert result["all_18_consoles_commercial_gameplay_verified"] is False
+          assert result["physical_usb_bluetooth_gamepads_verified"] is False
+          assert result["physical_camera_input_verified"] is False
+          assert result["public_native_core_redistribution_approved"] is False
+          print("Private 18-profile homebrew software matrix verified; public release remains BLOCKED")
+          PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
@@ -397,6 +423,7 @@ jobs:
             release/v32-full-linux/V32_FULL_LINUX_GUI_SMOKE.json
             release/v32-full-linux/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json
             release/v32-full-linux/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json
+            release/v32-full-linux/V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

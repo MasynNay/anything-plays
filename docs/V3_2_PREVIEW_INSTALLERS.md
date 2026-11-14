@@ -390,3 +390,25 @@ This fix should not be treated as confirmed on an installed 3.2 native
 package until the exact-head four-platform QA and Linux research evidence
 have both passed. Even after confirmation it is a bounded color homebrew
 A/V/input result, not general commercial game or physical hardware QA.
+
+
+## 18-console homebrew software evidence matrix (still not a release)
+
+In addition to two independent Linux native runtime QA receipts, the
+private full-core Linux job now validates and merges them into
+`V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json`. This uses an exact
+3.2 Git SHA and rejects any missing or duplicate profile, wrong native
+core family, inconsistent pass count, forged release status, child crash
+or timeout presented as success. It records **one original or immutable
+hash-pinned homebrew software diagnostic per console profile** across
+all 18 console names, and explicitly distinguishes the 14-core A/V
+baseline from the four experimental heavy/alternate profiles. The
+report contains **no private user game paths, media files or crash logs**.
+
+**18/18 software smoke positives, if achieved, do not mean 18/18 retail
+games play well.** The matrix separately records slow headless GameCube
+frame rate, silence in its test DOL, untested physical USB/Bluetooth
+controllers and cameras, unverified saves and real speakers, missing
+cross-platform game execution, macOS notarization and the still-open
+native-core redistribution review. `ready_for_public_3_2_release` is
+unconditionally **false**; QA can never turn a release on by itself.
