@@ -425,7 +425,12 @@ jobs:
           # exploratory, never a retail game or real speaker acceptance.
           # The DOL stays in a disposable temporary directory and is
           # NEVER uploaded with the preview installer or artifacts.
-          timeout 520 .build-venv/bin/python -m tools.v32_gamecube_audio_research \
+          # Unlike a compile-only test, native EGL must have a display.
+          # The pinned controller GPU probe above already uses xvfb-run.
+          # Give each separately compiled original AV test an isolated X server.
+          SDL_AUDIODRIVER=dummy \
+          timeout 520 xvfb-run -a -s '-screen 0 1280x800x24' \
+            .build-venv/bin/python -m tools.v32_gamecube_audio_research \
             --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
             --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \
             --source-sha "$AP_V32_QA_SOURCE_SHA" \
@@ -449,7 +454,9 @@ jobs:
           # the 3D startup issue; silence/crash remains unverified.
           # Both original test DOLs stay in isolated temporary folders
           # and are NEVER included in any uploaded user-facing artifact.
-          timeout 520 .build-venv/bin/python -m tools.v32_gamecube_audio_research \
+          SDL_AUDIODRIVER=dummy \
+          timeout 520 xvfb-run -a -s '-screen 0 1280x800x24' \
+            .build-venv/bin/python -m tools.v32_gamecube_audio_research \
             --source-kind console_av \
             --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
             --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \

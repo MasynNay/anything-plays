@@ -342,6 +342,48 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
         self.assertFalse(report["core_generated_nonzero_pcm_verified"])
         self.assertNotIn("/private/dol", json.dumps(report))
 
+    def test_original_audio_ci_uses_virtual_display_for_both_native_probes(self):
+        # Without the virtual X server, the Linux test can fail at EGL
+        # factory initialization before Dolphin ever sees the owned DOL.
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github/workflows/v32-private-preview-installers.yml"
+        ).read_text("utf-8").split(
+            "# Independent native audio diagnosis:", 1
+        )[1].split(
+            "- name: Retain Linux full-native-core research QA", 1
+        )[0]
+        original_runs = workflow.split(
+            ".build-venv/bin/python -m tools.v32_gamecube_audio_research"
+        )
+        self.assertEqual(len(original_runs), 3)
+        for launch in original_runs[:2]:
+            self.assertIn(
+                "timeout 520 xvfb-run -a -s '-screen 0 1280x800x24'",
+                launch,
+            )
+            self.assertIn("SDL_AUDIODRIVER=dummy", launch)
+        self.assertIn("--source-kind console_av", original_runs[2])
+        self.assertIn("V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json", workflow)
+        self.assertIn("V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json", workflow)
+
+    def test_original_audio_ci_keeps_nonrelease_assertions(self):
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github/workflows/v32-private-preview-installers.yml"
+        ).read_text("utf-8").split(
+            "# Independent native audio diagnosis:", 1
+        )[1].split(
+            "- name: Retain Linux full-native-core research QA", 1
+        )[0]
+        self.assertEqual(
+            workflow.count("timeout 520 xvfb-run -a"), 2
+        )
+        self.assertIn('assert result["ready_for_release"] is False', workflow)
+        self.assertIn('assert d["ready_for_release"] is False', workflow)
+        self.assertIn('assert result["speaker_hardware_tested"] is False', workflow)
+        self.assertIn('assert d["public_release_approved"] is False', workflow)
+
     def test_missing_docker_is_documented_not_hidden_as_sound_success(self):
         with TemporaryDirectory() as td:
             root = Path(td)
