@@ -18,6 +18,20 @@ Users can:
    **Keyboard controls** to configure keyboard input.
 5. Copy existing redacted diagnostics if they need help.
 
+### Quick controller remapping
+
+The existing controller configuration dialog also now provides a **Quick remap**
+section. Choose an in-game action and click **Press to assign**, then press one
+physical control. Inputs that were already held when capturing began are
+ignored until released and pressed again. Simultaneous fresh presses are
+rejected, rather than guessing which button was intended.
+
+The controller input buffer is suppressed while remapping and until every
+physical control is released after capture. This prevents a captured press
+from accidentally becoming a gameplay action. The change is local to the
+selected console and uses the existing preference-save path. Manual mapping
+dropdowns are preserved for users without a connected controller.
+
 The guide explicitly explains cases where a controller has not been detected,
 the application is unfocused, or the selected console is using a backend that
 does not accept the embedded controller path. A detected SDL controller is
