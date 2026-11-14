@@ -24,6 +24,28 @@ descriptive statistics, **not** accuracy or biological identity scores.
 Movement is expected from a fish, hand or toy; higher motion is not necessarily
 worse tracking.
 
+## Optional stationary-target jitter check
+
+After sampling a color, click **Check stationary jitter** and deliberately
+hold the target as still as practical for **45 live camera frames**. The guide
+uses the existing tracking pass; it does not open another webcam, capture
+video, or archive frames. The extra temporary buffer holds **at most 45 center
+coordinates**, and it is cleared on reconnect, target resampling, and guide
+close. A disconnected camera cannot start the measurement.
+
+The result reports matched/missing frames, the median position deviation
+from the median observed target center, and the 95th-percentile deviation in
+pixels. Fewer than eight valid matches are reported as **insufficient data**
+instead of a misleading zero-jitter result. These numbers help users see
+whether a held object visibly wanders across the preview. If the user actually
+moves during the hold, that movement also increases the reported variation.
+This is **not an accuracy score, optical motion benchmark, FPS test, or
+guarantee of stable control input**. Measurements are not written to profiles,
+sent to a server, or included in diagnostics exports.
+
+The test is opt-in, and completing it is not required to save a calibration.
+It preserves the same no-gameplay-arming behavior as the rest of the guide.
+
 **Cancel** restores the original primary target color and initial tolerance
 and minimum-area values; **Save & finish** persists the selected console's
 settings. Switching consoles cancels the guide before the previous console
@@ -31,7 +53,8 @@ profile is saved. The guide never re-arms object controls.
 
 ## Verification needed
 
-- Pure metric tests: `python -m unittest tests.test_calibration_metrics -v`.
+- Pure metrics and 45-frame lifecycle tests:
+  `python -m unittest tests.test_calibration_metrics tests.test_v32_stationary_calibration -v`.
 - Full CI and GUI startup on Windows, Linux and macOS.
 - Real webcam permission flow, initial camera discovery, hot-unplug, stop/retry,
   image selection behavior, and preview clicking with a non-modal wizard.
