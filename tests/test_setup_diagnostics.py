@@ -23,6 +23,37 @@ class SetupDiagnosticsTests(unittest.TestCase):
         self.assertIn("not located", report["checks"]["emulator"]["status"])
         self.assertIn("disabled", report["checks"]["controller"]["status"])
 
+    def test_unbundled_preview_console_is_not_reported_damaged(self):
+        report = self.evaluate(system="snes", preview_minimal=True)
+        item = report["checks"]["emulator"]
+        self.assertEqual(item["status"], "Not bundled in this 3.2 preview")
+        self.assertIn("mGBA for GB, GBC and GBA", item["next"])
+        self.assertNotIn("reinstall", item["next"].lower())
+
+    def test_preview_detected_core_is_still_recognized(self):
+        report = self.evaluate(
+            system="snes", preview_minimal=True, core_found=True,
+        )
+        self.assertEqual(
+            report["checks"]["emulator"]["status"], "Core file located"
+        )
+
+    def test_preview_gameboy_core_missing_is_legitimate_error(self):
+        report = self.evaluate(
+            system="gba", preview_minimal=True, core_found=False,
+        )
+        self.assertEqual(
+            report["checks"]["emulator"]["status"], "Core file not located"
+        )
+
+    def test_external_preview_backend_is_not_misclassified(self):
+        report = self.evaluate(
+            system="gamecube", preview_minimal=True, embedded_mode=False,
+        )
+        self.assertEqual(
+            report["checks"]["emulator"]["status"], "External emulator mode"
+        )
+
     def test_selected_camera_explains_permissions_without_claiming_denial(self):
         report = self.evaluate(camera_count=1, camera_selected=True)
         advice = report["checks"]["camera"]["next"]
