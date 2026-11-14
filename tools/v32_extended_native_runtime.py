@@ -43,8 +43,8 @@ FIXTURE_ORIGIN = {
 }
 STATUS = "PRIVATE_V32_EXTENDED_FOUR_NATIVE_SOFTWARE_RESEARCH_NOT_RELEASE"
 ROOT = Path(__file__).resolve().parents[1]
-SECONDS = {"ngp": 10, "ngpc": 10, "n64": 12, "gamecube": 18}
-TIMEOUTS = {"ngp": 65, "ngpc": 100, "n64": 95, "gamecube": 115}
+SECONDS = {"ngp": 10, "ngpc": 10, "n64": 12, "gamecube": 25}
+TIMEOUTS = {"ngp": 65, "ngpc": 100, "n64": 95, "gamecube": 130}
 REPORT_NAME = "V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json"
 
 
@@ -84,11 +84,14 @@ def command_for(profile, core, report, seconds, temp):
             "--report", str(report),
         ], report
     if profile == "gamecube":
+        # Emulator._run() uses the offscreen GPU GameCubeHardwareSession,
+        # NOT the older CoreSession CPU-only renderer. The latter executed
+        # 899 core steps at ~49 Hz but gave ZERO video frames in full QA.
+        # Probe the actual production EGL/libretro/FBO/canvas pipeline.
         return [
-            *base, "tools.probe_gamecube_homebrew",
+            *base, "tools.probe_gamecube_app",
             "--core", str(core), "--seconds", str(seconds),
-            "--report", str(report), "--cpu-core", "5",
-            "--single-core", "--exercise-controls",
+            "--report", str(report),
         ], report
     raise ValueError("Unknown original-console research profile")
 
@@ -136,17 +139,54 @@ def _verified(profile, evidence, exit_code):
         )
     if profile == "gamecube":
         return (
-            evidence.get("probe_passed") is True
+            evidence.get("passed") is True
             and re.fullmatch(r"[a-f0-9]{64}",
                              str(evidence.get("fixture_sha256", ""))) is not None
             and isinstance(details, dict)
             and details.get("playback_probe_passed") is True
-            and details.get("static_homebrew_interactive_passed") is True
-            and details.get("controller_input_exercised") is True
-            and type(details.get("video_callback_frames")) is int
-            and details["video_callback_frames"] >= 3
+            and details.get("passed") is True
+            and details.get("backend") ==
+            "production GameCubeHardwareSession + platform GPU host"
+            and details.get("uses_external_dolphin") is False
+            and details.get("passes_in_app_frame_queue") is True
+            and type(details.get("gamecube_rgb_callback_frames")) is int
+            and details["gamecube_rgb_callback_frames"] >= 12
+            and type(details.get("sampled_nonblank_frames")) is int
+            and details["sampled_nonblank_frames"] >= 6
+            and type(details.get("distinct_rgb_frame_hashes")) is int
+            and details["distinct_rgb_frame_hashes"] >= 3
+            and type(details.get("native_controller_polls")) is int
+            and details["native_controller_polls"] >= 100
+            and type(details.get("native_pcm_frame_samples")) is int
+            and details["native_pcm_frame_samples"] >= 1000
         )
     return False
+
+
+def _av_evidence(profile, raw, exit_code, timed_out):
+    """Record successful NGP A/V independent of gameplay input acceptance."""
+    if profile not in ("ngp", "ngpc") or exit_code != 0 or timed_out:
+        return False
+    if not isinstance(raw, dict):
+        return False
+    if profile == "ngp":
+        metrics = raw.get("native_metrics")
+        return (
+            raw.get("mono_cartridge_header_value") == 0
+            and isinstance(metrics, dict)
+            and metrics.get("video_gate_passed") is True
+            and metrics.get("audio_gate_passed") is True
+        )
+    fixture, data = raw.get("fixture"), raw.get("details")
+    return (
+        isinstance(fixture, dict)
+        and fixture.get("header_matches_test_target") is True
+        and fixture.get("header_mode_byte") == 0x10
+        and fixture.get("git_blob_sha1") == FIXTURES["ngpc"]["blob_sha1"]
+        and isinstance(data, dict)
+        and data.get("video_gate_passed") is True
+        and data.get("audio_gate_passed") is True
+    )
 
 
 def safe_evidence(profile, raw, exit_code, timed_out):
@@ -166,6 +206,9 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         ),
         "timed_out": bool(timed_out),
         "native_probe_verified": not timed_out and _verified(profile, raw, exit_code),
+        "native_video_audio_verified": _av_evidence(
+            profile, raw, exit_code, timed_out,
+        ),
         "is_exploratory": True,
         "real_user_gameplay_tested": False,
         "physical_camera_tested": False,
@@ -173,6 +216,22 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "physical_speakers_tested": False,
         "public_release_approved": False,
     }
+    # Preserve explicit verifiable gate states without raw filenames/logs.
+    # A title can render/emit PCM yet never query the virtual gamepad.
+    if profile in ("ngp", "ngpc"):
+        for name in ("video_gate_passed", "audio_gate_passed",
+                     "input_gate_passed"):
+            metrics_row = (raw.get("native_metrics") if profile == "ngp"
+                           else details)
+            row[name] = (
+                metrics_row.get(name) is True
+                if isinstance(metrics_row, dict) else False
+            )
+    if profile == "gamecube":
+        row["production_gpu_backend_exercised"] = (
+            details.get("backend") ==
+            "production GameCubeHardwareSession + platform GPU host"
+        )
     # Only known numeric metrics from actual native callbacks.
     metrics = (raw.get("native_metrics") if profile == "ngp" else details)
     if not isinstance(metrics, dict):
@@ -185,6 +244,13 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "native_audio_frames", "native_nonzero_pcm_values",
         "sample_rate", "observed_fps", "nonblank_sampled_frames",
         "core_emulation_steps", "emulation_steps_per_second",
+        "native_input_callback_queries",
+        "manual_a_native_positive_samples",
+        "camera_b_native_positive_samples",
+        "gamecube_rgb_callback_frames", "distinct_rgb_frame_hashes",
+        "native_controller_polls", "nonzero_controller_polls",
+        "native_pcm_frame_samples", "native_pcm_nonzero_values",
+        "continuous_render_fps", "gpu_readback_calls",
     ):
         val = metrics.get(name)
         if type(val) in (int, float) and 0 <= val < 1_000_000_000:
@@ -253,6 +319,9 @@ def execute(bundle, receipt, sha, output, *, run=run_case):
         "profiles": list(TARGETS),
         "profiles_attempted": 4,
         "exploratory_profiles_verified": passed,
+        "exploratory_ngp_profiles_with_native_av": sum(
+            x.get("native_video_audio_verified") is True for x in probes
+        ),
         "all_four_exploratory_verified": passed == 4,
         "probe_results": probes,
         "original_generated_monochrome_only": True,

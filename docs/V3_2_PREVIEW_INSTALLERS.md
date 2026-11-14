@@ -328,3 +328,25 @@ JSON summary without paths, upstream ROM binaries, usernames, device IDs,
 screenshots or raw crash traces. No test grants public release rights or
 claims commercial ROM performance, real speakers, webcam/controller
 hardware, portable save integrity, or all 18 systems fully compatible.
+
+
+### Diagnostic refinement after the first four-profile results
+
+At source revision `9ba37c0c`, native original NGP and pinned N64
+software-video acceptance passed; NGPC displayed changing color frames and
+real PCM but failed its *composite* video/audio/input condition. The
+research report now records independent strict video, PCM and native input
+Booleans and input callback counts for NGP/NGPC, without releasing ROM
+images, local device names or log tails. An A/V-only result is explicitly
+**not** a complete input/gameplay pass.
+
+The first GameCube research attempt used the obsolete CPU-only
+`CoreSession` probe and reported zero decoded video despite advancing
+native steps. The production application actually chooses
+**`GameCubeHardwareSession`** with the host's offscreen GPU/FBO path.
+The next experiment therefore runs `tools.probe_gamecube_app` against
+that *same production backend*, demanding nonblank changing RGB frames,
+native input polls and PCM callback frames, while retaining a bounded
+time limit, a pinned zlib test DOL and independent nonrelease flags.
+It does not claim controller hardware, speakers or general retail game
+compatibility even if the accelerated graphics test passes.

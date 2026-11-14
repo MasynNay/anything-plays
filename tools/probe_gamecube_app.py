@@ -295,6 +295,10 @@ def _parent(core, report, seconds, rom_override=None,
                     rom.read_bytes()).hexdigest()
             else:
                 rom = verified_homebrew(root / "GC-Controller-Test.dol")
+            # The verified immutable zlib fixture has a stable extracted
+            # DOL digest. Record just its SHA to independently attest which
+            # test binary the installed 3.2 native GPU path actually ran.
+            outcome["fixture_sha256"] = hashlib.sha256(rom.read_bytes()).hexdigest()
             child_report = root / "child.json"
             command = [
                 sys.executable, str(Path(__file__).resolve()), "--child",

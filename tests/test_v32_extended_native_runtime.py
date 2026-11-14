@@ -16,7 +16,11 @@ def valid_raw(profile):
             "changing_monochrome_video_verified_in_native_test": True,
             "audio_verified_in_native_test": True,
             "native_manual_and_camera_input_query_verified": True,
-            "native_metrics": {"passed": True, "native_audio_frames": 1024},
+            "native_metrics": {
+                "passed": True, "native_audio_frames": 1024,
+                "video_gate_passed": True, "audio_gate_passed": True,
+                "input_gate_passed": True,
+            },
         }
     if profile == "ngpc":
         return {
@@ -44,13 +48,19 @@ def valid_raw(profile):
         }
     if profile == "gamecube":
         return {
-            "probe_passed": True,
+            "passed": True,
             "fixture_sha256": "a" * 64,
             "details": {
                 "playback_probe_passed": True,
-                "static_homebrew_interactive_passed": True,
-                "controller_input_exercised": True,
-                "video_callback_frames": 42,
+                "passed": True,
+                "backend": "production GameCubeHardwareSession + platform GPU host",
+                "uses_external_dolphin": False,
+                "passes_in_app_frame_queue": True,
+                "gamecube_rgb_callback_frames": 42,
+                "sampled_nonblank_frames": 12,
+                "distinct_rgb_frame_hashes": 7,
+                "native_controller_polls": 500,
+                "native_pcm_frame_samples": 6000,
             },
         }
     raise KeyError(profile)
@@ -102,10 +112,13 @@ class ExtendedNativeProbeTests(unittest.TestCase):
 
     def test_dolphin_requires_native_input_driven_frame_evidence(self):
         raw = valid_raw("gamecube")
-        raw["details"]["controller_input_exercised"] = False
+        raw["details"]["native_controller_polls"] = 0
         self.assertFalse(qa._verified("gamecube", raw, 0))
         raw = valid_raw("gamecube")
-        raw["details"]["static_homebrew_interactive_passed"] = False
+        raw["details"]["gamecube_rgb_callback_frames"] = 0
+        self.assertFalse(qa._verified("gamecube", raw, 0))
+        raw = valid_raw("gamecube")
+        raw["details"]["backend"] = "older CPU-only CoreSession"
         self.assertFalse(qa._verified("gamecube", raw, 0))
 
     def test_report_sanitizes_paths_log_tails_and_private_game_names(self):
@@ -140,8 +153,9 @@ class ExtendedNativeProbeTests(unittest.TestCase):
             cmd, _ = qa.command_for(
                 "gamecube", folder/"core.so", folder/"out.json", 12, folder,
             )
-            self.assertIn("--single-core", cmd)
-            self.assertIn("--exercise-controls", cmd)
+            self.assertEqual(cmd[2], "tools.probe_gamecube_app")
+            self.assertNotIn("--single-core", cmd)
+            self.assertNotIn("--require-animated", cmd)
             with self.assertRaisesRegex(ValueError, "Unknown"):
                 qa.command_for("switch", folder/"core.so", folder/"x", 6, folder)
 
@@ -177,6 +191,7 @@ class ExtendedNativeProbeTests(unittest.TestCase):
                                     file, run=run)
             self.assertEqual(record["profiles_attempted"], 4)
             self.assertEqual(record["exploratory_profiles_verified"], 2)
+            self.assertEqual(record["exploratory_ngp_profiles_with_native_av"], 2)
             self.assertFalse(record["all_four_exploratory_verified"])
             self.assertFalse(record["all_18_consoles_gameplay_verified"])
             self.assertFalse(record["public_release_approved"])
