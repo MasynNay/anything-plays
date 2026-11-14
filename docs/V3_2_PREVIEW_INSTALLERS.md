@@ -350,3 +350,26 @@ native input polls and PCM callback frames, while retaining a bounded
 time limit, a pinned zlib test DOL and independent nonrelease flags.
 It does not claim controller hardware, speakers or general retail game
 compatibility even if the accelerated graphics test passes.
+
+
+### Measured 3.2 native GPU and Neo Geo Pocket Color diagnostic results
+
+The exact-head full-native Linux QA for `d8889e32` again passed the
+14 original-homebrew A/V probes. The second independent research run
+confirmed NGP genuine mono video/PCM/input and N64 CPU software video.
+Production GameCube offscreen GPU rendering now **passes** a real
+input-driven, changing-image native probe: 131 native RGB callbacks,
+22 distinct RGB frames, 142,912 controller polls and 1,071,041 native
+PCM callback frames. However, its headless Mesa run averaged **5.21 FPS**
+and the sample DOL emitted **zero nonzero PCM values**. This is successful
+rendering evidence, NOT proof of playable speed or sound on real GPUs.
+
+The pinned MIT Neo Geo Pocket Color cartridge produced 603 native
+frames at approximately 60 FPS and 281,718 nonzero PCM values. All three
+individual A/V/input gates reported true, but its overall native
+acceptance Boolean remained false. We preserve that **NOT VERIFIED**
+outcome pending independent process-completion and provenance details.
+The follow-up diagnostic reports only allowlisted true/false conditions,
+bounded native exit codes, offscreen GPU readback timing, and whether a
+nonzero PCM sample was observed. It retains **no original error strings,
+game assets, usernames, local paths or crashed-process stacks**.

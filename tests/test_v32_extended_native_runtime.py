@@ -90,6 +90,33 @@ class ExtendedNativeProbeTests(unittest.TestCase):
                     name, valid_raw(name), 0, True,
                 )["native_probe_verified"])
 
+    def test_color_a_v_success_does_not_hide_failed_native_completion(self):
+        data = valid_raw("ngpc")
+        data["probe_passed"] = False
+        data["native_exit_code"] = -11
+        data["details"]["passed"] = True
+        evidence = qa.safe_evidence("ngpc", data, 0, False)
+        self.assertFalse(evidence["native_probe_verified"])
+        self.assertTrue(evidence["native_video_audio_verified"])
+        self.assertTrue(evidence["input_gate_passed"])
+        self.assertTrue(evidence["native_child_report_passed"])
+        self.assertFalse(evidence["native_parent_probe_passed"])
+        self.assertEqual(evidence["native_inner_exit_code"], -11)
+        self.assertTrue(evidence["fixture_blob_matches_pinned_source"])
+        self.assertTrue(evidence["fixture_color_mode_confirmed"])
+
+    def test_headless_gpu_frames_are_not_claimed_as_playable_fps_or_sound(self):
+        data = valid_raw("gamecube")
+        data["details"]["continuous_render_fps"] = 5.21
+        data["details"]["native_pcm_nonzero_values"] = 0
+        data["details"]["gpu_readback_mean_ms"] = 30.5
+        report = qa.safe_evidence("gamecube", data, 0, False)
+        self.assertTrue(report["native_probe_verified"])
+        self.assertTrue(report["production_gpu_backend_exercised"])
+        self.assertFalse(report["headless_20fps_threshold_met"])
+        self.assertFalse(report["real_nonzero_pcm_observed"])
+        self.assertEqual(report["gpu_readback_mean_ms"], 30.5)
+
     def test_no_false_mono_header_or_color_header_acceptance(self):
         mono = valid_raw("ngp")
         mono["mono_cartridge_header_value"] = 0x10

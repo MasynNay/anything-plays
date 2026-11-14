@@ -226,11 +226,40 @@ def safe_evidence(profile, raw, exit_code, timed_out):
                 metrics_row.get(name) is True
                 if isinstance(metrics_row, dict) else False
             )
+    if profile == "ngpc":
+        fixture = raw.get("fixture")
+        if not isinstance(fixture, dict):
+            fixture = {}
+        inner = raw.get("native_exit_code")
+        # These are ONLY booleans and one bounded exit code. The source
+        # probe's error strings may contain paths and are NEVER copied.
+        row.update({
+            "native_parent_probe_passed": raw.get("probe_passed") is True,
+            "native_child_report_passed": details.get("passed") is True,
+            "native_child_reported_exception": bool(details.get("error")),
+            "native_parent_reported_exception": bool(raw.get("error")),
+            "native_inner_exit_code": (
+                inner if type(inner) is int and -255 <= inner <= 255
+                else None
+            ),
+            "fixture_header_matches_target":
+                fixture.get("header_matches_test_target") is True,
+            "fixture_color_mode_confirmed": fixture.get("header_mode_byte") == 0x10,
+            "fixture_mit_license_confirmed": fixture.get("license") == "MIT",
+            "fixture_blob_matches_pinned_source":
+                fixture.get("git_blob_sha1") == FIXTURES["ngpc"]["blob_sha1"],
+        })
     if profile == "gamecube":
         row["production_gpu_backend_exercised"] = (
             details.get("backend") ==
             "production GameCubeHardwareSession + platform GPU host"
         )
+        fps = details.get("continuous_render_fps")
+        row["headless_20fps_threshold_met"] = (
+            type(fps) in (int, float) and fps >= 20
+        )
+        pcm = details.get("native_pcm_nonzero_values")
+        row["real_nonzero_pcm_observed"] = type(pcm) is int and pcm > 0
     # Only known numeric metrics from actual native callbacks.
     metrics = (raw.get("native_metrics") if profile == "ngp" else details)
     if not isinstance(metrics, dict):
@@ -250,6 +279,8 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "native_controller_polls", "nonzero_controller_polls",
         "native_pcm_frame_samples", "native_pcm_nonzero_values",
         "continuous_render_fps", "gpu_readback_calls",
+        "gpu_readback_mean_ms", "gpu_readback_max_ms",
+        "gpu_readback_fraction_elapsed", "native_rss_growth_mb",
     ):
         val = metrics.get(name)
         if type(val) in (int, float) and 0 <= val < 1_000_000_000:
