@@ -41,6 +41,20 @@ It stages actual OS-native install packages, invokes existing native bundle
 checks, checks the embedded preview marker and native installer metadata, and
 generates `V32_PRIVATE_PREVIEW_RECEIPT.json` with source commit and SHA-256. The receipt verifier also inspects the unpacked application to reject any non-mGBA libretro core, extra Dolphin Sys runtime, or provenance manifest claiming more than the single mGBA core.
 
+The Linux workflow now also extracts the **built Debian package** into a
+disposable directory and launches its actual frozen App under Xvfb with a
+temporary HOME. Its 1.2-second real Tk startup check requires a live root,
+initialized app and event loop; it does not use a webcam, ROM or physical
+controller. The Windows and macOS artifacts still require equivalent installed
+desktop testing and physical-device validation.
+
+To avoid repeatedly running superseded 3.1 build suites, ten historic
+3.1/3.1.1 workflows now skip expensive jobs for the 3.2 integration PR.
+They remain eligible on their original branches. The 3.2 source checks and
+dedicated 3.2 four-platform preview workflow remain enabled. GitHub has
+already confirmed the legacy jobs' skipped status; that is NOT equivalent
+to the new 3.2 jobs passing.
+
 The artifact workflow intentionally has only read permissions and cannot
 create tags, GitHub releases or edit the default branch. GitHub Actions
 artifacts may be accessible to people who can download artifacts from the
