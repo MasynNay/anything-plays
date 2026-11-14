@@ -162,6 +162,14 @@ def exercise_installed_preview_setup(app, root):
         app.switch_system()
         if app.emu.find_system_core() is not None:
             raise RuntimeError("Limited 3.2 preview unexpectedly has an SNES core")
+        # Even a cached real executable must never count as the SNES
+        # emulator. The diagnostic must resolve this console afresh.
+        from anything_plays.ui_setup_diagnostics import _snapshot
+        import sys
+        with patch.object(app.emu, "core_path", sys.executable):
+            observed = _snapshot(app)
+        if observed["checks"]["emulator"]["status"] != "Not bundled in this 3.2 preview":
+            raise RuntimeError("Frozen setup diagnostics trusted a stale core path")
         with patch(
             "anything_plays.ui_library.messagebox.showinfo"
         ) as popup, patch.object(

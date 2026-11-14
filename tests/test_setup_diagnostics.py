@@ -138,6 +138,73 @@ class PrivateApp:
 
 
 class SnapshotPrivacyTests(unittest.TestCase):
+    def test_live_core_rescan_updates_without_restarting_emulator(self):
+        import tempfile
+        from pathlib import Path
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        with tempfile.TemporaryDirectory(prefix="private-core-refresh-") as home:
+            newly_installed = Path(home) / "newly-added-core.so"
+            app = PrivateApp(None)
+            app.emu.find_system_core = lambda: (
+                newly_installed if newly_installed.is_file() else None
+            )
+            before = _snapshot(app)
+            self.assertEqual(
+                before["checks"]["emulator"]["status"],
+                "Core file not located",
+            )
+            newly_installed.write_bytes(b"synthetic test only")
+            after = _snapshot(app)
+            self.assertEqual(
+                after["checks"]["emulator"]["status"], "Core file located",
+            )
+            self.assertIsNone(app.emu.core_path, "Read-only checks must not mutate core")
+            self.assertNotIn(str(newly_installed), json.dumps(after))
+            newly_installed.unlink()
+            removed = _snapshot(app)
+            self.assertEqual(
+                removed["checks"]["emulator"]["status"],
+                "Core file not located",
+            )
+
+    def test_stale_cached_core_from_another_console_is_not_reported_ready(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        with tempfile.TemporaryDirectory(prefix="private-core-stale-") as home:
+            previous_core = Path(home) / "old-gameboy-core.so"
+            previous_core.write_bytes(b"synthetic test only")
+            app = PrivateApp(previous_core)
+            app.system_key = FakeSetting("snes")
+            app.emu.find_system_core = lambda: None
+            with patch(
+                "anything_plays.ui_setup_diagnostics.current_identity",
+                return_value={"channel": "v32_preview"},
+            ):
+                report = _snapshot(app)
+            self.assertEqual(
+                report["checks"]["emulator"]["status"],
+                "Not bundled in this 3.2 preview",
+            )
+            self.assertNotIn(str(previous_core), json.dumps(report))
+            self.assertEqual(app.emu.core_path, previous_core)
+
+    def test_core_discovery_error_is_redacted_and_does_not_open_devices(self):
+        from anything_plays.ui_setup_diagnostics import _snapshot
+        app = PrivateApp(None)
+        def failed_lookup():
+            raise OSError("Private home path /home/user/my-core.so")
+        app.emu.find_system_core = failed_lookup
+        report = _snapshot(app)
+        self.assertEqual(
+            report["checks"]["emulator"]["status"],
+            "Core file not located",
+        )
+        self.assertNotIn("/home/user", json.dumps(report))
+
     def test_private_device_names_and_core_paths_never_enter_report(self):
         import tempfile
         from pathlib import Path

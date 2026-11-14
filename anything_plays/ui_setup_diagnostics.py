@@ -23,7 +23,19 @@ def _snapshot(app):
             active = bool(cap.isOpened())
         except Exception:
             active = False
-    path = getattr(app.emu, "core_path", None)
+    # Refresh must reflect the core actually discoverable for the current
+    # console, not an old core_path cached before a core-pack install,
+    # rollback, deletion or console change. No library is loaded or started.
+    # Older test façades and optional integrations without a resolver retain
+    # the prior read-only cached-path behavior.
+    finder = getattr(app.emu, "find_system_core", None)
+    if callable(finder):
+        try:
+            path = finder()
+        except (OSError, TypeError, ValueError, KeyError, RuntimeError):
+            path = None
+    else:
+        path = getattr(app.emu, "core_path", None)
     try:
         core_found = bool(path and Path(path).is_file())
     except (OSError, TypeError, ValueError):

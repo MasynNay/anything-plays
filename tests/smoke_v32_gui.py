@@ -191,6 +191,20 @@ def smoke():
                         app.system_key.set("snes")
                         app.switch_system()
                         try:
+                            # Source Tk setup reports the selected console,
+                            # not an unrelated cached native binary path.
+                            from anything_plays.ui_setup_diagnostics import _snapshot
+                            import sys
+                            with patch.object(
+                                app.emu, "find_system_core", return_value=None,
+                            ), patch.object(
+                                app.emu, "core_path", sys.executable,
+                            ):
+                                checked = _snapshot(app)
+                                assert checked["checks"]["emulator"]["status"] == (
+                                    "Not bundled in this 3.2 preview"
+                                )
+                                assert sys.executable not in json.dumps(checked)
                             with patch.object(
                                 app.emu, "find_system_core", return_value=None,
                             ), patch.object(

@@ -127,6 +127,17 @@ Device enumeration is suppressed and no physical hardware is used.
 The smoke is an **automated GUI lifecycle check only**; it is not evidence
 that USB cameras, Bluetooth controllers or commercial game files work.
 
+## Fresh emulator availability checks
+
+**Check my setup → Refresh checks** now performs a read-only core lookup for
+the currently selected emulator instead of trusting an old cached core path.
+This correctly recognizes a newly installed or removed approved core pack
+without restarting the application and avoids treating a previous console's
+core as ready for another console. No core is loaded, no ROM is read, and no
+device or network connection is opened. Diagnostic reports remain strictly
+allowlisted with no native file paths. Unit tests plus source and installed
+Tk tests cover stale core references and truthful limited-preview status.
+
 ## Release acceptance remaining
 
 - Full source and four-platform synthetic UI/soak tests on the integrated
