@@ -18,11 +18,22 @@ from tools.verify_v32_preview import FILES, verify
 REVISION = "1234567890abcdef1234567890abcdef12345678"
 
 
-def fake_identity(root, *, channel="v32_preview"):
+def fake_identity(root, *, channel="v32_preview", target="windows-x64"):
     location = root / "_internal" / "assets" / "v31_build_identity.json"
     location.parent.mkdir(parents=True, exist_ok=True)
     location.write_text(
         json.dumps(make_identity(channel)), encoding="utf-8",
+    )
+    cores = (
+        root / "Contents" / "Resources" / "cores"
+        if target.startswith("macos") else root / "cores"
+    )
+    cores.mkdir(parents=True, exist_ok=True)
+    suffix = {"windows-x64": ".dll", "linux-x64": ".so",
+              "macos-arm64": ".dylib", "macos-x64": ".dylib"}[target]
+    (cores / ("mgba_libretro" + suffix)).write_bytes(b"fake core")
+    (cores / "CORE_PROVENANCE.json").write_text(
+        json.dumps({"cores": [{"name": "mgba"}]}), encoding="utf-8",
     )
     return location
 
@@ -80,7 +91,7 @@ class V32ArtifactReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             bundle = folder / "bundle"
-            fake_identity(bundle)
+            fake_identity(bundle, target="linux-x64")
             file = fake_file(folder, FILES["linux-x64"])
             with patch("tools.verify_v32_preview.subprocess.check_output",
                        side_effect=["anything-plays-32-preview\n",
@@ -89,11 +100,38 @@ class V32ArtifactReceiptTests(unittest.TestCase):
             self.assertEqual(process.call_count, 2)
             self.assertEqual(report["target"], "linux-x64")
 
+    def test_extra_native_core_is_rejected_even_with_matching_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            bundle = folder / "bundle"
+            fake_identity(bundle)
+            file = fake_file(folder, FILES["windows-x64"], windows=True)
+            (bundle / "cores" / "snes9x_libretro.dll").write_bytes(b"extra")
+            with self.assertRaisesRegex(ValueError, "only the native mGBA"):
+                verify("windows-x64", file, REVISION, bundle=bundle)
+
+    def test_missing_or_exaggerated_core_manifest_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            bundle = folder / "bundle"
+            fake_identity(bundle)
+            file = fake_file(folder, FILES["windows-x64"], windows=True)
+            manifest = bundle / "cores" / "CORE_PROVENANCE.json"
+            manifest.write_text(
+                json.dumps({"cores": [{"name": "mgba"}, {"name": "dolphin"}]}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "incorrect cores"):
+                verify("windows-x64", file, REVISION, bundle=bundle)
+            manifest.unlink()
+            with self.assertRaisesRegex(ValueError, "Missing minimal-core"):
+                verify("windows-x64", file, REVISION, bundle=bundle)
+
     def test_dmg_needs_separate_32_plist_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             bundle = folder / "AnythingPlays32Preview.app"
-            fake_identity(bundle)
+            fake_identity(bundle, target="macos-arm64")
             plist = bundle / "Contents" / "Info.plist"
             plist.parent.mkdir(parents=True, exist_ok=True)
             with plist.open("wb") as stream:
