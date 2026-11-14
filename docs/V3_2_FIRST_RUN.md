@@ -25,6 +25,15 @@ A frozen release package cannot switch identity via that environment flag.
 No public v3.2 installer exists yet. The preview is unverified with real
 camera/gamepad hardware and should not be presented as release quality.
 
+**Console availability:** the test installers know all 18 control profiles
+but bundle only mGBA (GB, GBC and GBA). Selecting an unbundled console remains
+valid for layout setup; however, launching a game without its verified native
+core now displays **Not bundled in this 3.2 preview** and returns to the
+library without opening the ROM or emulator. This does *not* mean that the
+public stable 3.1.1 installation is damaged. A genuinely missing mGBA core is
+identified separately. The main status strip stays short; Check my setup
+contains the full next steps.
+
 ## One clear entrance
 
 A **Get started** button appears beside the Anything Plays title. The
