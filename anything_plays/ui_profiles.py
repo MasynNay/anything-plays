@@ -103,6 +103,11 @@ class ProfilesMixin:
         self.profile_store.put(self.system_key.get(), self.cfg)
 
     def switch_system(self, event=None):
+        # Finish calibration on its original console before persisting
+        # the old profile; a changed combobox already contains the new key.
+        close_calibration = getattr(self, 'close_camera_calibration', None)
+        if callable(close_calibration):
+            close_calibration(restore=True)
         key = self.system_key.get()
         if key not in SYSTEMS:
             return
