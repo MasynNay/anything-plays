@@ -168,6 +168,13 @@ def exercise_installed_preview_setup(app, root):
             raise RuntimeError("Unbundled console showed an inaccurate error")
         if "not a damaged installation" not in popup.call_args.args[1]:
             raise RuntimeError("Missing preview core was reported as corruption")
+        # Native stop() can preserve its previous ROM path. Do not let the
+        # Restart button revive a game we already rejected and unloaded.
+        app.emu.rom = "stale-frozen-preview-game.gba"
+        app.retry_current_rom()
+        native_start.assert_not_called()
+        if app.current_rom is not None or "Choose a game ROM" not in app.game_status.get():
+            raise RuntimeError("Blocked preview launch left a stale restart option")
     finally:
         app.system_key.set(old_system)
         app.switch_system()

@@ -196,6 +196,13 @@ def smoke():
                             assert "not a damaged installation" in (
                                 notice.call_args.args[1]
                             )
+                            # The worker retains its old ROM string after
+                            # stop(); 3.2 must not relaunch it via Restart.
+                            app.emu.rom = "stale-source-preview-game.gba"
+                            app.retry_current_rom()
+                            native_start.assert_not_called()
+                            assert app.current_rom is None
+                            assert "Choose a game ROM" in app.game_status.get()
                         finally:
                             app.system_key.set(previous_console)
                             app.switch_system()

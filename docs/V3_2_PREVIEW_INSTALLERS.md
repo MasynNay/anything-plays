@@ -181,7 +181,10 @@ missing-core behavior, and matching privacy-safe diagnostics. The four-platform
 frozen-app acceptance includes a synthetic unbundled SNES attempt to verify
 the real installer never tries to open a ROM or starts a native core. A rejected
 launch now uses the normal game teardown path, so a previously running session
-cannot leave native gameplay or stale video behind if its core disappears. No
+cannot leave native gameplay or stale video behind if its core disappears.
+The 3.2 Restart action also refuses to revive a prior ROM remembered internally
+by a stopped native worker; a new ROM must be explicitly selected. Public
+3.1.1 restart fallback behavior is unchanged. No
 retail-game file is accessed, and this does not count as 18-console QA.
 
 ## Human acceptance still required

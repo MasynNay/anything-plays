@@ -122,6 +122,30 @@ class PreviewCoreLaunchTests(unittest.TestCase):
         app.show_library.assert_called_once()
         self.assertIn("Not bundled", app.game_status.get())
 
+    def test_preview_restart_refuses_stale_rom_after_unload(self):
+        app = FakeApp("snes")
+        app.emu.rom = "/synthetic/previous-game.gba"
+        with patch(
+            "anything_plays.preview_storage.is_v32_preview",
+            return_value=True,
+        ):
+            app.retry_current_rom()
+        self.assertEqual(
+            app.game_status.get(), "Choose a game ROM before restarting.",
+        )
+        app.emu.start.assert_not_called()
+        app.emu.find_system_core.assert_not_called()
+
+    def test_published_stable_restart_fallback_is_unchanged(self):
+        app = FakeApp("snes", core="/synthetic/core.so")
+        app.emu.rom = "/synthetic/previous-game.sfc"
+        with patch(
+            "anything_plays.preview_storage.is_v32_preview",
+            return_value=False,
+        ):
+            app.retry_current_rom()
+        app.emu.start.assert_called_once_with("/synthetic/previous-game.sfc")
+
     def test_existing_user_core_can_launch_even_when_not_bundled(self):
         app = FakeApp("snes", core="/synthetic/user-approved-core.so")
         with patch("anything_plays.ui_library.messagebox.showinfo") as info:

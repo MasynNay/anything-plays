@@ -324,7 +324,15 @@ class LibraryMixin:
 
     def retry_current_rom(self):
         """Recover a failed/stalled native emulator without restarting the UI."""
-        path = self.current_rom or getattr(self.emu, "rom", None)
+        # In the 3.2 preview, the native worker may still remember a ROM
+        # after its session was stopped or a missing core was rejected.
+        # Only the explicitly selected current game is safe to retry.
+        # Preserve the published stable channel's existing fallback.
+        path = self.current_rom
+        if not path:
+            from anything_plays.preview_storage import is_v32_preview
+            if not is_v32_preview():
+                path = getattr(self.emu, "rom", None)
         if not path:
             self.game_status.set("Choose a game ROM before restarting.")
             return
