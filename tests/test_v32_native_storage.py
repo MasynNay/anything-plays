@@ -27,9 +27,16 @@ class V32NativeStorageTests(unittest.TestCase):
             stable = game.with_suffix(".sav")
             stable.write_bytes(b"STABLE_PROGRESS_DO_NOT_TOUCH")
             data_root = home / "data"
-            with patch.dict(os.environ, {"XDG_DATA_HOME": str(data_root)}):
-                with patch("anything_plays.libretro_save.is_v32_preview",
-                           return_value=True):
+            # Redirect all three native save conventions to this disposable
+            # fixture; never write files under a GitHub runner user profile.
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(data_root),
+                "APPDATA": str(home / "roaming"),
+            }), patch("anything_plays.libretro_save.Path.home",
+                     return_value=home), patch(
+                         "anything_plays.libretro_save.is_v32_preview",
+                         return_value=True,
+                     ):
                     memory = (C.c_ubyte * 4)(1, 2, 3, 4)
                     sav = SaveRAM(
                         game,
@@ -38,7 +45,10 @@ class V32NativeStorageTests(unittest.TestCase):
                     )
                     self.assertEqual(sav.path, sav.fallback_path)
                     self.assertNotEqual(sav.path, stable)
-                    self.assertIn("3.2-preview", str(sav.path))
+                    self.assertTrue(sav.path.is_relative_to(home))
+                    self.assertTrue(
+                        {"3.2-preview", "Preview-3.2"} & set(sav.path.parts),
+                    )
                     self.assertTrue(sav.persist())
                     self.assertEqual(sav.path.read_bytes(), bytes(memory))
                     self.assertEqual(
@@ -63,20 +73,45 @@ class V32NativeStorageTests(unittest.TestCase):
             self.skipTest(f"Symlink creation unavailable on host: {exc}")
 
     def test_preview_save_root_rejects_redirect_to_stable_saves(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            home = Path(temporary)
-            stable = home / "data" / "anything-plays" / "saves"
-            stable.mkdir(parents=True)
-            preview_parent = home / "data" / "anything-plays"
-            self._make_test_symlink(stable, preview_parent / "3.2-preview")
-            with patch.dict(os.environ, {
-                "XDG_DATA_HOME": str(home / "data"),
-            }):
-                with patch("anything_plays.libretro_save.is_v32_preview",
-                           return_value=True):
-                    with self.assertRaisesRegex(ValueError, "must not link"):
-                        _user_save_directory()
-            self.assertEqual(list(stable.iterdir()), [])
+        # Exercise each path convention on each runner. A Linux-only XDG
+        # test silently used the wrong location on native macOS/Windows.
+        for platform_name in ("linux", "darwin", "win32"):
+            with self.subTest(platform=platform_name):
+                with tempfile.TemporaryDirectory() as temporary:
+                    home = Path(temporary)
+                    if platform_name == "linux":
+                        parent = home / "data" / "anything-plays"
+                        old_name, preview_name = "saves", "3.2-preview"
+                    elif platform_name == "darwin":
+                        parent = (
+                            home / "Library" / "Application Support"
+                            / "AnythingPlays"
+                        )
+                        old_name, preview_name = "Saves", "Preview-3.2"
+                    else:
+                        parent = home / "roaming" / "AnythingPlays"
+                        old_name, preview_name = "Saves", "Preview-3.2"
+                    stable = parent / old_name
+                    stable.mkdir(parents=True)
+                    self._make_test_symlink(
+                        stable, parent / preview_name,
+                    )
+                    with patch.dict(os.environ, {
+                        "XDG_DATA_HOME": str(home / "data"),
+                        "APPDATA": str(home / "roaming"),
+                    }), patch(
+                        "anything_plays.libretro_save.sys.platform",
+                        platform_name,
+                    ), patch(
+                        "anything_plays.libretro_save.Path.home",
+                        return_value=home,
+                    ), patch(
+                        "anything_plays.libretro_save.is_v32_preview",
+                        return_value=True,
+                    ):
+                        with self.assertRaisesRegex(ValueError, "must not link"):
+                            _user_save_directory()
+                    self.assertEqual(list(stable.iterdir()), [])
 
     def test_preview_core_overlay_rejects_redirect_to_stable(self):
         with tempfile.TemporaryDirectory() as temporary:
