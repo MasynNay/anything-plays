@@ -110,9 +110,13 @@ Returning to the app does not replay a button that was pressed or held in
 another window: the physical controller must first return to a neutral,
 released state. A short status message explains why input is temporarily
 paused. The press-to-remap guard remains independent of this focus safety
-check. Synthetic focus-transition tests run in source CI and in each native
-preview installer's preflight; these tests do not certify Bluetooth or USB
-hardware.
+check. Reconnecting a USB/Bluetooth controller or changing from one pad to
+another also suppresses held inputs until the newly connected controller
+provides a neutral release sample; first-time enabling the controller
+remains responsive without an artificial delay. Manual Rescan follows the
+same neutral-release handoff rule. Synthetic connection, focus and remap
+tests run in source CI and in each native preview installer's preflight;
+these tests do not certify physical Bluetooth or USB hardware.
 
 ## Automated real Tk setup smoke
 

@@ -113,9 +113,18 @@ class GamepadMixin:
         self._gamepad_bindings = settings if isinstance(settings, dict) else {}
         self._controller_capture = None
         self._controller_capture_release_pending = False
+        # An SDL disconnect or device swap must never inject an already
+        # held button into gameplay. Only the next neutral sample from
+        # the new connected device may unlock controller input.
+        self._gamepad_last_controller = None
+        self._gamepad_seen_controller = False
+        self._gamepad_reconnect_release_pending = False
 
     def close_gamepad(self):
         """Release gamepad state even for partially constructed App objects."""
+        self._gamepad_last_controller = None
+        self._gamepad_seen_controller = False
+        self._gamepad_reconnect_release_pending = False
         self._cancel_controller_capture()
         close_guide = getattr(self, "_controller_guide_close", None)
         if callable(close_guide):
@@ -129,6 +138,9 @@ class GamepadMixin:
 
     def toggle_gamepad(self):
         """Enable an optional local gamepad; keep keyboard play available."""
+        self._gamepad_last_controller = None
+        self._gamepad_seen_controller = False
+        self._gamepad_reconnect_release_pending = False
         if self.gamepad_enabled.get():
             try:
                 self._gamepad.start()
@@ -153,6 +165,11 @@ class GamepadMixin:
 
     def refresh_gamepad(self):
         self._cancel_controller_capture("Controller rescan; choose Press to assign again.")
+        # Rescan is an explicit handoff. A newly enumerated device may already
+        # have held buttons; do not hand them to a live game until neutral.
+        self._gamepad_last_controller = None
+        self._gamepad_seen_controller = bool(self.gamepad_enabled.get())
+        self._gamepad_reconnect_release_pending = bool(self.gamepad_enabled.get())
         # Rescanning closes the previous SDL handle immediately. Also clear
         # its emulated held buttons now, rather than waiting for the next tick.
         self.emu.release_gamepad()
@@ -239,6 +256,28 @@ class GamepadMixin:
                 system = self.system_key.get()
                 settings = self._gamepad_bindings.get(system)
                 buttons, status = self._gamepad.poll(system, settings)
+                connected_device = self._gamepad.controller
+                previous_device = getattr(self, "_gamepad_last_controller", None)
+                if connected_device is not previous_device:
+                    # This is not a first-ever connection: the prior device
+                    # disconnected or was replaced. Keep both game ports'
+                    # controller state neutral until the newly connected
+                    # physical input returns to a fully released snapshot.
+                    if (previous_device is not None or
+                            (getattr(self, "_gamepad_seen_controller", False)
+                             and connected_device is not None)):
+                        self._gamepad_reconnect_release_pending = True
+                    self._gamepad_last_controller = connected_device
+                    if connected_device is not None:
+                        self._gamepad_seen_controller = True
+                if getattr(self, "_gamepad_reconnect_release_pending", False):
+                    if (connected_device is not None and
+                            not self._gamepad.physical_buttons):
+                        self._gamepad_reconnect_release_pending = False
+                    else:
+                        buttons = frozenset()
+                        if connected_device is not None:
+                            status += " · Release controller inputs after reconnecting"
                 self._controller_capture_tick(system)
                 if (getattr(self, "_controller_capture", None) is not None
                         or getattr(self, "_controller_capture_release_pending", False)):
@@ -284,6 +323,9 @@ class GamepadMixin:
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception as exc:
+            self._gamepad_last_controller = None
+            self._gamepad_seen_controller = False
+            self._gamepad_reconnect_release_pending = False
             self._cancel_controller_capture("Controller error; mapping canceled.")
             self.emu.release_gamepad()
             self._gamepad.stop()

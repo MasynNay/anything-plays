@@ -182,6 +182,53 @@ class ControllerCaptureTests(unittest.TestCase):
         app.gamepad_tick()
         self.assertEqual(app.emu.published[-1], frozenset({"A"}))
 
+    def test_hot_unplug_new_pad_requires_release_before_game_input(self):
+        app = CaptureHost()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+        app._gamepad.controller = None
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_reconnect_release_pending)
+        app._gamepad.controller = object()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_reconnect_release_pending)
+        self.assertIn("after reconnecting", app.gamepad_status.get())
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_reconnect_release_pending)
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_switching_between_connected_devices_suppresses_held_buttons(self):
+        app = CaptureHost()
+        app.gamepad_tick()  # Existing first device, initially neutral
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+        app._gamepad.controller = object()  # different USB/Bluetooth device
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_reconnect_release_pending)
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_reconnect_release_pending)
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_initial_controller_enable_keeps_first_ordinary_press_responsive(self):
+        app = CaptureHost()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+        self.assertFalse(app._gamepad_reconnect_release_pending)
+
     def test_disconnected_capture_is_canceled_without_saving(self):
         app = CaptureHost()
         status = Setting()
