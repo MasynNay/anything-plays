@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import patch
 
@@ -50,6 +51,29 @@ class V32SourcePreviewTests(unittest.TestCase):
                     current_identity(path=marker)["channel"],
                     "v311_stable_candidate",
                 )
+
+    def test_launcher_fails_closed_on_other_embedded_identity(self):
+        import run_v32_preview
+        with patch.dict(os.environ, {"AP_V32_PREVIEW": ""}):
+            with patch(
+                "anything_plays.build_identity.current_identity",
+                return_value=make_identity("v311_stable_candidate"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Refusing to start"):
+                    run_v32_preview.main()
+
+    def test_launcher_uses_valid_preview_identity_without_requiring_gui_in_test(self):
+        import run_v32_preview
+        fake_app = types.ModuleType("app")
+        fake_app.main = lambda: 23
+        with patch.dict(sys.modules, {"app": fake_app}):
+            with patch.dict(os.environ, {"AP_V32_PREVIEW": ""}):
+                with patch(
+                    "anything_plays.build_identity.current_identity",
+                    return_value=make_identity("v32_preview"),
+                ):
+                    self.assertEqual(run_v32_preview.main(), 23)
+                    self.assertEqual(os.environ["AP_V32_PREVIEW"], "1")
 
     def test_preview_never_reads_copies_or_changes_older_settings(self):
         with tempfile.TemporaryDirectory() as directory:
