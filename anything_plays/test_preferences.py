@@ -113,8 +113,17 @@ def prepare_test_preferences(home=None, *, channel=None):
         destination = root / identity["settings_namespace"]
         _checked_directory(destination)
         for name in MIGRATED_FILENAMES:
-            if (destination / name).is_symlink():
+            candidate = destination / name
+            if candidate.is_symlink():
                 raise ValueError("Preview settings cannot be linked to stable files")
+            if candidate.exists():
+                if not candidate.is_file():
+                    raise ValueError("Preview settings must be regular files")
+                # Refuse pre-existing hardlinks as well as symlinks. A
+                # hardlinked destination can silently overwrite stable
+                # settings when a legacy write path modifies it in place.
+                if candidate.stat().st_nlink != 1:
+                    raise ValueError("Preview settings cannot share stable files")
         return destination / "preferences.json"
     previous_preview = home / PREVIOUS_PREVIEW_DIR
     preview = home / TEST_DIR
