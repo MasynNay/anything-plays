@@ -108,6 +108,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_full_windows_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_full_macos_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_original_native_runtime.py' -v
+          python -m unittest discover -s tests -p 'test_v32_extended_native_runtime.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -347,6 +348,32 @@ jobs:
           assert report["public_release_approved"] is False
           print("6 gated original-source A/V homebrew systems and 8 additional exploratory native profiles examined in installed 3.2; retail compatibility NOT verified")
           PY
+          # Separate exploratory software runtime research for the four
+          # remaining profiles. The mono NGP program is fully original and
+          # generated offline. Color NGP, N64 and GC use only hash-pinned
+          # MIT/public-domain/zlib CI fixtures from immutable upstream.
+          # Missing media, native crashes, and hangs are NOT VERIFIED.
+          SDL_AUDIODRIVER=dummy \
+          timeout 460 xvfb-run -a -s '-screen 0 1280x800x24' \
+            .build-venv/bin/python -m tools.v32_extended_native_runtime \
+              --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
+              --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \
+              --source-sha "$AP_V32_QA_SOURCE_SHA" \
+              --report "$FULL/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json"
+          python - "$FULL/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          evidence = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+          assert evidence["profiles"] == ["ngp", "ngpc", "n64", "gamecube"]
+          assert evidence["profiles_attempted"] == 4
+          assert len(evidence["probe_results"]) == 4
+          assert 0 <= evidence["exploratory_profiles_verified"] <= 4
+          assert evidence["all_18_consoles_gameplay_verified"] is False
+          assert evidence["public_release_approved"] is False
+          assert evidence["commercial_game_compatibility_verified"] is False
+          assert all(row["is_exploratory"] is True for row in evidence["probe_results"])
+          print("Four remaining homebrew research probes recorded with individual fail/pass; no general retail compatibility claimed")
+          PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
@@ -357,6 +384,7 @@ jobs:
             release/v32-full-linux/V32_FULL_LINUX_QA_RECEIPT.json
             release/v32-full-linux/V32_FULL_LINUX_GUI_SMOKE.json
             release/v32-full-linux/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json
+            release/v32-full-linux/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

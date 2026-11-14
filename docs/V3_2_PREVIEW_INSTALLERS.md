@@ -298,3 +298,33 @@ This is the start of **software runtime acceptance**, not evidence that
 all 18 systems or actual retail games work. Real USB/Bluetooth gamepads,
 physical cameras, sound output, sustained saves and four-OS play testing
 remain independent acceptance requirements.
+
+
+## Last four 3.2 native profiles: independently reported software research
+
+The private Linux full-core QA now runs a distinct, nonblocking research
+stage for **NGP, NGPC, Nintendo 64, and GameCube** against the exact-head
+installed 3.2 emulator core files. These results are recorded separately
+in `V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json`, alongside the unchanged
+14-profile original-homebrew native A/V baseline.
+
+NGP runs an **original source-generated 0x00 monochrome program** with
+real K1GE frames, PSG PCM, and native manual/camera-input callbacks.
+NGPC downloads only its existing immutable Git-blob-pinned MIT color
+homebrew cartridge, checking the true 0x10 color header. N64 downloads
+only the pinned Unlicense/public-domain SaveTest ROM and measures actual
+native ParaLLEl software frames. GameCube downloads only the previously
+pinned zlib-licensed homebrew controller test DOL and attempts real
+Dolphin software-rendered, input-driven frames with the cached interpreter.
+These THREE third-party binaries are fetched **only in disposable private
+CI**, never distributed in the installer; fixed upstream digest checks
+precede execution. The original mono NGP test uses no downloads at all.
+
+Each heavy native test runs in a crash/timeout-contained subprocess.
+An unavailable fixture, native crash, silence or frozen frame is marked
+**NOT VERIFIED**, never passed, while leaving the 14-profile required
+original-homebrew gate unchanged. The output is a redacted, per-profile
+JSON summary without paths, upstream ROM binaries, usernames, device IDs,
+screenshots or raw crash traces. No test grants public release rights or
+claims commercial ROM performance, real speakers, webcam/controller
+hardware, portable save integrity, or all 18 systems fully compatible.
