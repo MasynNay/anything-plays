@@ -139,17 +139,13 @@ def run_smoke_gui(app_type, systems):
                     # identity and its isolated settings on the real frozen
                     # App. AP_V32_PREVIEW is intentionally not set or trusted.
                     from anything_plays.build_identity import current_identity
+                    from anything_plays.preview_startup_gate import (
+                        verify_preview_startup,
+                    )
                     identity = current_identity()
-                    correct = (
-                        result["frozen_binary"]
-                        and identity["channel"] == "v32_preview"
-                        and identity["public_release_approved"] is False
-                        and app.preferences_path.parent.name
-                        == "anything-plays-32-preview"
-                        and root.title() == identity["title"]
-                        and app.cap is None
-                        and app._gamepad.api is None
-                        and not app.armed
+                    correct = verify_preview_startup(
+                        app, root, identity=identity,
+                        frozen=result["frozen_binary"],
                     )
                     result["v32_frozen_isolation_verified"] = bool(correct)
                     result["v32_settings_namespace"] = (
