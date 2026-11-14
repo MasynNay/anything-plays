@@ -39,8 +39,9 @@ class Emu:
 
 
 class Root:
+    focused = True
     def focus_get(self):
-        return object()
+        return object() if self.focused else None
 
     def after(self, ms, callback):
         return 123
@@ -144,6 +145,27 @@ class ControllerCaptureTests(unittest.TestCase):
         self.assertEqual(app.saved, 0)
         self.assertTrue(app._controller_capture_release_pending)
         self.assertIn("disconnected", status.get())
+
+    def test_out_of_focus_input_cannot_assign_a_button(self):
+        app = CaptureHost()
+        status = Setting()
+        app._controller_capture = {
+            "system": "gba", "target": "B",
+            "baseline": frozenset(), "status": status, "rows": {},
+        }
+        app.root.focused = False
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app._controller_capture_tick("gba")
+        self.assertEqual(app._gamepad_bindings, {})
+        self.assertIn("Focus Anything Plays", status.get())
+        app.root.focused = True
+        app._controller_capture_tick("gba")
+        self.assertEqual(app._gamepad_bindings, {})
+        app._gamepad.physical_buttons = frozenset()
+        app._controller_capture_tick("gba")
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app._controller_capture_tick("gba")
+        self.assertEqual(app._gamepad_bindings["gba"]["A"], "B")
 
     def test_switching_console_does_not_map_previous_device(self):
         app = CaptureHost()
