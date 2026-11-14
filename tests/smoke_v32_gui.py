@@ -179,11 +179,15 @@ def smoke():
                                 side_effect=AssertionError(
                                     "Unbundled core was started"
                                 ),
-                            ) as native_start, patch(
+                            ) as native_start, patch.object(
+                                app.emu, "stop", wraps=app.emu.stop,
+                            ) as native_stop, patch(
                                 "anything_plays.ui_library.messagebox.showinfo",
                             ) as notice:
                                 app.start_rom("fake-source-preview-game.sfc")
                             native_start.assert_not_called()
+                            native_stop.assert_called_once()
+                            assert app.emu.frame is None
                             notice.assert_called_once()
                             assert app.current_rom is None
                             assert "Not bundled in this 3.2 preview" in (

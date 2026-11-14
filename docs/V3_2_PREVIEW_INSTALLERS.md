@@ -179,7 +179,9 @@ window uses concise status labels; **Check my setup** and the blocked-launch
 popup supply detailed guidance. Tests exercise all 18 profiles, stable
 missing-core behavior, and matching privacy-safe diagnostics. The four-platform
 frozen-app acceptance includes a synthetic unbundled SNES attempt to verify
-the real installer never tries to open a ROM or starts a native core. No
+the real installer never tries to open a ROM or starts a native core. A rejected
+launch now uses the normal game teardown path, so a previously running session
+cannot leave native gameplay or stale video behind if its core disappears. No
 retail-game file is accessed, and this does not count as 18-console QA.
 
 ## Human acceptance still required

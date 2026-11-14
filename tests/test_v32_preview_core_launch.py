@@ -7,6 +7,7 @@ public-package cores.
 """
 
 import unittest
+from threading import Lock
 from unittest.mock import Mock, patch
 
 from anything_plays.setup_health import (
@@ -39,7 +40,11 @@ class FakeApp(LibraryMixin):
         self.game_bezel = Mock()
         self.emu = Mock()
         self.emu.core_path = None
+        self.emu.lock = Lock()
+        self.emu.frame = object()
         self.emu.find_system_core.return_value = core
+        self.game_canvas = Mock()
+        self.game_photo = object()
         self.uses_embedded_emulator = lambda: True
         self.deactivate_manual = Mock()
         self.stop_controls = Mock()
@@ -74,8 +79,12 @@ class PreviewCoreLaunchTests(unittest.TestCase):
                 self.assertEqual(app.show_library.call_count, 1)
                 app.show_playing_info.assert_not_called()
                 app.emu.start.assert_not_called()
-                app.stop_external_emulator.assert_called_once()
-                app.stop_controls.assert_called_once()
+                app.emu.stop.assert_called_once()
+                self.assertIsNone(app.emu.frame)
+                self.assertIsNone(app.game_photo)
+                app.game_canvas.delete.assert_called_once_with("all")
+                app.stop_external_emulator.assert_called()
+                app.stop_controls.assert_called()
                 error.assert_not_called()
                 info.assert_called_once()
                 self.assertEqual(
@@ -94,11 +103,31 @@ class PreviewCoreLaunchTests(unittest.TestCase):
                     self.assertIn("not bundled", app.game_status.get().lower())
                     self.assertIn("not a damaged installation", message)
 
+    def test_missing_core_closes_an_existing_game_without_stale_video(self):
+        app = FakeApp("snes")
+        app.current_rom = "/synthetic/previous-game.gba"
+        app.emu.running = True
+        stale_frame = app.emu.frame
+        with patch(
+            "anything_plays.preview_storage.is_v32_preview",
+            return_value=True,
+        ), patch("anything_plays.ui_library.messagebox.showinfo"):
+            app.start_rom("/synthetic/unbundled-game.sfc")
+        app.emu.stop.assert_called_once()
+        self.assertIsNotNone(stale_frame)
+        self.assertIsNone(app.emu.frame)
+        self.assertIsNone(app.game_photo)
+        self.assertIsNone(app.current_rom)
+        app.game_canvas.delete.assert_called_once_with("all")
+        app.show_library.assert_called_once()
+        self.assertIn("Not bundled", app.game_status.get())
+
     def test_existing_user_core_can_launch_even_when_not_bundled(self):
         app = FakeApp("snes", core="/synthetic/user-approved-core.so")
         with patch("anything_plays.ui_library.messagebox.showinfo") as info:
             app.start_rom("/synthetic/user-game.sfc")
         app.emu.start.assert_called_once_with("/synthetic/user-game.sfc")
+        app.emu.stop.assert_not_called()
         info.assert_not_called()
         app.show_playing_info.assert_called_once()
         self.assertEqual(app.current_rom, "/synthetic/user-game.sfc")

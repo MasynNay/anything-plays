@@ -153,9 +153,14 @@ def exercise_installed_preview_setup(app, root):
             app.emu, "start", side_effect=RuntimeError(
                 "Unbundled preview attempted to start a native emulator"
             )
-        ) as native_start:
+        ) as native_start, patch.object(
+            app.emu, "stop", wraps=app.emu.stop,
+        ) as native_stop:
             app.start_rom("synthetic-unbundled-preview-game.sfc")
         native_start.assert_not_called()
+        native_stop.assert_called_once()
+        if app.emu.frame is not None:
+            raise RuntimeError("Blocked preview launch retained stale native video")
         popup.assert_called_once()
         if app.current_rom is not None:
             raise RuntimeError("Unbundled preview kept a fake game as playable")

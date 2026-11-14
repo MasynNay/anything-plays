@@ -397,9 +397,12 @@ class LibraryMixin:
                         title, guidance = preview_missing_core_guidance(
                             self.system_key.get()
                         )
-                        self.current_rom = None
+                        # If a previous game was already running, a now-
+                        # missing core must also stop its worker and clear
+                        # stale video. Use the normal shutdown path so save
+                        # state, canvas, and native resources are released.
+                        self.unload_rom()
                         self.game_status.set(title)
-                        self.show_library()
                         messagebox.showinfo(
                             "3.2 preview emulator availability",
                             guidance,
