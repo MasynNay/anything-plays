@@ -25,6 +25,7 @@ def valid_raw(profile):
     if profile == "ngpc":
         return {
             "passed": True,
+            "native_exit_code": 0,
             "fixture": {
                 "header_matches_test_target": True,
                 "header_mode_byte": 0x10,
@@ -126,10 +127,15 @@ class ExtendedNativeProbeTests(unittest.TestCase):
             "native_parent_probe_passed"
         ])
         # The parent alone is also insufficient without actual core,
-        # fixture and input success.
+        # fixture, native child exit and input success.
         wrong = valid_raw("ngpc")
         wrong["details"]["input_gate_passed"] = False
         self.assertFalse(qa._verified("ngpc", wrong, 0))
+        for fake_exit in (-11, 1, None, True, "0"):
+            forged = valid_raw("ngpc")
+            forged["native_exit_code"] = fake_exit
+            self.assertFalse(qa._verified("ngpc", forged, 0))
+        self.assertFalse(qa._verified("ngpc", valid_raw("ngpc"), -9))
 
     def test_headless_gpu_frames_are_not_claimed_as_playable_fps_or_sound(self):
         data = valid_raw("gamecube")

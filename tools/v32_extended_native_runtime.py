@@ -118,6 +118,8 @@ def _verified(profile, evidence, exit_code):
             # Keep the independent child A/V/input, pinned header,
             # fixture SHA and process-exit checks below unchanged.
             evidence.get("passed") is True
+            and type(evidence.get("native_exit_code")) is int
+            and evidence["native_exit_code"] == 0
             and isinstance(fixture, dict)
             and fixture.get("header_matches_test_target") is True
             and fixture.get("header_mode_byte") == 0x10
