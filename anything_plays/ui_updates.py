@@ -307,17 +307,16 @@ class UpdatesMixin:
         elif getattr(self, "_core_install_busy", False):
             status.set("Installing an approved emulator update…")
         else:
-            # The full 3.0 installer has ALL 11 cores. Missing binaries
-            # indicate corruption/packaging failure, not an optional feature.
-            # A minimal 3.2 preview intentionally bundles mGBA only.
-            # Missing other cores is not a damaged stable installation.
+            # Private 3.2 preview intentionally bundles only mGBA.
+            # Do not tell users to repair a healthy preview to add 15
+            # unbundled console cores, or to repair public 3.1.1.
             from anything_plays.build_identity import current_identity
-            if (current_identity()["channel"] == "v32_preview"
-                    and system not in ("gb", "gbc", "gba")):
-                status.set(
-                    "Not bundled in this 3.2 preview · "
-                    "GB, GBC and GBA use mGBA"
+            if current_identity()["channel"] == "v32_preview":
+                from anything_plays.setup_health import (
+                    preview_missing_core_guidance,
                 )
+                summary, guidance = preview_missing_core_guidance(system)
+                status.set(summary + " · " + guidance)
             else:
                 status.set(
                     "Emulator files missing · repair or reinstall Anything Plays"
