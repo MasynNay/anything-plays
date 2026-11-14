@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 
-from anything_plays.preview_storage import is_v32_preview
+from anything_plays.preview_storage import is_v32_preview, checked_preview_directory
 
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
@@ -26,16 +26,19 @@ def _user_save_directory():
     if sys.platform == "win32":
         root = os.environ.get("APPDATA")
         base = Path(root) if root else Path.home() / "AppData" / "Roaming"
-        return (base / "AnythingPlays" / "Preview-3.2" / "Saves"
-                if preview else base / "AnythingPlays" / "Saves")
+        return (checked_preview_directory(
+            base / "AnythingPlays" / "Preview-3.2" / "Saves", "Preview-3.2",
+        ) if preview else base / "AnythingPlays" / "Saves")
     if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support" / "AnythingPlays"
-        return (base / "Preview-3.2" / "Saves"
-                if preview else base / "Saves")
+        return (checked_preview_directory(
+            base / "Preview-3.2" / "Saves", "Preview-3.2",
+        ) if preview else base / "Saves")
     root = os.environ.get("XDG_DATA_HOME")
     base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local" / "share"
-    return (base / "anything-plays" / "3.2-preview" / "saves"
-            if preview else base / "anything-plays" / "saves")
+    return (checked_preview_directory(
+        base / "anything-plays" / "3.2-preview" / "saves", "3.2-preview",
+    ) if preview else base / "anything-plays" / "saves")
 
 
 def _fallback_path(rom_path):
@@ -100,6 +103,12 @@ class SaveRAM:
         # never replace it by an older legacy file from beside the ROM.
         if pointer and size and self.fallback_path.is_file():
             self.path = self.fallback_path
+        if pointer and size and is_v32_preview():
+            # A preview save may be created/replaced after the SaveRAM
+            # constructor ran. Refuse linked destinations before reading.
+            _user_save_directory()
+            if self.path.is_symlink():
+                raise ValueError("Preview save must not link to a stable file")
         if pointer and size and self.path.is_file():
             # Read only as much as this core can hold, plus one byte to
             # detect oversized/partial legacy saves. A corrupt multi-GB save
@@ -133,6 +142,10 @@ class SaveRAM:
         if digest == self._last_saved_digest and self.path.is_file():
             return False
         destination = self.path
+        if is_v32_preview():
+            # Re-validate the preview parent immediately before replacing
+            # files. No preview SRAM may follow a redirected stable directory.
+            _user_save_directory()
         try:
             self._write_atomic(destination, snapshot,
                                create_directory=(destination == self.fallback_path))
