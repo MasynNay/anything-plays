@@ -130,15 +130,27 @@ jobs:
           QA_HOME="$(mktemp -d)"
           trap 'rm -rf "$QA_HOME"' EXIT
           mkdir -p "$QA_HOME/payload" "$QA_HOME/home"
+          # Simulate an already-installed public 3.1 profile. Preview
+          # startup must leave stable bytes unchanged and create only its
+          # own settings namespace.
+          mkdir -p "$QA_HOME/home/.config/anything-plays-31"
+          printf '{"stable_test_canary": "do-not-change"}\n' > \
+            "$QA_HOME/home/.config/anything-plays-31/preferences.json"
+          cp "$QA_HOME/home/.config/anything-plays-31/preferences.json" \
+             "$QA_HOME/stable-before.json"
           dpkg-deb -x '${{ matrix.installer }}' "$QA_HOME/payload"
           ENTRY="$QA_HOME/payload/opt/anything-plays-32-preview/AnythingPlays"
           test -x "$ENTRY"
           HOME="$QA_HOME/home" \
           AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V32_GUI_SMOKE_CHECK=1 \
           AP_V30_UI_SMOKE_REPORT="$QA_HOME/v32-installed-gui.json" \
           SDL_VIDEODRIVER=dummy \
           PYGAME_HIDE_SUPPORT_PROMPT=1 \
           timeout 65 xvfb-run -a "$ENTRY" --ap-v30-ui-smoke
+          cmp "$QA_HOME/stable-before.json" \
+              "$QA_HOME/home/.config/anything-plays-31/preferences.json"
+          test -f "$QA_HOME/home/.config/anything-plays-32-preview/preferences.json"
           python - "$QA_HOME/v32-installed-gui.json" <<'PY'
           import json, sys
           from pathlib import Path
@@ -149,6 +161,8 @@ jobs:
           assert data["actual_app_initialized"] is True
           assert data["actual_tk_mainloop_ran"] is True
           assert data["frozen_binary"] is True
+          assert data["v32_frozen_isolation_verified"] is True
+          assert data["v32_settings_namespace"] == "anything-plays-32-preview"
           assert data["public_distribution_approved"] is False
           assert data["camera_hardware_tested"] is False
           assert data["gameplay_hardware_tested"] is False
