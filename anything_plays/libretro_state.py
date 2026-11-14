@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 
 from anything_plays.libretro_save import _fallback_path, _user_save_directory
 
@@ -171,7 +172,22 @@ class LibretroRecoveryState:
                 stream.write(packet)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, self.path)
+            # Concurrent Windows instances can briefly hold the destination
+            # open while publishing their own checkpoint. Keep this writer's
+            # unique, fully flushed temporary file intact and retry only
+            # documented native access/sharing violations, with a strict
+            # bounded delay. Other storage errors must fail immediately so
+            # the previous committed checkpoint stays recoverable.
+            for attempt in range(5):
+                try:
+                    os.replace(temporary, self.path)
+                    break
+                except PermissionError as exc:
+                    code = getattr(exc, "winerror", None)
+                    if (os.name != "nt" or code not in (5, 32, 33)
+                            or attempt == 4):
+                        raise
+                    time.sleep(0.025 * (attempt + 1))
         finally:
             if temporary is not None:
                 try:
