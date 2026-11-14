@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, Mock, patch
 from types import SimpleNamespace
 
 from anything_plays.gamecube_native_timing import GameCubeNativeTiming
-from anything_plays.gba_emulator import CoreSession
 
 
 class NativeLoopTimingTests(unittest.TestCase):
@@ -60,6 +59,16 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):
+        # The full source suite installs NumPy and exercises the real loop.
+        # The earliest native-installer preflight intentionally runs without
+        # scientific/GUI dependencies; skip ONLY this full-module integration
+        # case there, while all standard-library profiler tests still run.
+        try:
+            from anything_plays.gba_emulator import CoreSession
+        except ModuleNotFoundError as exc:
+            if exc.name in ("numpy", "PIL", "cv2", "sounddevice", "pygame"):
+                self.skipTest("Full emulator dependencies installed in later CI stage")
+            raise
         with tempfile.TemporaryDirectory() as td:
             core = Path(td) / "dolphin_libretro.so"
             core.write_bytes(b"test-core-bytes")
