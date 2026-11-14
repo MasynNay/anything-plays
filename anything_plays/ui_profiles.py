@@ -104,6 +104,16 @@ class ProfilesMixin:
         self.read_settings()
         self.profile_store.put(self.system_key.get(), self.cfg)
 
+    def persist_on_exit(self):
+        """Rollback an unfinished calibration before saving on shutdown.
+
+        A guide may have sampled a color or changed advanced controls, but
+        those are not committed unless the user explicitly chose Save.
+        """
+        if getattr(self, '_calibration_window', None) is not None:
+            self.close_camera_calibration(restore=True)
+        self.persist_system_profile()
+
     def switch_system(self, event=None):
         calibration_was_open = getattr(self, '_calibration_window', None) is not None
         close_guide = getattr(self, 'close_camera_calibration', None)
