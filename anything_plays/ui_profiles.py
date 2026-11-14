@@ -105,6 +105,9 @@ class ProfilesMixin:
         self.profile_store.put(self.system_key.get(), self.cfg)
 
     def switch_system(self, event=None):
+        close_guide = getattr(self, 'close_camera_calibration', None)
+        if callable(close_guide):
+            close_guide(restore=True)
         key = self.system_key.get()
         if key not in SYSTEMS:
             return
