@@ -94,6 +94,7 @@ class V32CIIsolationTests(unittest.TestCase):
             "tools.verify_v32_installed_gui seed",
             "tools.verify_v32_installed_gui verify",
             "test_v32_installed_gui.py",
+            "AP_V32_SETUP_SMOKE_CHECK",
             "release/V32_INSTALLED_GUI_RECEIPT.json",
         ):
             with self.subTest(required=required):
@@ -101,6 +102,17 @@ class V32CIIsolationTests(unittest.TestCase):
         # Require a single final acceptance receipt per platform, never
         # simply call the bundler's output proof a frozen GUI launch.
         self.assertEqual(preview.count("tools.verify_v32_installed_gui verify"), 3)
+        self.assertEqual(preview.count("AP_V32_SETUP_SMOKE_CHECK=1"), 2)
+        self.assertIn("$env:AP_V32_SETUP_SMOKE_CHECK = '1'", preview)
+        frozen = (
+            ROOT.parents[1] / "anything_plays" / "frozen_gui_smoke.py"
+        ).read_text("utf-8")
+        self.assertIn("exercise_installed_preview_setup(app, root)", frozen)
+        checker = (
+            ROOT.parents[1] / "tools" / "verify_v32_installed_gui.py"
+        ).read_text("utf-8")
+        self.assertIn('"v32_setup_dialog_count"', checker)
+        self.assertIn('"v32_setup_windows_verified"', checker)
 
     def test_current_source_and_private_installer_checks_remain_enabled(self):
         source = (ROOT / "ci.yml").read_text("utf-8")
