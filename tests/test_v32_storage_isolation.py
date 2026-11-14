@@ -130,6 +130,50 @@ class PreviewStorageTests(unittest.TestCase):
                         self.assertEqual(legacy.read_bytes(), b"OLD!")
                         self.assertFalse(sav.persist())
 
+    def test_hardlinked_preview_save_refuses_existing_stable_progress(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            rom = home / "old-game.gba"
+            rom.touch()
+            old_save = rom.with_suffix(".sav")
+            old_save.write_bytes(b"STBL")
+            with patch("pathlib.Path.home", return_value=home):
+                with patch.dict(os.environ, {"XDG_DATA_HOME": str(home / "xdg")}):
+                    with identity("v32_preview"):
+                        memory = C.create_string_buffer(b"TEST", 4)
+                        save = SaveRAM(
+                            rom, lambda _: C.addressof(memory), lambda _: 4,
+                        )
+                        save.path.parent.mkdir(parents=True)
+                        try:
+                            os.link(old_save, save.path)
+                        except (OSError, NotImplementedError):
+                            self.skipTest("Hardlink unavailable on this filesystem")
+                        with self.assertRaisesRegex(
+                            ValueError, "must not share a stable file",
+                        ):
+                            save.restore()
+                        self.assertEqual(C.string_at(memory, 4), b"TEST")
+                        self.assertEqual(old_save.read_bytes(), b"STBL")
+
+    def test_symlinked_private_data_folder_cannot_redirect_to_stable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            stable = home / "xdg" / "anything-plays" / "saves"
+            stable.mkdir(parents=True)
+            (stable / "canary").write_bytes(b"unchanged")
+            preview = home / "xdg" / "anything-plays" / "3.2-preview"
+            try:
+                preview.symlink_to(stable, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlink unavailable on this filesystem")
+            with patch("pathlib.Path.home", return_value=home):
+                with patch.dict(os.environ, {"XDG_DATA_HOME": str(home / "xdg")}):
+                    with identity("v32_preview"):
+                        with self.assertRaisesRegex(ValueError, "Preview storage"):
+                            _user_save_directory()
+            self.assertEqual((stable / "canary").read_bytes(), b"unchanged")
+
     def test_actual_core_session_libretro_paths_are_preview_only(self):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
