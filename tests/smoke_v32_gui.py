@@ -94,6 +94,25 @@ def smoke():
                         )
                         app.open_getting_started()
                         assert app._quick_start_window is launchpad
+                        assert "Camera: No camera found" in (
+                            launchpad._setup_readiness_vars["camera"].get()
+                        )
+                        click_named_button(launchpad, "Refresh status")
+                        assert app.cap is None and app._gamepad.api is None
+
+                        # Change the console without launching an emulator.
+                        # The same live setup snapshot must explain that an
+                        # unbundled preview core is not an installation fault.
+                        selected = app.system_key.get()
+                        app.system_key.set("snes")
+                        app.switch_system()
+                        click_named_button(launchpad, "Refresh status")
+                        assert launchpad._setup_readiness_vars["emulator"].get() == (
+                            "Emulator: Not bundled in this 3.2 preview"
+                        )
+                        app.system_key.set(selected)
+                        app.switch_system()
+                        click_named_button(launchpad, "Refresh status")
 
                         # Entering the color wizard does not open a webcam.
                         click_named_button(launchpad, "Calibrate camera (optional)")

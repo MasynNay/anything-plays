@@ -87,6 +87,56 @@ def show_quick_start(app):
         lambda event: canvas.itemconfigure(embedded, width=event.width),
     )
 
+    # A small, explicitly refreshed status summary makes the first-run
+    # guide useful without requiring a troubleshooting dialog. Reuse the
+    # same redacted, read-only report as Check my setup: no cameras, ROMs,
+    # controllers, native cores or network connections are started here.
+    readiness = ttk.LabelFrame(body, text="CURRENT SETUP", padding=(11, 9))
+    readiness.pack(fill="x", padx=(1, 5), pady=(0, 10))
+    ttk.Label(
+        readiness,
+        text="Camera and controller are optional. Keyboard play needs "
+             "a compatible emulator core and your own game file.",
+        style="Helper.TLabel", wraplength=485, justify="left",
+    ).pack(anchor="w", pady=(0, 6))
+    names = (
+        ("emulator", "Emulator"),
+        ("camera", "Camera"),
+        ("controller", "Controller"),
+        ("input_backend", "Input path"),
+    )
+    readiness_vars = {
+        key: tk.StringVar(master=window, value=title + ": Not checked")
+        for key, title in names
+    }
+    window._setup_readiness_vars = readiness_vars
+    for key, _title in names:
+        ttk.Label(
+            readiness, textvariable=readiness_vars[key],
+            style="Helper.TLabel", wraplength=485, justify="left",
+        ).pack(anchor="w", pady=(2, 0))
+
+    def refresh_readiness():
+        try:
+            from anything_plays.ui_setup_diagnostics import _snapshot
+            checks = _snapshot(app)["checks"]
+        except (ValueError, tk.TclError, OSError, RuntimeError, KeyError):
+            for key, title in names:
+                readiness_vars[key].set(
+                    title + ": Could not check; open Check my setup."
+                )
+            return
+        for key, title in names:
+            readiness_vars[key].set(
+                title + ": " + checks[key]["status"]
+            )
+
+    ttk.Button(
+        readiness, text="Refresh status", command=refresh_readiness,
+        style="Compact.TButton",
+    ).pack(anchor="w", pady=(8, 0))
+    refresh_readiness()
+
     def show_console():
         app.root.lift()
         app.system_combo.focus_set()

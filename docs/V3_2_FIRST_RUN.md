@@ -127,6 +127,18 @@ Device enumeration is suppressed and no physical hardware is used.
 The smoke is an **automated GUI lifecycle check only**; it is not evidence
 that USB cameras, Bluetooth controllers or commercial game files work.
 
+## Live readiness in Get started
+
+The **Get started** launchpad now displays four concise local status lines:
+emulator, camera, controller, and input path. **Refresh status** reads the
+same strictly redacted setup snapshot as **Check my setup** without opening
+a camera, connecting a controller, launching a core, scanning a ROM or
+reaching the network. It updates when the chosen console changes, including
+an explicit **Not bundled in this 3.2 preview** label for unavailable
+console profiles. The camera and controller are clearly described as
+optional. Real source Tk and all four frozen installed-GUI lifecycle
+checks exercise this summary and its refresh action.
+
 ## Fresh emulator availability checks
 
 **Check my setup → Refresh checks** now performs a read-only core lookup for

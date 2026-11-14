@@ -62,6 +62,13 @@ def _one_installed_setup_roundtrip(app, root):
     app.open_getting_started()
     if _active_window(app, "_quick_start_window") is not quick:
         raise RuntimeError("Opening Get started twice created duplicate windows")
+    if set(quick._setup_readiness_vars) != {
+            "emulator", "camera", "controller", "input_backend"}:
+        raise RuntimeError("Frozen Get started lacks live readiness summary")
+    _click_button(quick, "Refresh status")
+    if (not quick._setup_readiness_vars["emulator"].get().startswith("Emulator:")
+            or not quick._setup_readiness_vars["camera"].get().startswith("Camera:")):
+        raise RuntimeError("Frozen readiness summary did not refresh")
 
     # Calibration uses the already available main camera preview and can be
     # cancelled without opening a device or granting gameplay input.
@@ -162,6 +169,15 @@ def exercise_installed_preview_setup(app, root):
         app.switch_system()
         if app.emu.find_system_core() is not None:
             raise RuntimeError("Limited 3.2 preview unexpectedly has an SNES core")
+        # Refresh the real installed first-run window while a limited
+        # console is selected, without starting any native game device.
+        app.open_getting_started()
+        quick = _active_window(app, "_quick_start_window")
+        _click_button(quick, "Refresh status")
+        if quick._setup_readiness_vars["emulator"].get() != (
+                "Emulator: Not bundled in this 3.2 preview"):
+            raise RuntimeError("Frozen Get started misreported preview core status")
+        _click_button(quick, "Done")
         # Even a cached real executable must never count as the SNES
         # emulator. The diagnostic must resolve this console afresh.
         from anything_plays.ui_setup_diagnostics import _snapshot
