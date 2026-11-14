@@ -74,6 +74,36 @@ def verify(target, installer, source_revision, *, bundle=None):
     if identity != make_identity("v32_preview"):
         raise ValueError("Frozen 3.2 app contains the wrong build identity.")
 
+    # The app knows all 18 console PROFILE names. This private preview is
+    # licensed/staged as an mGBA-only native build, not an 18-core installer.
+    cores = (
+        root / "Contents" / "Resources" / "cores"
+        if target.startswith("macos") else root / "cores"
+    )
+    suffix = {
+        "linux-x64": ".so",
+        "windows-x64": ".dll",
+        "macos-arm64": ".dylib",
+        "macos-x64": ".dylib",
+    }[target]
+    native = list(cores.glob("*_libretro.*"))
+    expected_native = cores / ("mgba_libretro" + suffix)
+    if (len(native) != 1 or native[0] != expected_native
+            or not expected_native.is_file() or expected_native.is_symlink()
+            or expected_native.stat().st_size == 0):
+        raise ValueError("Private QA must contain only the native mGBA core.")
+    if (cores / "dolphin-emu").exists() or (cores / "dolphin-emu").is_symlink():
+        raise ValueError("A full-size Dolphin runtime entered minimal preview.")
+    manifest_path = cores / "CORE_PROVENANCE.json"
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        raise ValueError("Missing minimal-core provenance manifest.")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    records = manifest.get("cores") if isinstance(manifest, dict) else None
+    if (not isinstance(records, list) or len(records) != 1
+            or not isinstance(records[0], dict)
+            or records[0].get("name") != "mgba"):
+        raise ValueError("Preview manifest advertises extra or incorrect cores.")
+
     digest = hashlib.sha256()
     with file.open("rb") as stream:
         for part in iter(lambda: stream.read(4 * 1024 * 1024), b""):
@@ -90,6 +120,7 @@ def verify(target, installer, source_revision, *, bundle=None):
         "size_bytes": file.stat().st_size,
         "settings_namespace": identity["settings_namespace"],
         "bundled_console_profiles": ["gb", "gbc", "gba"],
+        "bundled_core_names": ["mgba"],
         "physical_camera_verified": False,
         "physical_controller_verified": False,
         "all_18_consoles_verified": False,
