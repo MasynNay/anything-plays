@@ -59,7 +59,12 @@ def exercise_installed_preview_setup(app, root):
     # cancelled without opening a device or granting gameplay input.
     app.open_calibration_wizard()
     root.update_idletasks()
-    _active_window(app, "_calibration_window")
+    calibration = _active_window(app, "_calibration_window")
+    _click_button(calibration, "Check stationary jitter")
+    if getattr(app, "_calibration_stability_running", False):
+        raise RuntimeError("Disconnected preview started a jitter measurement")
+    if "Start the webcam" not in app._calibration_stability_status.get():
+        raise RuntimeError("Frozen calibration did not explain missing camera")
     app.close_camera_calibration(restore=True)
     if getattr(app, "_calibration_window", None) is not None:
         raise RuntimeError("Frozen calibration failed to close/rollback")
