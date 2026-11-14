@@ -171,6 +171,46 @@ class CameraDriverReadRecoveryTests(unittest.TestCase):
             [c.args[0] for c in app.root.after.call_args_list], [45],
         )
 
+    def test_camera_change_during_capture_never_autostarts_new_selection(self):
+        app = CameraHarness()
+        old = app.cap
+        app._active_camera_name = "Original USB webcam (device 0)"
+        app.camera_options["Another webcam (device 2)"] = 2
+        app.camera_name.get.return_value = "Another webcam (device 2)"
+        old.read.side_effect = RuntimeError("original camera disconnected")
+        app.tick()
+        self.assertIsNone(app.cap)
+        self.assertIsNone(app._active_camera_name)
+        self.assertFalse(app.armed)
+        self.assertIsNone(app._camera_reconnect_job)
+        self.assertEqual(app._camera_reconnect_attempts, 0)
+        old.release.assert_called_once()
+        self.assertIn("Click Use camera to start", app.status.set.call_args.args[0])
+
+    def test_stale_retry_callback_cannot_erase_new_device_timer(self):
+        app = CameraHarness()
+        app._camera_reconnect_name = "Selected webcam (device 0)"
+        app._camera_reconnect_job = "scheduled-new-webcam-retry"
+        app._retry_camera("Old webcam (device 9)")
+        self.assertEqual(app._camera_reconnect_job, "scheduled-new-webcam-retry")
+        self.assertEqual(app._camera_reconnect_name, "Selected webcam (device 0)")
+
+    def test_changed_dropdown_cancels_old_reconnect_without_opening(self):
+        app = CameraHarness()
+        old = app.cap
+        app.camera_name.get.return_value = "Another webcam (device 2)"
+        app._camera_reconnect_name = "Selected webcam (device 0)"
+        app._camera_reconnect_attempts = 4
+        app._camera_reconnect_job = "timer-already-firing"
+        with patch("anything_plays.ui_camera.cv2.VideoCapture") as open_device:
+            app._retry_camera("Selected webcam (device 0)")
+        open_device.assert_not_called()
+        self.assertIs(app.cap, old)
+        self.assertIsNone(app._camera_reconnect_job)
+        self.assertIsNone(app._camera_reconnect_name)
+        self.assertEqual(app._camera_reconnect_attempts, 0)
+        self.assertIn("selection changed", app.status.set.call_args.args[0])
+
     def test_successful_reconnect_does_not_restore_prior_armed_camera(self):
         app = CameraHarness()
         app.cap.read.side_effect = RuntimeError("USB removed")
@@ -181,6 +221,9 @@ class CameraDriverReadRecoveryTests(unittest.TestCase):
                    return_value=fresh):
             app._retry_camera("Selected webcam (device 0)")
         self.assertIs(app.cap, fresh)
+        self.assertEqual(
+            app._active_camera_name, "Selected webcam (device 0)",
+        )
         self.assertFalse(app.armed)
         self.assertFalse(app.emu.armed)
         self.assertIsNone(app._camera_reconnect_job)

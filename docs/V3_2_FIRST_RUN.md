@@ -62,8 +62,11 @@ the exact enumerated device is still present, even if discovery order changes.
 When that webcam disappears, the interface selects the first available device
 but asks the user to verify it before clicking **Use camera**. Refresh stops
 capture and camera-based gameplay input; it never automatically starts a
-newly discovered or substituted camera. Selection regression tests and real
-source/installed Tk GUI smoke cover this behavior without opening a webcam.
+newly discovered or substituted camera. If a live camera disconnects while
+the dropdown points to a different device, retry is canceled rather than
+silently opening that new camera. Old retry callbacks also cannot clear
+another camera's pending retry token. Selection regression tests and real
+source/installed Tk GUI smoke cover discovery without opening a webcam.
 
 ## Calibration safety and guidance
 

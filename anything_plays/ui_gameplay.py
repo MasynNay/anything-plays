@@ -227,9 +227,20 @@ class GameplayMixin:
                 if ok:
                     self.frame = frame
                 else:
-                    chosen = self.camera_name.get()
+                    # The dropdown may have changed without pressing Use
+                    # camera. Reconnect only the original active device,
+                    # never another one that happened to be selected.
+                    chosen = getattr(self, "_active_camera_name", None)
+                    chosen = chosen or self.camera_name.get()
                     self.stop_camera()
-                    self._queue_camera_retry(chosen)
+                    if chosen == self.camera_name.get():
+                        self._queue_camera_retry(chosen)
+                    else:
+                        self.status.set(
+                            "Camera disconnected after selection changed. "
+                            "Click Use camera to start the chosen device; "
+                            "object controls remain paused."
+                        )
             if self.frame is not None:
                 # A still reference image needs only periodic redraw. Without
                 # a live camera, repeatedly detecting the same pixels wastes
