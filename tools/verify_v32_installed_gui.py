@@ -23,6 +23,10 @@ REQUIRED_TRUE = (
     "actual_tk_mainloop_ran",
     "frozen_binary",
     "v32_frozen_isolation_verified",
+    "v32_setup_windows_verified",
+    "v32_setup_camera_untouched",
+    "v32_setup_gamepad_untouched",
+    "v32_setup_still_disarmed",
 )
 REQUIRED_FALSE = (
     "public_distribution_approved",
@@ -72,6 +76,8 @@ def verify(report, home):
         raise ValueError("Wrong installed application settings identity")
     if data.get("console_profile_count") != 18:
         raise ValueError("Installed GUI did not initialize all 18 console profiles")
+    if data.get("v32_setup_dialog_count") != 5:
+        raise ValueError("Installed GUI did not open and close all five setup dialogs")
     if data.get("initialized_system") not in ("gb", "gbc", "gba"):
         raise ValueError("Installed preview did not start in a bundled console")
 
@@ -101,6 +107,7 @@ def verify(report, home):
         "source_profile_count": 18,
         "stable_settings_unchanged": True,
         "preview_profiles_separate": True,
+        "five_native_setup_windows_verified": True,
         "camera_hardware_tested": False,
         "controller_hardware_tested": False,
         "public_release_approved": False,
