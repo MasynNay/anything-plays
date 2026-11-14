@@ -36,8 +36,6 @@ The current [3.1.1 release](https://github.com/MasynNay/anything-plays/releases/
 
 ## Next: 3.2 — Setup and control experience
 
-**Development underway:** A source-only camera calibration guide now has a standalone development branch, live observational feedback and deterministic metric tests. See [calibration development notes](V3_2_CAMERA_CALIBRATION.md). This is not hardware acceptance or a public 3.2 release.
-
 **Goal:** A first-time user should be able to go from installation to a working camera or keyboard-controlled game without reading technical documentation.
 
 1. **Local camera calibration wizard.** Guide camera selection, color sampling, lighting, live zone feedback and target stability in a small flow, with an expert path still available. Show measurable jitter, lost tracking and zone-trigger events; avoid false accuracy promises. [Feature issue #29](https://github.com/MasynNay/anything-plays/issues/29).
