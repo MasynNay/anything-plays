@@ -45,7 +45,13 @@ The Linux workflow now also extracts the **built Debian package** into a
 disposable directory and launches its actual frozen App under Xvfb with a
 temporary HOME. Its 1.2-second real Tk startup check requires a live root,
 initialized app and event loop; it does not use a webcam, ROM or physical
-controller. The Windows and macOS artifacts still require equivalent installed
+controller. The frozen-startup gate also verifies the exact embedded 3.2
+preview identity, 3.2 settings namespace and camera/controller disarmed state.
+CI seeds a canary in the existing stable 3.1 preferences folder and checks
+that the canary is **byte-for-byte unchanged** after preview startup. It
+checks the preview's saved console-profile file rather than incorrectly
+assuming a new preferences.json must exist after a read-only launch.
+The Windows and macOS artifacts still require equivalent installed
 desktop testing and physical-device validation.
 
 To avoid repeatedly running superseded 3.1 build suites, ten historic
