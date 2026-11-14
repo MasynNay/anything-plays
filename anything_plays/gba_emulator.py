@@ -30,6 +30,7 @@ from anything_plays.libretro_input import (
     BUTTONS, IDS, InputBuffer, TWO_PLAYER_SYSTEMS,
 )
 from anything_plays.libretro_save import SaveRAM, native_core_save_directory
+from anything_plays.preview_storage import is_v32_preview, preview_system_directory
 from anything_plays.libretro_state import LibretroRecoveryState
 from anything_plays.neopop_flash import check_cartridge_flash, InvalidNeoPopFlash
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
@@ -156,9 +157,6 @@ class CoreSession:
         # Every ROM needs a unique user-writable directory or two different
         # games with the same filename can silently overwrite progress.
         # Dolphin keeps its independent user save directory and Sys files.
-        from anything_plays.preview_storage import (
-            is_v32_preview, preview_system_directory,
-        )
         if system in ("gamecube", "ngp", "ngpc"):
             save_folder = native_core_save_directory(self.rom, system)
             save_folder.mkdir(parents=True, exist_ok=True)
