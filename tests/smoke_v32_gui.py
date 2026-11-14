@@ -64,6 +64,15 @@ def smoke():
                         launchpad = app._quick_start_window
                         assert launchpad is not None
                         assert launchpad.winfo_exists()
+                        first_run_canvas = next(
+                            item for item in all_widgets(launchpad)
+                            if isinstance(item, tk.Canvas)
+                        )
+                        app.theme_name.set("Plum Dark")
+                        root.update_idletasks()
+                        assert first_run_canvas.cget("bg") == (
+                            app.THEMES["Plum Dark"][1]
+                        )
                         app.open_getting_started()
                         assert app._quick_start_window is launchpad
 
@@ -84,6 +93,15 @@ def smoke():
                         root.update_idletasks()
                         assert app._controller_guide_window.winfo_exists()
                         assert app._gamepad.api is None
+                        guide_canvas = next(
+                            item for item in all_widgets(app._controller_guide_window)
+                            if isinstance(item, tk.Canvas)
+                        )
+                        app.theme_name.set("Ocean Dark")
+                        root.update_idletasks()
+                        assert guide_canvas.cget("bg") == (
+                            app.THEMES["Ocean Dark"][1]
+                        )
                         app._controller_guide_close()
                         assert app._controller_guide_window is None
 
@@ -93,6 +111,16 @@ def smoke():
                         root.update_idletasks()
                         remap = app._gamepad_setup_window
                         assert remap is not None and remap.winfo_exists()
+                        remap_canvases = [
+                            item for item in all_widgets(remap)
+                            if isinstance(item, tk.Canvas)
+                        ]
+                        assert len(remap_canvases) >= 2
+                        app.theme_name.set("Light")
+                        root.update_idletasks()
+                        assert remap_canvases[-1].cget("bg") == (
+                            app.THEMES["Light"][1]
+                        )
                         assert any(
                             isinstance(item, ttk.LabelFrame)
                             and "QUICK REMAP" in item.cget("text")
@@ -109,6 +137,15 @@ def smoke():
                         root.update_idletasks()
                         checker = app._setup_diagnostics_window
                         assert checker.winfo_exists()
+                        diag_canvas = next(
+                            item for item in all_widgets(checker)
+                            if isinstance(item, tk.Canvas)
+                        )
+                        app.theme_name.set("Ocean Dark")
+                        root.update_idletasks()
+                        assert diag_canvas.cget("bg") == (
+                            app.THEMES["Ocean Dark"][1]
+                        )
                         click_named_button(checker, "Copy safe report")
                         report = json.loads(root.clipboard_get())
                         assert report["console"] == app.system_key.get()
