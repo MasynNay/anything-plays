@@ -58,6 +58,12 @@ class V32CIIsolationTests(unittest.TestCase):
             "xvfb-run -a",
             "--ap-v30-ui-smoke",
             "actual_tk_mainloop_ran",
+            "AP_V32_GUI_SMOKE_CHECK=1",
+            "stable-before.json",
+            "do-not-change",
+            "cmp ",
+            "anything-plays-32-preview/system_profiles.json",
+            'data["v32_frozen_isolation_verified"] is True',
             'data["frozen_binary"] is True',
             'data["public_distribution_approved"] is False',
         ):
