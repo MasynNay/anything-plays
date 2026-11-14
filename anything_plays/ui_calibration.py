@@ -4,6 +4,7 @@ The guide reuses the main preview and its existing color tracking results.
 It does not create another VideoCapture, store any video, or arm game inputs.
 """
 
+import copy
 from collections import deque
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -59,6 +60,7 @@ class CalibrationMixin:
         self.stop_controls()
         self._calibration_original = {
             "system": self.system_key.get(),
+            "profile": copy.deepcopy(self.cfg),
             "rgb": list(self.cfg["rgb"]),
             "tolerance": int(self.tolerance.get()),
             "min_area": int(self.min_area.get()),
@@ -326,26 +328,27 @@ class CalibrationMixin:
             self.stop_controls()
         if restore:
             saved = self._calibration_original
-            self.cfg["rgb"] = list(saved["rgb"])
-            self.tolerance.set(saved["tolerance"])
-            self.min_area.set(saved["min_area"])
-            self.refresh_color()
+            # Do not rebuild the prior profile from the newly selected
+            # combobox or from half-finished calibration spinbox values.
+            self.cfg = copy.deepcopy(saved["profile"])
+            if self.system_key.get() == saved["system"]:
+                self.refresh_settings()
+            else:
+                self.tolerance.set(saved["tolerance"])
+                self.min_area.set(saved["min_area"])
+                self.refresh_color()
             if self.pick_mode is True:
                 self.pick_mode = False
-            # Another control can persist the sampled color while the
-            # guide is open. Restore that original color on disk as well,
-            # even if the user has just switched the console combobox.
             try:
-                self.read_settings()
                 self.profile_store.put(saved["system"], self.cfg)
             except (ValueError, OSError, tk.TclError):
                 self.status.set(
-                    "Calibration canceled, but the restored settings "
-                    "could not be saved. Check your configuration folder."
+                    "Calibration canceled but restored controls could not be saved. "
+                    "Please check your configuration folder."
                 )
             else:
                 self.status.set(
-                    "Calibration canceled. Previous target color restored."
+                    "Calibration canceled. Previous control settings restored."
                 )
         self._calibration_history.clear()
         try:
