@@ -27,6 +27,23 @@ class StubApp(UpdatesMixin):
 
 
 class EmulatorPreviewTests(unittest.TestCase):
+    def test_private_preview_never_auto_checks_online(self):
+        app = StubApp("gba")
+        app._closing = False
+        app._emulator_update_status = Value()
+        app.check_emulator_updates = lambda **kwargs: self.fail(
+            "3.2 preview cannot initiate an automatic online check"
+        )
+        with patch(
+            "anything_plays.build_identity.current_identity",
+            return_value=make_identity("v32_preview"),
+        ):
+            app.schedule_emulator_update_checks()
+        self.assertIn(
+            "Automatic emulator update checks are paused",
+            app._emulator_update_status.get(),
+        )
+
     def test_dolphin_sys_can_only_be_released_with_full_app(self):
         self.assertIn("dolphin", FULL_APP_ONLY)
         remote = [
