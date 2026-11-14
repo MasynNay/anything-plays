@@ -74,8 +74,12 @@ actual native setup windows: Get started, guided camera calibration, the
 controller/keyboard guide, controller button remapping, and setup diagnostics.
 The controller remap window must refuse capture when no controller is
 connected, and the real App must remain disarmed with no active camera/SDL
-device after all dialogs close. This tests packaged Tk resources and
-dialog lifecycle rather than just checking that one main window exists.
+device after all dialogs close. The installed-GUI harness now repeats the
+five native setup-dialog roundtrips **eight times (40 total)** in the
+*same running frozen app*, checking after every round for orphaned Tk
+top-level windows and accumulating theme-observer callbacks. This catches
+reopen/close resource leaks that a single successful first-run dialog would
+miss; it does not simulate a physical webcam or controller.
 The common native verifier seeds fake 3.1
 preferences **and** console profiles and rejects even one altered byte.
 A separate `V32_INSTALLED_GUI_RECEIPT.json` is retained with each installer.
@@ -109,6 +113,18 @@ revalidate parent directories at the actual checkpoint operation rather than
 trusting only construction-time checks. Every desktop OS convention is covered
 by new synthetic native-save tests in CI. These are source-level safeguards;
 a physical device run is still required.
+
+## Camera driver recovery under transient faults
+
+The 3.2 UI scheduler now routes actual native `VideoCapture.read()`
+exceptions, success-with-None or empty frame buffers, and errors while
+mirroring a valid frame into the **same bounded reconnect loop** used for
+ordinary camera hot-unplug. It clears stale previews and camera-held
+gameplay input first, retains the selected device, and does **not**
+silently arm controls after reconnect. A healthy frame still follows the
+normal low-overhead rendering path. The source suite uses injected mock
+capture failures and synthetic pixels, not a real camera. USB permissions,
+driver-specific failures, and actual hot-unplug remain field-test gates.
 
 ## Save recovery and long-session regression scope
 
