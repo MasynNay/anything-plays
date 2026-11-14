@@ -71,6 +71,30 @@ class V32CIIsolationTests(unittest.TestCase):
             with self.subTest(expected=expected):
                 self.assertIn(expected, preview)
 
+    def test_all_four_native_preview_installers_launch_the_frozen_gui(self):
+        preview = (
+            ROOT / "v32-private-preview-installers.yml"
+        ).read_text("utf-8")
+        for required in (
+            "Windows real Inno install and frozen 3.2 GUI startup",
+            "macOS genuine mounted preview DMG frozen GUI startup",
+            "tools.assemble_v31_full_windows import unpack",
+            "Start-Process -FilePath $exe",
+            "hdiutil attach -readonly -nobrowse",
+            "AnythingPlays32Preview.app",
+            "--ap-v30-ui-smoke",
+            "AP_V32_GUI_SMOKE_CHECK",
+            "tools.verify_v32_installed_gui seed",
+            "tools.verify_v32_installed_gui verify",
+            "test_v32_installed_gui.py",
+            "release/V32_INSTALLED_GUI_RECEIPT.json",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, preview)
+        # Require a single final acceptance receipt per platform, never
+        # simply call the bundler's output proof a frozen GUI launch.
+        self.assertEqual(preview.count("tools.verify_v32_installed_gui verify"), 3)
+
     def test_current_source_and_private_installer_checks_remain_enabled(self):
         source = (ROOT / "ci.yml").read_text("utf-8")
         self.assertIn("python -m unittest discover -s tests -v", source)
