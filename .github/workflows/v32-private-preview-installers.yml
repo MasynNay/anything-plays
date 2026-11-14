@@ -474,6 +474,15 @@ jobs:
           assert d["ready_for_release"] is False
           print("Original simple console AV program result recorded independently of GX 3D; no speaker/hardware claim")
           PY
+          # Gate PRIVATE Linux original-source GameCube native A/V evidence.
+          # Source-built 3D/GX+ASND and independent console+ASND programs
+          # must BOTH produce authentic in-app video and nonzero PCM callbacks.
+          # A missing/failed experiment must fail CI, not silently become a
+          # successful installer run. This is NOT a real speaker/game pass.
+          .build-venv/bin/python -m tools.v32_gamecube_audio_gate \
+            --gx-report "$FULL/V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json" \
+            --console-report "$FULL/V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA"
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
