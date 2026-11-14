@@ -7,6 +7,7 @@ Stable-version paths must remain byte-for-byte compatible.
 
 import ctypes as C
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -157,14 +158,19 @@ class PreviewStorageTests(unittest.TestCase):
                         stable = CoreSession(
                             SimpleNamespace(volume=0.25), "gba", rom, None,
                         )
-                        old = home / ".config" / "anything-plays"
+                        legacy_save = home / ".config" / "anything-plays"
+                        legacy_system = (
+                            home / "Library" / "Application Support"
+                            / "AnythingPlays"
+                            if sys.platform == "darwin" else legacy_save
+                        )
                         self.assertEqual(
                             Path(os.fsdecode(C.string_at(stable._system_dir_buffer))),
-                            old,
+                            legacy_system,
                         )
                         self.assertEqual(
                             Path(os.fsdecode(C.string_at(stable._save_dir_buffer))),
-                            old,
+                            legacy_save,
                         )
 
     def test_stable_save_semantics_stay_unchanged(self):
