@@ -159,6 +159,9 @@ class CameraMixin:
 
     def stop_camera(self, *, keep_reconnect=False):
         """Release camera, stale frames, and pending reconnect when requested."""
+        camera_changed = getattr(self, "calibration_camera_changed", None)
+        if callable(camera_changed):
+            camera_changed()
         if not keep_reconnect:
             self.cancel_camera_reconnect()
         self.stop_controls()
