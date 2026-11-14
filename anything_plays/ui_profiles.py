@@ -196,7 +196,12 @@ class ProfilesMixin:
         self.cfg['zone_label_position'] = self.zone_label_position.get()
         self.cfg['shuffle_enabled'] = bool(self.shuffle_enabled.get())
         self.cfg['zone_image'] = self.zone_image_path.get()
-        self.cfg['mapping'] = {name: var.get() for name, var in self.mapping_vars.items()}
+        # The UI has fields for all console families; a portable profile
+        # must contain mappings for the selected console only.
+        allowed = BUTTONS_BY_SYSTEM[self.system_key.get()]
+        self.cfg['mapping'] = {
+            name: self.mapping_vars[name].get() for name in allowed
+        }
 
     def save_profile(self):
         """Export only portable control settings, never paths or ROM metadata."""
