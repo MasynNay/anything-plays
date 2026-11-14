@@ -165,8 +165,35 @@ def exercise_installed_preview_setup(app, root):
     # ROM, launching a core or telling users the install is corrupted.
     old_system = app.system_key.get()
     try:
-        app.system_key.set("snes")
-        app.switch_system()
+        # Source and frozen UI must agree: changing console releases even
+        # an old valid cached game frame, Game-only output, and Stream Mode
+        # pixel snapshots. Only synthetic pixels are used.
+        import numpy as np
+        from unittest.mock import Mock
+        with app.emu.lock:
+            app.emu.frame = np.zeros((8, 8, 3), dtype=np.uint8)
+            old_serial = app.emu.frame_serial
+        app.game_photo = object()
+        app._last_game_render = ("previous game",)
+        app._stream_game_frame = object()
+        app._stream_game_serial = old_serial
+        app._stream_last_render = ("previous stream",)
+        app.game_bezel.set_active(True)
+        with patch.object(app, "_game_only_canvas", Mock()) as other_canvas:
+            app.system_key.set("snes")
+            app.switch_system()
+            other_canvas.delete.assert_called_with("all")
+        with app.emu.lock:
+            if app.emu.frame is not None or app.emu.frame_serial <= old_serial:
+                raise RuntimeError("Frozen console switch retained old game frame")
+        if (app.game_photo is not None
+                or app._last_game_render is not None
+                or app._stream_game_frame is not None
+                or app._stream_game_serial is not None
+                or app._stream_last_render is not None):
+            raise RuntimeError("Frozen console switch retained cached game video")
+        if app.game_bezel.active:
+            raise RuntimeError("Frozen console switch retained active game bezel")
         if app.emu.find_system_core() is not None:
             raise RuntimeError("Limited 3.2 preview unexpectedly has an SNES core")
         # Refresh the real installed first-run window while a limited

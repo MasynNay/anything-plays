@@ -156,6 +156,17 @@ device or network connection is opened. Diagnostic reports remain strictly
 allowlisted with no native file paths. Unit tests plus source and installed
 Tk tests cover stale core references and truthful limited-preview status.
 
+## Game video cleanup on console switching
+
+Switching console profiles now stops the previous game, deactivates manual
+controls and explicitly clears the old native video buffer under its lock.
+It also invalidates cached Tk game frames, Game-only view, Stream Mode game
+snapshots and the game bezel before selecting the next emulator. This avoids
+a prior console's image appearing after a new system has been chosen, even
+if no new ROM is started. Source Tk and all four native installed-GUI checks
+seed synthetic old frames to verify cleanup; no game ROM or native core is
+required for these tests.
+
 ## Release acceptance remaining
 
 - Full source and four-platform synthetic UI/soak tests on the integrated

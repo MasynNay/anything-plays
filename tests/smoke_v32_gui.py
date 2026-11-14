@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 import tempfile
 import tkinter as tk
+from unittest.mock import Mock
+import numpy as np
 from tkinter import ttk
 from unittest.mock import patch
 
@@ -203,12 +205,35 @@ def smoke():
                         click_named_button(checker, "Done")
                         assert app._setup_diagnostics_window is None
 
-                        # Even with the full real Tk interface open, an
-                        # unavailable 3.2 console must not call any native
-                        # emulator or mistake a limited preview for damage.
-                        previous_console = app.system_key.get()
-                        app.system_key.set("snes")
-                        app.switch_system()
+                        # A console change must fully clear the previous
+                        # session's last video frame, cached Tcl image,
+                        # Game-only output, Stream Mode snapshot and bezel.
+                        # Seed synthetic pixels without opening a native core.
+                        with app.emu.lock:
+                            app.emu.frame = np.zeros((8, 8, 3), dtype=np.uint8)
+                            old_serial = app.emu.frame_serial
+                        app.game_photo = object()
+                        app._last_game_render = ("obsolete game",)
+                        app._stream_game_frame = object()
+                        app._stream_game_serial = old_serial
+                        app._stream_last_render = ("obsolete stream",)
+                        app.game_bezel.set_active(True)
+                        with patch.object(
+                            app, "_game_only_canvas", Mock(),
+                        ) as other_canvas:
+                            previous_console = app.system_key.get()
+                            app.system_key.set("snes")
+                            app.switch_system()
+                            other_canvas.delete.assert_called_with("all")
+                        with app.emu.lock:
+                            assert app.emu.frame is None
+                            assert app.emu.frame_serial > old_serial
+                        assert app.game_photo is None
+                        assert app._last_game_render is None
+                        assert app._stream_game_frame is None
+                        assert app._stream_game_serial is None
+                        assert app._stream_last_render is None
+                        assert not app.game_bezel.active
                         try:
                             # Source Tk setup reports the selected console,
                             # not an unrelated cached native binary path.
