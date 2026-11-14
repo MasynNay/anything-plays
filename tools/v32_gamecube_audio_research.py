@@ -28,6 +28,13 @@ from tools.v32_extended_native_runtime import check_sources
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "tools/gamecube-3d-homebrew"
 DOL_NAME = "anythingplays-gc-gx-gamecube.dol"
+FIXTURE_PROGRAMS = {
+    "gx3d": (SOURCE, DOL_NAME),
+    "console_av": (
+        ROOT / "tools/gamecube-av-homebrew",
+        "anythingplays-gc-av-gamecube.dol",
+    ),
+}
 STATUS = "PRIVATE_V32_ORIGINAL_GC_AUDIO_AND_GPU_RESEARCH_NOT_RELEASE"
 BUILD_LIMIT = 300
 PROBE_LIMIT = 140
@@ -41,25 +48,34 @@ def digest(file):
     return h.hexdigest()
 
 
-def check_source_program():
-    """Require both original sound & real GX source before compiling."""
-    main = SOURCE/"source/main.c"
-    make = SOURCE/"Makefile"
+def check_source_program(kind="gx3d"):
+    """Verify source-authored ASND tone and video before any compiler run."""
+    if kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Unrecognized owned GameCube audio program")
+    folder, _ = FIXTURE_PROGRAMS[kind]
+    main = folder/"source/main.c"
+    make = folder/"Makefile"
     if any(not f.is_file() or f.is_symlink() for f in (main, make)):
         raise ValueError("Original GameCube AV source missing or symlinked")
     src = main.read_text("utf-8")
     options = make.read_text("utf-8")
-    for needle in ("#include <asndlib.h>", "ASND_Init();",
-                   "ASND_SetInfiniteVoice(", "ASND_Pause(0);",
-                   "DCFlushRange(audio_tone", "GX_Begin(GX_QUADS"):
+    essentials = ("#include <asndlib.h>", "ASND_Init();",
+                  "ASND_SetInfiniteVoice(", "ASND_Pause(0);")
+    video_and_tone = (
+        ("DCFlushRange(audio_tone", "GX_Begin(GX_QUADS")
+        if kind == "gx3d"
+        else ("DCFlushRange(tone", "console_init(", "VIDEO_WaitVSync()")
+    )
+    for needle in essentials + video_and_tone:
         if needle not in src:
-            raise ValueError("Original GX/ASND audio test code missing: " + needle)
+            raise ValueError("Original GameCube source AV code missing: " + needle)
     if "-lasnd" not in options:
         raise ValueError("Original GX/ASND linker rule missing")
     return {"main_c_sha256": digest(main), "makefile_sha256": digest(make)}
 
 
-def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=None):
+def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
+                      reason=None, *, source_kind="gx3d"):
     """Retain only bounded numeric native A/V facts, no raw subprocess data."""
     raw = raw if isinstance(raw, dict) else {}
     details = raw.get("details") if isinstance(raw.get("details"), dict) else {}
@@ -102,11 +118,31 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=Non
             reason_code = "native_gpu_video_conditions_not_met"
         else:
             reason_code = "nonzero_pcm_conditions_not_met"
+    if source_kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Original GameCube AV fixture kind not recognized")
+    # Only emit a strict allowlist of exception CLASS names, never text
+    # containing a path, device label, game title or native backtrace.
+    exception = details.get("error")
+    if isinstance(exception, str):
+        exception = exception.partition(":")[0].strip()
+        if exception not in {
+            "RuntimeError", "OSError", "ValueError", "MemoryError",
+            "FileNotFoundError", "SystemError", "TypeError", "AssertionError",
+        }:
+            exception = "other_native_exception"
+    else:
+        exception = None
     result = {
         "schema_version": 1,
         "status": STATUS,
         "source_revision": source_sha,
-        "fixture": "original_source_generated_gx_3d_and_asnd_stereo_pcm",
+        "fixture": (
+            "original_source_generated_gx_3d_and_asnd_stereo_pcm"
+            if source_kind == "gx3d"
+            else "original_source_generated_console_video_and_asnd_stereo_pcm"
+        ),
+        "source_program_kind": source_kind,
+        "native_child_exception_class": exception,
         "original_program_compiled_in_private_ci": built,
         "program_sha256": dol_digest if built else None,
         "parent_report_received": bool(raw),
@@ -148,7 +184,7 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built, reason=Non
     return result
 
 
-def execute(bundle, receipt, sha, report):
+def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
     report = Path(report)
     if report.exists() or report.is_symlink():
         raise ValueError("Cannot overwrite or follow a research report")
@@ -156,16 +192,19 @@ def execute(bundle, receipt, sha, report):
         raise ValueError("Exact 3.2 Git SHA required")
     # No Docker, compiled ROM, or native library is opened before the
     # original 11-core preview identity + native source receipt is checked.
+    if source_kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Original audio research fixture not recognized")
     core = check_sources(bundle, receipt, sha)["gamecube"]
-    source_digests = check_source_program()
+    source_folder, dol_name = FIXTURE_PROGRAMS[source_kind]
+    source_digests = check_source_program(source_kind)
     with tempfile.TemporaryDirectory(prefix="ap32-gc-audio-research-") as td:
         tmp = Path(td)
         # Compile ONLY copies of the repository-owned original source.
         project = tmp/"project"
-        shutil.copytree(SOURCE, project, ignore=shutil.ignore_patterns(
+        shutil.copytree(source_folder, project, ignore=shutil.ignore_patterns(
             "build_*", "*.dol", "*.elf", "*.map"
         ), symlinks=False)
-        dol = project/DOL_NAME
+        dol = project/dol_name
         result = {}
         report_path = tmp/"probe.json"
         try:
@@ -183,10 +222,12 @@ def execute(bundle, receipt, sha, report):
             )
             if build.returncode or not dol.is_file() or dol.is_symlink():
                 result = evaluate_evidence({}, -1, None, sha, False,
-                                           "original_source_compiler_unavailable")
+                                           "original_source_compiler_unavailable",
+                                           source_kind=source_kind)
             elif not 100 <= dol.stat().st_size <= 4 * 1024 * 1024:
                 result = evaluate_evidence({}, -1, None, sha, False,
-                                           "original_source_binary_invalid")
+                                           "original_source_binary_invalid",
+                                           source_kind=source_kind)
             else:
                 sh = digest(dol)
                 env = dict(os.environ)
@@ -212,13 +253,16 @@ def execute(bundle, receipt, sha, report):
                     raw = {}
                 result = evaluate_evidence(
                     raw, executed.returncode, sh, sha, True,
+                    source_kind=source_kind,
                 )
         except FileNotFoundError:
             result = evaluate_evidence({}, -1, None, sha, False,
-                                       "source_compiler_not_installed")
+                                       "source_compiler_not_installed",
+                                       source_kind=source_kind)
         except subprocess.TimeoutExpired:
             result = evaluate_evidence({}, -1, None, sha, False,
-                                       "research_compile_or_native_timeout")
+                                       "research_compile_or_native_timeout",
+                                       source_kind=source_kind)
     result["original_program_source_sha256"] = source_digests
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2, sort_keys=True)+"\n", "utf-8")
@@ -241,9 +285,12 @@ def main():
     p.add_argument("--bundle", type=Path, required=True)
     p.add_argument("--source-receipt", type=Path, required=True)
     p.add_argument("--source-sha", required=True)
+    p.add_argument("--source-kind", choices=tuple(FIXTURE_PROGRAMS),
+                   default="gx3d")
     p.add_argument("--output", type=Path, required=True)
     a = p.parse_args()
-    execute(a.bundle, a.source_receipt, a.source_sha, a.output)
+    execute(a.bundle, a.source_receipt, a.source_sha, a.output,
+            source_kind=a.source_kind)
 
 
 if __name__ == "__main__":

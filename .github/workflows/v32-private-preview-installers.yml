@@ -18,6 +18,7 @@ on:
       - 'tools/v32_acceptance_matrix.py'
       - 'tools/v32_gamecube_audio_research.py'
       - 'tools/gamecube-3d-homebrew/**'
+      - 'tools/gamecube-av-homebrew/**'
       - 'tests/test_v32_gamecube_*.py'
       - 'tests/test_v32_acceptance_matrix.py'
       - 'tools/probe_gamecube_app.py'
@@ -442,6 +443,30 @@ jobs:
           assert result["public_release_approved"] is False
           print("Original-source 3.2 GameCube audio research captured; no real speaker or retail compatibility claim")
           PY
+          # Independent simpler ORIGINAL GameCube video+tone fixture:
+          # this emits console text and real ASND audio but does not use
+          # the GX 3D rendering path. A successful result would isolate
+          # the 3D startup issue; silence/crash remains unverified.
+          # Both original test DOLs stay in isolated temporary folders
+          # and are NEVER included in any uploaded user-facing artifact.
+          timeout 520 .build-venv/bin/python -m tools.v32_gamecube_audio_research \
+            --source-kind console_av \
+            --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
+            --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output "$FULL/V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json"
+          python - "$FULL/V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          d = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+          assert d["source_revision"] == os.environ["AP_V32_QA_SOURCE_SHA"]
+          assert d["source_program_kind"] == "console_av"
+          assert type(d["core_generated_nonzero_pcm_verified"]) is bool
+          assert d["speaker_hardware_tested"] is False
+          assert d["public_release_approved"] is False
+          assert d["ready_for_release"] is False
+          print("Original simple console AV program result recorded independently of GX 3D; no speaker/hardware claim")
+          PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
@@ -455,6 +480,7 @@ jobs:
             release/v32-full-linux/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json
             release/v32-full-linux/V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json
             release/v32-full-linux/V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json
+            release/v32-full-linux/V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

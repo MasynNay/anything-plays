@@ -35,6 +35,41 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
         self.assertTrue(all(len(s) == 64 for s in contents.values()))
         self.assertEqual(qa.DOL_NAME, "anythingplays-gc-gx-gamecube.dol")
 
+    def test_original_simple_console_av_generator_has_stereo_source(self):
+        file_hashes = qa.check_source_program("console_av")
+        self.assertEqual(set(file_hashes), {"main_c_sha256", "makefile_sha256"})
+        self.assertEqual(
+            qa.FIXTURE_PROGRAMS["console_av"][1],
+            "anythingplays-gc-av-gamecube.dol",
+        )
+        with self.assertRaisesRegex(ValueError, "Unrecognized"):
+            qa.check_source_program("commercial_game")
+
+    def test_simple_console_av_probe_remains_independent_of_gx3d(self):
+        report = qa.evaluate_evidence(
+            fixture(), 0, "a"*64, "b"*40, True,
+            source_kind="console_av",
+        )
+        self.assertEqual(report["source_program_kind"], "console_av")
+        self.assertIn("console_video", report["fixture"])
+        self.assertTrue(report["core_generated_nonzero_pcm_verified"])
+        self.assertFalse(report["speaker_hardware_tested"])
+        with self.assertRaisesRegex(ValueError, "kind"):
+            qa.evaluate_evidence({}, -1, None, "b"*40, False,
+                                 source_kind="unknown")
+
+    def test_failure_carries_only_exception_class_never_error_paths(self):
+        raw = fixture()
+        raw["details"]["error"] = "RuntimeError: /home/secret/roms/child.dol"
+        report = qa.evaluate_evidence(raw, 0, "a"*64, "b"*40, True)
+        self.assertEqual(report["native_child_exception_class"], "RuntimeError")
+        self.assertNotIn("/home/secret", json.dumps(report))
+        raw["details"]["error"] = "/Users/secret: contains private text"
+        report = qa.evaluate_evidence(raw, -1, "a"*64, "b"*40, True)
+        self.assertEqual(report["native_child_exception_class"],
+                         "other_native_exception")
+        self.assertNotIn("/Users/secret", json.dumps(report))
+
     def test_actual_native_pcm_only_counts_when_source_digest_and_child_valid(self):
         full = qa.evaluate_evidence(fixture(), 0, "a"*64, "b"*40, True)
         self.assertTrue(full["native_gpu_homebrew_rendering_verified"])

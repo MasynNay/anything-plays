@@ -467,3 +467,22 @@ alone cannot imply stereo sound works. A sanitized diagnostic now reports
 whether a parent or child native result exists, bounded native exit code,
 timeout and a narrow failure-stage identifier, without leaking raw logs,
 fixture paths, devices or user data. Actual sound output remains open.
+
+
+### Independent simple GameCube console and DSP experiment
+
+The first full-native original 3D GX/ASND homebrew program compiled from
+source but its native child returned exit code **1** with no verified video
+or audio. That alone does **not** prove Dolphin can never output sound.
+A second independent original GameCube program from this repository now
+tests only libogc **console text video + an ASND-generated stereo tone**,
+without GX's 3D scene. The same offline devkitPPC build method, private
+source SHA, real native Dolphin core, GPU frontend and strict callback
+verification apply. Both programs have separate redacted QA receipts
+(`V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json` and
+`V32_ORIGINAL_GAMECUBE_CONSOLE_AV_QA.json`), so one failure can never be
+misrepresented as the other's success. A bounded native error *class*
+can be reported, never its possibly sensitive exception text or path.
+Both compiled DOLs are deleted with their disposable workspaces; neither
+is uploaded or shipped. Even if actual nonzero PCM is produced, physical
+speaker playback and real commercial-game audio remain unverified.
