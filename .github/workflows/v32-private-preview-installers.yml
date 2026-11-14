@@ -349,17 +349,17 @@ jobs:
           $full = Join-Path $PWD 'release/v32-full-windows'
           $installer = Join-Path $full 'AnythingPlaysSetup-3.2.0-fullqa1.exe'
           $qa = Join-Path $env:RUNNER_TEMP "AP32-Full-Windows-$env:GITHUB_RUN_ID"
-          $home = Join-Path $qa 'home'
+          $qaHome = Join-Path $qa 'home'
           $installed = Join-Path $qa 'installed'
-          New-Item -ItemType Directory -Force -Path $home | Out-Null
+          New-Item -ItemType Directory -Force -Path $qaHome | Out-Null
           python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $installed
           if ($LASTEXITCODE -ne 0) { throw 'Full QA Inno installation failed' }
           $exe = Join-Path $installed 'AnythingPlays.exe'
           if (-not (Test-Path $exe)) { throw 'Full-core 3.2 QA executable missing' }
-          $env:HOME = $home
-          $env:USERPROFILE = $home
-          $env:APPDATA = Join-Path $home 'AppData/Roaming'
-          $env:LOCALAPPDATA = Join-Path $home 'AppData/Local'
+          $env:HOME = $qaHome
+          $env:USERPROFILE = $qaHome
+          $env:APPDATA = Join-Path $qaHome 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $qaHome 'AppData/Local'
           $env:AP_V30_UI_SMOKE_CHECK = '1'
           $env:AP_V32_GUI_SMOKE_CHECK = '1'
           $env:AP_V32_SETUP_SMOKE_CHECK = '0'
