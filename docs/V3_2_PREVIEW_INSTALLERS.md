@@ -99,8 +99,16 @@ their own GitHub Actions success before being treated as verified.
 
 Private preview paths also reject symlink redirection back into stable data
 and hardlinked SRAM inputs, so a seemingly distinct directory cannot be used
-to import or corrupt a stable game's save during QA. These are source-level
-safeguards; a physical device run is still required.
+to import or corrupt a stable game's save during QA. This check now extends
+**below the private save root** into Neo Geo Pocket cartridge-flash directories,
+GameCube memory-card folders, and nested native resume checkpoints. A
+symlinked `native-core`, `neo-geo-pocket`, `gamecube`, or `resume` directory
+cannot silently route private preview writes to public stable progress. Resume
+states also reject hardlinks to other files before reading or writing, and
+revalidate parent directories at the actual checkpoint operation rather than
+trusting only construction-time checks. Every desktop OS convention is covered
+by new synthetic native-save tests in CI. These are source-level safeguards;
+a physical device run is still required.
 
 ## Save recovery and long-session regression scope
 
