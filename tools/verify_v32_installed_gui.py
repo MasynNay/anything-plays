@@ -27,6 +27,8 @@ REQUIRED_TRUE = (
     "v32_setup_camera_untouched",
     "v32_setup_gamepad_untouched",
     "v32_setup_still_disarmed",
+    "v32_setup_no_orphan_windows",
+    "v32_setup_theme_traces_stable",
 )
 REQUIRED_FALSE = (
     "public_distribution_approved",
@@ -76,8 +78,10 @@ def verify(report, home):
         raise ValueError("Wrong installed application settings identity")
     if data.get("console_profile_count") != 18:
         raise ValueError("Installed GUI did not initialize all 18 console profiles")
-    if data.get("v32_setup_dialog_count") != 5:
-        raise ValueError("Installed GUI did not open and close all five setup dialogs")
+    if data.get("v32_setup_repeat_cycles") != 8:
+        raise ValueError("Installed GUI did not repeat the setup lifecycle")
+    if data.get("v32_setup_dialog_count") != 40:
+        raise ValueError("Installed GUI did not complete all forty setup roundtrips")
     if data.get("initialized_system") not in ("gb", "gbc", "gba"):
         raise ValueError("Installed preview did not start in a bundled console")
 
@@ -108,6 +112,8 @@ def verify(report, home):
         "stable_settings_unchanged": True,
         "preview_profiles_separate": True,
         "five_native_setup_windows_verified": True,
+        "repeated_native_setup_cycles_verified": 8,
+        "native_dialog_roundtrips_verified": 40,
         "camera_hardware_tested": False,
         "controller_hardware_tested": False,
         "public_release_approved": False,
