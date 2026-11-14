@@ -5,7 +5,8 @@ Never retains images, frame buffers, object contours or camera identifiers.
 """
 
 from collections import Counter
-from math import hypot
+from math import ceil, hypot, isfinite
+from statistics import median
 
 
 def calibration_summary(samples):
@@ -77,3 +78,48 @@ def calibration_advice(report, *, sampled):
         "Target detections and multiple zones were observed. Review the "
         "preview and save when the behavior matches what you expect."
     )
+
+
+def stationary_tracking_summary(centers):
+    """Measure observed position variation during an explicit still-target hold.
+
+    A moving object naturally produces large deviations, so this is NOT an
+    accuracy estimate and must be labeled as a user-requested stationary test.
+    Never retain frame pixels, color samples, device IDs or personal paths.
+    The GUI limits the input to 45 recently observed centers.
+    """
+    positions = []
+    frames = 0
+    for center in centers:
+        frames += 1
+        if center is None:
+            continue
+        try:
+            x, y = center
+            x, y = float(x), float(y)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if isfinite(x) and isfinite(y):
+            positions.append((x, y))
+    seen = len(positions)
+    result = {
+        "frames": frames,
+        "seen": seen,
+        "lost": frames - seen,
+        "median_deviation_px": None,
+        "p95_deviation_px": None,
+    }
+    # Fewer observations cannot establish meaningful frame-to-frame
+    # variation, and a single match must never appear as zero jitter.
+    if seen < 8:
+        return result
+    center_x = median(x for x, _ in positions)
+    center_y = median(y for _, y in positions)
+    distances = sorted(
+        hypot(x - center_x, y - center_y) for x, y in positions
+    )
+    result["median_deviation_px"] = round(median(distances), 1)
+    result["p95_deviation_px"] = round(
+        distances[max(0, ceil(0.95 * seen) - 1)], 1,
+    )
+    return result
