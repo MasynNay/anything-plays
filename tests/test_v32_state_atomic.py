@@ -75,7 +75,11 @@ class V32NativeRecoveryAtomicTests(unittest.TestCase):
         def concurrent_replace(source, destination):
             with lock:
                 seen.append((Path(source), Path(destination)))
-            gate.wait(timeout=10)
+                first_attempt = len(seen) <= 2
+            if first_attempt:
+                # Retried Windows sharing denials must not wait for a
+                # nonexistent third writer at the two-party barrier.
+                gate.wait(timeout=10)
             return original_replace(source, destination)
 
         with patch("anything_plays.libretro_state.os.replace",
@@ -86,7 +90,7 @@ class V32NativeRecoveryAtomicTests(unittest.TestCase):
                 self.assertTrue(a.result(timeout=20))
                 self.assertTrue(b.result(timeout=20))
 
-        self.assertEqual(len(seen), 2)
+        self.assertGreaterEqual(len(seen), 2)
         self.assertEqual(len({source for source, _ in seen}), 2)
         self.assertTrue(all(target == one.path for _, target in seen))
         self.assertTrue(all(
@@ -116,6 +120,33 @@ class V32NativeRecoveryAtomicTests(unittest.TestCase):
         restored, value = self.checkpoint(b"0000")
         self.assertTrue(restored.restore())
         self.assertEqual(value["bytes"], b"GOOD")
+
+    def test_windows_transient_sharing_denial_retries_same_complete_packet(self):
+        if os.name != "nt":
+            self.skipTest("Windows-native sharing errors are host-specific")
+        checkpoint, _ = self.checkpoint(b"SAFE")
+        original_replace = os.replace
+        attempts = [0]
+
+        def temporarily_denied(source, destination):
+            attempts[0] += 1
+            if attempts[0] == 1:
+                busy = PermissionError(13, "temporary checkpoint sharing lock")
+                busy.winerror = 32
+                raise busy
+            return original_replace(source, destination)
+
+        with patch("anything_plays.libretro_state.os.replace",
+                   side_effect=temporarily_denied), patch(
+                       "anything_plays.libretro_state.time.sleep",
+                   ) as backoff:
+            self.assertTrue(checkpoint.persist())
+        self.assertEqual(attempts[0], 2)
+        backoff.assert_called_once()
+        self.assertEqual(list(checkpoint.path.parent.glob("*.tmp")), [])
+        restored, state = self.checkpoint(b"0000")
+        self.assertTrue(restored.restore())
+        self.assertEqual(state["bytes"], b"SAFE")
 
     def test_old_fixed_temp_symlink_is_not_touched(self):
         checkpoint, _ = self.checkpoint(b"SAFE")
