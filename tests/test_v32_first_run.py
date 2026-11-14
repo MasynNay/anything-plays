@@ -41,6 +41,14 @@ class FirstRunNavigationTests(unittest.TestCase):
         self.assertIn("open_setup_diagnostics", source)
         self.assertIn("Open a game", source)
 
+    def test_preview_clearly_discloses_minimal_bundled_core_support(self):
+        guide = (ROOT / "anything_plays/ui_quickstart.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('current_identity()["channel"] == "v32_preview"', guide)
+        self.assertIn("Only GB, GBC and GBA are bundled", guide)
+        self.assertIn("settings stay separate", guide)
+
     def test_main_app_stays_inside_source_boundary(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
         self.assertLess(len(source.splitlines()), 250)
