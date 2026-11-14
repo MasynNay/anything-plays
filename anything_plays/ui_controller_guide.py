@@ -94,11 +94,15 @@ def show_controller_guide(app):
     ).grid(row=2, column=0, sticky="ew", padx=(0, 5))
 
     ttk.Label(
+        wrapper, textvariable=app.gamepad_diagnostics_status,
+        style="Helper.TLabel", wraplength=515, justify="left",
+    ).pack(anchor="w", pady=(9, 0))
+    ttk.Label(
         wrapper,
         text="Input detection is not certification of a physical controller "
              "model. No game controls are changed until you choose a mapping.",
         style="Helper.TLabel", wraplength=515, justify="left",
-    ).pack(anchor="w", pady=(12, 0))
+    ).pack(anchor="w", pady=(7, 0))
 
     def close():
         job, app._controller_guide_job = (
