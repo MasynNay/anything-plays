@@ -43,6 +43,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Headless GUI smoke test
         run: PYTHONPATH=. xvfb-run -a python tests/smoke_gui.py
+      - name: 3.2 integrated setup GUI smoke (no devices or ROMs)
+        run: PYTHONPATH=. xvfb-run -a python tests/smoke_v32_gui.py
 
   native-mgba-compatibility:
     runs-on: ubuntu-24.04
