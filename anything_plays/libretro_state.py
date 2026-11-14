@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import tempfile
 
 from anything_plays.libretro_save import _fallback_path, _user_save_directory
 
@@ -153,19 +154,29 @@ class LibretroRecoveryState:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.is_symlink():
             raise ValueError("Refusing to replace symlinked native resume")
-        temp = self.path.with_suffix(".apstate.tmp")
+        # Never use a fixed .apstate.tmp name. Two independent instances
+        # saving the same game could truncate one another's in-flight state
+        # or unlink a buffer the other is about to publish. A unique sibling
+        # on the same filesystem gives every writer its own complete packet.
+        temporary = None
         try:
-            if temp.is_symlink():
-                raise ValueError("Refusing symlinked temporary resume file")
-            with temp.open("wb") as stream:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=self.path.name + ".",
+                suffix=".tmp",
+                dir=self.path.parent,
+                delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
                 stream.write(packet)
                 stream.flush()
                 os.fsync(stream.fileno())
-            temp.replace(self.path)
+            os.replace(temporary, self.path)
         finally:
-            try:
-                temp.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
         self._last_digest = digest
         return True
