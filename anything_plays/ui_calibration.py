@@ -58,6 +58,7 @@ class CalibrationMixin:
 
         self.stop_controls()
         self._calibration_original = {
+            "system": self.system_key.get(),
             "rgb": list(self.cfg["rgb"]),
             "tolerance": int(self.tolerance.get()),
             "min_area": int(self.min_area.get()),
@@ -274,6 +275,13 @@ class CalibrationMixin:
         )
 
     def _calibration_finish(self):
+        if self.cap is None:
+            messagebox.showinfo(
+                "Camera calibration",
+                "Your camera is disconnected. Reconnect it and check "
+                "tracking before saving.", parent=self._calibration_window,
+            )
+            return
         try:
             self.persist_system_profile()
         except (ValueError, OSError, tk.TclError) as exc:
@@ -300,6 +308,10 @@ class CalibrationMixin:
                 self.root.after_cancel(job)
             except tk.TclError:
                 pass
+        # The main UI can independently arm buttons while the non-modal
+        # guide is visible. A close must always leave gameplay disarmed.
+        if not getattr(self, "_closing", False):
+            self.stop_controls()
         if restore:
             saved = self._calibration_original
             self.cfg["rgb"] = list(saved["rgb"])
@@ -308,7 +320,21 @@ class CalibrationMixin:
             self.refresh_color()
             if self.pick_mode is True:
                 self.pick_mode = False
-            self.status.set("Calibration canceled. Previous target color restored.")
+            # Another control can persist the sampled color while the
+            # guide is open. Restore that original color on disk as well,
+            # even if the user has just switched the console combobox.
+            try:
+                self.read_settings()
+                self.profile_store.put(saved["system"], self.cfg)
+            except (ValueError, OSError, tk.TclError):
+                self.status.set(
+                    "Calibration canceled, but the restored settings "
+                    "could not be saved. Check your configuration folder."
+                )
+            else:
+                self.status.set(
+                    "Calibration canceled. Previous target color restored."
+                )
         self._calibration_history.clear()
         try:
             window.destroy()
