@@ -37,15 +37,22 @@ def _click_button(window, caption):
     found[0].invoke()
 
 
-def exercise_installed_preview_setup(app, root):
-    """Return explicit check results only if all four real dialogs round-trip."""
-    if current_identity()["channel"] != "v32_preview":
-        raise RuntimeError("Never run 3.2 GUI setup checks on stable identity")
-    if (getattr(app, "cap", None) is not None
-            or getattr(app, "armed", None) is not False
-            or getattr(getattr(app, "_gamepad", None), "api", None) is not None):
-        raise RuntimeError("Installed 3.2 setup must begin with devices disarmed")
+SETUP_LIFECYCLE_ROUNDS = 8
+SETUP_DIALOGS_PER_ROUND = 5
 
+
+def _live_toplevels(parent):
+    """Collect all remaining native Tk dialogs, including nested children."""
+    found = set()
+    for child in parent.winfo_children():
+        if isinstance(child, tk.Toplevel) and child.winfo_exists():
+            found.add(str(child))
+        found.update(_live_toplevels(child))
+    return found
+
+
+def _one_installed_setup_roundtrip(app, root):
+    """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
     # window (not a mock) and close it through its own Done button.
     app.open_getting_started()
@@ -100,9 +107,43 @@ def exercise_installed_preview_setup(app, root):
             or app._gamepad.api is not None):
         raise RuntimeError("Preview setup unexpectedly activated gameplay devices")
 
+
+def exercise_installed_preview_setup(app, root):
+    """Prove repeated setup use has no orphan Tk windows or theme callbacks."""
+    if current_identity()["channel"] != "v32_preview":
+        raise RuntimeError("Never run 3.2 GUI setup checks on stable identity")
+    if (getattr(app, "cap", None) is not None
+            or getattr(app, "armed", None) is not False
+            or getattr(getattr(app, "_gamepad", None), "api", None) is not None):
+        raise RuntimeError("Installed 3.2 setup must begin with devices disarmed")
+
+    initial_windows = _live_toplevels(root)
+    original_traces = len(app.theme_name.trace_info())
+    for round_number in range(SETUP_LIFECYCLE_ROUNDS):
+        _one_installed_setup_roundtrip(app, root)
+        root.update_idletasks()
+        if _live_toplevels(root) != initial_windows:
+            raise RuntimeError(
+                f"Frozen setup left a native Tk window after round {round_number + 1}"
+            )
+        if len(app.theme_name.trace_info()) != original_traces:
+            raise RuntimeError(
+                f"Frozen setup leaked a theme callback after round {round_number + 1}"
+            )
+        if (app.cap is not None or app.armed is not False
+                or app._gamepad.api is not None):
+            raise RuntimeError(
+                "Repeated preview setup unexpectedly activated gameplay devices"
+            )
+
     return {
         "v32_setup_windows_verified": True,
-        "v32_setup_dialog_count": 5,
+        "v32_setup_dialog_count": (
+            SETUP_DIALOGS_PER_ROUND * SETUP_LIFECYCLE_ROUNDS
+        ),
+        "v32_setup_repeat_cycles": SETUP_LIFECYCLE_ROUNDS,
+        "v32_setup_no_orphan_windows": True,
+        "v32_setup_theme_traces_stable": True,
         "v32_setup_camera_untouched": True,
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
