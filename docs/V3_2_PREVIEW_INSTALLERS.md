@@ -210,3 +210,26 @@ On a disposable/test account before considering a public release:
 
 **No production approval, notarization, or physical hardware certification
 is inferred from source-only or synthetic CI.**
+
+
+## Private Linux full-native staging (3.2 research, not release)
+
+The 3.2 integration workflow now adds an independent **Linux x64-only**
+candidate using the fresh exact-head 3.2 preview application and 11
+original-source native core libraries from the published v3.1.1 release.
+The original release DEB is downloaded with its SHA256SUMS and verified
+before extraction; every reused native core and its source marker is
+verified before and after repackaging. Only native cores and their original
+notices are copied, never the old Python application, ROMs, user settings,
+save data or emulator configuration. The QA Debian package stays in the
+private 3.2 preview package and settings namespace and uses version
+`3.2.0~fullqa1`, distinct from the regular mGBA-only preview.
+
+The result is re-extracted and its **actual frozen 3.2 Tk application**
+launched under Xvfb. A separate 7-day GitHub Actions artifact retains the
+full-core Linux QA DEB, source/hash receipt and installed GUI evidence.
+This demonstrates an 18-profile / 11-core **technical inventory**, not
+18 verified games, real audio/save/input, hardware compatibility, rights
+clearance or production readiness. Windows and both Mac native full-core
+assemblies remain separate future tasks. The regular mGBA-only preview
+artifacts and public stable 3.1.1 are unchanged.

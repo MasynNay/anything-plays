@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: v32-unreleased-preview-${{ github.event.pull_request.number || github.ref }}
@@ -103,6 +104,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_installed_gui.py' -v
           python -m unittest discover -s tests -p 'test_v32_stationary_calibration.py' -v
           python -m unittest discover -s tests -p 'test_v32_controller_capture.py' -v
+          python -m unittest discover -s tests -p 'test_v32_full_linux_gate.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -267,6 +269,67 @@ jobs:
             --home "$QA/home" \
             --report release/V32_FROZEN_GUI_SMOKE.json \
             --output release/V32_INSTALLED_GUI_RECEIPT.json
+      - name: Assemble private Linux full 11-native-core candidate from verified 3.1.1 bytes
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern anything-plays-31_3.1.1_amd64.deb --dir baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS.txt --dir baseline311
+          python -m tools.stage_v32_full_linux \
+            --stable baseline311/anything-plays-31_3.1.1_amd64.deb \
+            --preview 'release/anything-plays-32-preview_3.2.0~preview1_amd64.deb' \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_PREVIEW_RECEIPT.json \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output release/v32-full-linux
+          FULL="$PWD/release/v32-full-linux"
+          QA_HOME="$(mktemp -d)"
+          trap 'rm -rf "$QA_HOME"' EXIT
+          dpkg-deb -x "$FULL/anything-plays-32-preview_3.2.0~fullqa1_amd64.deb" "$QA_HOME/full-installed"
+          HOME="$QA_HOME" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V32_GUI_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$FULL/V32_FULL_LINUX_GUI_SMOKE.json" \
+          SDL_VIDEODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          timeout 65 xvfb-run -a \
+            "$QA_HOME/full-installed/opt/anything-plays-32-preview/AnythingPlays" --ap-v30-ui-smoke
+          python - "$FULL" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          directory = Path(sys.argv[1])
+          receipt = json.loads((directory/"V32_FULL_LINUX_QA_RECEIPT.json").read_text())
+          smoke = json.loads((directory/"V32_FULL_LINUX_GUI_SMOKE.json").read_text())
+          assert receipt["native_core_count"] == 11
+          assert receipt["console_profiles"] == 18
+          assert receipt["public_release_approved"] is False
+          assert receipt["all_18_consoles_gameplay_verified"] is False
+          assert smoke["passed"] is True
+          assert smoke["frozen_binary"] is True
+          assert smoke["v32_frozen_isolation_verified"] is True
+          assert smoke["console_profile_count"] == 18
+          assert smoke["public_distribution_approved"] is False
+          print("Full native 3.2 Linux candidate installed-GUI PASS; hardware and real gameplay NOT certified")
+          PY
+      - name: Retain Linux full-native-core research QA separately (never public)
+        if: matrix.target == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2-linux-x64-18-PROFILE-FULL-NATIVE-PRIVATE-QA
+          path: |
+            release/v32-full-linux/anything-plays-32-preview_3.2.0~fullqa1_amd64.deb
+            release/v32-full-linux/V32_FULL_LINUX_QA_RECEIPT.json
+            release/v32-full-linux/V32_FULL_LINUX_GUI_SMOKE.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
       - name: Describe accurate testing limitations
         shell: bash
         run: |
