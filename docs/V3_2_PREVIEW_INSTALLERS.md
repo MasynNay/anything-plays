@@ -266,16 +266,26 @@ probe opens native libraries from the *re-extracted full-core 3.2 DEB*, not
 from an unrelated installed RetroArch copy. It checks real decoded/changing
 video frames and core-generated PCM using existing original GB, GBC, GBA,
 NES, SNES and Genesis probe programs with individual crash/time limits.
-Five profiles (GB, GBC, GBA, NES and the source-built Supafaust SNES)
-are now strict acceptance gates after successful native frame and PCM
-verification. BlastEm Genesis remains **exploratory** and uses the
-repository's existing source-generated *non-TMSS* original homebrew
-variant: the default original Genesis Plus GX fixture performed an
-unconditional TMSS hardware register write that could halt BlastEm's
-non-TMSS console configuration. Only that optional startup write is
-replaced with five M68000 NOPs, leaving the original video/PSG code
-unchanged. This change tests the correct hardware startup behavior,
-not a modification or patch of any commercial game.
+Six profiles (GB, GBC, GBA, NES, source-built Supafaust SNES and
+source-built BlastEm Genesis) are now strict acceptance gates after
+native frame/PCM evidence passed in 3.2. BlastEm uses the repository's
+existing source-generated *non-TMSS* original homebrew variant:
+the old Genesis Plus GX fixture performed an unconditional TMSS register
+write that could halt BlastEm's non-TMSS console configuration. Only
+that optional startup instruction is replaced with five M68000 NOPs;
+no commercial game is modified.
+
+Eight additional native profiles are probed as **exploratory**:
+Master System, Game Gear and SG-1000 with the same BlastEm build;
+Atari 2600 with the source-built GPL2+ Tia replacement; Atari 7800
+with ProSystem; PC Engine with exact-source Mednafen PCE Fast; and
+WonderSwan mono/color with Mednafen WonderSwan. Each creates original
+test ROM bytes at runtime, demands core-generated RGB/PCM using the
+existing strict program probes, and records its pass/fail individually.
+An exploratory failure does not make the six known-good cases appear
+to fail, nor may it be represented as verified gameplay. Neo Geo
+Pocket/Color and the heavier N64/GameCube need additional independent
+fixtures, runtime systems and platform-specific acceptance.
 Individual exploratory failures are explicitly listed in the same report;
 they are never relabeled as passing. The runner verifies the 11-core source
 manifest, the 3.2 exact Git SHA, and the private build receipt *before*

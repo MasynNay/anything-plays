@@ -26,7 +26,7 @@ def success(system):
 
 class V32OriginalHomebrewNativeTests(unittest.TestCase):
     def test_four_required_origins_do_not_rely_on_legacy_core_names(self):
-        self.assertEqual(qa.REQUIRED, ("gb", "gbc", "gba", "nes", "snes"))
+        self.assertEqual(qa.REQUIRED, ("gb", "gbc", "gba", "nes", "snes", "genesis"))
         self.assertEqual(qa.CASES["snes"][0], "mednafen_supafaust")
         self.assertEqual(qa.CASES["genesis"][0], "blastem")
         self.assertEqual(
@@ -36,14 +36,20 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
         self.assertEqual(qa.CASES["nes"][0], "fceumm")
         self.assertEqual(qa.CASES["gbc"][0], "mgba")
         self.assertEqual(set(qa.CASES), set(qa.REQUIRED) | set(qa.EXPLORATORY))
+        self.assertEqual(len(qa.CASES), 14)
+        self.assertEqual(qa.CASES["atari2600"][0], "tia")
+        self.assertEqual(qa.CASES["pce"][0], "mednafen_pce_fast")
+        self.assertEqual(qa.CASES["ws"][0], "mednafen_wswan")
+        self.assertEqual(qa.CASES["wsc"][0], "mednafen_wswan")
+        self.assertEqual(qa.CASES["sg1000"][0], "blastem")
 
     def test_strict_success_is_not_misrepresented_as_18_compatible_games(self):
         systems = tuple(qa.CASES)
         reports = [success(system) for system in systems]
         result = qa.analyze_results(reports, systems)
         self.assertTrue(result["passed"])
-        self.assertEqual(result["required_profiles_passed"], 5)
-        self.assertEqual(result["exploratory_profiles_passed"], 1)
+        self.assertEqual(result["required_profiles_passed"], 6)
+        self.assertEqual(result["exploratory_profiles_passed"], 8)
         self.assertEqual(result["profiles_in_native_inventory"], 18)
         for key in ("all_18_consoles_gameplay_verified",
                     "commercial_game_compatibility_verified",
@@ -56,14 +62,15 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
     def test_exploratory_native_failure_is_not_reported_as_success(self):
         systems = tuple(qa.CASES)
         reports = [success(system) for system in systems]
-        reports[-1] = qa.safe_summary(
-            "genesis", {"passed": False, "error": "sensitive local ROM path"},
+        index = systems.index("atari2600")
+        reports[index] = qa.safe_summary(
+            "atari2600", {"passed": False, "error": "sensitive local ROM path"},
             -11, False,
         )
         result = qa.analyze_results(reports, systems)
         self.assertTrue(result["passed"])
-        self.assertEqual(result["exploratory_profiles_passed"], 0)
-        self.assertFalse(result["probes"][-1]["probe_passed"])
+        self.assertEqual(result["exploratory_profiles_passed"], 7)
+        self.assertFalse(result["probes"][index]["probe_passed"])
 
     def test_any_required_native_crash_fails_the_gate(self):
         systems = tuple(qa.CASES)
@@ -71,7 +78,7 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
         reports[2] = qa.safe_summary("gba", {}, -11, False)
         result = qa.analyze_results(reports, systems)
         self.assertFalse(result["passed"])
-        self.assertEqual(result["required_profiles_passed"], 4)
+        self.assertEqual(result["required_profiles_passed"], 5)
 
     def test_no_sensitive_console_tail_or_core_path_is_in_output(self):
         report = success("gb")
@@ -125,7 +132,7 @@ class V32OriginalHomebrewNativeTests(unittest.TestCase):
             self.assertTrue(result["passed"])
             self.assertTrue(result["original_source_generated_homebrew_only"])
             self.assertEqual(result["source_revision"], "f" * 40)
-            self.assertEqual(len(result["probes"]), 6)
+            self.assertEqual(len(result["probes"]), 14)
             self.assertNotIn("commercial_gameplay_verified", result)
             with patch.object(qa, "check_preflight", return_value=root):
                 with self.assertRaisesRegex(ValueError, "overwrite"):

@@ -5,11 +5,11 @@ actually executes the installed native .so through production Libretro, and
 checks decoded changing RGB and core-generated PCM with strict subprocess
 timeouts. NO proprietary game assets, BIOS, devices or network are accessed.
 
-Five source-generated homebrew profiles gate this incremental runtime
-checkpoint, including the proven Supafaust SNES alternative. BlastEm Genesis
-remains EXPLORATORY until its hardware-model-safe fixture is independently
-proven. It must use the original non-TMSS source-authored variant: the old
-unconditional $A14000 unlock halts a Genesis model without TMSS circuitry.
+Six native console profiles now gate this incremental runtime checkpoint,
+including the proven Supafaust SNES alternative and BlastEm's original
+non-TMSS Genesis diagnostic. Eight more source-generated console profiles
+are investigated separately; failed exploratory results are never marked as
+passing, nor are they required to pass the six proven baseline gates.
 Do not relabel this as 18/18 real-game compatibility or public approval.
 """
 from __future__ import annotations
@@ -27,8 +27,11 @@ from anything_plays.v30_gpl_trial import validate_trial_core_directory
 from tools.stage_v32_full_linux import FULL, STATUS as FULL_STATUS, no_links
 from tools.verify_v31_rc import validate_staged_identity
 
-REQUIRED = ("gb", "gbc", "gba", "nes", "snes")
-EXPLORATORY = ("genesis",)
+REQUIRED = ("gb", "gbc", "gba", "nes", "snes", "genesis")
+EXPLORATORY = (
+    "mastersystem", "gamegear", "sg1000", "atari2600", "atari7800",
+    "pce", "ws", "wsc",
+)
 CASES = {
     "gb": ("mgba", "tools.probe_gb_homebrew", ("--system", "gb")),
     "gbc": ("mgba", "tools.probe_gb_homebrew", ("--system", "gbc")),
@@ -39,6 +42,21 @@ CASES = {
     # variant retains its cartridge's video/audio program, replacing only
     # an unconditional TMSS register write with M68000 NOP instructions.
     "genesis": ("blastem", "tools.probe_v30_blastem_genesis_variant", ()),
+    "mastersystem": ("blastem", "tools.probe_sega8_homebrew",
+                     ("--system", "mastersystem")),
+    "gamegear": ("blastem", "tools.probe_sega8_homebrew",
+                 ("--system", "gamegear")),
+    "sg1000": ("blastem", "tools.probe_sega8_homebrew",
+               ("--system", "sg1000")),
+    # This QA package intentionally uses the source-built GPL2+ Tia
+    # alternative, NOT the older Stella2014 core from 3.1.
+    "atari2600": ("tia", "tools.probe_atari_homebrew", ()),
+    "atari7800": ("prosystem", "tools.probe_atari7800_homebrew", ()),
+    "pce": ("mednafen_pce_fast", "tools.probe_pce_homebrew", ()),
+    "ws": ("mednafen_wswan", "tools.probe_wonderswan_homebrew",
+           ("--system", "ws")),
+    "wsc": ("mednafen_wswan", "tools.probe_wonderswan_homebrew",
+            ("--system", "wsc")),
 }
 STATUS = "PRIVATE_V32_FULL_NATIVE_ORIGINAL_HOMEBREW_RUNTIME_RESEARCH_NOT_RELEASE"
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
@@ -100,6 +118,13 @@ def safe_summary(system, raw, exit_code, timed_out):
         "core_name": CASES[system][0],
         "required_gate": system in REQUIRED,
         "native_child_exit_zero": exit_code == 0,
+        # Numeric native exit status only; never retain stderr, stack
+        # traces, raw ROM paths, machine usernames or private directories.
+        "native_process_exit_code": (
+            raw.get("native_exit_code")
+            if type(raw.get("native_exit_code")) is int
+            and -255 <= raw["native_exit_code"] <= 255 else None
+        ),
         "timed_out": bool(timed_out),
         "probe_passed": not timed_out and exit_code == 0 and raw.get("passed") is True,
     }
