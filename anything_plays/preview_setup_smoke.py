@@ -8,6 +8,7 @@ interactive controller remapping and color sampling flows.
 
 import tkinter as tk
 from tkinter import ttk
+from unittest.mock import patch
 
 from anything_plays.build_identity import current_identity
 
@@ -136,7 +137,40 @@ def exercise_installed_preview_setup(app, root):
                 "Repeated preview setup unexpectedly activated gameplay devices"
             )
 
+    # A full application (3.1.1) includes more native cores, but this
+    # preview intentionally has mGBA only. Verify that a real frozen App
+    # refuses an unsupported console without trying to read even a dummy
+    # ROM, launching a core or telling users the install is corrupted.
+    old_system = app.system_key.get()
+    try:
+        app.system_key.set("snes")
+        app.switch_system()
+        if app.emu.find_system_core() is not None:
+            raise RuntimeError("Limited 3.2 preview unexpectedly has an SNES core")
+        with patch(
+            "anything_plays.ui_library.messagebox.showinfo"
+        ) as popup, patch.object(
+            app.emu, "start", side_effect=RuntimeError(
+                "Unbundled preview attempted to start a native emulator"
+            )
+        ) as native_start:
+            app.start_rom("synthetic-unbundled-preview-game.sfc")
+        native_start.assert_not_called()
+        popup.assert_called_once()
+        if app.current_rom is not None:
+            raise RuntimeError("Unbundled preview kept a fake game as playable")
+        if "Not bundled in this 3.2 preview" not in app.game_status.get():
+            raise RuntimeError("Unbundled console showed an inaccurate error")
+        if "not a damaged installation" not in popup.call_args.args[1]:
+            raise RuntimeError("Missing preview core was reported as corruption")
+    finally:
+        app.system_key.set(old_system)
+        app.switch_system()
+    if app.cap is not None or app.armed is not False:
+        raise RuntimeError("Core guidance changed camera input safety")
+
     return {
+        "v32_unbundled_core_launch_safe": True,
         "v32_setup_windows_verified": True,
         "v32_setup_dialog_count": (
             SETUP_DIALOGS_PER_ROUND * SETUP_LIFECYCLE_ROUNDS
