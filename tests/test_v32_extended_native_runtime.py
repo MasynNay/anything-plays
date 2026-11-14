@@ -24,7 +24,7 @@ def valid_raw(profile):
         }
     if profile == "ngpc":
         return {
-            "probe_passed": True,
+            "passed": True,
             "fixture": {
                 "header_matches_test_target": True,
                 "header_mode_byte": 0x10,
@@ -92,7 +92,7 @@ class ExtendedNativeProbeTests(unittest.TestCase):
 
     def test_color_a_v_success_does_not_hide_failed_native_completion(self):
         data = valid_raw("ngpc")
-        data["probe_passed"] = False
+        data["passed"] = False
         data["native_exit_code"] = -11
         data["details"]["passed"] = True
         evidence = qa.safe_evidence("ngpc", data, 0, False)
@@ -104,6 +104,32 @@ class ExtendedNativeProbeTests(unittest.TestCase):
         self.assertEqual(evidence["native_inner_exit_code"], -11)
         self.assertTrue(evidence["fixture_blob_matches_pinned_source"])
         self.assertTrue(evidence["fixture_color_mode_confirmed"])
+
+    def test_ngpc_parent_uses_real_passed_field_not_n64_probe_passed(self):
+        native = valid_raw("ngpc")
+        self.assertNotIn("probe_passed", native)
+        self.assertTrue(qa._verified("ngpc", native, 0))
+        good = qa.safe_evidence("ngpc", native, 0, False)
+        self.assertTrue(good["native_parent_probe_passed"])
+        self.assertTrue(good["native_probe_verified"])
+        self.assertTrue(good["native_video_audio_verified"])
+        self.assertTrue(good["video_gate_passed"])
+        self.assertTrue(good["audio_gate_passed"])
+        self.assertTrue(good["input_gate_passed"])
+        # An adversarial result must not bypass the real parent decision:
+        # the N64-style key is irrelevant to the NeoPop parent.
+        forged = valid_raw("ngpc")
+        forged["passed"] = False
+        forged["probe_passed"] = True
+        self.assertFalse(qa._verified("ngpc", forged, 0))
+        self.assertFalse(qa.safe_evidence("ngpc", forged, 0, False)[
+            "native_parent_probe_passed"
+        ])
+        # The parent alone is also insufficient without actual core,
+        # fixture and input success.
+        wrong = valid_raw("ngpc")
+        wrong["details"]["input_gate_passed"] = False
+        self.assertFalse(qa._verified("ngpc", wrong, 0))
 
     def test_headless_gpu_frames_are_not_claimed_as_playable_fps_or_sound(self):
         data = valid_raw("gamecube")

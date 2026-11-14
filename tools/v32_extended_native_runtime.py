@@ -113,7 +113,11 @@ def _verified(profile, evidence, exit_code):
     if profile == "ngpc":
         fixture = evidence.get("fixture")
         return (
-            evidence.get("probe_passed") is True
+            # The actual NeoPop parent emits "passed", NOT
+            # "probe_passed" (which belongs to the N64 parent).
+            # Keep the independent child A/V/input, pinned header,
+            # fixture SHA and process-exit checks below unchanged.
+            evidence.get("passed") is True
             and isinstance(fixture, dict)
             and fixture.get("header_matches_test_target") is True
             and fixture.get("header_mode_byte") == 0x10
@@ -234,7 +238,7 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         # These are ONLY booleans and one bounded exit code. The source
         # probe's error strings may contain paths and are NEVER copied.
         row.update({
-            "native_parent_probe_passed": raw.get("probe_passed") is True,
+            "native_parent_probe_passed": raw.get("passed") is True,
             "native_child_report_passed": details.get("passed") is True,
             "native_child_reported_exception": bool(details.get("error")),
             "native_parent_reported_exception": bool(raw.get("error")),

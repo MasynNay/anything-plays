@@ -373,3 +373,20 @@ The follow-up diagnostic reports only allowlisted true/false conditions,
 bounded native exit codes, offscreen GPU readback timing, and whether a
 nonzero PCM sample was observed. It retains **no original error strings,
 game assets, usernames, local paths or crashed-process stacks**.
+
+
+### Neo Geo Pocket Color full native probe result mapping (3.2)
+
+The independent `tools.probe_ngp_mit_homebrew` parent writes its strict
+aggregate result as **`passed`**, whereas the N64 homebrew parent writes
+`probe_passed`. The first 3.2 extended reporter mistakenly read the N64
+key from the NGP Color report, falsely rejecting an otherwise passing
+native color homebrew test. This mapping was corrected without changing
+the actual NeoPop probe, native checks, exit code, required genuine
+0x10 color cartridge header, pinned MIT Git blob identity or A/V/input
+criteria. Regression tests now reject fabricated success via an extraneous
+`probe_passed` key and require the real parent plus all child gates.
+This fix should not be treated as confirmed on an installed 3.2 native
+package until the exact-head four-platform QA and Linux research evidence
+have both passed. Even after confirmation it is a bounded color homebrew
+A/V/input result, not general commercial game or physical hardware QA.
