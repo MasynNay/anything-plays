@@ -54,6 +54,13 @@ is based on observed color matches and zone hits, **not** a fabricated
 accuracy percentage. It now asks users to collect at least eight frames and
 observe the object at least once after sampling before saving.
 
+A new optional **Check stationary jitter** action asks you to hold the sampled
+target still for 45 live frames. It reports median and 95th-percentile target
+position variation in pixels, plus lost detections. It never records images,
+starts a second camera or arms gameplay. Deliberate movement during the hold
+also raises the metric, so it is **not** a tracking accuracy score. The small
+position-only buffer is cleared on camera changes, resampling and exit.
+
 Closing the application during unfinished calibration cancels it **before**
 the normal shutdown profile save. Cancel and switching consoles restore the
 exact pre-calibration profile. Saves are never silently approved by closing
