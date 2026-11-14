@@ -56,8 +56,9 @@ def show_quick_start(app):
             shell,
             text="DEVELOPMENT PREVIEW · Only GB, GBC and GBA are bundled "
                  "in the test installers. Other console profiles may need "
-                 "a separate native core. Your stable installation and "
-                 "settings stay separate.",
+                 "a separate native core. The preview starts with fresh, "
+                 "separate game saves. Your stable installation, saved games "
+                 "and settings are not imported or overwritten.",
             style="Helper.TLabel",
             wraplength=510, justify="left",
         ).pack(anchor="w", pady=(0, 10))
