@@ -105,6 +105,15 @@ rejects ambiguous simultaneous new inputs, requires focus, and suppresses
 controller-to-game input during capture **and until release**. Other consoles'
 controller mappings are unchanged.
 
+When Anything Plays loses keyboard/window focus, controller input is released.
+Returning to the app does not replay a button that was pressed or held in
+another window: the physical controller must first return to a neutral,
+released state. A short status message explains why input is temporarily
+paused. The press-to-remap guard remains independent of this focus safety
+check. Synthetic focus-transition tests run in source CI and in each native
+preview installer's preflight; these tests do not certify Bluetooth or USB
+hardware.
+
 ## Automated real Tk setup smoke
 
 The integration branch now adds `tests/smoke_v32_gui.py` to the standard

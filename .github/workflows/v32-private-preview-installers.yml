@@ -102,6 +102,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_preview_startup_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_installed_gui.py' -v
           python -m unittest discover -s tests -p 'test_v32_stationary_calibration.py' -v
+          python -m unittest discover -s tests -p 'test_v32_controller_capture.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash

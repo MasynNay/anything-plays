@@ -248,12 +248,24 @@ class GamepadMixin:
                     if (getattr(self, "_controller_capture", None) is None
                             and not self._gamepad.physical_buttons):
                         self._controller_capture_release_pending = False
+                # Focus loss releases game controls immediately. Regaining
+                # focus is NOT permission to replay a button held while
+                # another application was active. Require a neutral physical
+                # controller sample before game input resumes. This is
+                # independent of the remapping press/release guard above.
+                unfocused = self.root.focus_get() is None
+                if unfocused:
+                    self._gamepad_focus_release_pending = True
+                elif getattr(self, "_gamepad_focus_release_pending", False):
+                    if self._gamepad.physical_buttons:
+                        buttons = frozenset()
+                        status += " · Release controller inputs after refocusing"
+                    else:
+                        self._gamepad_focus_release_pending = False
                 if not self.uses_embedded_emulator():
                     buttons = frozenset()
                     status += " · Embedded emulators only"
-                elif not self.emu.running:
-                    buttons = frozenset()
-                elif self.root.focus_get() is None:
+                elif not self.emu.running or unfocused:
                     buttons = frozenset()
                 self.emu.set_gamepad_buttons(buttons)
                 status_changed = status != self.gamepad_status.get()

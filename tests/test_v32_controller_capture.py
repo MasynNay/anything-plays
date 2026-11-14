@@ -132,6 +132,56 @@ class ControllerCaptureTests(unittest.TestCase):
         app.gamepad_tick()  # normal play can resume after release
         self.assertEqual(app.emu.published[-1], frozenset({"A"}))
 
+    def test_focus_loss_and_return_waits_for_neutral_controller(self):
+        app = CaptureHost()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+        app.root.focused = False
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_focus_release_pending)
+        app.root.focused = True
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertIn("Release controller inputs", app.gamepad_status.get())
+        app._gamepad.physical_buttons = frozenset({"A", "B"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_focus_release_pending)
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_press_started_while_unfocused_cannot_enter_on_refocus(self):
+        app = CaptureHost()
+        app.root.focused = False
+        app.gamepad_tick()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        app.root.focused = True
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_focus_release_pending)
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_neutral_focus_return_does_not_delay_new_gameplay_press(self):
+        app = CaptureHost()
+        app.root.focused = False
+        app.gamepad_tick()
+        app.root.focused = True
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_focus_release_pending)
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
     def test_disconnected_capture_is_canceled_without_saving(self):
         app = CaptureHost()
         status = Setting()
