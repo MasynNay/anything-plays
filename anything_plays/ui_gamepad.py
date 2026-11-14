@@ -304,6 +304,14 @@ class GamepadMixin:
                 "Console changed or controller disconnected; mapping canceled."
             )
             return
+        if self.root.focus_get() is None:
+            # Never learn a mapping from another app or an unattended pad.
+            # Require a fresh edge after the window regains focus.
+            capture["baseline"] = frozenset(self._gamepad.physical_buttons)
+            capture["status"].set(
+                "Focus Anything Plays, then release and press the control."
+            )
+            return
         source, baseline, ambiguous = newly_pressed_source(
             capture["baseline"], self._gamepad.physical_buttons
         )
