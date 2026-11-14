@@ -124,7 +124,7 @@ class ProfilesMixin:
             self.root.after_cancel(pending)
             self._zone_label_save_job = None
         try:
-            self.read_settings()
+            self.read_settings(previous)
             self.profile_store.put(previous, self.cfg)
         except (ValueError, tk.TclError, OSError):
             pass
@@ -175,7 +175,7 @@ class ProfilesMixin:
         self.load_zone_art(silent=True)
         self.refresh_color()
 
-    def read_settings(self):
+    def read_settings(self, system=None):
         self.cfg['tolerance'] = max(1, min(90, int(self.tolerance.get())))
         self.cfg['min_area'] = max(5, int(self.min_area.get()))
         self.cfg['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
@@ -201,7 +201,10 @@ class ProfilesMixin:
         self.cfg['zone_image'] = self.zone_image_path.get()
         # The UI has fields for all console families; a portable profile
         # must contain mappings for the selected console only.
-        allowed = BUTTONS_BY_SYSTEM[self.system_key.get()]
+        # The combobox may already show the NEXT console during a switch.
+        # Persist the old console's visible mappings under its own identity.
+        selected = system if system in BUTTONS_BY_SYSTEM else self.system_key.get()
+        allowed = BUTTONS_BY_SYSTEM[selected]
         self.cfg['mapping'] = {
             name: self.mapping_vars[name].get() for name in allowed
         }
