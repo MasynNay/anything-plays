@@ -15,6 +15,12 @@ def main():
     # Set before importing App: it loads the embedded/source identity and
     # selects the matching per-channel settings folder during construction.
     os.environ["AP_V32_PREVIEW"] = "1"
+    from anything_plays.build_identity import current_identity
+    if current_identity()["channel"] != "v32_preview":
+        raise RuntimeError(
+            "Refusing to start the 3.2 source preview with a different "
+            "embedded build identity. Use a clean development checkout."
+        )
     from app import main as start_app
     return start_app()
 
