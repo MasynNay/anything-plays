@@ -237,6 +237,12 @@ def _child(core, rom, report, seconds, require_audio=False,
             1000.0 * session.gpu_readback_max_seconds, 3),
         "gpu_readback_fraction_elapsed": round(
             session.gpu_readback_seconds / elapsed, 4),
+        # The native-loop timings encompass Dolphin CPU/JIT + GPU work
+        # + callbacks. GL readback is a measured SUBSET, not a competing
+        # independent time bucket.
+        **session.native_run_timing.snapshot(
+            gpu_readback_seconds=session.gpu_readback_seconds
+        ),
         "rss_sample_count": len(rss_samples),
         "rss_warmup_seconds": warmup,
         "native_rss_growth_mb": None if growth is None else round(growth, 2),

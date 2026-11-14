@@ -393,9 +393,18 @@ class CoreSession:
 
             frame_number = 0
             next_frame = time.monotonic()
+            # GameCube alone records bounded timing counters. The native
+            # timing includes GPU callback/readback time; all other systems
+            # retain their historical loop without profiling overhead.
+            gamecube_timing = getattr(self, "native_run_timing", None)
             while not self.emulator.stop_event.is_set():
                 self.emulator.inputs.before_frame(self.emulator.armed)
+                native_start = time.perf_counter() if gamecube_timing else None
                 self.native.run()
+                if gamecube_timing:
+                    gamecube_timing.record_native_run(
+                        time.perf_counter() - native_start
+                    )
                 self.emulator.inputs.after_frame()
                 frame_number += 1
                 if frame_number % 300 == 0:
@@ -404,7 +413,12 @@ class CoreSession:
                 next_frame += 1 / frames_per_second
                 remaining = next_frame - time.monotonic()
                 if remaining > 0:
+                    wait_start = time.perf_counter() if gamecube_timing else None
                     self.emulator.stop_event.wait(remaining)
+                    if gamecube_timing:
+                        gamecube_timing.record_wait(
+                            time.perf_counter() - wait_start
+                        )
                 elif remaining < -0.25:
                     next_frame = time.monotonic()
             self.persist_game_progress()

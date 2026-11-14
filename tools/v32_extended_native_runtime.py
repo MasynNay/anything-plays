@@ -286,6 +286,12 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "native_pcm_frame_samples", "native_pcm_nonzero_values",
         "continuous_render_fps", "gpu_readback_calls",
         "gpu_readback_mean_ms", "gpu_readback_max_ms",
+        "native_run_calls", "native_run_mean_ms", "native_run_max_ms",
+        "native_run_total_seconds", "native_run_over_16ms",
+        "native_run_over_50ms", "native_run_over_100ms",
+        "native_run_non_readback_mean_ms",
+        "gpu_readback_share_of_native_run",
+        "scheduler_wait_calls", "scheduler_wait_total_seconds",
         "gpu_readback_fraction_elapsed", "native_rss_growth_mb",
     ):
         val = metrics.get(name)

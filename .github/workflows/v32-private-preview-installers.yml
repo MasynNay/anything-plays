@@ -16,6 +16,9 @@ on:
       - 'tools/stage_v32_full_macos.py'
       - 'tools/v32_*native_runtime.py'
       - 'tools/v32_acceptance_matrix.py'
+      - 'tools/v32_gamecube_audio_research.py'
+      - 'tools/gamecube-3d-homebrew/**'
+      - 'tests/test_v32_gamecube_*.py'
       - 'tests/test_v32_acceptance_matrix.py'
       - 'tools/probe_gamecube_app.py'
       - 'tools/probe_ngp_mit_homebrew.py'
@@ -124,6 +127,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_original_native_runtime.py' -v
           python -m unittest discover -s tests -p 'test_v32_extended_native_runtime.py' -v
           python -m unittest discover -s tests -p 'test_v32_acceptance_matrix.py' -v
+          python -m unittest discover -s tests -p 'test_v32_gamecube_native_timing.py' -v
+          python -m unittest discover -s tests -p 'test_v32_gamecube_audio_research.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
@@ -412,6 +417,31 @@ jobs:
           assert result["public_native_core_redistribution_approved"] is False
           print("Private 18-profile homebrew software matrix verified; public release remains BLOCKED")
           PY
+          # Independent native audio diagnosis: the pinned controller DOL
+          # emits silence by design. Compile only our OWN source GX+ASND
+          # tone homebrew in a network-disabled devkitPPC Docker build,
+          # then run it in the same actual 3.2 Dolphin GPU core. This is
+          # exploratory, never a retail game or real speaker acceptance.
+          # The DOL stays in a disposable temporary directory and is
+          # NEVER uploaded with the preview installer or artifacts.
+          timeout 520 .build-venv/bin/python -m tools.v32_gamecube_audio_research \
+            --bundle "$QA_HOME/full-installed/opt/anything-plays-32-preview" \
+            --source-receipt "$FULL/V32_FULL_LINUX_QA_RECEIPT.json" \
+            --source-sha "$AP_V32_QA_SOURCE_SHA" \
+            --output "$FULL/V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json"
+          python - "$FULL/V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          result = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+          assert result["source_revision"] == os.environ["AP_V32_QA_SOURCE_SHA"]
+          assert result["status"] == "PRIVATE_V32_ORIGINAL_GC_AUDIO_AND_GPU_RESEARCH_NOT_RELEASE"
+          assert type(result["core_generated_nonzero_pcm_verified"]) is bool
+          assert result["speaker_hardware_tested"] is False
+          assert result["retail_game_compatibility_verified"] is False
+          assert result["ready_for_release"] is False
+          assert result["public_release_approved"] is False
+          print("Original-source 3.2 GameCube audio research captured; no real speaker or retail compatibility claim")
+          PY
       - name: Retain Linux full-native-core research QA separately (never public)
         if: matrix.target == 'linux-x64'
         uses: actions/upload-artifact@v4
@@ -424,6 +454,7 @@ jobs:
             release/v32-full-linux/V32_ORIGINAL_HOMEBREW_RUNTIME_QA.json
             release/v32-full-linux/V32_FOUR_REMAINING_CONSOLES_RESEARCH_QA.json
             release/v32-full-linux/V32_18_PROFILE_SOFTWARE_EVIDENCE_NOT_RELEASE.json
+            release/v32-full-linux/V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

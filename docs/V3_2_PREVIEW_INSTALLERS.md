@@ -412,3 +412,37 @@ controllers and cameras, unverified saves and real speakers, missing
 cross-platform game execution, macOS notarization and the still-open
 native-core redistribution review. `ready_for_public_3_2_release` is
 unconditionally **false**; QA can never turn a release on by itself.
+
+
+## 3.2 GameCube performance bottleneck and real PCM research
+
+At the earlier verified `6ca52936` Linux headless run, Dolphin emitted
+approximately 5.72 image frames per second using the actual production
+offscreen GPU backend, yet GPU readback averaged **3.02 ms/copy** and
+accounted for only **1.73% of elapsed time**. Changing Tk preview FPS
+or optimizing `glReadPixels` alone cannot plausibly repair the main
+5-FPS slowdown. The 3.2 native worker now tracks the complete real
+`retro_run()` execution time per frame and its bounded mean, maximum,
+slow-frame bucket counts, scheduler wait time and the fractional readback
+cost. These counters distinguish slow Dolphin CPU/GPU emulation from
+optional preview copies; they store no game frames or user paths.
+
+The existing zlib controller-test DOL emits silent PCM, so zero nonzero
+PCM on that fixture does **not** prove broken GameCube audio. A second,
+independent private-only experiment now builds the repository's **own GX
+3D + ASND-generated stereo tone GameCube DOL** from checked source using
+the project's established `devkitpro/devkitppc` toolchain in a network-
+disabled container. It runs the newly built DOL against the **same
+verified 3.2 native Dolphin core and production GPU host**, requiring
+real source-generated nonzero stereo PCM alongside native moving video.
+This DOL is built only in a disposable CI workspace and is *never*
+included in any installer, release or uploaded artifact. A redacted
+`V32_ORIGINAL_GAMECUBE_AUDIO_GPU_QA.json` records actual callbacks or
+honest compile/runtime failure, never a fictional pass. A successful
+PCM callback is still not proof of real physical speaker output.
+
+This research does not lower the 18-profile original homebrew gates or
+allow private core redistribution. Consumer GPU performance, extended
+GameCube sessions, save recovery, physical cameras/controllers, speaker
+playback and independent redistribution/legal review remain separate
+blocked release requirements.
