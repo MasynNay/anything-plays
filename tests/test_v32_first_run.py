@@ -47,7 +47,8 @@ class FirstRunNavigationTests(unittest.TestCase):
         )
         self.assertIn('current_identity()["channel"] == "v32_preview"', guide)
         self.assertIn("Only GB, GBC and GBA are bundled", guide)
-        self.assertIn("settings stay separate", guide)
+        self.assertIn("separate game saves", guide)
+        self.assertIn("and settings are not imported or overwritten", guide)
 
     def test_main_app_stays_inside_source_boundary(self):
         source = (ROOT / "app.py").read_text(encoding="utf-8")
