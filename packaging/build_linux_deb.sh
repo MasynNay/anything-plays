@@ -345,6 +345,10 @@ Categories=Game;Emulator;
 DESKTOP
 # 3.2 private preview has its own Debian package, launcher and icon.
 if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+  # Do not advertise consoles whose native cores are absent from this preview.
+  sed -i \
+    -e 's@Embedded GB/GBC/GBA, SNES, NES, Genesis and experimental 3D cores\.@Contains only mGBA for GB/GBC/GBA; other consoles not bundled.@g' \
+    "$PKG/DEBIAN/control"
   sed -i \
     -e 's@anything-plays-30-preview@anything-plays-32-preview@g' \
     -e 's@anything-plays-preview@anything-plays-32-preview@g' \
