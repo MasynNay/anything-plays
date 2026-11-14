@@ -73,6 +73,8 @@ class EmulatorPreviewTests(unittest.TestCase):
         message = app._selected_emulator_status.get()
         self.assertIn("Not bundled in this 3.2 preview", message)
         self.assertNotIn("repair", message.lower())
+        self.assertLessEqual(len(message), 110)
+        self.assertIn("Check my setup", message)
 
     def test_preview_mgba_missing_is_real_problem_not_claimed_ready(self):
         app = StubApp("gba")
@@ -83,6 +85,8 @@ class EmulatorPreviewTests(unittest.TestCase):
             with patch("anything_plays.core_locator.find_core", return_value=None):
                 app.refresh_selected_emulator_state()
         self.assertIn("missing", app._selected_emulator_status.get())
+        self.assertIn("mGBA", app._selected_emulator_status.get())
+        self.assertLessEqual(len(app._selected_emulator_status.get()), 110)
 
     def test_installed_core_still_reports_ready(self):
         app = StubApp("snes")
