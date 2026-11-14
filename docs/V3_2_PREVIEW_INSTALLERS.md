@@ -72,7 +72,10 @@ When running the source preview without an installer, use the regular project
 setup instructions to install Python dependencies and fetch an appropriate
 mGBA core before attempting GB/GBC/GBA gameplay. A missing optional SNES,
 N64 or GameCube core in this limited preview is explicitly labeled **not
-bundled** rather than incorrectly described as corruption.
+bundled** rather than incorrectly described as corruption. The same
+distinction now appears in the local **Check my setup** troubleshooting
+report, not only the main emulator-status strip. If a matching native core
+really is installed, diagnostics correctly recognize it instead.
 
 ## Human acceptance still required
 
