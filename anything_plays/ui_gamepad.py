@@ -423,8 +423,30 @@ class GamepadMixin:
         ).pack(anchor="w")
         self._refresh_gamepad_live_input()
 
+        group = ttk.LabelFrame(
+            content, text="BUTTON MAPPING · " + system.upper(), padding=(8, 7)
+        )
+        group.pack(fill="both", expand=True)
+        ttk.Label(
+            group,
+            text="Quick remap at top. Scroll down for individual controller mappings.",
+            style="Helper.TLabel"
+        ).pack(anchor="w", pady=(0, 5))
+        holder = ttk.Frame(group)
+        holder.pack(fill="both", expand=True)
+        canvas = tk.Canvas(holder, borderwidth=0, highlightthickness=0)
+        scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        rows = ttk.Frame(canvas)
+        window_id = canvas.create_window((0, 0), window=rows, anchor="nw")
+        rows.bind("<Configure>", lambda _e: canvas.configure(
+            scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(
+            window_id, width=e.width))
         quick = ttk.LabelFrame(
-            content, text="QUICK REMAP · PRESS A BUTTON", padding=(9, 7),
+            rows, text="QUICK REMAP · PRESS A BUTTON", padding=(9, 7),
         )
         quick.pack(fill="x", pady=(0, 9))
         ttk.Label(
@@ -487,28 +509,6 @@ class GamepadMixin:
             wraplength=500,
         ).pack(anchor="w", pady=(7, 0))
 
-        group = ttk.LabelFrame(
-            content, text="BUTTON MAPPING · " + system.upper(), padding=(8, 7)
-        )
-        group.pack(fill="both", expand=True)
-        ttk.Label(
-            group,
-            text="Physical controller input                   In-game action",
-            style="Helper.TLabel"
-        ).pack(anchor="w", pady=(0, 5))
-        holder = ttk.Frame(group)
-        holder.pack(fill="both", expand=True)
-        canvas = tk.Canvas(holder, borderwidth=0, highlightthickness=0)
-        scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        rows = ttk.Frame(canvas)
-        window_id = canvas.create_window((0, 0), window=rows, anchor="nw")
-        rows.bind("<Configure>", lambda _e: canvas.configure(
-            scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(
-            window_id, width=e.width))
 
         # Separate physical buttons into recognizable regions of the graphic,
         # instead of an undifferentiated 22-control vertical list.
