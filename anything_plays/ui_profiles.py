@@ -1,11 +1,13 @@
 """Read, validate, migrate and save per-console settings and input mappings."""
 
+import copy
 import json
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from anything_plays.atomic_storage import write_json_atomically
+from anything_plays.portable_profiles import load_bundle, save_bundle
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import (BUTTONS_BY_SYSTEM, DISABLED_MAPPING,
                              default_for, normalize)
@@ -119,7 +121,7 @@ class ProfilesMixin:
             self.root.after_cancel(pending)
             self._zone_label_save_job = None
         try:
-            self.read_settings()
+            self.read_settings(previous)
             self.profile_store.put(previous, self.cfg)
         except (ValueError, tk.TclError, OSError):
             pass
@@ -170,7 +172,7 @@ class ProfilesMixin:
         self.load_zone_art(silent=True)
         self.refresh_color()
 
-    def read_settings(self):
+    def read_settings(self, system=None):
         self.cfg['tolerance'] = max(1, min(90, int(self.tolerance.get())))
         self.cfg['min_area'] = max(5, int(self.min_area.get()))
         self.cfg['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
@@ -194,33 +196,175 @@ class ProfilesMixin:
         self.cfg['zone_label_position'] = self.zone_label_position.get()
         self.cfg['shuffle_enabled'] = bool(self.shuffle_enabled.get())
         self.cfg['zone_image'] = self.zone_image_path.get()
-        self.cfg['mapping'] = {name: var.get() for name, var in self.mapping_vars.items()}
+        # The UI has fields for all console families; a portable profile
+        # must contain mappings for the selected console only.
+        # The combobox may already show the NEXT console during a switch.
+        # Persist the old console's visible mappings under its own identity.
+        selected = system if system in BUTTONS_BY_SYSTEM else self.system_key.get()
+        allowed = BUTTONS_BY_SYSTEM[selected]
+        self.cfg['mapping'] = {
+            name: self.mapping_vars[name].get() for name in allowed
+        }
 
     def save_profile(self):
+        """Export only portable control settings, never paths or ROM metadata."""
         try:
             self.read_settings()
-        except Exception:
-            messagebox.showerror('Profile', 'Correct the settings first.')
+            # Validate before displaying the save picker, so malformed
+            # in-progress spinbox values cannot produce an invalid file.
+            from anything_plays.portable_profiles import make_bundle
+            make_bundle(
+                self.system_key.get(), self.cfg,
+                theme=self.theme_name.get(), allowed_themes=self.THEMES,
+            )
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                'Export controls', f'Correct the settings first: {exc}',
+                parent=self.root,
+            )
             return
-        path = filedialog.asksaveasfilename(defaultextension='.json', filetypes=[('JSON profile', '*.json')])
-        if path:
-            Path(path).write_text(json.dumps(self.cfg, indent=2), encoding='utf-8')
-            self.profile_store.put(self.system_key.get(), self.cfg)
-
-    def load_profile(self):
-        path = filedialog.askopenfilename(filetypes=[('JSON profile', '*.json')])
+        path = filedialog.asksaveasfilename(
+            parent=self.root,
+            defaultextension='.json',
+            filetypes=[('Anything Plays control profile', '*.json')],
+            initialfile=f'anything-plays-{self.system_key.get()}-controls.json',
+        )
         if not path:
             return
         try:
-            cfg = json.loads(Path(path).read_text(encoding='utf-8'))
-            if not isinstance(cfg, dict) or not isinstance(cfg.get('zones'), dict):
-                raise ValueError('Invalid profile: missing zones')
-            self.stop_controls()
-            self.cfg = normalize(self.system_key.get(), cfg, DEFAULT)
+            save_bundle(
+                path, self.system_key.get(), self.cfg,
+                theme=self.theme_name.get(), allowed_themes=self.THEMES,
+            )
             self.profile_store.put(self.system_key.get(), self.cfg)
+        except (OSError, ValueError, TypeError) as exc:
+            messagebox.showerror(
+                'Export controls', f'Could not export controls: {exc}',
+                parent=self.root,
+            )
+            return
+        self.status.set(
+            'Control profile exported. ROMs, personal paths, saves and '
+            'camera footage were not included.'
+        )
+
+    def load_profile(self):
+        """Preview and confirm safe settings; preserve an undo snapshot."""
+        path = filedialog.askopenfilename(
+            parent=self.root,
+            filetypes=[('Anything Plays control profile', '*.json')],
+        )
+        if not path:
+            return
+        system = self.system_key.get()
+        try:
+            imported, theme, legacy = load_bundle(
+                path, selected_system=system, allowed_themes=self.THEMES,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            messagebox.showerror(
+                'Import controls', f'Could not read this profile: {exc}',
+                parent=self.root,
+            )
+            return
+        description = (
+            f'Console: {system.upper()}\n'
+            f'Button zones: {len(imported["zones"])}\n'
+            f'Mapped controls: {len(imported["mapping"])}\n'
+            f'Appearance theme: {theme or "keep current"}\n'
+            f'Format: {"legacy profile (review console carefully)" if legacy else "version 1"}\n\n'
+            'This replaces the selected console’s camera control settings. '
+            'Your other consoles, ROMs, saves and controller preferences '
+            'are not changed.\n\n'
+            'Object controls will remain stopped until you enable them again. '
+            'You can undo this import afterward.\n\n'
+            'Apply these settings?'
+        )
+        if not messagebox.askyesno(
+                'Review control-profile import', description,
+                parent=self.root):
+            return
+
+        try:
+            self.read_settings()
+            previous = copy.deepcopy(self.cfg)
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                'Import controls', f'Could not read current settings: {exc}',
+                parent=self.root,
+            )
+            return
+        previous_saved = self.profile_store.get(system)
+        previous_theme = self.theme_name.get()
+        self.stop_controls()
+        try:
+            self.profile_store.put(system, imported)
+            self.cfg = self.profile_store.get(system)
             self.refresh_settings()
+            if theme is not None and theme != previous_theme:
+                self.theme_name.set(theme)
+                self.apply_theme(theme)
+            self.save_preferences()
         except Exception as exc:
-            messagebox.showerror('Profile', str(exc))
+            # ProfileStore.put updates its in-memory cache before the disk
+            # write. Always restore both copies on an interrupted apply.
+            try:
+                self.profile_store.put(system, previous_saved)
+            except OSError:
+                pass
+            self.cfg = previous
+            try:
+                self.refresh_settings()
+                self.theme_name.set(previous_theme)
+                self.apply_theme(previous_theme)
+            except (ValueError, tk.TclError):
+                pass
+            messagebox.showerror(
+                'Import controls', f'Import failed; previous controls restored: {exc}',
+                parent=self.root,
+            )
+            return
+        self._last_profile_import = (system, previous, previous_theme)
+        undo = getattr(self, '_undo_import_button', None)
+        if undo is not None:
+            undo.configure(state='normal')
+        self.status.set(
+            f'{system.upper()} controls imported. Object input is paused. '
+            'Use Undo import to restore your previous layout.'
+        )
+
+    def undo_profile_import(self):
+        """Undo the most recent profile import without changing other consoles."""
+        snapshot = getattr(self, '_last_profile_import', None)
+        if snapshot is None:
+            return
+        system, previous, theme = snapshot
+        if self.system_key.get() != system:
+            messagebox.showinfo(
+                'Undo import', f'Switch back to {system.upper()} to undo.',
+                parent=self.root,
+            )
+            return
+        self.stop_controls()
+        try:
+            self.profile_store.put(system, previous)
+            self.cfg = self.profile_store.get(system)
+            self.refresh_settings()
+            if self.theme_name.get() != theme:
+                self.theme_name.set(theme)
+                self.apply_theme(theme)
+            self.save_preferences()
+        except (OSError, ValueError, tk.TclError) as exc:
+            messagebox.showerror(
+                'Undo import', f'Could not restore the previous controls: {exc}',
+                parent=self.root,
+            )
+            return
+        self._last_profile_import = None
+        undo = getattr(self, '_undo_import_button', None)
+        if undo is not None:
+            undo.configure(state='disabled')
+        self.status.set('Previous control settings restored. Object input remains paused.')
 
     def reset_profile(self):
         self.stop_controls()
