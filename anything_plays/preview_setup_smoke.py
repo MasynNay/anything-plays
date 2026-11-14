@@ -194,6 +194,29 @@ def exercise_installed_preview_setup(app, root):
             raise RuntimeError("Frozen console switch retained cached game video")
         if app.game_bezel.active:
             raise RuntimeError("Frozen console switch retained active game bezel")
+        # The same stale-frame guarantees must also hold on an ordinary
+        # unload while the preview game window remains mounted.
+        with app.emu.lock:
+            app.emu.frame = np.zeros((8, 8, 3), dtype=np.uint8)
+            old_serial = app.emu.frame_serial
+        app.game_photo = object()
+        app._stream_game_frame = object()
+        app._stream_game_serial = old_serial
+        app._stream_canvas_item = 9
+        app._stream_photo = object()
+        camera_reference = object()
+        app._stream_camera_frame = camera_reference
+        with patch.object(app, "_game_only_canvas", Mock()) as game_canvas, \
+             patch.object(app, "_stream_canvas", Mock()) as stream_canvas:
+            app.unload_rom()
+            game_canvas.delete.assert_called_with("all")
+            stream_canvas.delete.assert_called_with("all")
+        if (app.emu.frame is not None or app.emu.frame_serial <= old_serial
+                or app._stream_game_frame is not None
+                or app._stream_photo is not None
+                or app._stream_canvas_item is not None
+                or app._stream_camera_frame is not camera_reference):
+            raise RuntimeError("Frozen game unload left stale game video")
         if app.emu.find_system_core() is not None:
             raise RuntimeError("Limited 3.2 preview unexpectedly has an SNES core")
         # Refresh the real installed first-run window while a limited

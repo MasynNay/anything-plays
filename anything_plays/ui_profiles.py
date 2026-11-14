@@ -147,29 +147,8 @@ class ProfilesMixin:
         self.deactivate_manual()
         self.emu.stop()
         self.stop_external_emulator()
-        # The native worker intentionally retains its last ROM/video for
-        # diagnostic or recovery purposes. A console switch must not show
-        # or stream a frame from the old console, especially if a previous
-        # game was running immediately before the selector changed.
-        # Keep the source of truth under the same lock as draw_game().
-        with self.emu.lock:
-            self.emu.frame = None
-            self.emu.frame_serial += 1
-        self.game_photo = None
-        self._last_game_render = None
-        self._game_image_item = None
-        self._game_image_canvas = None
-        game_only_canvas = getattr(self, "_game_only_canvas", None)
-        if game_only_canvas is not None:
-            game_only_canvas.delete("all")
-        self._stream_game_frame = None
-        self._stream_game_serial = None
-        invalidate_stream = getattr(self, "_invalidate_stream", None)
-        if callable(invalidate_stream):
-            invalidate_stream()
-        game_bezel = getattr(self, "game_bezel", None)
-        if game_bezel is not None:
-            game_bezel.set_active(False)
+        from anything_plays.game_display_lifecycle import clear_game_video
+        clear_game_video(self)
         self.emu.system = key
         self.emu.core_path = self.emu.find_system_core()
         self.rom_directory = self.rom_directories.get(key, '')
@@ -177,7 +156,6 @@ class ProfilesMixin:
         self.update_external_setup()
         self.refresh_selected_emulator_state()
         self.current_rom = None
-        self.game_canvas.delete('all')
         self.show_external_placeholder()
         self.game_status.set('Load your own ' + SYSTEMS[key].title + ' ROM')
         self.show_library()

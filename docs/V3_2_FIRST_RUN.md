@@ -167,6 +167,17 @@ if no new ROM is started. Source Tk and all four native installed-GUI checks
 seed synthetic old frames to verify cleanup; no game ROM or native core is
 required for these tests.
 
+## Unified game-video cleanup
+
+**Unload game**, changing console profiles, and rejecting a missing preview
+core now share one game-display cleanup path. The old native frame is erased
+under the emulator lock, the frame revision advances, the primary/Game-only
+Tk image caches and the Stream Mode game/output images are cleared, and
+the game bezel returns to idle. This happens even if a secondary Tk view was
+closed immediately before unload. Camera stream snapshots are preserved.
+Source unit tests and real source/frozen Tk tests assert the absence of stale
+game pixels; none of these checks load a game ROM.
+
 ## Release acceptance remaining
 
 - Full source and four-platform synthetic UI/soak tests on the integrated

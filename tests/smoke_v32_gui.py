@@ -234,6 +234,31 @@ def smoke():
                         assert app._stream_game_serial is None
                         assert app._stream_last_render is None
                         assert not app.game_bezel.active
+
+                        # Unload and console switch must share the same
+                        # lifecycle, including Stream Mode's rendered canvas.
+                        # Camera preview data must not be removed.
+                        with app.emu.lock:
+                            app.emu.frame = np.zeros((8, 8, 3), dtype=np.uint8)
+                            serial_before_unload = app.emu.frame_serial
+                        app.game_photo = object()
+                        app._stream_game_frame = object()
+                        app._stream_game_serial = serial_before_unload
+                        app._stream_canvas_item = 10
+                        app._stream_photo = object()
+                        camera_marker = object()
+                        app._stream_camera_frame = camera_marker
+                        with patch.object(app, "_stream_canvas", Mock()) as stream, \
+                             patch.object(app, "_game_only_canvas", Mock()) as other:
+                            app.unload_rom()
+                            stream.delete.assert_called_with("all")
+                            other.delete.assert_called_with("all")
+                        assert app.emu.frame is None
+                        assert app.emu.frame_serial > serial_before_unload
+                        assert app._stream_game_frame is None
+                        assert app._stream_photo is None
+                        assert app._stream_canvas_item is None
+                        assert app._stream_camera_frame is camera_marker
                         try:
                             # Source Tk setup reports the selected console,
                             # not an unrelated cached native binary path.

@@ -346,14 +346,9 @@ class LibraryMixin:
         self.deactivate_manual()
         self.stop_controls()
         self.emu.stop()
-        with self.emu.lock:
-            self.emu.frame = None
+        from anything_plays.game_display_lifecycle import clear_game_video
+        clear_game_video(self)
         self.current_rom = None
-        self.game_photo = None
-        self.game_canvas.delete('all')
-        bezel = getattr(self, "game_bezel", None)
-        if bezel is not None:
-            bezel.set_active(False)
         self.game_status.set('No ROM loaded')
         self.show_library()
 
