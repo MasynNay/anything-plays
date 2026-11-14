@@ -121,7 +121,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/verify_v32_preview.py             --target '${{ matrix.target }}'             --installer '${{ matrix.installer }}'             --bundle '${{ matrix.bundle }}'             --output 'release/V32_PRIVATE_PREVIEW_RECEIPT.json'
+          python -m tools.verify_v32_preview             --target '${{ matrix.target }}'             --installer '${{ matrix.installer }}'             --bundle '${{ matrix.bundle }}'             --output 'release/V32_PRIVATE_PREVIEW_RECEIPT.json'
       - name: Linux installed Debian application startup smoke (isolated)
         if: matrix.target == 'linux-x64'
         shell: bash
