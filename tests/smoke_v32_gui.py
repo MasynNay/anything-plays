@@ -41,12 +41,19 @@ def smoke():
     with tempfile.TemporaryDirectory(prefix="anything-plays-v32-gui-") as home:
         with patch("pathlib.Path.home", return_value=Path(home)):
             with patch("anything_plays.ui_camera.discover", return_value=[]):
-                with patch.dict(os.environ, {"AP_V30_UI_SMOKE_CHECK": "1"}):
+                with patch.dict(os.environ, {
+                    "AP_V30_UI_SMOKE_CHECK": "1",
+                    "AP_V32_PREVIEW": "1",
+                }):
                     root = tk.Tk()
                     app = None
                     try:
                         app = App(root)
                         root.update_idletasks()
+                        assert app.preferences_path.parent.name == (
+                            "anything-plays-32-preview"
+                        )
+                        assert "3.2" in root.title()
                         assert not app.armed
                         assert app.cap is None
                         assert app._gamepad.api is None
