@@ -56,6 +56,75 @@ class V32NativeStorageTests(unittest.TestCase):
                         stable.read_bytes(), b"STABLE_PROGRESS_DO_NOT_TOUCH",
                     )
 
+    def _make_test_symlink(self, target, link, *, directory=True):
+        try:
+            link.symlink_to(target, target_is_directory=directory)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"Symlink creation unavailable on host: {exc}")
+
+    def test_preview_save_root_rejects_redirect_to_stable_saves(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            stable = home / "data" / "anything-plays" / "saves"
+            stable.mkdir(parents=True)
+            preview_parent = home / "data" / "anything-plays"
+            self._make_test_symlink(stable, preview_parent / "3.2-preview")
+            with patch.dict(os.environ, {
+                "XDG_DATA_HOME": str(home / "data"),
+            }):
+                with patch("anything_plays.libretro_save.is_v32_preview",
+                           return_value=True):
+                    with self.assertRaisesRegex(ValueError, "must not link"):
+                        _user_save_directory()
+            self.assertEqual(list(stable.iterdir()), [])
+
+    def test_preview_core_overlay_rejects_redirect_to_stable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            old = home / "data" / "anything-plays" / "3.0"
+            old.mkdir(parents=True)
+            self._make_test_symlink(old, old.parent / "3.2-preview")
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(home / "data")}):
+                with patch("anything_plays.core_packs.is_v32_preview",
+                           return_value=True):
+                    with patch("anything_plays.core_packs.sys.platform",
+                               "linux"):
+                        with self.assertRaisesRegex(ValueError, "must not link"):
+                            managed_core_root()
+
+    def test_libretro_system_dir_rejects_redirect_to_stable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            preview = home / ".config" / "anything-plays-32-preview"
+            stable = home / ".config" / "anything-plays" / "libretro-system"
+            preview.mkdir(parents=True)
+            stable.mkdir(parents=True)
+            self._make_test_symlink(stable, preview / "libretro-system")
+            with self.assertRaisesRegex(ValueError, "must not link"):
+                preview_system_directory(home)
+
+    def test_preview_never_restores_symlinked_legacy_save_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            game = home / "game.gba"
+            game.write_bytes(b"mock ROM")
+            stable = game.with_suffix(".sav")
+            stable.write_bytes(b"ABCD")
+            with patch.dict(os.environ, {"XDG_DATA_HOME": str(home / "data")}):
+                with patch("anything_plays.libretro_save.is_v32_preview",
+                           return_value=True):
+                    memory = (C.c_ubyte * 4)()
+                    sav = SaveRAM(
+                        game, lambda _id: C.addressof(memory), lambda _id: 4,
+                    )
+                    sav.path.parent.mkdir(parents=True)
+                    self._make_test_symlink(
+                        stable, sav.path, directory=False,
+                    )
+                    with self.assertRaisesRegex(ValueError, "must not link"):
+                        sav.restore()
+                    self.assertEqual(stable.read_bytes(), b"ABCD")
+
     def test_stable_rom_adjacent_save_path_remains_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
             game = Path(temporary) / "old-game.gba"
