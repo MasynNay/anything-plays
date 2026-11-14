@@ -19,6 +19,11 @@ def fixture(sha="a"*64):
             "backend": "production GameCubeHardwareSession + platform GPU host",
             "passes_in_app_frame_queue": True,
             "gamecube_rgb_callback_frames": 120,
+            "sampled_nonblank_frames": 60,
+            "distinct_rgb_frame_hashes": 25,
+            "native_controller_polls": 900,
+            "nonzero_controller_polls": 70,
+            "error": None,
             "native_pcm_frame_samples": 180000,
             "native_pcm_nonzero_values": 39000,
             "native_pcm_sample_rate": 48000.0,
@@ -120,6 +125,51 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
                 report = qa.evaluate_evidence(raw, exit_code, "a"*64, "b"*40, True)
                 self.assertFalse(report["core_generated_nonzero_pcm_verified"])
                 self.assertFalse(report["public_release_approved"])
+
+    def test_failed_audio_preserves_authenticated_video_evidence(self):
+        raw = fixture()
+        raw["passed"] = False
+        raw["native_exit_code"] = 1
+        raw["details"]["passed"] = False
+        raw["details"]["native_pcm_nonzero_values"] = 0
+        raw["details"]["native_nonzero_pcm_requirement_met"] = False
+        report = qa.evaluate_evidence(raw, 1, "a"*64, "b"*40, True)
+        self.assertTrue(report["original_program_identity_verified"])
+        self.assertTrue(report["owned_program_native_video_observed"])
+        self.assertFalse(report["native_gpu_homebrew_rendering_verified"])
+        self.assertFalse(report["core_generated_nonzero_pcm_verified"])
+        self.assertEqual(report["experiment_outcome"],
+                         "native_video_observed_without_nonzero_pcm")
+        self.assertFalse(report["ready_for_release"])
+
+    def test_native_exception_is_not_an_audio_only_failure(self):
+        raw = fixture()
+        raw["passed"] = False
+        raw["native_exit_code"] = 1
+        raw["details"]["passed"] = False
+        raw["details"]["error"] = "RuntimeError: /home/private/game.dol"
+        report = qa.evaluate_evidence(raw, 1, "a"*64, "b"*40, True)
+        self.assertFalse(report["owned_program_native_video_observed"])
+        self.assertEqual(report["native_child_exception_class"], "RuntimeError")
+        self.assertEqual(report["experiment_outcome"], "native_child_exception")
+        self.assertNotIn("/home/private", json.dumps(report))
+
+    def test_crash_and_source_mismatch_never_claim_native_video(self):
+        for mode in ("source", "crash", "missing-frames", "bool-counter"):
+            with self.subTest(mode=mode):
+                raw = fixture()
+                if mode == "source":
+                    raw["fixture_sha256"] = "d" * 64
+                elif mode == "crash":
+                    raw["native_exit_code"] = -11
+                elif mode == "missing-frames":
+                    raw["details"]["distinct_rgb_frame_hashes"] = 0
+                else:
+                    raw["details"]["native_controller_polls"] = True
+                report = qa.evaluate_evidence(raw, 0, "a"*64, "b"*40, True)
+                self.assertFalse(report["owned_program_native_video_observed"])
+                self.assertFalse(report["native_gpu_homebrew_rendering_verified"])
+                self.assertFalse(report["core_generated_nonzero_pcm_verified"])
 
     def test_missing_docker_is_documented_not_hidden_as_sound_success(self):
         with TemporaryDirectory() as td:

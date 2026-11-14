@@ -80,19 +80,39 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
     raw = raw if isinstance(raw, dict) else {}
     details = raw.get("details") if isinstance(raw.get("details"), dict) else {}
     native_exit = raw.get("native_exit_code")
-    rendered = (
-        child_exit == 0 and raw.get("passed") is True
-        and type(native_exit) is int and native_exit == 0
+    pcm = details.get("native_pcm_nonzero_values")
+    pcm_samples = details.get("native_pcm_frame_samples")
+    source_matches = (
+        built is True and isinstance(dol_digest, str)
+        and re.fullmatch(r"[a-f0-9]{64}", dol_digest) is not None
         and raw.get("original_av_dol_sha256") == dol_digest
         and raw.get("fixture_sha256") == dol_digest
+    )
+    # Requiring audio makes the child exit 1 even when it rendered video.
+    # Record bounded video observations separately, never as release proof.
+    video_observed = (
+        source_matches
+        and type(child_exit) is int and child_exit in (0, 1)
+        and type(native_exit) is int and native_exit in (0, 1)
+        and details.get("error") is None
         and details.get("backend")
         == "production GameCubeHardwareSession + platform GPU host"
         and details.get("passes_in_app_frame_queue") is True
         and type(details.get("gamecube_rgb_callback_frames")) is int
         and details["gamecube_rgb_callback_frames"] >= 12
+        and type(details.get("sampled_nonblank_frames")) is int
+        and details["sampled_nonblank_frames"] >= 6
+        and type(details.get("distinct_rgb_frame_hashes")) is int
+        and details["distinct_rgb_frame_hashes"] >= 3
+        and type(details.get("native_controller_polls")) is int
+        and details["native_controller_polls"] >= 100
+        and type(details.get("nonzero_controller_polls")) is int
+        and details["nonzero_controller_polls"] >= 10
     )
-    pcm = details.get("native_pcm_nonzero_values")
-    pcm_samples = details.get("native_pcm_frame_samples")
+    rendered = (
+        video_observed and child_exit == 0
+        and raw.get("passed") is True and native_exit == 0
+    )
     audio = (
         rendered and details.get("native_nonzero_pcm_requirement_met") is True
         and type(pcm) is int and pcm >= 200
@@ -112,9 +132,17 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
             reason_code = "native_child_timed_out"
         elif not isinstance(raw.get("details"), dict):
             reason_code = "native_child_details_absent"
-        elif type(child_code) is int and child_code != 0:
+        elif not source_matches:
+            reason_code = "original_source_identity_not_verified"
+        elif type(child_code) is int and child_code not in (0, 1):
             reason_code = "native_child_nonzero_exit"
-        elif not rendered:
+        elif details.get("error") is not None:
+            reason_code = "native_child_exception"
+        elif video_observed and (type(pcm) is not int or pcm == 0):
+            reason_code = "native_video_observed_without_nonzero_pcm"
+        elif video_observed and pcm < 200:
+            reason_code = "native_video_observed_with_insufficient_pcm"
+        elif not video_observed:
             reason_code = "native_gpu_video_conditions_not_met"
         else:
             reason_code = "nonzero_pcm_conditions_not_met"
@@ -153,6 +181,8 @@ def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
         ),
         "native_subprocess_timed_out": raw.get("timed_out") is True,
         "native_gpu_homebrew_rendering_verified": rendered,
+        "owned_program_native_video_observed": video_observed,
+        "original_program_identity_verified": source_matches,
         "core_generated_nonzero_pcm_verified": audio,
         "core_generated_pcm_sample_frames": (
             pcm_samples if type(pcm_samples) is int and 0 <= pcm_samples < 1e9 else 0
