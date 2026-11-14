@@ -105,6 +105,7 @@ class ProfilesMixin:
         self.profile_store.put(self.system_key.get(), self.cfg)
 
     def switch_system(self, event=None):
+        calibration_was_open = getattr(self, '_calibration_window', None) is not None
         close_guide = getattr(self, 'close_camera_calibration', None)
         if callable(close_guide):
             close_guide(restore=True)
@@ -124,7 +125,8 @@ class ProfilesMixin:
             self.root.after_cancel(pending)
             self._zone_label_save_job = None
         try:
-            self.read_settings(previous)
+            if not calibration_was_open:
+                self.read_settings(previous)
             self.profile_store.put(previous, self.cfg)
         except (ValueError, tk.TclError, OSError):
             pass
