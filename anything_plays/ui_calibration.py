@@ -218,6 +218,18 @@ class CalibrationMixin:
         self._calibration_step += 1
         self._calibration_render_step()
 
+    def calibration_camera_changed(self):
+        """Drop stale observations after camera stop, switch or reconnect."""
+        if getattr(self, "_calibration_window", None) is None:
+            return
+        self._calibration_sampled = False
+        self._calibration_history.clear()
+        self._calibration_step = min(self._calibration_step, 1)
+        self._calibration_render_step()
+        self._calibration_diagnostics.set(
+            "Camera changed. Pick your target color again before continuing."
+        )
+
     def calibration_color_sampled(self):
         """Invoked by the primary-color click handler, never by a thread."""
         if getattr(self, "_calibration_window", None) is None:
