@@ -9,7 +9,7 @@ from collections import deque
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from anything_plays.calibration_metrics import calibration_summary
+from anything_plays.calibration_metrics import calibration_advice, calibration_summary
 from anything_plays.tracking import zone_at
 
 
@@ -121,6 +121,13 @@ class CalibrationMixin:
             diagnostics, textvariable=self._calibration_diagnostics,
             wraplength=480, justify="left",
         ).pack(anchor="w")
+        self._calibration_advice = tk.StringVar(
+            master=window, value="Sample a target color to begin."
+        )
+        ttk.Label(
+            diagnostics, textvariable=self._calibration_advice,
+            style="Value.TLabel", wraplength=475, justify="left",
+        ).pack(anchor="w", pady=(9, 0))
         ttk.Label(
             diagnostics,
             text="Detection means a color match, not verified identification. "
@@ -209,14 +216,17 @@ class CalibrationMixin:
                 parent=self._calibration_window,
             )
             return
-        if step == 2 and len(self._calibration_history) < 8:
-            messagebox.showinfo(
-                "Camera calibration",
-                "Observe at least eight live frames after selecting the "
-                "target so the detection feedback is meaningful.",
-                parent=self._calibration_window,
-            )
-            return
+        if step == 2:
+            report = calibration_summary(self._calibration_history)
+            if report["frames"] < 8 or report["seen"] == 0:
+                messagebox.showinfo(
+                    "Camera calibration",
+                    "The guide needs eight live frames and at least one "
+                    "target detection before you can save. Keep the target "
+                    "in view, or sample its color again.",
+                    parent=self._calibration_window,
+                )
+                return
         self._calibration_step += 1
         self._calibration_render_step()
 
@@ -263,8 +273,14 @@ class CalibrationMixin:
             self._calibration_diagnostics.set(
                 "No live camera connected. Select a webcam in the main window."
             )
+            self._calibration_advice.set(
+                "Reconnect a camera and sample the target color again."
+            )
         else:
             report = calibration_summary(self._calibration_history)
+            self._calibration_advice.set(
+                calibration_advice(report, sampled=self._calibration_sampled)
+            )
             if not report["frames"]:
                 text = "Waiting for live frames from the main preview…"
             else:
