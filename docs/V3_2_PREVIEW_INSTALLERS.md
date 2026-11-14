@@ -68,7 +68,14 @@ run before they can be counted as verified):
 Each test opens a real Tk root, constructs the App and runs its event loop for
 1.2 seconds. It verifies the exact immutable 3.2 build marker, disarmed inputs,
 all 18 **profiles** (not 18 bundled native cores), and a fresh preview profile
-saved after clean shutdown. The common native verifier seeds fake 3.1
+saved after clean shutdown. The installed app now also opens and closes five
+actual native setup windows: Get started, guided camera calibration, the
+controller/keyboard guide, controller button remapping, and setup diagnostics.
+The controller remap window must refuse capture when no controller is
+connected, and the real App must remain disarmed with no active camera/SDL
+device after all dialogs close. This tests packaged Tk resources and
+dialog lifecycle rather than just checking that one main window exists.
+The common native verifier seeds fake 3.1
 preferences **and** console profiles and rejects even one altered byte.
 A separate `V32_INSTALLED_GUI_RECEIPT.json` is retained with each installer.
 This remains a smoke test without physical camera, USB/Bluetooth controller,
