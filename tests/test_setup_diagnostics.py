@@ -42,9 +42,12 @@ class SetupDiagnosticsTests(unittest.TestCase):
         report = self.evaluate(
             system="gba", preview_minimal=True, core_found=False,
         )
-        self.assertEqual(
-            report["checks"]["emulator"]["status"], "Core file not located"
-        )
+        item = report["checks"]["emulator"]
+        self.assertEqual(item["status"], "Preview mGBA emulator file missing")
+        self.assertIn("GB, GBC and GBA", item["next"])
+        self.assertIn("Stable 3.1.1 is installed separately", item["next"])
+        self.assertNotIn("Not bundled", item["status"])
+        self.assertNotIn("reinstall Anything Plays 3.0", item["next"])
 
     def test_external_preview_backend_is_not_misclassified(self):
         report = self.evaluate(
