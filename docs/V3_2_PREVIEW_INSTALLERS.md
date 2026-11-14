@@ -52,18 +52,27 @@ It stages actual OS-native install packages, invokes existing native bundle
 checks, checks the embedded preview marker and native installer metadata, and
 generates `V32_PRIVATE_PREVIEW_RECEIPT.json` with source commit and SHA-256. The receipt verifier also inspects the unpacked application to reject any non-mGBA libretro core, extra Dolphin Sys runtime, or provenance manifest claiming more than the single mGBA core.
 
-The Linux workflow now also extracts the **built Debian package** into a
-disposable directory and launches its actual frozen App under Xvfb with a
-temporary HOME. Its 1.2-second real Tk startup check requires a live root,
-initialized app and event loop; it does not use a webcam, ROM or physical
-controller. The frozen-startup gate also verifies the exact embedded 3.2
-preview identity, 3.2 settings namespace and camera/controller disarmed state.
-CI seeds a canary in the existing stable 3.1 preferences folder and checks
-that the canary is **byte-for-byte unchanged** after preview startup. It
-checks the preview's saved console-profile file rather than incorrectly
-assuming a new preferences.json must exist after a read-only launch.
-The Windows and macOS artifacts still require equivalent installed
-desktop testing and physical-device validation.
+**All four platforms now have real installed-frozen-GUI CI gates**
+(the newly added three-platform gates still require a successful exact-head
+run before they can be counted as verified):
+
+- **Linux x64:** extract the actual Debian package into a disposable
+  directory and launch its frozen App under Xvfb.
+- **Windows x64:** silently install the actual Inno Setup EXE into a
+  disposable folder, then launch the installed `AnythingPlays.exe` using
+  the host's desktop session.
+- **macOS Apple Silicon and Intel:** mount the finished, ad-hoc-signed DMG
+  read-only, verify the app bundle signature, and launch the actual
+  `AnythingPlays32Preview.app` executable from that mounted volume.
+
+Each test opens a real Tk root, constructs the App and runs its event loop for
+1.2 seconds. It verifies the exact immutable 3.2 build marker, disarmed inputs,
+all 18 **profiles** (not 18 bundled native cores), and a fresh preview profile
+saved after clean shutdown. The common native verifier seeds fake 3.1
+preferences **and** console profiles and rejects even one altered byte.
+A separate `V32_INSTALLED_GUI_RECEIPT.json` is retained with each installer.
+This remains a smoke test without physical camera, USB/Bluetooth controller,
+retail ROM, macOS notarization or redistribution approval.
 
 To avoid repeatedly running superseded 3.1 build suites, eleven historic
 3.1/3.1.1 workflows now skip expensive jobs for the 3.2 integration PR.
