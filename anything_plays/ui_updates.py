@@ -46,6 +46,15 @@ class UpdatesMixin:
     def schedule_emulator_update_checks(self):
         if self._closing:
             return
+        from anything_plays.build_identity import current_identity
+        if current_identity()["channel"] == "v32_preview":
+            # Hermetic QA should not phone home or change its core provenance
+            # merely because a disposable preview was launched. The manual
+            # update button stays available as an explicit user action.
+            self._emulator_update_status.set(
+                "3.2 preview · Automatic emulator update checks are paused"
+            )
+            return
         try:
             self.check_emulator_updates(automatic=True)
         finally:
