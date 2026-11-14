@@ -96,6 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v32_native_storage.py' -v
+          python -m unittest discover -s tests -p 'test_v32_nested_native_storage.py' -v
           python -m unittest discover -s tests -p 'test_v32_state_atomic.py' -v
           python -m unittest discover -s tests -p 'test_v32_preview_endurance.py' -v
           python -m unittest discover -s tests -p 'test_v32_preview_startup_gate.py' -v
