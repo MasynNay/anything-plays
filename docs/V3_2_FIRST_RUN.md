@@ -59,6 +59,15 @@ the normal shutdown profile save. Cancel and switching consoles restore the
 exact pre-calibration profile. Saves are never silently approved by closing
 a window.
 
+## Live theme parity
+
+All four 3.2 setup windows remain non-modal. Their native scroll canvases
+now follow live theme changes made in the main window, including light/dark
+switches, rather than leaving white surfaces in a dark interface. The Tk
+variable observers detach when each child dialog is destroyed, preventing
+stale callbacks during later theme changes or shutdown. This is covered by
+headless Tcl lifetime tests and by the integrated Xvfb GUI smoke.
+
 ## Controller input safety
 
 When choosing an in-game button and physically pressing a controller
