@@ -217,6 +217,57 @@ class OriginalGameCubeAVResearchTests(unittest.TestCase):
         self.assertFalse(out["core_generated_nonzero_pcm_verified"])
         self.assertFalse(out["public_release_approved"])
 
+    def test_original_dol_header_preflight_accepts_bounded_bootstrap(self):
+        import struct
+        with TemporaryDirectory() as td:
+            dol = Path(td) / "owned-fixture.dol"
+            data = bytearray(0x160)
+            struct.pack_into(">I", data, 0x00, 0x100)
+            struct.pack_into(">I", data, 0x48, 0x80003100)
+            struct.pack_into(">I", data, 0x90, 0x40)
+            struct.pack_into(">I", data, 0xE0, 0x80003100)
+            dol.write_bytes(data)
+            parsed = qa.inspect_original_dol(dol)
+            self.assertTrue(parsed["structure_verified"])
+            self.assertEqual(parsed["layout_code"], "valid_gamecube_dol_layout")
+            self.assertEqual(parsed["text_section_count"], 1)
+            self.assertTrue(parsed["entry_within_text"])
+            self.assertNotIn(str(dol), json.dumps(parsed))
+
+    def test_original_dol_preflight_rejects_invalid_entry_and_range(self):
+        import struct
+        with TemporaryDirectory() as td:
+            dol = Path(td) / "owned-fixture.dol"
+            data = bytearray(0x140)
+            struct.pack_into(">I", data, 0x00, 0x100)
+            struct.pack_into(">I", data, 0x48, 0x80003100)
+            struct.pack_into(">I", data, 0x90, 0x40)
+            struct.pack_into(">I", data, 0xE0, 0x80004200)
+            dol.write_bytes(data)
+            self.assertEqual(
+                qa.inspect_original_dol(dol)["layout_code"],
+                "entry_not_in_text",
+            )
+            struct.pack_into(">I", data, 0x90, 0x80)
+            dol.write_bytes(data)
+            self.assertEqual(
+                qa.inspect_original_dol(dol)["layout_code"],
+                "invalid_section_bounds",
+            )
+            dol.write_bytes(b"x" * 20)
+            self.assertEqual(
+                qa.inspect_original_dol(dol)["layout_code"],
+                "truncated_header",
+            )
+
+    def test_original_dol_preflight_missing_file_is_redacted(self):
+        with TemporaryDirectory() as td:
+            missing = Path(td) / "private-contents.dol"
+            result = qa.inspect_original_dol(missing)
+            self.assertFalse(result["structure_verified"])
+            self.assertEqual(result["layout_code"], "header_unreadable")
+            self.assertNotIn("private-contents", json.dumps(result))
+
     def test_missing_docker_is_documented_not_hidden_as_sound_success(self):
         with TemporaryDirectory() as td:
             root = Path(td)

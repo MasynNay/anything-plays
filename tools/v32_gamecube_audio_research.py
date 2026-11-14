@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,69 @@ FIXTURE_PROGRAMS = {
 STATUS = "PRIVATE_V32_ORIGINAL_GC_AUDIO_AND_GPU_RESEARCH_NOT_RELEASE"
 BUILD_LIMIT = 300
 PROBE_LIMIT = 140
+DOL_HEADER_SIZE = 0x100
+DOL_RAM_START = 0x80000000
+DOL_RAM_END = 0x81800000
+
+
+def inspect_original_dol(path):
+    """Inspect a DOL's fixed header without retaining binary or paths.
+
+    There are seven code and eleven data slots, with big-endian addresses.
+    All returned observations are bounded, privacy-safe types and codes.
+    """
+    result = {
+        "structure_verified": False,
+        "layout_code": "header_unreadable",
+        "text_section_count": 0,
+        "data_section_count": 0,
+        "entry_within_text": False,
+    }
+    try:
+        file = Path(path)
+        file_size = file.stat().st_size
+        if file_size < DOL_HEADER_SIZE:
+            result["layout_code"] = "truncated_header"
+            return result
+        with file.open("rb") as fp:
+            header = fp.read(DOL_HEADER_SIZE)
+        if len(header) != DOL_HEADER_SIZE:
+            return result
+        offsets = struct.unpack_from(">18I", header, 0x00)
+        addresses = struct.unpack_from(">18I", header, 0x48)
+        lengths = struct.unpack_from(">18I", header, 0x90)
+        entry = struct.unpack_from(">I", header, 0xE0)[0]
+        code_ranges = []
+        for slot, (offset, address, length) in enumerate(
+            zip(offsets, addresses, lengths)
+        ):
+            if offset == address == length == 0:
+                continue
+            if (offset < DOL_HEADER_SIZE or length == 0
+                    or offset + length > file_size
+                    or address < DOL_RAM_START
+                    or address + length > DOL_RAM_END):
+                result["layout_code"] = "invalid_section_bounds"
+                return result
+            if slot < 7:
+                code_ranges.append((address, address + length))
+                result["text_section_count"] += 1
+            else:
+                result["data_section_count"] += 1
+        if not code_ranges:
+            result["layout_code"] = "missing_text_sections"
+            return result
+        result["entry_within_text"] = any(
+            first <= entry < last for first, last in code_ranges
+        )
+        if not result["entry_within_text"]:
+            result["layout_code"] = "entry_not_in_text"
+            return result
+        result["structure_verified"] = True
+        result["layout_code"] = "valid_gamecube_dol_layout"
+    except OSError:
+        pass
+    return result
 
 
 def digest(file):
@@ -260,6 +324,13 @@ def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
         ), symlinks=False)
         dol = project/dol_name
         result = {}
+        layout = {
+            "structure_verified": False,
+            "layout_code": "not_compiled",
+            "text_section_count": 0,
+            "data_section_count": 0,
+            "entry_within_text": False,
+        }
         report_path = tmp/"probe.json"
         try:
             uid_args = (
@@ -284,6 +355,13 @@ def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
                                            source_kind=source_kind)
             else:
                 sh = digest(dol)
+                layout = inspect_original_dol(dol)
+                if not layout["structure_verified"]:
+                    result = evaluate_evidence(
+                        {}, -1, sh, sha, True,
+                        "original_source_dol_layout_invalid",
+                        source_kind=source_kind,
+                    )
                 env = dict(os.environ)
                 env.update({
                     "HOME": str(tmp/"home"),
@@ -292,23 +370,24 @@ def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
                     "PYGAME_HIDE_SUPPORT_PROMPT": "1",
                     "AP_V32_PREVIEW": "1",
                 })
-                (tmp/"home").mkdir()
-                executed = subprocess.run(
-                    [sys.executable, "-m", "tools.probe_gamecube_app",
-                     "--core", str(core), "--rom", str(dol),
-                     "--require-audio", "--seconds", "25",
-                     "--report", str(report_path)],
-                    cwd=ROOT, env=env, capture_output=True,
-                    text=True, check=False, timeout=PROBE_LIMIT,
-                )
-                try:
-                    raw = json.loads(report_path.read_text("utf-8"))
-                except (OSError, ValueError):
-                    raw = {}
-                result = evaluate_evidence(
-                    raw, executed.returncode, sh, sha, True,
-                    source_kind=source_kind,
-                )
+                if layout["structure_verified"]:
+                    (tmp/"home").mkdir()
+                    executed = subprocess.run(
+                        [sys.executable, "-m", "tools.probe_gamecube_app",
+                         "--core", str(core), "--rom", str(dol),
+                         "--require-audio", "--seconds", "25",
+                         "--report", str(report_path)],
+                        cwd=ROOT, env=env, capture_output=True,
+                        text=True, check=False, timeout=PROBE_LIMIT,
+                    )
+                    try:
+                        raw = json.loads(report_path.read_text("utf-8"))
+                    except (OSError, ValueError):
+                        raw = {}
+                    result = evaluate_evidence(
+                        raw, executed.returncode, sh, sha, True,
+                        source_kind=source_kind,
+                    )
         except FileNotFoundError:
             result = evaluate_evidence({}, -1, None, sha, False,
                                        "source_compiler_not_installed",
@@ -318,6 +397,7 @@ def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
                                        "research_compile_or_native_timeout",
                                        source_kind=source_kind)
     result["original_program_source_sha256"] = source_digests
+    result["original_dol_bootstrap_layout"] = layout
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2, sort_keys=True)+"\n", "utf-8")
     print(json.dumps({
@@ -327,6 +407,10 @@ def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
         "core_generated_nonzero_pcm_verified":
             result["core_generated_nonzero_pcm_verified"],
         "experiment_outcome": result["experiment_outcome"],
+        "native_startup_phase": result["native_startup_phase"],
+        "native_boot_failure_category": result["native_boot_failure_category"],
+        "native_child_exception_class": result["native_child_exception_class"],
+        "original_dol_bootstrap_layout": result["original_dol_bootstrap_layout"],
         "ready_for_release": False,
     }, indent=2, sort_keys=True))
     # This is separate exploratory research. A missing compiler or failure
