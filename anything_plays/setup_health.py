@@ -8,6 +8,34 @@ identifiers, or other user data. The UI copies it only after a user action.
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 
 
+# The 3.2 QA installers have 18 setup profiles but only one native core,
+# mGBA. Keep every preview-specific help message consistent with this
+# intentionally narrow shipping inventory, not the full 3.1.1 release.
+PREVIEW_BUNDLED_SYSTEMS = frozenset(("gb", "gbc", "gba"))
+
+
+def preview_missing_core_guidance(system):
+    """Return (status, next step) only; never inspect private ROM paths."""
+    if system not in BUTTONS_BY_SYSTEM:
+        raise ValueError("Choose a supported console before checking a core.")
+    if system in PREVIEW_BUNDLED_SYSTEMS:
+        return (
+            "Preview mGBA emulator file missing",
+            "GB, GBC and GBA are intended to use bundled mGBA in this 3.2 "
+            "test installer. If it is missing, check this preview installation "
+            "or its emulator components; a source checkout must supply a "
+            "compatible mGBA core. Stable 3.1.1 is installed separately.",
+        )
+    return (
+        "Not bundled in this 3.2 preview",
+        "This test installer bundles mGBA for GB, GBC and GBA only. "
+        "Other console profiles are visible, but their native emulator "
+        "cores are not bundled. This is not a damaged installation. "
+        "Choose GB, GBC or GBA for bundled gameplay, or wait for a "
+        "reviewed full-core preview. Stable 3.1.1 is unaffected.",
+    )
+
+
 def build_setup_report(
     *, system, camera_count, camera_selected, camera_active,
     core_found, controller_enabled, controller_detected, embedded_mode,
@@ -52,13 +80,8 @@ def build_setup_report(
             "Core file located",
             "An emulator core file is present. This does not verify game compatibility."
         )
-    elif preview_minimal and system not in ("gb", "gbc", "gba"):
-        core = (
-            "Not bundled in this 3.2 preview",
-            "This test installer includes mGBA for GB, GBC and GBA only. "
-            "Other console profiles are visible, but their native emulator "
-            "cores are not bundled. This is not a damaged installation."
-        )
+    elif preview_minimal:
+        core = preview_missing_core_guidance(system)
     else:
         core = (
             "Core file not located",
