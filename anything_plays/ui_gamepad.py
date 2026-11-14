@@ -82,8 +82,17 @@ class GamepadMixin:
             actions, text="Rescan", command=self.refresh_gamepad,
             style="Compact.TButton"
         ).pack(side="right", padx=(0, 6))
+        ttk.Button(
+            panel, text="Guided setup · controller or keyboard",
+            command=self.open_controller_setup_guide, style="Accent.TButton",
+        ).pack(fill="x", pady=(10, 0))
         self.refresh_controller_artwork()
         return panel
+
+    def open_controller_setup_guide(self):
+        """Explain connection, testing and remapping without changing input."""
+        from anything_plays.ui_controller_guide import show_controller_guide
+        return show_controller_guide(self)
 
     def initialize_gamepad_preferences(self, preferences):
         """Load optional controller preferences without initializing SDL."""
@@ -103,6 +112,9 @@ class GamepadMixin:
 
     def close_gamepad(self):
         """Release gamepad state even for partially constructed App objects."""
+        close_guide = getattr(self, "_controller_guide_close", None)
+        if callable(close_guide):
+            close_guide()
         try:
             self.emu.release_gamepad()
         finally:

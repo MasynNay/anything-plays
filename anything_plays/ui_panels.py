@@ -101,6 +101,10 @@ class AuxiliaryPanelsMixin:
         self.arm_button.pack(fill='x')
         ttk.Button(controls, text='STOP ALL OBJECT CONTROLS  (Esc)', command=self.stop_controls, style='Danger.TButton').pack(fill='x', pady=5)
         ttk.Label(controls, text='F11 fullscreen · F10 borderless · Esc exit fullscreen and stop controls · Ctrl+Alt+F11 start/stop camera controls. No global keyboard injection.', wraplength=315).pack(anchor='w')
+        ttk.Button(
+            controls, text='Check my setup · camera, game, controller',
+            command=self.open_setup_diagnostics, style='Compact.TButton',
+        ).pack(fill='x', pady=(8, 2))
         ttk.Button(controls, text='Keyboard Shortcuts', command=self.configure_shortcuts).pack(fill='x', pady=(8, 2))
         profiles = ttk.Frame(right)
         profiles.pack(fill='x', padx=(12, 2), pady=(0, 16))
@@ -127,3 +131,8 @@ class AuxiliaryPanelsMixin:
             style='Helper.TLabel', wraplength=400,
         ).pack(anchor='w', padx=(12, 2), pady=(0, 12))
 
+
+    def open_setup_diagnostics(self):
+        """Show read-only local troubleshooting and redacted setup checks."""
+        from anything_plays.ui_setup_diagnostics import show_setup_diagnostics
+        return show_setup_diagnostics(self)
