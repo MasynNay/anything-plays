@@ -39,13 +39,20 @@ The workflow `.github/workflows/v32-private-preview-installers.yml`
 only builds from the integration PR head with exclusive non-release flags.
 It stages actual OS-native install packages, invokes existing native bundle
 checks, checks the embedded preview marker and native installer metadata, and
-generates `V32_PRIVATE_PREVIEW_RECEIPT.json` with source commit and SHA-256.
+generates `V32_PRIVATE_PREVIEW_RECEIPT.json` with source commit and SHA-256. The receipt verifier also inspects the unpacked application to reject any non-mGBA libretro core, extra Dolphin Sys runtime, or provenance manifest claiming more than the single mGBA core.
 
 The artifact workflow intentionally has only read permissions and cannot
 create tags, GitHub releases or edit the default branch. GitHub Actions
 artifacts may be accessible to people who can download artifacts from the
 repository and expire in seven days. Do not treat an Actions artifact as
 confidential or as a customer-facing release.
+
+
+When running the source preview without an installer, use the regular project
+setup instructions to install Python dependencies and fetch an appropriate
+mGBA core before attempting GB/GBC/GBA gameplay. A missing optional SNES,
+N64 or GameCube core in this limited preview is explicitly labeled **not
+bundled** rather than incorrectly described as corruption.
 
 ## Human acceptance still required
 
