@@ -61,7 +61,7 @@ class V32CIIsolationTests(unittest.TestCase):
             "actual_tk_mainloop_ran",
             "AP_V32_GUI_SMOKE_CHECK=1",
             "stable-before.json",
-            "do-not-change",
+            "tools.verify_v32_installed_gui seed",
             "cmp ",
             "anything-plays-32-preview/system_profiles.json",
             'data["v32_frozen_isolation_verified"] is True',
@@ -70,6 +70,13 @@ class V32CIIsolationTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, preview)
+        # The literal canaries now live in the shared installed-GUI module,
+        # not in platform-specific workflow shell scripts.
+        verifier = (
+            ROOT.parents[1] / "tools" / "verify_v32_installed_gui.py"
+        ).read_text("utf-8")
+        self.assertIn("do-not-change", verifier)
+        self.assertIn("system_profiles.json", verifier)
 
     def test_all_four_native_preview_installers_launch_the_frozen_gui(self):
         preview = (
