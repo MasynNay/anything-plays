@@ -150,7 +150,7 @@ jobs:
           timeout 65 xvfb-run -a "$ENTRY" --ap-v30-ui-smoke
           cmp "$QA_HOME/stable-before.json" \
               "$QA_HOME/home/.config/anything-plays-31/preferences.json"
-          test -f "$QA_HOME/home/.config/anything-plays-32-preview/preferences.json"
+          test -f "$QA_HOME/home/.config/anything-plays-32-preview/system_profiles.json"
           python - "$QA_HOME/v32-installed-gui.json" <<'PY'
           import json, sys
           from pathlib import Path
