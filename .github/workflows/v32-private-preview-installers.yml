@@ -91,6 +91,12 @@ jobs:
           assert make_identity("v32_preview")["public_release_approved"] is False
           print("3.2 preview exclusively selected; public release disabled")
           PY
+      - name: Verify preview save/core isolation on this actual OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v32_native_storage.py' -v
+          python -m unittest discover -s tests -p 'test_v32_preview_startup_gate.py' -v
       - name: Install Linux native Debian tooling
         if: runner.os == 'Linux'
         shell: bash
