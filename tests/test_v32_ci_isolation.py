@@ -128,6 +128,7 @@ class V32CIIsolationTests(unittest.TestCase):
         self.assertIn("test_v32_state_atomic.py", preview)
         self.assertIn("test_v32_preview_endurance.py", preview)
         self.assertIn("test_v32_preview_startup_gate.py", preview)
+        self.assertIn("test_v32_stationary_calibration.py", preview)
         self.assertNotIn("python tools/verify_v32_preview.py", preview)
         self.assertIn("actions/upload-artifact@v4", preview)
         self.assertNotIn("gh release create", preview)
