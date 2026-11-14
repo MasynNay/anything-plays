@@ -25,6 +25,17 @@ package, and the embedded `v32_preview` build marker selects a clean
 `anything-plays-32-preview` settings directory. There is no automatic
 migration from published stable settings or 3.1 release-candidate profiles.
 
+**Game progress is isolated too.** Unlike published builds, this private
+preview never imports or replaces an adjacent `<ROM>.sav` file. Its SRAM
+snapshots and native per-core saves use new version-specific user-data folders
+on Windows, Linux and macOS; the Libretro firmware/system directory and
+per-user core-pack store are version-specific as well. A game already in your
+stable library will therefore start with fresh progress in the preview.
+Preview save progress can be tested and reopened inside the preview without
+touching the stable game's original saves. This is deliberate: test firmware,
+save states, core updates and unknown native behavior must not mutate the
+working 3.1/3.1.1 installation.
+
 - **Linux:** `anything-plays-32-preview` package, executable, desktop entry,
   icon and `/opt/anything-plays-32-preview` installation.
 - **Windows:** distinct `V32PreviewBuild` Inno Setup AppId, folder, program
@@ -83,7 +94,7 @@ On a disposable/test account before considering a public release:
 
 1. Confirm the installed app title says **Anything Plays 3.2 Development
    Preview**, the installer is alongside—not replacing—3.1.1, and the old
-   settings are unchanged.
+   settings, `<ROM>.sav` progress and managed core store are unchanged.
 2. Launch the camera wizard using a real USB/internal webcam, sample a
    distinctive target, verify zone feedback, stop/reconnect camera, and verify
    that object controls cannot arm during calibration.
