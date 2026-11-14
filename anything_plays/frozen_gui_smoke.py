@@ -158,6 +158,16 @@ def run_smoke_gui(app_type, systems):
                             "Frozen 3.2 preview identity, default input state "
                             "or isolated settings namespace was not verified"
                         )
+                if (result["passed"]
+                        and os.environ.get("AP_V32_SETUP_SMOKE_CHECK") == "1"):
+                    try:
+                        from anything_plays.preview_setup_smoke import (
+                            exercise_installed_preview_setup,
+                        )
+                        result.update(exercise_installed_preview_setup(app, root))
+                    except Exception:
+                        result["error"] = traceback.format_exc()[-9000:]
+                        result["passed"] = False
                 if os.environ.get("AP_V31_STREAM_SMOKE_CHECK") == "1":
                     try:
                         result.update(_exercise_installed_stream_mode(app))
