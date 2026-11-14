@@ -267,6 +267,12 @@ class GamepadMixin:
                             (getattr(self, "_gamepad_seen_controller", False)
                              and connected_device is not None)):
                         self._gamepad_reconnect_release_pending = True
+                        # Remapping belongs to a particular physical device.
+                        # A hotplug or swap during capture must never map a
+                        # fresh pad's first press using the old pad's baseline.
+                        self._cancel_controller_capture(
+                            "Controller changed; choose Press to assign again."
+                        )
                     self._gamepad_last_controller = connected_device
                     if connected_device is not None:
                         self._gamepad_seen_controller = True

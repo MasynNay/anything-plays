@@ -114,8 +114,10 @@ check. Reconnecting a USB/Bluetooth controller or changing from one pad to
 another also suppresses held inputs until the newly connected controller
 provides a neutral release sample; first-time enabling the controller
 remains responsive without an artificial delay. Manual Rescan follows the
-same neutral-release handoff rule. Synthetic connection, focus and remap
-tests run in source CI and in each native preview installer's preflight;
+same neutral-release handoff rule. A hotplug during Press to assign cancels
+that mapping rather than treating a new device's first button as the old
+device's intended control. Synthetic connection, focus and remap tests
+run in source CI and in each native preview installer's preflight;
 these tests do not certify physical Bluetooth or USB hardware.
 
 ## Automated real Tk setup smoke

@@ -51,6 +51,9 @@ class CaptureHost(GamepadMixin):
     def __init__(self):
         self._closing = False
         self._controller_capture_release_pending = False
+        self._gamepad_last_controller = None
+        self._gamepad_seen_controller = False
+        self._gamepad_reconnect_release_pending = False
         self._gamepad = Reader()
         self._gamepad_bindings = {}
         self._controller_capture = None
@@ -221,6 +224,28 @@ class ControllerCaptureTests(unittest.TestCase):
         app._gamepad.physical_buttons = frozenset({"A"})
         app.gamepad_tick()
         self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_controller_swap_during_remap_cancels_without_assigning_button(self):
+        app = CaptureHost()
+        app.gamepad_tick()  # establish original device identity
+        note = Setting()
+        app._controller_capture = {
+            "system": "gba", "target": "B",
+            "baseline": frozenset(), "status": note, "rows": {},
+        }
+        app._gamepad.controller = object()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertIsNone(app._controller_capture)
+        self.assertEqual(app._gamepad_bindings, {})
+        self.assertEqual(app.saved, 0)
+        self.assertIn("Controller changed", note.get())
+        self.assertTrue(app._controller_capture_release_pending)
+        self.assertEqual(app.emu.published[-1], frozenset())
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._controller_capture_release_pending)
+        self.assertFalse(app._gamepad_reconnect_release_pending)
 
     def test_initial_controller_enable_keeps_first_ordinary_press_responsive(self):
         app = CaptureHost()
