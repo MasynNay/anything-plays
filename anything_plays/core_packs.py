@@ -29,7 +29,7 @@ import zipfile
 
 from anything_plays.emulator_updates import UPSTREAM_REPOS
 from anything_plays.update_check import version_key
-from anything_plays.preview_storage import is_v32_preview
+from anything_plays.preview_storage import is_v32_preview, checked_preview_directory
 
 RELEASES_API = "https://api.github.com/repos/MasynNay/anything-plays/releases?per_page=30"
 RELEASE_PREFIX = "https://github.com/MasynNay/anything-plays/releases/download/"
@@ -63,10 +63,16 @@ def managed_core_root():
     scope = "3.2-preview" if is_v32_preview() else "3.0"
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
-        return base / "AnythingPlays" / scope / "cores"
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "AnythingPlays" / scope / "cores"
-    return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "anything-plays" / scope / "cores"
+        candidate = base / "AnythingPlays" / scope / "cores"
+    elif sys.platform == "darwin":
+        candidate = (Path.home() / "Library" / "Application Support"
+                     / "AnythingPlays" / scope / "cores")
+    else:
+        candidate = (Path(os.environ.get(
+            "XDG_DATA_HOME", str(Path.home() / ".local/share"),
+        )) / "anything-plays" / scope / "cores")
+    return (checked_preview_directory(candidate, scope)
+            if is_v32_preview() else candidate)
 
 
 def _no_symlinks(path, parent):
