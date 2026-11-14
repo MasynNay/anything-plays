@@ -84,8 +84,14 @@ class PreviewNestedSaveIsolationTests(unittest.TestCase):
                                 # Every scenario starts without a previous
                                 # linked subtree, so failure cannot be
                                 # attributed to a different path component.
-                                if (save_root / "native-core").is_symlink():
-                                    (save_root / "native-core").unlink()
+                                native = save_root / "native-core"
+                                if native.is_symlink():
+                                    native.unlink()
+                                elif relative == "native-core" and native.is_dir():
+                                    # Prior child tests may have created the
+                                    # empty native-core directory; remove it
+                                    # before inserting a redirect at its root.
+                                    native.rmdir()
                                 link.parent.mkdir(parents=True, exist_ok=True)
                                 self.make_symlink(stable, link)
                                 with self.assertRaisesRegex(
