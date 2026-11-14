@@ -239,12 +239,12 @@ class GamepadMixin:
                 settings = self._gamepad_bindings.get(system)
                 buttons, status = self._gamepad.poll(system, settings)
                 self._controller_capture_tick(system)
-                if (self._controller_capture is not None
-                        or self._controller_capture_release_pending):
+                if (getattr(self, "_controller_capture", None) is not None
+                        or getattr(self, "_controller_capture_release_pending", False)):
                     # Remapping must never inject the captured press into a
                     # running game, including the frame after assignment.
                     buttons = frozenset()
-                    if (self._controller_capture is None
+                    if (getattr(self, "_controller_capture", None) is None
                             and not self._gamepad.physical_buttons):
                         self._controller_capture_release_pending = False
                 if not self.uses_embedded_emulator():
