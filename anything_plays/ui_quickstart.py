@@ -6,6 +6,7 @@ ROM, starts SDL, or arms object controls. Every operation needs a user click.
 
 import tkinter as tk
 from tkinter import ttk
+from anything_plays.ui_setup_theme import bind_theme_canvas
 
 
 def show_quick_start(app):
@@ -69,6 +70,7 @@ def show_quick_start(app):
     canvas = tk.Canvas(
         holder, borderwidth=0, highlightthickness=0, bg=surface,
     )
+    bind_theme_canvas(app, window, canvas)
     scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scroll.set)
     scroll.pack(side="right", fill="y")
