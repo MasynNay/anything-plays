@@ -110,6 +110,27 @@ class V32SourcePreviewTests(unittest.TestCase):
                     (location / "system_profiles.json").read_text(encoding="utf-8"),
                 )
 
+    def test_preview_refuses_a_hardlink_to_stable_preferences(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            stable = home / ".config" / "anything-plays-31"
+            stable.mkdir(parents=True)
+            stable_file = stable / "preferences.json"
+            stable_file.write_text('{"theme": "Plum Dark"}', encoding="utf-8")
+            preview = home / ".config" / "anything-plays-32-preview"
+            preview.mkdir(parents=True)
+            target = preview / "preferences.json"
+            try:
+                os.link(stable_file, target)
+            except (OSError, NotImplementedError):
+                self.skipTest("Hardlink test unavailable on host")
+            with self.assertRaisesRegex(ValueError, "share stable"):
+                prepare_test_preferences(home, channel="v32_preview")
+            self.assertEqual(
+                stable_file.read_text(encoding="utf-8"),
+                '{"theme": "Plum Dark"}',
+            )
+
     def test_preview_rejects_linked_preference_destination(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)
