@@ -194,7 +194,7 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, Calibratio
         if pending_rom_scan is not None:
             pending_rom_scan.set()
         try:
-            self.persist_system_profile()
+            self.persist_on_exit()
         except (OSError, ValueError, tk.TclError):
             pass
         # Cleanup each driver separately: a USB camera can fail while
@@ -209,7 +209,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, Calibratio
             job = getattr(self, job_name, None)
             if job is not None:
                 cleanup(job_name, lambda job=job: self.root.after_cancel(job))
-        cleanup("calibration guide", lambda: self.close_camera_calibration(restore=False))
         cleanup("stream output", self.close_stream_mode)
         cleanup("manual input", self.deactivate_manual)
         cleanup("gamepad", self.close_gamepad)
