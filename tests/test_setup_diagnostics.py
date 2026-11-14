@@ -1,0 +1,75 @@
+"""Read-only setup diagnostics contracts, no devices or game files needed."""
+
+import json
+import unittest
+
+from anything_plays.setup_health import build_setup_report
+
+
+class SetupDiagnosticsTests(unittest.TestCase):
+    def evaluate(self, **changes):
+        options = dict(
+            system="gba", camera_count=0, camera_selected=False,
+            camera_active=False, core_found=False, controller_enabled=False,
+            controller_detected=False, embedded_mode=True,
+        )
+        options.update(changes)
+        return build_setup_report(**options)
+
+    def test_no_camera_or_core_still_offers_keyboard(self):
+        report = self.evaluate()
+        self.assertIn("No camera found", report["checks"]["camera"]["status"])
+        self.assertIn("keyboard", report["checks"]["camera"]["next"])
+        self.assertIn("not located", report["checks"]["emulator"]["status"])
+        self.assertIn("disabled", report["checks"]["controller"]["status"])
+
+    def test_selected_camera_explains_permissions_without_claiming_denial(self):
+        report = self.evaluate(camera_count=1, camera_selected=True)
+        advice = report["checks"]["camera"]["next"]
+        self.assertIn("check OS privacy permissions", advice)
+        self.assertNotIn("permission denied", advice.lower())
+
+    def test_live_camera_observed_not_certified(self):
+        report = self.evaluate(
+            camera_count=2, camera_selected=True, camera_active=True,
+        )
+        self.assertIn("running", report["checks"]["camera"]["status"])
+        self.assertIn("target color", report["checks"]["camera"]["next"])
+
+    def test_controller_diagnostics_do_not_require_hardware(self):
+        waiting = self.evaluate(controller_enabled=True)
+        self.assertIn("Waiting", waiting["checks"]["controller"]["status"])
+        detected = self.evaluate(
+            controller_enabled=True, controller_detected=True,
+        )
+        self.assertIn("detected", detected["checks"]["controller"]["status"])
+        self.assertIn("test live buttons", detected["checks"]["controller"]["next"])
+
+    def test_external_backend_warns_in_app_mapping_may_not_work(self):
+        report = self.evaluate(embedded_mode=False, core_found=True)
+        self.assertIn("external", report["checks"]["input_backend"]["status"].lower())
+        self.assertIn("may not reach", report["checks"]["input_backend"]["next"])
+        self.assertIn("does not verify", report["checks"]["emulator"]["next"])
+
+    def test_report_is_allowlisted_and_does_not_expose_private_data(self):
+        report = self.evaluate(
+            camera_count=100, camera_selected=True, core_found=True,
+            controller_enabled=True, controller_detected=True,
+        )
+        self.assertEqual(set(report), {"format", "version", "console", "checks"})
+        self.assertEqual(
+            set(report["checks"]),
+            {"camera", "emulator", "controller", "input_backend"},
+        )
+        encoded = json.dumps(report)
+        for private in ("ROM path", "bluetooth_name", "camera_frame",
+                        "user_directory", "device_serial", "/home/"):
+            self.assertNotIn(private, encoded)
+
+    def test_unknown_console_rejected(self):
+        with self.assertRaisesRegex(ValueError, "supported console"):
+            self.evaluate(system="../../secrets")
+
+
+if __name__ == "__main__":
+    unittest.main()
