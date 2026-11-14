@@ -109,6 +109,11 @@ class SaveRAM:
             _user_save_directory()
             if self.path.is_symlink():
                 raise ValueError("Preview save must not link to a stable file")
+            if self.path.is_file() and self.path.stat().st_nlink != 1:
+                # A regular-looking hardlink can point to an existing
+                # stable SRAM file. Never import someone else's progress
+                # through a linked preview destination.
+                raise ValueError("Preview save must not share a stable file")
         if pointer and size and self.path.is_file():
             # Read only as much as this core can hold, plus one byte to
             # detect oversized/partial legacy saves. A corrupt multi-GB save
