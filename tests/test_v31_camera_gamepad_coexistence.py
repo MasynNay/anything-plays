@@ -322,7 +322,15 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertFalse(app.emu.held("B", 1))
         app.root.focus = object()
         app.one_frame()
-        self.assertTrue(app.emu.held("A"), "SDL resumes after focus returns")
+        self.assertFalse(app.emu.held("A"),
+                         "a held SDL press must not resume on focus return")
+        self.pad.buttons = set()
+        app.one_frame()
+        self.assertFalse(app.emu.inputs.gamepad_buttons)
+        self.pad.buttons = {"A"}
+        app.one_frame()
+        self.assertTrue(app.emu.held("A"),
+                        "a fresh press resumes after releasing the controller")
 
     def test_camera_stop_does_not_release_keyboard_or_controller(self):
         app = self.app
