@@ -24,6 +24,22 @@ from anything_plays.emulator_updates import (
 )
 
 CHECK_INTERVAL_SECONDS = 24 * 60 * 60
+
+# GameCube needs a paired, version-matched Dolphin core plus Sys assets. The
+# single-file core-pack updater must never offer it; full application updates
+# carry the separately reviewed matching runtime.
+FULL_APP_ONLY = frozenset(("dolphin",))
+
+
+def _pending_core_packs(packs, installed_revision):
+    """Filter approved updates without touching the filesystem or network."""
+    return [
+        item for item in packs
+        if item["name"] not in FULL_APP_ONLY
+        and installed_revision(item["name"]) != item["sha256"]
+    ]
+
+
 class UpdatesMixin:
     """Never stall the Tk event loop or swap a loaded native emulator."""
 
@@ -79,11 +95,9 @@ class UpdatesMixin:
                 report = check_emulator_updates(_search_directories(), online=True)
                 approved_error = None
                 try:
-                    available = [
-                        item for item in discover_core_packs()
-                        if item["name"] not in FULL_APP_ONLY
-                        and installed_pack_revision(item["name"]) != item["sha256"]
-                    ]
+                    available = _pending_core_packs(
+                        discover_core_packs(), installed_pack_revision,
+                    )
                 except (OSError, ValueError, TimeoutError) as exc:
                     available = []
                     approved_error = str(exc)
@@ -286,5 +300,17 @@ class UpdatesMixin:
         else:
             # The full 3.0 installer has ALL 11 cores. Missing binaries
             # indicate corruption/packaging failure, not an optional feature.
-            status.set("Emulator files missing · repair or reinstall Anything Plays")
+            # A minimal 3.2 preview intentionally bundles mGBA only.
+            # Missing other cores is not a damaged stable installation.
+            from anything_plays.build_identity import current_identity
+            if (current_identity()["channel"] == "v32_preview"
+                    and system not in ("gb", "gbc", "gba")):
+                status.set(
+                    "Not bundled in this 3.2 preview · "
+                    "GB, GBC and GBA use mGBA"
+                )
+            else:
+                status.set(
+                    "Emulator files missing · repair or reinstall Anything Plays"
+                )
 
