@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from anything_plays.build_identity import make_identity
 from anything_plays.core_packs import managed_core_root
+from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_save import (
     SaveRAM, _fallback_path, _user_save_directory,
     native_core_save_directory,
@@ -127,6 +128,44 @@ class PreviewStorageTests(unittest.TestCase):
                         self.assertEqual(sav.path.read_bytes(), b"NEW!")
                         self.assertEqual(legacy.read_bytes(), b"OLD!")
                         self.assertFalse(sav.persist())
+
+    def test_actual_core_session_libretro_paths_are_preview_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            rom = home / "synthetic-test.gba"
+            rom.write_bytes(b"synthetic-no-native-core")
+            with patch("pathlib.Path.home", return_value=home):
+                with patch("anything_plays.gba_emulator.AudioSink"):
+                    with identity("v32_preview"):
+                        session = CoreSession(
+                            SimpleNamespace(volume=0.25), "gba", rom, None,
+                        )
+                        expected = preview_system_directory(home)
+                        self.assertEqual(
+                            Path(os.fsdecode(C.string_at(session._system_dir_buffer))),
+                            expected,
+                        )
+                        self.assertEqual(
+                            Path(os.fsdecode(C.string_at(session._save_dir_buffer))),
+                            expected,
+                        )
+                        self.assertTrue(expected.is_dir())
+                        self.assertFalse(
+                            (home / ".config" / "anything-plays").exists()
+                        )
+                    with identity("v311_stable_candidate"):
+                        stable = CoreSession(
+                            SimpleNamespace(volume=0.25), "gba", rom, None,
+                        )
+                        old = home / ".config" / "anything-plays"
+                        self.assertEqual(
+                            Path(os.fsdecode(C.string_at(stable._system_dir_buffer))),
+                            old,
+                        )
+                        self.assertEqual(
+                            Path(os.fsdecode(C.string_at(stable._save_dir_buffer))),
+                            old,
+                        )
 
     def test_stable_save_semantics_stay_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
