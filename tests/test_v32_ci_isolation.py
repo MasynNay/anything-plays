@@ -47,6 +47,23 @@ class V32CIIsolationTests(unittest.TestCase):
                     self.assertIsNotNone(if_line)
                     self.assertIn("feature/v3.2-integration", if_line)
 
+    def test_linux_preview_requires_frozen_extracted_debian_gui_start(self):
+        preview = (
+            ROOT / "v32-private-preview-installers.yml"
+        ).read_text("utf-8")
+        for expected in (
+            "Linux installed Debian application startup smoke (isolated)",
+            "dpkg-deb -x",
+            "anything-plays-32-preview/AnythingPlays",
+            "xvfb-run -a",
+            "--ap-v30-ui-smoke",
+            "actual_tk_mainloop_ran",
+            'data["frozen_binary"] is True',
+            'data["public_distribution_approved"] is False',
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, preview)
+
     def test_current_source_and_private_installer_checks_remain_enabled(self):
         source = (ROOT / "ci.yml").read_text("utf-8")
         self.assertIn("python -m unittest discover -s tests -v", source)
