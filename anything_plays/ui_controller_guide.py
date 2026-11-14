@@ -33,7 +33,9 @@ def show_controller_guide(app):
     shell.pack(fill="both", expand=True)
     scroller = ttk.Frame(shell)
     scroller.pack(fill="both", expand=True)
-    canvas = tk.Canvas(scroller, highlightthickness=0, borderwidth=0)
+    canvas = tk.Canvas(scroller, highlightthickness=0, borderwidth=0,
+                       bg=app.THEMES.get(app.theme_name.get(),
+                                         app.THEMES["Dark"])[1])
     bar = ttk.Scrollbar(scroller, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=bar.set)
     bar.pack(side="right", fill="y")
