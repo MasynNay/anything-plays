@@ -124,6 +124,7 @@ class V32CIIsolationTests(unittest.TestCase):
         self.assertIn("feature/v3.2-integration", preview)
         self.assertIn("python -m tools.verify_v32_preview", preview)
         self.assertIn("test_v32_native_storage.py", preview)
+        self.assertIn("test_v32_state_atomic.py", preview)
         self.assertIn("test_v32_preview_startup_gate.py", preview)
         self.assertNotIn("python tools/verify_v32_preview.py", preview)
         self.assertIn("actions/upload-artifact@v4", preview)
