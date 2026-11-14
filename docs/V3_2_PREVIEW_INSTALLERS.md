@@ -52,9 +52,10 @@ It stages actual OS-native install packages, invokes existing native bundle
 checks, checks the embedded preview marker and native installer metadata, and
 generates `V32_PRIVATE_PREVIEW_RECEIPT.json` with source commit and SHA-256. The receipt verifier also inspects the unpacked application to reject any non-mGBA libretro core, extra Dolphin Sys runtime, or provenance manifest claiming more than the single mGBA core.
 
-**All four platforms now have real installed-frozen-GUI CI gates**
-(the newly added three-platform gates still require a successful exact-head
-run before they can be counted as verified):
+**All four platforms have passed real installed-frozen-GUI CI gates**
+at the verified 3.2 checkpoint `6d8257b6` ([native run
+43605185838](https://github.com/MasynNay/anything-plays/actions/runs/43605185838)).
+Subsequent code changes must pass their own exact-head rerun:
 
 - **Linux x64:** extract the actual Debian package into a disposable
   directory and launch its frozen App under Xvfb.
@@ -92,13 +93,33 @@ The initial 3.2 source-check runs exposed a strict repository hygiene
 allowlist blocker: it rejected the new, reviewed `run_v32_preview.py` entry
 point. The allowlist now explicitly permits that single source launcher while
 rejecting unrelated root scripts; a regression test locks this down.
-That earlier failure is resolved in source, but source CI remains pending
-until a runner completes tests on the newest commit.
+That earlier failure was resolved, and source tests passed at the
+verified four-platform checkpoint. New source changes continue to require
+their own GitHub Actions success before being treated as verified.
 
 Private preview paths also reject symlink redirection back into stable data
 and hardlinked SRAM inputs, so a seemingly distinct directory cannot be used
 to import or corrupt a stable game's save during QA. These are source-level
 safeguards; a physical device run is still required.
+
+## Save recovery and long-session regression scope
+
+The previous Neo Geo Pocket full-state checkpoint writer used one shared
+`.apstate.tmp` filename. Concurrent app instances could overwrite or delete
+each other's in-flight state. The 3.2 branch now writes to unique temporary
+siblings, flushes the complete checkpoint to disk and atomically publishes the
+finished bytes. A failed replace must keep the previous state intact, and an
+old symlink at the legacy fixed-temp name must remain untouched.
+
+Native source tests and the four-platform package preflight now exercise
+two deliberately overlapping checkpoint writers, simulated failed writes,
+correctly restored last-complete checkpoints, and 1,500 identical state
+snapshots without repeated disk replacements. A separate SRAM test advances
+**108,000 simulated 60-FPS frames (30 virtual minutes)**, including 5-second
+checkpoint intervals, restarts and a failed checkpoint/retry, while asserting
+that a public/stable ROM-adjacent save stays byte-identical. The simulation
+runs quickly; **it is not a 30-minute real-world session, game-speed metric,
+physical controller test or substitute for the later field soak**.
 
 The artifact workflow intentionally has only read permissions and cannot
 create tags, GitHub releases or edit the default branch. GitHub Actions
