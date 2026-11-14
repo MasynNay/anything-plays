@@ -156,12 +156,19 @@ class CoreSession:
         # Every ROM needs a unique user-writable directory or two different
         # games with the same filename can silently overwrite progress.
         # Dolphin keeps its independent user save directory and Sys files.
+        from anything_plays.preview_storage import (
+            is_v32_preview, preview_system_directory,
+        )
         if system in ("gamecube", "ngp", "ngpc"):
             save_folder = native_core_save_directory(self.rom, system)
             save_folder.mkdir(parents=True, exist_ok=True)
+        elif is_v32_preview():
+            # Some cores use GET_SAVE_DIRECTORY even when SRAM is handled
+            # elsewhere. The preview cannot write into stable's system area.
+            save_folder = preview_system_directory()
+            save_folder.mkdir(parents=True, exist_ok=True)
         else:
-            # Unused by generic SRAM-only cores. The native environment
-            # callback continues to point their save request at system_dir.
+            # Stable legacy system paths are deliberately unchanged.
             save_folder = Path.home() / ".config" / "anything-plays"
         self._save_dir_buffer = C.create_string_buffer(
             os.fsencode(str(save_folder))
@@ -176,6 +183,9 @@ class CoreSession:
             # the bundled Sys, other OS paths, and existing save locations.
             from anything_plays.gamecube_sys import writable_dolphin_system_directory
             folder = writable_dolphin_system_directory(self.core_path)
+        elif is_v32_preview():
+            # No 3.2 native core may write firmware/cache into public 3.0/3.1.
+            folder = preview_system_directory()
         elif sys.platform == "darwin":
             folder = Path.home() / "Library" / "Application Support" / "AnythingPlays"
         else:
