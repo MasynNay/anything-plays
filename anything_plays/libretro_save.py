@@ -50,6 +50,20 @@ def _fallback_path(rom_path):
 
 
 
+def _checked_native_save_path(path):
+    """Validate every native-core child within preview's private save scope.
+
+    The top-level save root alone is insufficient: an existing native-core,
+    resume, neo-geo-pocket or ROM-specific child may be a symlink pointing
+    directly into a public stable save directory. Leave stable layouts alone.
+    """
+    path = Path(path)
+    if not is_v32_preview():
+        return path
+    scope = "Preview-3.2" if sys.platform in ("win32", "darwin") else "3.2-preview"
+    return checked_preview_directory(path, scope)
+
+
 def native_core_save_directory(rom_path, system):
     """Provide writable native save paths independent from installed emulator cores.
 
@@ -64,11 +78,15 @@ def native_core_save_directory(rom_path, system):
         # Dolphin's virtual memory cards are shared at console level, like
         # physical GameCube cards; keep them stable across game/core updates.
         # This must be a user-owned platform data path, not installed Sys.
-        return _user_save_directory() / "native-core" / "gamecube"
+        return _checked_native_save_path(
+            _user_save_directory() / "native-core" / "gamecube"
+        )
     if system not in ("ngp", "ngpc"):
         raise ValueError("No native save directory defined for this core")
     fallback = _fallback_path(rom_path)
-    return fallback.parent / "native-core" / "neo-geo-pocket" / fallback.stem
+    return _checked_native_save_path(
+        fallback.parent / "native-core" / "neo-geo-pocket" / fallback.stem
+    )
 
 
 class SaveRAM:
