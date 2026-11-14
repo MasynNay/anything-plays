@@ -40,13 +40,23 @@ def build_setup_report(
             "You can still play using a keyboard without a webcam.",
         )
 
-    core = (
-        ("Core file located", "An emulator core file is present. This does not verify game compatibility.")
-        if core_found
-        else ("Core file not located",
-              "Check installed emulator components or reinstall the official complete package. "
-              "No game files are required to run this check.")
-    )
+    if not embedded_mode:
+        core = (
+            "External emulator mode",
+            "An embedded core check is not a valid readiness test here. "
+            "Verify your external emulator configuration and input settings."
+        )
+    elif core_found:
+        core = (
+            "Core file located",
+            "An emulator core file is present. This does not verify game compatibility."
+        )
+    else:
+        core = (
+            "Core file not located",
+            "Check installed emulator components or reinstall the official "
+            "complete package. No game files are required to run this check."
+        )
 
     if not controller_enabled:
         gamepad = (
