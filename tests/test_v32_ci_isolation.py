@@ -113,6 +113,15 @@ class V32CIIsolationTests(unittest.TestCase):
         ).read_text("utf-8")
         self.assertIn('"v32_setup_dialog_count"', checker)
         self.assertIn('"v32_setup_windows_verified"', checker)
+        self.assertIn('"v32_setup_repeat_cycles"', checker)
+        self.assertIn('"v32_setup_theme_traces_stable"', checker)
+        lifecycle = (
+            ROOT.parents[1] / "anything_plays" / "preview_setup_smoke.py"
+        ).read_text("utf-8")
+        self.assertIn("SETUP_LIFECYCLE_ROUNDS = 8", lifecycle)
+        self.assertIn("SETUP_DIALOGS_PER_ROUND = 5", lifecycle)
+        self.assertIn("_live_toplevels(root)", lifecycle)
+        self.assertIn("len(app.theme_name.trace_info())", lifecycle)
 
     def test_current_source_and_private_installer_checks_remain_enabled(self):
         source = (ROOT / "ci.yml").read_text("utf-8")
