@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from anything_plays.setup_health import build_setup_report
+from anything_plays.ui_setup_theme import bind_theme_canvas
 
 
 def _snapshot(app):
@@ -87,6 +88,7 @@ def show_setup_diagnostics(app):
     canvas = tk.Canvas(holder, highlightthickness=0, borderwidth=0,
                        bg=app.THEMES.get(app.theme_name.get(),
                                          app.THEMES["Dark"])[1])
+    bind_theme_canvas(app, window, canvas)
     scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scroll.set)
     scroll.pack(side="right", fill="y")
