@@ -11,6 +11,7 @@ from anything_plays.gamepad import (
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 from anything_plays.ui_controller_art import draw_gamepad
 from anything_plays.controller_capture import newly_pressed_source
+from anything_plays.ui_setup_theme import bind_theme_canvas
 
 
 class GamepadMixin:
@@ -435,6 +436,7 @@ class GamepadMixin:
         holder = ttk.Frame(group)
         holder.pack(fill="both", expand=True)
         canvas = tk.Canvas(holder, borderwidth=0, highlightthickness=0)
+        bind_theme_canvas(self, window, canvas)
         scroll = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scroll.set)
         scroll.pack(side="right", fill="y")
