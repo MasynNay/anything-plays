@@ -65,12 +65,24 @@ assuming a new preferences.json must exist after a read-only launch.
 The Windows and macOS artifacts still require equivalent installed
 desktop testing and physical-device validation.
 
-To avoid repeatedly running superseded 3.1 build suites, ten historic
+To avoid repeatedly running superseded 3.1 build suites, eleven historic
 3.1/3.1.1 workflows now skip expensive jobs for the 3.2 integration PR.
 They remain eligible on their original branches. The 3.2 source checks and
 dedicated 3.2 four-platform preview workflow remain enabled. GitHub has
 already confirmed the legacy jobs' skipped status; that is NOT equivalent
 to the new 3.2 jobs passing.
+
+The initial 3.2 source-check runs exposed a strict repository hygiene
+allowlist blocker: it rejected the new, reviewed `run_v32_preview.py` entry
+point. The allowlist now explicitly permits that single source launcher while
+rejecting unrelated root scripts; a regression test locks this down.
+That earlier failure is resolved in source, but source CI remains pending
+until a runner completes tests on the newest commit.
+
+Private preview paths also reject symlink redirection back into stable data
+and hardlinked SRAM inputs, so a seemingly distinct directory cannot be used
+to import or corrupt a stable game's save during QA. These are source-level
+safeguards; a physical device run is still required.
 
 The artifact workflow intentionally has only read permissions and cannot
 create tags, GitHub releases or edit the default branch. GitHub Actions
