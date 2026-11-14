@@ -81,6 +81,13 @@ def smoke():
                         root.update_idletasks()
                         assert app._calibration_window.winfo_exists()
                         assert app.cap is None
+                        click_named_button(
+                            app._calibration_window, "Check stationary jitter",
+                        )
+                        assert not app._calibration_stability_running
+                        assert "Start the webcam" in (
+                            app._calibration_stability_status.get()
+                        )
                         app.toggle()
                         assert not app.armed
                         assert "Finish or cancel calibration" in app.action.get()
