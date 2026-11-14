@@ -165,6 +165,39 @@ def smoke():
                         click_named_button(checker, "Done")
                         assert app._setup_diagnostics_window is None
 
+                        # Even with the full real Tk interface open, an
+                        # unavailable 3.2 console must not call any native
+                        # emulator or mistake a limited preview for damage.
+                        previous_console = app.system_key.get()
+                        app.system_key.set("snes")
+                        app.switch_system()
+                        try:
+                            with patch.object(
+                                app.emu, "find_system_core", return_value=None,
+                            ), patch.object(
+                                app.emu, "start",
+                                side_effect=AssertionError(
+                                    "Unbundled core was started"
+                                ),
+                            ) as native_start, patch(
+                                "anything_plays.ui_library.messagebox.showinfo",
+                            ) as notice:
+                                app.start_rom("fake-source-preview-game.sfc")
+                            native_start.assert_not_called()
+                            notice.assert_called_once()
+                            assert app.current_rom is None
+                            assert "Not bundled in this 3.2 preview" in (
+                                app.game_status.get()
+                            )
+                            assert "not a damaged installation" in (
+                                notice.call_args.args[1]
+                            )
+                        finally:
+                            app.system_key.set(previous_console)
+                            app.switch_system()
+                        assert not app.armed
+                        assert app.cap is None
+
                         click_named_button(launchpad, "Done")
                         assert app._quick_start_window is None
                         assert not app.armed
