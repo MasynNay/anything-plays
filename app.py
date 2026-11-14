@@ -33,7 +33,6 @@ from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 from anything_plays.ui_icon import IconMixin
 
-
 class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, CalibrationMixin, GameplayMixin,
           VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin, StreamMixin,
           ShortcutsMixin, GamepadMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
