@@ -10,9 +10,22 @@ import unittest
 from unittest.mock import patch
 
 from anything_plays.calibration_metrics import stationary_tracking_summary
-from anything_plays.ui_calibration import (
-    CalibrationMixin, STATIONARY_SAMPLE_FRAMES,
-)
+
+# Native installer PREflight intentionally runs before full OpenCV packaging
+# dependencies are installed. Pure math must run on all four OSes, while the
+# Tk lifecycle is tested in source CI (with OpenCV) and the actual frozen GUI.
+try:
+    from anything_plays.ui_calibration import (
+        CalibrationMixin, STATIONARY_SAMPLE_FRAMES,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "cv2":
+        raise
+    CalibrationMixin = object
+    STATIONARY_SAMPLE_FRAMES = 45
+    UI_AVAILABLE = False
+else:
+    UI_AVAILABLE = True
 
 
 class Value:
@@ -88,6 +101,9 @@ class StillTargetMetricsTests(unittest.TestCase):
         self.assertEqual(report["median_deviation_px"], 0)
         self.assertEqual(report["p95_deviation_px"], 0)
 
+    @unittest.skipUnless(
+        UI_AVAILABLE, "OpenCV is not installed during native preflight",
+    )
     def test_user_must_explicitly_start_after_sampling_and_camera_start(self):
         guide = FakeWizard()
         guide.cap = None
@@ -100,6 +116,9 @@ class StillTargetMetricsTests(unittest.TestCase):
         self.assertFalse(guide._calibration_stability_running)
         self.assertIn("Sample", guide._calibration_stability_status.get())
 
+    @unittest.skipUnless(
+        UI_AVAILABLE, "OpenCV is not installed during native preflight",
+    )
     def test_collects_exactly_45_live_centers_then_stops(self):
         guide = FakeWizard()
         guide._calibration_begin_stability()
@@ -118,6 +137,9 @@ class StillTargetMetricsTests(unittest.TestCase):
         self.assertIn("not a tracking accuracy score",
                       guide._calibration_stability_status.get())
 
+    @unittest.skipUnless(
+        UI_AVAILABLE, "OpenCV is not installed during native preflight",
+    )
     def test_camera_disconnect_and_color_resample_discards_old_jitter(self):
         guide = FakeWizard()
         guide._calibration_begin_stability()
