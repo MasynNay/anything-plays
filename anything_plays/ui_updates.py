@@ -315,8 +315,16 @@ class UpdatesMixin:
                 from anything_plays.setup_health import (
                     preview_missing_core_guidance,
                 )
-                summary, guidance = preview_missing_core_guidance(system)
-                status.set(summary + " · " + guidance)
+                summary, _guidance = preview_missing_core_guidance(system)
+                # This is a compact always-visible status strip; detailed
+                # recovery instructions belong in Check my setup and the
+                # blocked-ROM popup, not in a long line that squeezes Tk.
+                suffix = (
+                    " · Check this preview's mGBA files"
+                    if system in ("gb", "gbc", "gba")
+                    else " · GB/GBC/GBA bundled · See Check my setup"
+                )
+                status.set(summary + suffix)
             else:
                 status.set(
                     "Emulator files missing · repair or reinstall Anything Plays"
