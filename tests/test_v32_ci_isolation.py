@@ -20,6 +20,7 @@ SUPERSEDED = (
     "v311-camera-failure-native-regression.yml",
     "v31-final-identity-private-qa.yml",
     "v311-private-source-stage.yml",
+    "v311-save-atomic-four-platform-qa.yml",
 )
 
 
