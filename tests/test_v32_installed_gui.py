@@ -21,6 +21,7 @@ def passing_report():
         "error": None,
         "v32_settings_namespace": "anything-plays-32-preview",
         "console_profile_count": 18,
+        "v32_setup_dialog_count": 5,
         "initialized_system": "gba",
     }
 
@@ -45,6 +46,7 @@ class V32InstalledGuiAcceptanceTests(unittest.TestCase):
             result = verify(report, home)
             self.assertTrue(result["installed_frozen_preview"])
             self.assertTrue(result["stable_settings_unchanged"])
+            self.assertTrue(result["five_native_setup_windows_verified"])
             self.assertFalse(result["camera_hardware_tested"])
             self.assertFalse(result["public_release_approved"])
 
@@ -83,6 +85,10 @@ class V32InstalledGuiAcceptanceTests(unittest.TestCase):
                 ("public_distribution_approved", True),
                 ("v32_settings_namespace", "anything-plays-31"),
                 ("console_profile_count", 1),
+                ("v32_setup_dialog_count", 4),
+                ("v32_setup_camera_untouched", False),
+                ("v32_setup_gamepad_untouched", False),
+                ("v32_setup_still_disarmed", False),
                 ("initialized_system", "snes"),
                 ("error", "frozen app startup failed"),
             ):
