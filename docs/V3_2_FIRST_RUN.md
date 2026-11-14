@@ -3,6 +3,28 @@
 **This is an unreleased 3.2 development feature.** The public v3.1.1
 installers and update channel have not been changed.
 
+## Run the source-only 3.2 preview (no installer)
+
+Check out the **feature/v3.2-integration** branch, install the regular Python
+dependencies documented in the repository, then run:
+
+```bash
+python run_v32_preview.py
+```
+
+Do not use `python app.py` as the 3.2 preview entrypoint: that old entrypoint
+intentionally retains the 3.1 source preview identity for compatibility.
+
+This launcher explicitly selects the **3.2 development preview** identity
+and creates only `~/.config/anything-plays-32-preview/`, with no automatic
+migration from stable 3.0/3.1/3.1.1 or former release-candidate settings.
+It includes no game ROMs or proprietary BIOS. It does not publish releases,
+open webcams or scan controllers merely by selecting a settings channel.
+A frozen release package cannot switch identity via that environment flag.
+
+No public v3.2 installer exists yet. The preview is unverified with real
+camera/gamepad hardware and should not be presented as release quality.
+
 ## One clear entrance
 
 A **Get started** button appears beside the Anything Plays title. The
