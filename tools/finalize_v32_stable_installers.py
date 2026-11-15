@@ -59,7 +59,7 @@ def validate_qa_receipt(target, source, receipt, revision):
             or data.get("stable_settings_namespace",
                         data.get("settings_namespace")) != "anything-plays-31"
             or data.get("public_release_approved") is not False
-            or data.get("redistribution_approved") is not False):
+            or data.get("redistribution_approved", False) is not False):
         raise ValueError("Unreviewed full-native 3.2 source or receipt")
     return source, public_name
 
@@ -103,7 +103,7 @@ def _windows(source, destination):
     app = root / "dist" / "AnythingPlays"
     validate_staged_identity(app, channel="v32_stable_candidate")
     before = full_inventory(app / "cores")
-    if len(before) != 11:
+    if before.get("native_core_count") != 11:
         raise ValueError("Full 3.2 Windows native source app incomplete")
     script = root / "packaging" / "installer.iss"
     subprocess.run([iscc(), "/DV32UpgradeQABuild=1",
@@ -130,7 +130,7 @@ def _mac(source, destination):
             app = root/"source"/"AnythingPlays31.app"
             verify_identity(app)
             before=full_inventory(app/"Contents/Resources/cores")
-            if len(before)!=11:
+            if before.get("native_core_count") != 11:
                 raise ValueError("Original Mac full native library set missing")
             shutil.copytree(app, root/"AnythingPlays31.app", symlinks=True)
         final_app=root/"AnythingPlays31.app"
