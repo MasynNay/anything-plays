@@ -134,6 +134,65 @@ class NativeLoopTimingTests(unittest.TestCase):
             self.assertTrue(emu.running)
             self.assertGreaterEqual(session.native_run_timing.native_run_total_seconds, 0)
 
+    def test_real_core_loop_records_behind_schedule_and_resyncs(self):
+        # Synthetic, deterministic slow native core. The real CoreSession
+        # scheduling loop must count missed deadlines without dropping any
+        # retro_run() calls or depending on a physical GPU/audio device.
+        try:
+            from anything_plays.gba_emulator import CoreSession
+        except ModuleNotFoundError as exc:
+            if exc.name in ("numpy", "PIL", "cv2", "sounddevice", "pygame"):
+                self.skipTest("Full emulator dependencies installed in later CI stage")
+            raise
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "dolphin_libretro.so"
+            core.write_bytes(b"original-synthetic-core")
+            session = object.__new__(CoreSession)
+            session.system = "gamecube"
+            session.rom = Path(td) / "test-homebrew.dol"
+            session.rom.write_bytes(b"original test fixture")
+            session.core_path = str(core)
+            session._load_game = Mock()
+            session.persist_game_progress = Mock()
+            session.audio = Mock(output_error=None)
+            session.save_ram = None
+            session.enable_state_resume = False
+            session.native_run_timing = GameCubeNativeTiming()
+            stop = threading.Event()
+            emu = SimpleNamespace(
+                inputs=Mock(system="gamecube"), stop_event=stop,
+                armed=False, running=False, launching=True,
+                audio_sink=None, audio_warning=None, save_warning=None,
+            )
+            session.emulator = emu
+            fake = MagicMock()
+            fake.av_info = Mock()
+            fake.memory_data = Mock(return_value=None)
+            fake.memory_size = Mock(return_value=0)
+            virtual_clock = [0.0]
+            core_calls = []
+
+            def slow_native_step():
+                core_calls.append(True)
+                virtual_clock[0] += 0.35  # >250ms catch-up reset threshold
+                if len(core_calls) == 3:
+                    stop.set()
+
+            fake.run.side_effect = slow_native_step
+            with patch("anything_plays.gba_emulator.NativeCore", return_value=fake), \\
+                 patch("anything_plays.gba_emulator.SaveRAM"), \\
+                 patch("anything_plays.gba_emulator.time.monotonic",
+                       side_effect=lambda: virtual_clock[0]):
+                session.run()
+            snapshot = session.native_run_timing.snapshot()
+            self.assertEqual(len(core_calls), 3)
+            self.assertEqual(snapshot["native_run_calls"], 3)
+            self.assertEqual(snapshot["scheduler_late_frames"], 3)
+            self.assertEqual(snapshot["scheduler_resyncs"], 3)
+            self.assertGreater(snapshot["scheduler_late_max_ms"], 250)
+            self.assertEqual(snapshot["scheduler_wait_calls"], 0)
+            fake.close.assert_called_once()
+
     def test_research_metrics_are_allowlisted_not_raw_logs(self):
         from tools.v32_extended_native_runtime import safe_evidence
         raw = {
