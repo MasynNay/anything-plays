@@ -168,6 +168,19 @@ def run_smoke_gui(app_type, systems):
                     except Exception:
                         result["error"] = traceback.format_exc()[-9000:]
                         result["passed"] = False
+                if (result["passed"] and os.environ.get(
+                        "AP_V32_UPGRADE_SRAM_SMOKE_CHECK"
+                ) == "1"):
+                    try:
+                        from anything_plays.v32_upgrade_sram_smoke import (
+                            exercise_installed_stable_sram,
+                        )
+                        result["v32_upgrade_sram_roundtrip_verified"] = (
+                            exercise_installed_stable_sram(app)
+                        )
+                    except Exception:
+                        result["error"] = traceback.format_exc()[-9000:]
+                        result["passed"] = False
                 if os.environ.get("AP_V31_STREAM_SMOKE_CHECK") == "1":
                     try:
                         result.update(_exercise_installed_stream_mode(app))

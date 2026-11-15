@@ -20,6 +20,7 @@ on:
       - 'tests/test_v32_stable_full_macos_gate.py'
       - 'tools/v32_stable_data_rehearsal.py'
       - 'tests/test_v32_stable_data_rehearsal.py'
+      - 'tests/test_v32_upgrade_sram_roundtrip.py'
       - 'tests/test_v32_upgrade_identity.py'
       - 'tests/test_v32_upgrade_source_checker.py'
       - 'requirements-build.txt'
@@ -96,6 +97,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_upgrade_identity.py' -v
           python -m unittest discover -s tests -p 'test_v32_upgrade_source_checker.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_data_rehearsal.py' -v
+          python -m unittest discover -s tests -p 'test_v32_upgrade_sram_roundtrip.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_full_linux_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_full_windows_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_full_macos_gate.py' -v
@@ -329,12 +331,13 @@ jobs:
           HOME="$qa/home" USERPROFILE="$qa/home" \
             AP_V30_UI_SMOKE_CHECK=1 \
             AP_V30_UI_SMOKE_REPORT="$qa/full-installed-gui.json" \
+            AP_V32_UPGRADE_SRAM_SMOKE_CHECK=1 \
             SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=dummy \
             PYGAME_HIDE_SUPPORT_PROMPT=1 \
             timeout 95 xvfb-run -a "$entry" --ap-v30-ui-smoke
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/full-installed-gui.json" \
-            --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+            --require-sram --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
           python - <<'PY'
           import json,os
           from pathlib import Path
@@ -406,11 +409,12 @@ jobs:
           $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
           $env:AP_V30_UI_SMOKE_CHECK = '1'
           $env:AP_V30_UI_SMOKE_REPORT = Join-Path $qa 'full-frozen-report.json'
+          $env:AP_V32_UPGRADE_SRAM_SMOKE_CHECK = '1'
           $env:SDL_AUDIODRIVER = 'dummy'
           $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
           $run = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru
           if ($run.ExitCode -ne 0) { throw 'Frozen 11-core 3.2 Windows stable app failed' }
-          python -m tools.v32_stable_data_rehearsal verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+          python -m tools.v32_stable_data_rehearsal verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --require-sram --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
           if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows upgrade lost synthetic old data' }
           $receipt = @{
             schema_version = 1
@@ -519,6 +523,7 @@ jobs:
           HOME="$qa/home" USERPROFILE="$qa/home" \
             AP_V30_UI_SMOKE_CHECK=1 \
             AP_V30_UI_SMOKE_REPORT="$qa/full-installed-gui.json" \
+            AP_V32_UPGRADE_SRAM_SMOKE_CHECK=1 \
             SDL_AUDIODRIVER=dummy PYGAME_HIDE_SUPPORT_PROMPT=1 \
             python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
           import subprocess,sys
@@ -528,7 +533,7 @@ jobs:
           PY
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/full-installed-gui.json" \
-            --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+            --require-sram --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
           python - "$arch" <<'PY'
           import json,os,sys
           from pathlib import Path

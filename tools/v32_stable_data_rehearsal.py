@@ -12,6 +12,10 @@ import hashlib
 import json
 from pathlib import Path
 
+from anything_plays.v32_sram_fixture import (
+    ROM_FOLDER, ROM_NAME, ROM_CANARY, OLD_SRAM, NEW_SRAM,
+)
+
 # Keep the fixture self-contained. Importing the game's default profile
 # would load the emulator, NumPy and SDL before the clean OS runner installs
 # its runtime dependencies; it is unnecessary for a synthetic old profile.
@@ -61,10 +65,16 @@ def seed(home):
     # A canary beside the stable settings proves a genuinely unrelated old
     # save cannot be overwritten by a no-game startup and shutdown.
     (root / "synthetic-existing.sav").write_bytes(SAVE_CANARY)
+    rom_folder = home / ROM_FOLDER
+    if rom_folder.exists() or rom_folder.is_symlink():
+        raise ValueError("Synthetic ROM fixture directory already exists")
+    rom_folder.mkdir()
+    (rom_folder / ROM_NAME).write_bytes(ROM_CANARY)
+    (rom_folder / ROM_NAME).with_suffix(".sav").write_bytes(OLD_SRAM)
     return root
 
 
-def verify(home, report):
+def verify(home, report, *, require_sram=False):
     home = _safe_home(home)
     report = Path(report)
     if (not report.is_file() or report.is_symlink()
@@ -119,6 +129,18 @@ def verify(home, report):
         raise ValueError("3.2 modified a saved-game canary during startup")
     if (home / ".config" / "anything-plays-32-preview").exists():
         raise ValueError("Stable upgrade accidentally created preview settings")
+    if require_sram:
+        if data.get("v32_upgrade_sram_roundtrip_verified") is not True:
+            raise ValueError("Installed 3.2 SRAM restore/persist/cold-restore not verified")
+        rom_folder = home / ROM_FOLDER
+        rom = rom_folder / ROM_NAME
+        save = rom.with_suffix(".sav")
+        for path, content in ((rom, ROM_CANARY), (save, NEW_SRAM)):
+            if (rom_folder.is_symlink() or not rom_folder.is_dir()
+                    or not path.is_file() or path.is_symlink()
+                    or path.stat().st_nlink != 1
+                    or path.read_bytes() != content):
+                raise ValueError("3.2 lost actual legacy Libretro SRAM roundtrip")
     return {
         "schema_version": 1,
         "status": STATUS,
@@ -129,6 +151,8 @@ def verify(home, report):
         "old_save_canary_sha256": hashlib.sha256(SAVE_CANARY).hexdigest(),
         "old_save_canary_byte_identical": True,
         "old_preview_settings_not_used": True,
+        "legacy_cartridge_sram_roundtrip_verified": bool(require_sram),
+        "native_game_core_executed": False,
         "synthetic_test_data_only": True,
         "real_gameplay_or_save_emulation_tested": False,
         "physical_devices_tested": False,
@@ -142,15 +166,17 @@ def main(argv=None):
     parser.add_argument("--home", type=Path, required=True)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--require-sram", action="store_true",
+                        help="Require a real frozen SaveRAM cold-reload smoke")
     args = parser.parse_args(argv)
     if args.operation == "seed":
-        if args.report or args.output:
+        if args.report or args.output or args.require_sram:
             parser.error("Seed only accepts --home")
         seed(args.home)
         return 0
     if not args.report or not args.output:
         parser.error("Verify requires --report and --output")
-    checked = verify(args.home, args.report)
+    checked = verify(args.home, args.report, require_sram=args.require_sram)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(checked, indent=2, sort_keys=True) + "\n", "utf-8")
     print("Synthetic old stable GBA settings and save survived real 3.2 frozen startup")
