@@ -98,6 +98,20 @@ class GameVideoLifecycleTests(unittest.TestCase):
             app.stop_controls.assert_called()
         self.assertEqual(app.show_playing_info.call_count, len(paths))
 
+    def test_first_launch_does_not_clear_nonexistent_render(self):
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app.start_rom("/synthetic/first.gba")
+        app.emu.start.assert_called_once_with("/synthetic/first.gba")
+        app.game_canvas.delete.assert_not_called()
+        self.assertEqual(
+            [call.args for call in app.game_bezel.set_active.call_args_list],
+            [(False,), (True,)],
+        )
+
     def test_rom_replacement_clears_old_frame_before_native_start(self):
         app = LibraryHost()
         app.emu.running = True
