@@ -11,6 +11,8 @@ item and a single cancellable, bounded-rate update job.
 from __future__ import annotations
 
 import re
+import math
+import time
 from functools import lru_cache
 import tkinter as tk
 from tkinter import colorchooser, ttk
@@ -125,6 +127,22 @@ def stream_panel_boxes(size, layout="DS stacked", game_size=53):
         (edge, edge + header + a + gap, width - edge,
          height - edge - bottom),
     )
+
+
+def stream_render_delay_ms(interval_ms, render_seconds):
+    """Schedule stream refresh from render *start*, not render completion.
+
+    Allow a small minimum idle period when composition is overloaded, so a
+    slow OBS capture never creates a busy-loop in Tk or steals native input
+    processing time. The timer controls capture only, never emulator FPS.
+    """
+    try:
+        elapsed_ms = float(render_seconds) * 1000
+    except (ValueError, TypeError, OverflowError):
+        elapsed_ms = 0
+    if not math.isfinite(elapsed_ms) or elapsed_ms < 0:
+        elapsed_ms = 0
+    return max(8, round(interval_ms - elapsed_ms))
 
 
 def compose_stream_output(game, camera, *, size, settings, themes,
@@ -473,8 +491,14 @@ class StreamMixin:
         # Streamers can pick smooth motion or lower CPU usage without
         # changing the underlying emulator/camera sampling rates.
         interval = round(1000 / int(self._stream_options["frame_rate"].split()[0]))
+        started = time.perf_counter()
         try:
             self._render_stream_frame()
+            # Rendering a frame already spent part of our output period.
+            # Compensate that cost instead of accumulating timer drift.
+            interval = stream_render_delay_ms(
+                interval, time.perf_counter() - started
+            )
             if hasattr(self, "_stream_diagnostic"):
                 self._stream_diagnostic.set(
                     "Output ready · Game and camera are mirrored, not restarted."
