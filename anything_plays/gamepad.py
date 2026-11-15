@@ -288,11 +288,16 @@ class GamepadReader:
                     next_triggers.add(source)
                     physical.add(source)
         except Exception:
-            # A device can disappear between attached() and a button read.
-            # Clear the snapshot now; rescan automatically on the next poll.
+            # A device can disappear between attached() and a button/axis
+            # read, even after attached() succeeded. Release every input now.
+            # Back off just as we do for pump/enumeration errors: retrying a
+            # permanently failing HID handle at Tk's 65 ms polling cadence
+            # can churn native SDL devices and stall the UI. Rescan remains
+            # immediately available through refresh().
             self._close_device()
-            self.last_scan = float("-inf")
-            return frozenset(), "Controller disconnected · Scanning again"
+            self.last_scan = self.clock()
+            self.retry_after = self.last_scan + SCAN_INTERVAL
+            return frozenset(), "Controller disconnected · Retrying"
         # Commit the entire new sample only once all SDL calls succeed.
         # On any exception, _close_device clears these latches and all held
         # inputs; an unplugged controller cannot keep a direction pressed.
