@@ -21,8 +21,11 @@ class WindowsActualInnoTests(unittest.TestCase):
         self.assertIn("/VERYSILENT", result)
         self.assertIn("/CURRENTUSER", result)
         self.assertIn("/NOICONS", result)
-        self.assertIn("/DIR=C:/CI Apps/Anything Plays", result)
-        self.assertIn("/LOG=C:/CI Logs/setup.log", result)
+        # pathlib uses backslashes on Windows and forward slashes on
+        # Linux. The actual native installer receives the correct host path.
+        normalized = [item.replace(chr(92), "/") for item in result]
+        self.assertIn("/DIR=C:/CI Apps/Anything Plays", normalized)
+        self.assertIn("/LOG=C:/CI Logs/setup.log", normalized)
         self.assertNotIn("unpack", " ".join(result))
 
     def test_real_inno_rejected_outside_windows_ci(self):
