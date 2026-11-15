@@ -296,12 +296,36 @@ jobs:
         run: |
           set -euo pipefail
           qa="$(mktemp -d)"
-          trap 'rm -rf "$qa"' EXIT
+          trap 'sudo rm -rf "$qa"' EXIT
           python -m tools.v32_stable_data_rehearsal seed --home "$qa/home"
-          mkdir -p "$qa/installed"
-          dpkg-deb -x release/v32-stable-full-linux/anything-plays-31_3.2.0~fullupgradeqa1_amd64.deb "$qa/installed"
-          entry="$qa/installed/opt/anything-plays-31/AnythingPlays"
+          # The runner package database is NEVER changed. This is a genuine
+          # old-then-new dpkg transaction against an isolated dpkg --root,
+          # whose administrator database and app files are both disposable.
+          mkdir -p "$qa/osroot/var/lib/dpkg"
+          touch "$qa/osroot/var/lib/dpkg/status"
+          old_package="baseline311/anything-plays-31_3.1.1_amd64.deb"
+          new_package="release/v32-stable-full-linux/anything-plays-31_3.2.0~fullupgradeqa1_amd64.deb"
+          sudo dpkg --root="$qa/osroot" --force-depends -i "$old_package"
+          dpkg --root="$qa/osroot" -s anything-plays-31 | grep -Fx 'Version: 3.1.1'
+          entry="$qa/osroot/opt/anything-plays-31/AnythingPlays"
           test -x "$entry"
+          python - "$qa/osroot/opt/anything-plays-31" <<'PY'
+          import sys
+          from pathlib import Path
+          from tools.verify_v31_rc import validate_staged_identity
+          validate_staged_identity(Path(sys.argv[1]),channel="v311_stable_candidate")
+          PY
+          old_binary_sha="$(sha256sum "$entry" | cut -d' ' -f1)"
+          sudo dpkg --root="$qa/osroot" --force-depends -i "$new_package"
+          dpkg --root="$qa/osroot" -s anything-plays-31 | grep -Fx 'Version: 3.2.0~fullupgradeqa1'
+          test -x "$entry"
+          test "$(sha256sum "$entry" | cut -d' ' -f1)" != "$old_binary_sha"
+          python - "$qa/osroot/opt/anything-plays-31" <<'PY'
+          import sys
+          from pathlib import Path
+          from tools.verify_v31_rc import validate_staged_identity
+          validate_staged_identity(Path(sys.argv[1]),channel="v32_stable_candidate")
+          PY
           HOME="$qa/home" USERPROFILE="$qa/home" \
             AP_V30_UI_SMOKE_CHECK=1 \
             AP_V30_UI_SMOKE_REPORT="$qa/full-installed-gui.json" \
@@ -311,6 +335,23 @@ jobs:
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/full-installed-gui.json" \
             --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          result={
+              "schema_version":1, "source_revision":os.environ["QA_SOURCE_SHA"],
+              "original_version":"3.1.1",
+              "upgraded_version":"3.2.0~fullupgradeqa1",
+              "same_package_dpkg_isolated_root_upgrade_verified":True,
+              "synthetic_prior_settings_and_save_preserved":True,
+              "real_user_game_save_tested":False,
+              "physical_hardware_tested":False,
+              "public_release_approved":False,
+          }
+          Path("release/V32_PRIVATE_LINUX_DPKG_UPGRADE_RECEIPT.json").write_text(
+              json.dumps(result,indent=2)+"\n","utf-8"
+          )
+          PY
       - name: Assemble 18-profile full-native Windows stable upgrade privately
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -516,6 +557,7 @@ jobs:
             release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
             release/V32_PRIVATE_WINDOWS_INSTALLED_UPGRADE_RECEIPT.json
+            release/V32_PRIVATE_LINUX_DPKG_UPGRADE_RECEIPT.json
             release/V32_PRIVATE_MAC_REPLACEMENT_RECEIPT.json
             release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
             release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
