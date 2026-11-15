@@ -59,10 +59,12 @@ def source_gate(stable, source, checksums, receipt, sha):
         "redistribution_approved": False,
         "public_release_approved": False,
     }
-    if type(data) is not dict or any(
-        type(data.get(key)) is not type(value) or data[key] != value
-        for key, value in required.items()
-    ):
+    if (type(data) is not dict
+            or set(data) != set(required) | {"identity_marker"}
+            or not isinstance(data.get("identity_marker"), str)
+            or not data["identity_marker"].endswith("v31_build_identity.json")
+            or any(type(data.get(key)) is not type(value) or data[key] != value
+                   for key, value in required.items())):
         raise ValueError("Source-stage receipt mismatch; refuse untrusted 3.2 app")
     return stable, source
 

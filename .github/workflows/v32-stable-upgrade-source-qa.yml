@@ -12,6 +12,8 @@ on:
       - 'packaging/**'
       - 'tools/write_v31_identity.py'
       - 'tools/verify_v32_stable_upgrade_source.py'
+      - 'tools/stage_v32_stable_full_linux.py'
+      - 'tests/test_v32_stable_full_linux_gate.py'
       - 'tools/v32_stable_data_rehearsal.py'
       - 'tests/test_v32_stable_data_rehearsal.py'
       - 'tests/test_v32_upgrade_identity.py'
@@ -252,6 +254,56 @@ jobs:
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/frozen-report.json" \
             --output release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
+      - name: Assemble Linux 18-profile full-native stable identity privately
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'anything-plays-31_3.1.1_amd64.deb' --dir baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline311
+          python -m tools.stage_v32_stable_full_linux \
+            --stable baseline311/anything-plays-31_3.1.1_amd64.deb \
+            --source 'release/anything-plays-31_3.2.0~upgradeqa1_amd64.deb' \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/v32-stable-full-linux
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          item=json.loads(Path('release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json').read_text('utf-8'))
+          assert item['native_core_count']==11 and item['console_profiles']==18
+          assert item['same_debian_stable_package'] is True
+          assert item['native_core_bytes_preserved'] is True
+          assert item['public_release_approved'] is False
+          print('Actual full-native 3.2 Linux stable-ID DEB staged, NOT released')
+          PY
+      - name: Full-native frozen Linux 3.2 app preserves synthetic 3.1.1 data
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa="$(mktemp -d)"
+          trap 'rm -rf "$qa"' EXIT
+          python -m tools.v32_stable_data_rehearsal seed --home "$qa/home"
+          mkdir -p "$qa/installed"
+          dpkg-deb -x release/v32-stable-full-linux/anything-plays-31_3.2.0~fullupgradeqa1_amd64.deb "$qa/installed"
+          entry="$qa/installed/opt/anything-plays-31/AnythingPlays"
+          test -x "$entry"
+          HOME="$qa/home" USERPROFILE="$qa/home" \
+            AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$qa/full-installed-gui.json" \
+            SDL_AUDIODRIVER=dummy SDL_VIDEODRIVER=dummy \
+            PYGAME_HIDE_SUPPORT_PROMPT=1 \
+            timeout 95 xvfb-run -a "$entry" --ap-v30-ui-smoke
+          python -m tools.v32_stable_data_rehearsal verify \
+            --home "$qa/home" --report "$qa/full-installed-gui.json" \
+            --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
       - name: Retain only exact SHA and identity receipts, NEVER an upgrade installer
         uses: actions/upload-artifact@v4
         with:
@@ -260,5 +312,7 @@ jobs:
             release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
+            release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+            release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
           if-no-files-found: error
           retention-days: 7

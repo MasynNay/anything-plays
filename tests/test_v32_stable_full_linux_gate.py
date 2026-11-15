@@ -28,6 +28,7 @@ class FullStableLinuxGateTests(unittest.TestCase):
             "installer": SOURCE, "installer_sha256": sha256(source),
             "installer_bytes": source.stat().st_size,
             "identity_channel": "v32_stable_candidate",
+            "identity_marker": "_internal/assets/v31_build_identity.json",
             "stable_settings_namespace": "anything-plays-31",
             "stable_package_identity_matches_311": True,
             "native_core_count": 1,
@@ -59,6 +60,7 @@ class FullStableLinuxGateTests(unittest.TestCase):
                 ("source_revision","b"*40),
                 ("native_core_count",11),
                 ("public_release_approved",True),
+                ("identity_marker","../../redirected.json"),
                 ("settings_namespace","anything-plays-32-preview"),
                 ("installer_sha256","0"*64),
             ):
@@ -66,14 +68,8 @@ class FullStableLinuxGateTests(unittest.TestCase):
                     altered=dict(data)
                     altered[key]=value
                     d.write_text(json.dumps(altered),"utf-8")
-                    if key=="settings_namespace":
-                        # Unknown fields should not bypass exact source checks.
-                        self.assertEqual(
-                            source_gate(a,b,c,d,"a"*40),(a,b)
-                        )
-                    else:
-                        with self.assertRaises(ValueError):
-                            source_gate(a,b,c,d,"a"*40)
+                    with self.assertRaises(ValueError):
+                        source_gate(a,b,c,d,"a"*40)
 
 
 if __name__ == "__main__":
