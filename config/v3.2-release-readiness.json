@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "version": "3.2.0",
+  "state": "FEATURE_COMPLETE_PRIVATE_FULL_NATIVE_QA_NOT_PUBLIC",
+  "tested_source_sha": "9f6950bc2a532375d2da5a6011571c9af11cf828",
+  "source_workflow": 43728173567,
+  "installer_workflow": 43728173563,
+  "tested_platforms": [
+    "linux-x64",
+    "windows-x64",
+    "macos-arm64",
+    "macos-x64"
+  ],
+  "native_core_families": 11,
+  "console_profiles": 18,
+  "linux_homebrew_positive_profiles": 18,
+  "software_evidence": {
+    "python_312_313_native_mgba_tests_passed": true,
+    "four_private_frozen_full_native_installer_qa_passed": true,
+    "linux_18_original_or_pinned_homebrew_qa_passed": true
+  },
+  "publication_gates": {
+    "reviewed_full_native_source_and_redistribution_rights": false,
+    "verified_stable_311_to_320_upgrade_identity_and_game_saves": false,
+    "owner_real_camera_controller_long_gameplay_review": false,
+    "independently_staged_final_public_assets_source_and_sha256": false,
+    "owner_explicit_exact_release_authorization": false
+  },
+  "known_limitations": {
+    "physical_camera_verified": false,
+    "physical_controller_verified": false,
+    "physical_speakers_verified": false,
+    "commercial_games_all_verified": false,
+    "gamecube_headless_20fps_met": false,
+    "macos_notarized": false
+  },
+  "public_release_approved": false,
+  "artifacts_expire_at_utc": "2026-11-22T15:10:30Z",
+  "note": "Full 18-profile private QA installers use the 3.2 preview identity and do not upgrade stable 3.1.1. Software tests alone never authorize publication."
+}

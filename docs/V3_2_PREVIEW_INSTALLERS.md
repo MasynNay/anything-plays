@@ -1,5 +1,16 @@
 # Anything Plays 3.2 — Unreleased cross-platform preview installers
 
+**Latest exact-head software checkpoint:** source regression
+[43728173567](https://github.com/MasynNay/anything-plays/actions/runs/43728173567)
+and all four installed full-native QA candidates
+[43728173563](https://github.com/MasynNay/anything-plays/actions/runs/43728173563)
+passed on app SHA `9f6950bc2a532375d2da5a6011571c9af11cf828`.
+The separate Linux original/pinned homebrew matrix reported 18/18
+per-console software positives; GameCube headless speed, physical devices,
+stable upgrade identity and redistribution authorization remain unverified.
+[Current release acceptance](V3_2_RELEASE_ACCEPTANCE.md).
+This evidence concerns **private QA**, never an approved public 3.2 release.
+
 **Status:** Build automation committed on the `feature/v3.2-integration`
 development branch, but no installer is considered verified until the exact
 commit's CI job succeeds. This is NOT a public 3.2 release.
