@@ -179,10 +179,12 @@ class NativeLoopTimingTests(unittest.TestCase):
                     stop.set()
 
             fake.run.side_effect = slow_native_step
-            with patch("anything_plays.gba_emulator.NativeCore", return_value=fake), \\
-                 patch("anything_plays.gba_emulator.SaveRAM"), \\
-                 patch("anything_plays.gba_emulator.time.monotonic",
-                       side_effect=lambda: virtual_clock[0]):
+            with (
+                patch("anything_plays.gba_emulator.NativeCore", return_value=fake),
+                patch("anything_plays.gba_emulator.SaveRAM"),
+                patch("anything_plays.gba_emulator.time.monotonic",
+                      side_effect=lambda: virtual_clock[0]),
+            ):
                 session.run()
             snapshot = session.native_run_timing.snapshot()
             self.assertEqual(len(core_calls), 3)
