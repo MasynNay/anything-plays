@@ -290,7 +290,7 @@ class PixelAndControllerCoexistenceTests(TestCase):
         app = self.app
         app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
         converter = cv2.cvtColor
-        with patch("anything_plays.tracking.cv2.cvtColor", wraps=converter) as convert:
+        with patch.object(cv2, "cvtColor", wraps=converter) as convert:
             app.draw_camera()
         conversions = [call for call in convert.call_args_list
                        if call.args[1] == cv2.COLOR_BGR2HSV]
@@ -321,8 +321,7 @@ class PixelAndControllerCoexistenceTests(TestCase):
             decorations.append(True)
             return original_draw(*args, **kwargs)
 
-        with patch("anything_plays.ui_camera.cv2.drawContours",
-                   side_effect=observed_draw):
+        with patch.object(cv2, "drawContours", side_effect=observed_draw):
             app.draw_camera()
         self.assertEqual(len(decorations), 2)
         self.assertTrue(np.array_equal(unmarked, app.frame),
