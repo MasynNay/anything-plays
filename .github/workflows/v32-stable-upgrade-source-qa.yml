@@ -16,6 +16,8 @@ on:
       - 'tests/test_v32_stable_full_linux_gate.py'
       - 'tools/stage_v32_stable_full_windows.py'
       - 'tests/test_v32_stable_full_windows_gate.py'
+      - 'tools/stage_v32_stable_full_macos.py'
+      - 'tests/test_v32_stable_full_macos_gate.py'
       - 'tools/v32_stable_data_rehearsal.py'
       - 'tests/test_v32_stable_data_rehearsal.py'
       - 'tests/test_v32_upgrade_identity.py'
@@ -96,6 +98,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_stable_data_rehearsal.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_full_linux_gate.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_full_windows_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_stable_full_macos_gate.py' -v
       - name: Install Debian extraction and headless prerequisites
         if: runner.os == 'Linux'
         shell: bash
@@ -354,6 +357,78 @@ jobs:
           if ($run.ExitCode -ne 0) { throw 'Frozen 11-core 3.2 Windows stable app failed' }
           python -m tools.v32_stable_data_rehearsal verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
           if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows upgrade lost synthetic old data' }
+      - name: Assemble full-native stable-identity 3.2 Mac DMG privately
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case '${{ matrix.target }}' in
+            macos-arm64) arch=arm64 ;;
+            macos-x64) arch=x64 ;;
+            *) exit 1 ;;
+          esac
+          mkdir -p baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern "AnythingPlays-3.1.1-macos-${arch}.dmg" --dir baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern "SHA256SUMS.txt" --dir baseline311
+          python -m tools.stage_v32_stable_full_macos \
+            --arch "$arch" \
+            --stable "baseline311/AnythingPlays-3.1.1-macos-${arch}.dmg" \
+            --preview "release/AnythingPlays-3.2.0-UPGRADE-QA-macos-${arch}.dmg" \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/v32-stable-full-macos
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          item=json.loads(Path('release/v32-stable-full-macos/V32_FULL_MACOS_QA_RECEIPT.json').read_text('utf-8'))
+          assert item['native_core_count']==11 and item['console_profiles']==18
+          assert item['stable_bundle_identity_matches_311'] is True
+          assert item['native_core_bytes_preserved'] is True
+          assert item['public_release_approved'] is False
+          print('Private full-native 3.2 stable-identity Mac DMG passed source QA')
+          PY
+      - name: Full-native frozen Mac 3.2 app preserves synthetic 3.1.1 data
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case '${{ matrix.target }}' in
+            macos-arm64) arch=arm64 ;;
+            macos-x64) arch=x64 ;;
+            *) exit 1 ;;
+          esac
+          qa="$(mktemp -d /tmp/ap32-full-mac-data.XXXXXX)"
+          volume="$(mktemp -d /tmp/ap32-full-mac-dmg.XXXXXX)"
+          trap 'hdiutil detach "$volume" >/dev/null 2>&1 || true; rm -rf "$qa"; rmdir "$volume" >/dev/null 2>&1 || true' EXIT
+          python -m tools.v32_stable_data_rehearsal seed --home "$qa/home"
+          dmg="release/v32-stable-full-macos/AnythingPlays-3.2.0-fullupgradeqa1-macos-${arch}.dmg"
+          mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$volume" "$dmg"; then mounted=1; break; fi
+            sleep "$((attempt * 3))"
+          done
+          test "$mounted" = 1
+          app="$volume/AnythingPlays31.app"
+          test -x "$app/Contents/MacOS/AnythingPlays"
+          codesign --verify --verbose=2 "$app"
+          HOME="$qa/home" USERPROFILE="$qa/home" \
+            AP_V30_UI_SMOKE_CHECK=1 \
+            AP_V30_UI_SMOKE_REPORT="$qa/full-installed-gui.json" \
+            SDL_AUDIODRIVER=dummy PYGAME_HIDE_SUPPORT_PROMPT=1 \
+            python - "$app/Contents/MacOS/AnythingPlays" <<'PY'
+          import subprocess,sys
+          run=subprocess.run([sys.argv[1],"--ap-v30-ui-smoke"],timeout=110)
+          if run.returncode:
+              raise SystemExit("Full-native 3.2 stable Mac GUI could not start")
+          PY
+          python -m tools.v32_stable_data_rehearsal verify \
+            --home "$qa/home" --report "$qa/full-installed-gui.json" \
+            --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
       - name: Retain only exact SHA and identity receipts, NEVER an upgrade installer
         uses: actions/upload-artifact@v4
         with:
@@ -365,5 +440,6 @@ jobs:
             release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
             release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
             release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
+            release/v32-stable-full-macos/V32_FULL_MACOS_QA_RECEIPT.json
           if-no-files-found: error
           retention-days: 7
