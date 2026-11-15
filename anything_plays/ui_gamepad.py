@@ -168,6 +168,19 @@ class GamepadMixin:
         self._refresh_gamepad_live_input()
         self.refresh_controller_artwork()
 
+    def prepare_gamepad_for_game_transition(self):
+        """Release controller state before unloading or replacing a game.
+
+        ROM and console switches may finish between the 65 ms SDL polls. Do
+        not carry a button held in the old title into the next title even if
+        no tick observed the gap. Only an explicit neutral sample unlocks
+        the next game, without delaying an ordinary fresh press.
+        """
+        enabled = getattr(self, "gamepad_enabled", None)
+        if enabled is not None and enabled.get():
+            self._gamepad_game_resume_release_pending = True
+        self.emu.release_gamepad()
+
     def refresh_gamepad(self):
         self._cancel_controller_capture("Controller rescan; choose Press to assign again.")
         # Rescan is an explicit handoff. A newly enumerated device may already
