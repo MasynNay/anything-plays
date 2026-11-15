@@ -53,6 +53,44 @@ class AudioBufferTests(unittest.TestCase):
         audio.callback(output, 4, None, None)
         self.assertEqual(output.tolist(), [[10, 20], [-1, -2], [0, 0], [0, 0]])
 
+    def test_delivery_metrics_distinguish_pcm_from_output_underrun(self):
+        audio = AudioSink()
+        audio.push(np.array([[11, 12], [13, 14]], dtype=np.int16))
+        first = np.full((3, 2), 999, dtype=np.int16)
+        audio.callback(first, 3, None, None)
+        np.testing.assert_array_equal(first, [[11, 12], [13, 14], [0, 0]])
+        second = np.full((2, 2), 999, dtype=np.int16)
+        audio.callback(second, 2, None, None)
+        np.testing.assert_array_equal(second, [[0, 0], [0, 0]])
+        self.assertEqual(audio.delivery_snapshot(), {
+            "audio_output_callback_calls": 2,
+            "audio_output_requested_frames": 5,
+            "audio_output_underrun_frames": 3,
+            "audio_queue_dropped_frames": 0,
+        })
+
+    def test_bounded_audio_queue_reports_evicted_frames(self):
+        audio = AudioSink()
+        for index in range(40):
+            audio.push(np.array([[index, -index]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 32)
+        self.assertEqual(audio.delivery_snapshot()["audio_queue_dropped_frames"], 8)
+        out = np.zeros((32, 2), dtype=np.int16)
+        audio.callback(out, 32, None, None)
+        self.assertEqual(out[0].tolist(), [8, -8])
+        self.assertEqual(out[-1].tolist(), [39, -39])
+        self.assertEqual(audio.delivery_snapshot()["audio_output_underrun_frames"], 0)
+
+    def test_muting_consumes_pcm_without_false_underrun(self):
+        audio = AudioSink()
+        audio.push(np.array([[100, -100]], dtype=np.int16))
+        audio.set_volume(0)
+        out = np.full((1, 2), 1000, dtype=np.int16)
+        audio.callback(out, 1, None, None)
+        self.assertEqual(out.tolist(), [[0, 0]])
+        self.assertEqual(audio.delivery_snapshot()["audio_output_underrun_frames"], 0)
+        self.assertEqual(audio.delivery_snapshot()["audio_output_requested_frames"], 1)
+
     def test_single_sample_audio_uses_fixed_size_blocks(self):
         audio = AudioSink()
         for index in range(3000):
