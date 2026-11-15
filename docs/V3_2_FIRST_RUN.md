@@ -34,6 +34,17 @@ public stable 3.1.1 installation is damaged. A genuinely missing mGBA core is
 identified separately. The main status strip stays short; Check my setup
 contains the full next steps.
 
+## Restore and undo without losing newer edits
+
+An all-console backup is a portable **controls-only** archive. Restoring it
+modifies only consoles whose portable controls differ; custom local backgrounds,
+ROM libraries, controller identities and user data are retained. Undo stores a
+snapshot of only those changed consoles. If a player adjusts controls after
+restoring the backup, **Undo all restore** identifies the conflicting consoles
+and asks before replacing these newer edits. Cancel leaves every saved profile
+unchanged. Local-only backgrounds are preserved even when Undo is approved.
+An unfinished camera calibration must be canceled or saved before an undo.
+
 ## One clear entrance
 
 A **Get started** button appears beside the Anything Plays title. The

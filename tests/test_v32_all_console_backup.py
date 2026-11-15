@@ -9,6 +9,7 @@ from unittest.mock import patch
 from anything_plays.portable_profile_library import (
     FORMAT, MAX_ARCHIVE_BYTES, make_library_archive, parse_library_archive,
     load_library_archive, save_library_archive, portable_restore_delta,
+    prepare_restore_undo,
 )
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import (
@@ -231,6 +232,42 @@ class AllConsoleBackupTests(unittest.TestCase):
             self.assertEqual(
                 portable_restore_delta(fresh.profiles, imported), {}
             )
+
+    def test_undo_conflicts_and_local_only_edits_are_preserved(self):
+        before = all_profiles()
+        before["gba"]["zone_image"] = "before-local-background.png"
+        applied = copy.deepcopy(before)
+        applied["gba"]["tolerance"] = 41
+        applied["snes"]["mapping"]["A"] = "B"
+        current = copy.deepcopy(applied)
+        current["gba"]["zone_image"] = "newer-local-background.png"
+        previous = {key: before[key] for key in ("gba", "snes")}
+        applied_subset = {key: applied[key] for key in previous}
+        current_subset = {key: current[key] for key in previous}
+        candidate, conflicts = prepare_restore_undo(
+            current_subset, applied_subset, previous
+        )
+        self.assertEqual(conflicts, ())
+        self.assertEqual(candidate["gba"]["tolerance"], before["gba"]["tolerance"])
+        self.assertEqual(
+            candidate["gba"]["zone_image"], "newer-local-background.png"
+        )
+        self.assertEqual(candidate["snes"]["mapping"], before["snes"]["mapping"])
+        self.assertEqual(current, applied | {"gba": current["gba"]})
+
+        current_subset["snes"]["mapping"]["A"] = "X"
+        current_subset["gba"]["tolerance"] = 55
+        _, conflicts = prepare_restore_undo(
+            current_subset, applied_subset, previous
+        )
+        self.assertEqual(conflicts, ("gba", "snes"))
+        with self.assertRaises(ValueError):
+            prepare_restore_undo(
+                {"gba": current_subset["gba"]},
+                applied_subset,
+                previous,
+            )
+        self.assertEqual(applied["gba"]["tolerance"], 41)
 
     def test_change_preview_identifies_only_changed_portable_console_settings(self):
         from anything_plays.portable_profile_library import changed_systems

@@ -415,6 +415,11 @@ class ProfilesMixin:
             )
             return
         self._last_profile_archive_import = previous_changed
+        # Keep the exact committed profiles as a conflict baseline.
+        # A later user edit must never be overwritten by a blind Undo.
+        self._last_profile_archive_applied = {
+            system: self.profile_store.get(system) for system in differences
+        }
         undo = getattr(self, "_undo_all_profile_restore_button", None)
         if undo is not None:
             undo.configure(state="normal")
@@ -430,15 +435,56 @@ class ProfilesMixin:
         )
 
     def undo_all_profile_restore(self):
-        """Restore the entire pre-import set in one atomic write."""
+        """Undo only restored portable controls; protect newer user edits."""
         prior = getattr(self, "_last_profile_archive_import", None)
+        applied = getattr(self, "_last_profile_archive_applied", None)
         if prior is None:
             return
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                "Undo all restore",
+                "Finish or cancel camera calibration before undoing a restore.",
+                parent=self.root,
+            )
+            return
+        from anything_plays.portable_profile_library import prepare_restore_undo
+        try:
+            current = {
+                system: self.profile_store.get(system) for system in prior
+            }
+            selected = self.system_key.get()
+            if selected in prior:
+                # Include edits visible in Tk but not yet persisted.
+                self.read_settings()
+                current[selected] = copy.deepcopy(self.cfg)
+            changes, conflicts = prepare_restore_undo(current, applied, prior)
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                "Undo all restore", f"Cannot review the undo safely: {exc}",
+                parent=self.root,
+            )
+            return
+        if conflicts:
+            preview = ", ".join(SYSTEMS[key].title for key in conflicts[:7])
+            remaining = len(conflicts) - 7
+            if remaining:
+                preview += f" (+{remaining} more)"
+            if not messagebox.askyesno(
+                "Review newer control edits",
+                f"Controls were edited after the backup restore in "
+                f"{len(conflicts)} console(s):\\n{preview}\\n\\n"
+                "Undo will replace those newer control edits with their "
+                "pre-restore layouts. Local backgrounds and other private "
+                "settings will be kept.\\n\\nContinue with Undo?",
+                parent=self.root,
+            ):
+                self.status.set("Undo canceled; newer control edits were kept.")
+                return
         self.stop_controls()
         try:
-            self.profile_store.put_many(prior)
-            if self.system_key.get() in prior:
-                self.cfg = self.profile_store.get(self.system_key.get())
+            self.profile_store.put_many(changes)
+            if selected in prior:
+                self.cfg = self.profile_store.get(selected)
                 self.refresh_settings()
         except (OSError, ValueError, TypeError, tk.TclError) as exc:
             messagebox.showerror(
@@ -447,6 +493,7 @@ class ProfilesMixin:
             )
             return
         self._last_profile_archive_import = None
+        self._last_profile_archive_applied = None
         undo = getattr(self, "_undo_all_profile_restore_button", None)
         if undo is not None:
             undo.configure(state="disabled")

@@ -194,13 +194,35 @@ def _exercise_installed_control_archive(app, root):
                 or app.armed):
             raise RuntimeError("Frozen restore left incorrect live/undo state")
 
-        _click_button(root, "Undo all restore")
-        if any(
-            app.profile_store.get(name).get("zone_image")
-            != f"local-only-{name}.png"
-            for name in (independent, untouched)
-        ):
-            raise RuntimeError("Undo restore erased local-only console data")
+        # Post-restore user edits must not be silently discarded. A newer
+        # local-only background, however, must survive an approved undo.
+        newer = app.profile_store.get(independent)
+        newer["zone_image"] = "newer-local-only-art.png"
+        newer["tolerance"] = 48 if modified[independent]["tolerance"] != 48 else 49
+        app.profile_store.put(independent, newer)
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=False,
+        ) as declined:
+            _click_button(root, "Undo all restore")
+        if declined.call_count != 1 or not app._undo_all_profile_restore_button.instate(["!disabled"]):
+            raise RuntimeError("Undo conflict did not require approval")
+        if (app.profile_store.get(independent)["tolerance"] != newer["tolerance"]
+                or app.profile_store.get(independent)["zone_image"] != "newer-local-only-art.png"):
+            raise RuntimeError("Declined undo discarded newer control edits")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ) as accepted:
+            _click_button(root, "Undo all restore")
+        if accepted.call_count != 1 or "newer control edits" not in accepted.call_args.args[1]:
+            raise RuntimeError("Approved undo did not explain destructive changes")
+        if (app.profile_store.get(independent).get("zone_image")
+                != "newer-local-only-art.png"):
+            raise RuntimeError("Undo erased a newer local-only background")
+        if (app.profile_store.get(untouched).get("zone_image")
+                != f"local-only-{untouched}.png"):
+            raise RuntimeError("Undo changed an untouched console background")
         for name in BUTTONS_BY_SYSTEM:
             if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
                 raise RuntimeError("Undo all did not restore previous profiles")

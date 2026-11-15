@@ -120,6 +120,36 @@ def portable_restore_delta(current, incoming):
     return result
 
 
+def prepare_restore_undo(current, applied, previous):
+    """Build a safe all-console Undo preserving current local-only settings.
+
+    A complete snapshot of the consoles changed by the restore is required.
+    Callers receive both the candidate changes and any consoles with newer
+    portable control edits. They must ask before overwriting those edits.
+    Local-only data (artwork, paths, device settings) is never rolled back.
+    """
+    if (not isinstance(current, dict) or not isinstance(applied, dict)
+            or not isinstance(previous, dict) or not current
+            or set(current) != set(applied) or set(current) != set(previous)
+            or not set(current) <= SYSTEM_NAMES):
+        raise ValueError("Undo snapshots must cover the same valid consoles.")
+    restored, conflicts = {}, []
+    for system in BUTTONS_BY_SYSTEM:
+        if system not in current:
+            continue
+        newest = make_bundle(system, current[system])["profile"]
+        installed = make_bundle(system, applied[system])["profile"]
+        older = make_bundle(system, previous[system])["profile"]
+        if newest != installed:
+            conflicts.append(system)
+        merged = copy.deepcopy(current[system])
+        for key in newest:
+            merged.pop(key, None)
+        merged.update(older)
+        restored[system] = merged
+    return restored, tuple(conflicts)
+
+
 def load_library_archive(path):
     with Path(path).open("rb") as stream:
         data = stream.read(MAX_ARCHIVE_BYTES + 1)
