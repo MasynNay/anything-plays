@@ -42,6 +42,8 @@ class LibraryHost(VideoHost, LibraryMixin):
         self.show_library = Mock()
         self.show_playing_info = Mock()
         self.uses_embedded_emulator = lambda: True
+        self.system_key = Mock()
+        self.system_key.get.return_value = "gba"
         self.prepare_gamepad_for_game_transition = Mock()
         self.emu.find_system_core.return_value = "/synthetic/test-core.so"
         self.root = Mock()
@@ -146,7 +148,8 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNone(app._stream_game_frame)
         app.emu.start.assert_not_called()
         self.assertIsNone(app._stream_photo)
-        self.assertIn("Game could not start", app.game_status.set.call_args.args[0])
+        self.assertIn("A bundled emulator core is missing",
+                      app.game_status.set.call_args.args[0])
 
     def test_rom_unload_disarms_gamepad_before_stop(self):
         app = LibraryHost()
