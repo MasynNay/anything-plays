@@ -367,6 +367,10 @@ def _child(core, rom, report, seconds, require_audio=False,
         "nonzero_controller_polls": nonzero_polls,
         "native_pcm_frame_samples": session.audio.pcm_frames,
         "native_pcm_nonzero_values": session.audio.pcm_nonzero,
+        # Unlike generated native PCM, these counters reflect real output
+        # callback requests and bounded producer backlog eviction. They are
+        # still NOT a physical speaker/audibility verification.
+        **session.audio.delivery_snapshot(),
         "continuous_render_fps": round(frame_callbacks / elapsed, 2),
         "gpu_readback_calls": session.gpu_readback_calls,
         "gpu_readback_total_seconds": round(session.gpu_readback_seconds, 4),
