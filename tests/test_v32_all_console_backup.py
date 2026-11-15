@@ -131,7 +131,11 @@ class AllConsoleBackupTests(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / "anything_plays/preview_setup_smoke.py"
         ).read_text("utf-8")
-        self.assertNotIn('.cget("state")', source)
+        # Restrict the assertion to calls on this specific Undo widget:
+        # the nearby explanatory comment legitimately mentions cget().
+        self.assertNotIn(
+            '_undo_all_profile_restore_button.cget("state")', source,
+        )
         self.assertIn(
             '_undo_all_profile_restore_button.instate(["disabled"])',
             source,
