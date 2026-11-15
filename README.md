@@ -10,7 +10,7 @@ A camera-powered desktop app that turns real-world movement into controls for cl
 
 **18 console profiles · 11 native emulator cores · Windows, macOS and Linux**
 
-[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.2.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) · [Previous 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.2.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) · [Previous 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Screenshots](#screenshots) · [Features](#features) · [Get started](#get-started) · [How it works](#how-it-works) · [Roadmap](docs/ROADMAP.md) · [Open issues](https://github.com/MasynNay/anything-plays/issues)
 
 </div>
 
@@ -219,7 +219,7 @@ anything-plays/
 
 Anything Plays is actively maintained. The [public roadmap](docs/ROADMAP.md) separates released functionality from ongoing reliability work and future proposals.
 
-**Current priorities:** GameCube GPU performance and long-session stability, more camera and save compatibility testing, and better setup diagnostics. Planned work includes easier camera calibration and portable control profiles.
+**Current priorities:** GameCube GPU performance and long-session stability, more camera and save compatibility testing, and better setup diagnostics. Camera calibration and portable profiles shipped in 3.2; future work targets runtime compatibility and performance.
 
 [Read the roadmap](docs/ROADMAP.md) · [Browse development issues](https://github.com/MasynNay/anything-plays/issues)
 
@@ -229,7 +229,7 @@ Anything Plays is actively maintained. The [public roadmap](docs/ROADMAP.md) sep
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-The source includes automated tests and four-platform release checks. The [verified 3.1 stable build](https://github.com/MasynNay/anything-plays/actions/runs/43140637755) covers packaged startup and selected emulator behavior. This is **not** a claim of compatibility with every retail game, webcam, GPU or extended session.
+The source includes automated tests and four-platform release checks. The [verified 3.2.0 full-native release candidates](https://github.com/MasynNay/anything-plays/actions/runs/43742977770) covers packaged startup and selected emulator behavior. This is **not** a claim of compatibility with every retail game, webcam, GPU or extended session.
 
 See [technical documentation](docs/README.md), [contributing](.github/CONTRIBUTING.md), and the [security policy](.github/SECURITY.md). If you encounter an issue, include your OS, console, expected behavior, and steps to reproduce, without uploading copyrighted game files or private camera footage.
 

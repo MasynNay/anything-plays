@@ -75,7 +75,9 @@ class V31ReleaseGateTests(unittest.TestCase):
         readme = (Path(__file__).resolve().parents[1] / "README.md").read_text("utf-8")
         self.assertIn("releases/tag/v3.1.0", readme)
         self.assertIn("releases/tag/v3.0.0", readme)
-        self.assertIn("releases/tag/v3.1.0-rc2", readme)
+        # Latest public stable and both previous stable rollback tags remain.
+        self.assertIn("releases/tag/v3.1.1", readme)
+        self.assertIn("releases/tag/v3.2.0", readme)
         report = json.loads(FILE.read_text("utf-8"))
         self.assertIn("mgba_core_four_platforms", "single_mgba_core_four_platforms")
         self.assertIn("42822217817", report["verified_previews"]["single_mgba_core_four_platforms"])
