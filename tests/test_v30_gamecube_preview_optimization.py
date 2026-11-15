@@ -80,6 +80,34 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.preview_readback_skips, 4)
         self.assertEqual(session.raw_video_callbacks, 7)
 
+    def test_gl_status_failure_stops_native_session_without_publishing_pixels(self):
+        session = object.__new__(GameCubeHardwareSession)
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=5, lock=threading.Lock(),
+            stop_event=threading.Event(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+        )
+        session.host = Mock(read_frame=Mock(side_effect=RuntimeError(
+            "GPU readback OpenGL error"
+        )))
+        session.opengl_error = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        self.assertEqual(session.opengl_error, "GPU readback failed (RuntimeError)")
+        self.assertTrue(session.emulator.stop_event.is_set())
+        self.assertIsNone(session.emulator.frame)
+        self.assertEqual(session.emulator.frame_serial, 5)
+        self.assertEqual(session.hardware_frames, 0)
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        session.host.read_frame.assert_called_once()
+
     def test_native_gpu_readback_errors_stop_without_publishing_stale_frames(self):
         for error in (
             OSError("USB GPU device reset"),
