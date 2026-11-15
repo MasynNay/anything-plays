@@ -29,6 +29,7 @@ REQUIRED_TRUE = (
     "v32_setup_gamepad_untouched",
     "v32_setup_still_disarmed",
     "v32_control_archive_roundtrip_verified",
+    "v32_reset_undo_verified",
     "v32_console_artwork_isolation_verified",
     "v32_failed_console_switch_recovery_verified",
     "v32_single_control_export_isolated",

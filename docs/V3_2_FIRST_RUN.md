@@ -127,6 +127,8 @@ interface refresh leaves the Undo snapshot available for retry, and camera
 controls remain stopped. Switching to another console does not discard the
 snapshot; switch back to the reset console to use Undo. The private frozen
 Tk GUI smoke exercises a rejected and approved Undo reset with later edits.
+Every unreleased installer must report `v32_reset_undo_verified` after this
+real-button exercise, or its acceptance check fails.
 
 ## Transactional console-editor switching
 

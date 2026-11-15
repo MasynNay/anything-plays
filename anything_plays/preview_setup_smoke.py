@@ -775,6 +775,7 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
         "v32_control_archive_roundtrip_verified": control_archive_verified,
+        "v32_reset_undo_verified": control_archive_verified,
         "v32_console_artwork_isolation_verified": private_artwork_verified,
         "v32_failed_console_switch_recovery_verified": rejected_switch_verified,
         "v32_single_control_export_isolated": True,
