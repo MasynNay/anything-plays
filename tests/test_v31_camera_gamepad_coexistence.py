@@ -286,6 +286,51 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertTrue(app.emu.held("B", 0))
         self.assertTrue(app.emu.held("Start", 0))
 
+    def test_two_colors_share_one_hsv_conversion_and_release_on_loss(self):
+        app = self.app
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        converter = cv2.cvtColor
+        with patch("anything_plays.tracking.cv2.cvtColor", wraps=converter) as convert:
+            app.draw_camera()
+        conversions = [call for call in convert.call_args_list
+                       if call.args[1] == cv2.COLOR_BGR2HSV]
+        self.assertEqual(len(conversions), 1, "one camera HSV conversion per frame")
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        app.set_pixels()
+        app.draw_camera()
+        app.emu.frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+
+    def test_camera_controls_dispatch_before_contour_annotations(self):
+        app = self.app
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        unmarked = app.frame.copy()
+        original_draw = cv2.drawContours
+        decorations = []
+
+        def observed_draw(*args, **kwargs):
+            # Native InputBuffer receives complete held snapshots for both
+            # players before any cosmetic OpenCV contour is rendered.
+            self.assertIn(app.emu.inputs.id_for("A"),
+                          app.emu.inputs._camera_held[0])
+            self.assertIn(app.emu.inputs.id_for("B"),
+                          app.emu.inputs._camera_held[1])
+            decorations.append(True)
+            return original_draw(*args, **kwargs)
+
+        with patch("anything_plays.ui_camera.cv2.drawContours",
+                   side_effect=observed_draw):
+            app.draw_camera()
+        self.assertEqual(len(decorations), 2)
+        self.assertTrue(np.array_equal(unmarked, app.frame),
+                        "annotating the preview must not mutate input pixels")
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+
     def test_overlapping_camera_and_gamepad_hold_releases_independently(self):
         app = self.app
         self.pad.buttons = {"A"}
