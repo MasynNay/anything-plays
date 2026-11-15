@@ -101,6 +101,12 @@ class GameCubeHardwareSession(CoreSession):
             self.null_video_callbacks += 1
             return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
+            # Stop promptly after a failed native readback. Dolphin can issue
+            # another video callback while its worker exits; avoid reopening
+            # a failed GL path or retaining new frames after shutdown.
+            if (self.opengl_error is not None or
+                    self.emulator.stop_event.is_set()):
+                return
             # glReadPixels blocks on GPU/CPU synchronization. Copy only as
             # fast as the selected preview rate, but NEVER skip retro_run()
             # frames, audio, controller updates, or internal Dolphin work.
@@ -114,10 +120,21 @@ class GameCubeHardwareSession(CoreSession):
             begun = time.perf_counter()
             try:
                 rgb = self.host.read_frame(width, height)
-            except (RuntimeError, ValueError) as exc:
-                # Surface loss is a real playback failure, not an invitation
-                # to keep emulating silently with black graphics.
-                self.opengl_error = f"{type(exc).__name__}: {exc}"
+                shape = getattr(rgb, "shape", ())
+                # A torn GL context can return an empty or malformed buffer
+                # without raising. Never publish it to Tk/OBS as a fresh
+                # game image or count it as a valid hardware frame.
+                if (len(shape) != 3 or shape[0] <= 0 or shape[1] <= 0
+                        or shape[2] != 3 or
+                        str(getattr(rgb, "dtype", "")) != "uint8"):
+                    raise ValueError("GPU readback returned invalid RGB pixels")
+            except (RuntimeError, ValueError, OSError, TypeError,
+                    OverflowError, MemoryError) as exc:
+                # A native driver can disappear during glReadPixels. Request
+                # shutdown while inside this Python callback: an uncaught
+                # exception crossing ctypes can leave Dolphin running with a
+                # permanently stale display. Do not retry this broken host.
+                self.opengl_error = f"{type(exc).__name__}: {str(exc)[:120]}"
                 self.emulator.stop_event.set()
                 return
             duration = max(0.0, time.perf_counter() - begun)
