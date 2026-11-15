@@ -40,6 +40,11 @@ class LibraryHost(VideoHost, LibraryMixin):
         self.stop_controls = Mock()
         self.game_status = Mock()
         self.show_library = Mock()
+        self.show_playing_info = Mock()
+        self.uses_embedded_emulator = lambda: True
+        self.prepare_gamepad_for_game_transition = Mock()
+        self.emu.find_system_core.return_value = "/synthetic/test-core.so"
+        self.root = Mock()
 
 
 class GameVideoLifecycleTests(unittest.TestCase):
@@ -77,6 +82,29 @@ class GameVideoLifecycleTests(unittest.TestCase):
         app.stop_controls.assert_called_once()
         app.deactivate_manual.assert_called_once()
         app.show_library.assert_called_once()
+
+    def test_repeated_same_console_rom_switches_prepare_gamepad_first(self):
+        app = LibraryHost()
+        paths = [f"/synthetic/test-{number}.gba" for number in range(8)]
+        for number, path in enumerate(paths, 1):
+            app.start_rom(path)
+            self.assertEqual(app.current_rom, path)
+            self.assertEqual(app.prepare_gamepad_for_game_transition.call_count,
+                             number)
+            self.assertEqual(app.emu.start.call_count, number)
+            self.assertEqual(app.emu.start.call_args.args, (path,))
+            app.stop_controls.assert_called()
+        self.assertEqual(app.show_playing_info.call_count, len(paths))
+
+    def test_rom_unload_disarms_gamepad_before_stop(self):
+        app = LibraryHost()
+        sequence = []
+        app.prepare_gamepad_for_game_transition.side_effect = (
+            lambda: sequence.append("controller release")
+        )
+        app.emu.stop.side_effect = lambda: sequence.append("native stop")
+        app.unload_rom()
+        self.assertEqual(sequence, ["controller release", "native stop"])
 
     def test_closed_secondary_windows_do_not_prevent_unloading(self):
         import tkinter as tk
