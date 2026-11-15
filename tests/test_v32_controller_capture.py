@@ -4,6 +4,7 @@ import unittest
 
 from anything_plays.controller_capture import newly_pressed_source
 from anything_plays.ui_gamepad import GamepadMixin
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 class Setting:
@@ -78,6 +79,9 @@ class CaptureHost(GamepadMixin):
 
 
 class ControllerCaptureTests(unittest.TestCase):
+    def test_private_installer_requires_failed_remap_recovery(self):
+        self.assertIn("v32_controller_remap_rejected_save_verified", REQUIRED_TRUE)
+
     def test_failed_press_mapping_retries_without_claiming_assignment(self):
         app = CaptureHost()
         status, row = Setting(), Setting("A")

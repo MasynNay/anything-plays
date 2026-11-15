@@ -517,6 +517,71 @@ def _exercise_installed_failed_console_switch(app):
     return True
 
 
+def _exercise_installed_controller_write_failure(app):
+    """Check rejected manual remaps through the real frozen App.
+
+    Preferences and input devices are disposable; synthetic disk-full
+    errors prove a failed write cannot become a successful controller
+    mapping or inadvertently close the setup dialog.
+    """
+    import copy
+    from anything_plays.gamepad import normalize_bindings
+    from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
+
+    system = app.system_key.get()
+    if system not in BUTTONS_BY_SYSTEM:
+        raise RuntimeError("Frozen controller cannot identify its console")
+    prior = copy.deepcopy(app._gamepad_bindings)
+    prior_bytes = (
+        app.preferences_path.read_bytes()
+        if app.preferences_path.exists() else None
+    )
+    try:
+        app._gamepad_bindings[system] = {"A": "A"}
+        selected = tk.StringVar(master=app.root, value="B")
+        with patch(
+            "anything_plays.ui_profiles.write_json_atomically",
+            side_effect=OSError("simulated private settings disk full"),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showwarning",
+        ) as warning:
+            saved = app._save_gamepad_binding(
+                system, "A", "B", display_var=selected,
+            )
+        if saved is not False or warning.call_count != 1:
+            raise RuntimeError("Frozen controller reported a rejected save as success")
+        if (app._gamepad_bindings[system] != {"A": "A"}
+                or selected.get() != normalize_bindings(
+                    system, {"A": "A"},
+                )["A"]):
+            raise RuntimeError("Frozen failed remap changed controls or selector")
+        closed = []
+        with patch(
+            "anything_plays.ui_profiles.write_json_atomically",
+            side_effect=OSError("simulated private settings disk full"),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showwarning",
+        ) as warning:
+            reset = app._reset_gamepad_mappings(
+                system, lambda: closed.append(True),
+            )
+        if reset is not False or warning.call_count != 1:
+            raise RuntimeError("Frozen controller reset reported false success")
+        if closed or app._gamepad_bindings[system] != {"A": "A"}:
+            raise RuntimeError("Failed frozen controller defaults lost prior mapping")
+        current_bytes = (
+            app.preferences_path.read_bytes()
+            if app.preferences_path.exists() else None
+        )
+        if current_bytes != prior_bytes:
+            raise RuntimeError("Frozen rejected controller remap changed settings")
+    finally:
+        app._gamepad_bindings = prior
+    if app.cap is not None or app.armed or app._gamepad.api is not None:
+        raise RuntimeError("Failed controller remap unexpectedly activated devices")
+    return True
+
+
 def _one_installed_setup_roundtrip(app, root):
     """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
@@ -610,6 +675,7 @@ def exercise_installed_preview_setup(app, root):
     control_archive_verified = _exercise_installed_control_archive(app, root)
     private_artwork_verified = _exercise_installed_artwork_downloads(app)
     rejected_switch_verified = _exercise_installed_failed_console_switch(app)
+    controller_failure_verified = _exercise_installed_controller_write_failure(app)
     if _live_toplevels(root) != original_windows:
         raise RuntimeError("Frozen control backup left a native Tk dialog")
     if len(app.theme_name.trace_info()) != original_traces:
@@ -778,6 +844,7 @@ def exercise_installed_preview_setup(app, root):
         "v32_reset_undo_verified": control_archive_verified,
         "v32_console_artwork_isolation_verified": private_artwork_verified,
         "v32_failed_console_switch_recovery_verified": rejected_switch_verified,
+        "v32_controller_remap_rejected_save_verified": controller_failure_verified,
         "v32_single_control_export_isolated": True,
         "v32_unsaved_shutdown_guard_verified": True,
     }

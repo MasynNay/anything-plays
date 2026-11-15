@@ -32,6 +32,7 @@ REQUIRED_TRUE = (
     "v32_reset_undo_verified",
     "v32_console_artwork_isolation_verified",
     "v32_failed_console_switch_recovery_verified",
+    "v32_controller_remap_rejected_save_verified",
     "v32_single_control_export_isolated",
     "v32_unsaved_shutdown_guard_verified",
     "v32_setup_no_orphan_windows",

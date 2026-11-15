@@ -2,6 +2,16 @@
 
 This is a source-only development change, not a published release.
 
+## Reliable controller remapping
+
+Manual mapping, Press to assign and Restore defaults now treat persistence as
+part of the operation. When saving preferences fails, the prior mapping is
+restored, the selection returns to its previous button, and the controller
+setup remains open. A failed Press to assign stays available for another
+release-and-press attempt instead of claiming success. The private frozen
+installer acceptance verifies these scenarios against the real Tk App with
+injected storage errors and no physical controller.
+
 ## What changes
 
 The **Controller · Manual Play** panel now includes a full-width
