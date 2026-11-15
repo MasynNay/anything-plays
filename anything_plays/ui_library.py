@@ -381,13 +381,6 @@ class LibraryMixin:
         self.current_rom = str(path)
         self._save_warning_until = 0
         try:
-            # Starting another ROM may happen without an explicit Unload.
-            # Stop the old native worker BEFORE clearing game-only and stream
-            # canvases; otherwise the previous game's pixels can remain on
-            # screen while the new native core initializes (or fails).
-            self.emu.stop()
-            from anything_plays.game_display_lifecycle import clear_game_video
-            clear_game_video(self)
             if not self.uses_embedded_emulator():
                 if not self.start_external_rom(str(path)):
                     return
@@ -440,6 +433,15 @@ class LibraryMixin:
                         'Repair or reinstall Anything Plays 3.0; every console '
                         'is included and must work offline.'
                     )
+                # Existing native sessions must be fully stopped before any
+                # framebuffer cleanup. CoreSession.start() already stops an
+                # inactive session, so avoid an extra stop on first launch.
+                # Keep missing-core preview's own unload/stop path unchanged.
+                if (getattr(self.emu, "running", False) is True or
+                        getattr(self.emu, "launching", False) is True):
+                    self.emu.stop()
+                from anything_plays.game_display_lifecycle import clear_game_video
+                clear_game_video(self)
                 self.emu.start(str(path))
             self.current_rom = str(path)
             if self.uses_embedded_emulator():
