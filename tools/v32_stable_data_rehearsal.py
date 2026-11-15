@@ -12,9 +12,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from anything_plays.settings_defaults import DEFAULT
-from anything_plays.system_profiles import default_for
-
+# Keep the fixture self-contained. Importing the game's default profile
+# would load the emulator, NumPy and SDL before the clean OS runner installs
+# its runtime dependencies; it is unnecessary for a synthetic old profile.
 NAMESPACE = Path(".config") / "anything-plays-31"
 PREFERENCES = {
     "system": "gba",
@@ -43,9 +43,15 @@ def seed(home):
     if root.exists() or root.is_symlink():
         raise ValueError("Stable QA fixture already exists")
     root.mkdir(parents=True)
-    profile = default_for("gba", DEFAULT)
-    profile["tolerance"] = PROFILE_TOLERANCE
-    profile["private_profile_canary"] = "synthetic-existing-gba"
+    # ProfileStore safely fills all unspecified GBA controls from its
+    # existing defaults after the frozen app launches. The explicitly
+    # saved old zone, mapping and custom values must survive normalization.
+    profile = {
+        "tolerance": PROFILE_TOLERANCE,
+        "private_profile_canary": "synthetic-existing-gba",
+        "zones": {"A": [0.0, 0.0, 1.0, 1.0]},
+        "mapping": {"A": "A"},
+    }
     (root / "preferences.json").write_text(
         json.dumps(PREFERENCES, indent=2) + "\n", "utf-8"
     )
