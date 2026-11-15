@@ -1,11 +1,14 @@
-# Anything Plays 3.2 — Feature-complete QA, public release still blocked
+# Anything Plays 3.2.0 — Public release and QA evidence
 
-As of **November 15, 2026**, the 3.2 feature set is implemented on
-[`feature/v3.2-integration`](https://github.com/MasynNay/anything-plays/pull/244).
-The latest private full-native software and installer QA is green, but
-**v3.2.0 has NOT been published, merged, or approved for distribution**.
-The existing public [v3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1)
-remains the stable application.
+**PUBLIC STABLE RELEASE — November 15, 2026.** [Anything Plays 3.2.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) was published following merged PR #244, exact four-platform [release candidate verification](https://github.com/MasynNay/anything-plays/actions/runs/43742977770) and successful [publication workflow](https://github.com/MasynNay/anything-plays/actions/runs/43743526029).
+
+The actual public release includes **four internally versioned 3.2.0 full-native installers**, original source access, SHA-256 sums and QA manifest. The original 3.1.1 download remains unchanged and available. The published source tag identifies `0c4db50ede64646cecbadd400dd54f0ae76166c9`.
+
+**Scope:** Free and noncommercial/nonpromotional, with separately licensed third-party components. Native CI verified the 3.1.1-to-3.2 upgrade process on all four OSes; installed real-game progress, physical webcam/gamepad/speaker combinations, extended retail gameplay and independent transitive-license auditing are **not universally verified**. The scoped owner authorization is in [`config/v3.2-publication-authorization.json`](../config/v3.2-publication-authorization.json). See the [public release notes](releases/ANYTHING_PLAYS_V3_2_PUBLIC_NOTES.md) and the release's attached source review.
+
+## Historical pre-publication QA freeze
+
+The remaining material documents the **pre-publication** acceptance evidence and outstanding broad hardware/compliance research as it stood before release. Its earlier hold status is preserved for audit, not a statement that 3.2.0 is still unreleased. The legacy `config/v3.2-release-readiness.json` and `check_v32_release_readiness` implement a stricter *universal* acceptance gate and are archival; the public release used an explicit scoped authorization with disclosures.
 
 ## Exact tested evidence
 
@@ -51,7 +54,7 @@ and Undo reset, per-console artwork, stored-profile rollback, and disarmed
 camera/controller safety checks are implemented. Full package CI has passed;
 source tests verify import/undo recovery under failed disk writes.
 
-## Requirements before PUBLIC 3.2
+## Prepublication acceptance checklist and ongoing field-research limits
 
 1. Complete **real game-save and ROM-library continuity acceptance** after
    upgrading 3.1.1 to 3.2. The private
@@ -77,9 +80,9 @@ source tests verify import/undo recovery under failed disk writes.
    final stable installer hashes, source companion, and release scope**.
    Publish a new version without replacing or deleting v3.1.1.
 
-Machine-check the honest publication hold with
+Historical universal-acceptance checklist (separate from the scoped published release):
 `python -m tools.check_v32_release_readiness --require-public-ready`.
-The command intentionally fails until the evidence and all owner gates
+The command remains intentionally strict until every broader hardware and research gate
 in [`config/v3.2-release-readiness.json`](../config/v3.2-release-readiness.json)
 are individually reviewed. A green CI badge never flips these flags.
 

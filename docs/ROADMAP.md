@@ -1,8 +1,8 @@
 # Anything Plays — Product roadmap
 
-**If it moves, it plays.** Anything Plays is a free desktop application that turns locally tracked camera movement into controls for classic games. This is the current **post-3.1.1 stable** product plan, not a list of unverified feature promises.
+**If it moves, it plays.** Anything Plays is a free desktop application that turns locally tracked camera movement into controls for classic games. This is the current **post-3.2.0 stable** product plan, not a list of unverified feature promises.
 
-[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.1.1](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) · [Report an issue](https://github.com/MasynNay/anything-plays/issues) · [Architecture](ARCHITECTURE.md)
+[Official website](https://anythingplays.masynnay.com/) · [Download stable 3.2.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) · [Report an issue](https://github.com/MasynNay/anything-plays/issues) · [Architecture](ARCHITECTURE.md)
 
 ## Release history and current status
 
@@ -13,16 +13,16 @@
 | **3.0** | Released, November 9, 2026 | 18 console profiles, 11 native emulator core families, Windows/Linux/Apple Silicon/Intel Mac installers |
 | **3.1.0** | **Public stable, November 11, 2026 (Mountain Time)** | OBS-friendly two-screen Stream Mode, 16 themes, configurable bezels, optional SDL gamepad mapping/tester, safer reconnect/focus handling, isolated preferences, all 18 consoles |
 | **3.1.1** | **Public stable, November 12, 2026 (Mountain Time)** | Camera recovery, controller/SDL resilience, atomic game-save reliability, ROM/art shelf fault isolation, expanded four-platform tests; same 18 consoles |
-| **3.2** | **Feature-complete; four-platform native upgrade rehearsals passed; release on hold** | Onboarding, camera calibration, portable controls, 11 original native cores / 18 profiles; synthetic 3.1.1 → 3.2 OS upgrades passed; real saves, rights and hardware acceptance pending |
+| **3.2.0** | **Public stable, November 15, 2026** | Guided onboarding, camera calibration, controller/keyboard setup, portable control backups and Undo, privacy-safe diagnostics; 11 original native cores / 18 console profiles, four native installers and verified 3.1.x upgrade path |
 | **3.3** | Proposed | GameCube and 3D performance, smoother streaming capture, lower latency and extended-session optimization |
 
-The current [3.1.1 release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) provides four full installers, matching SHA256 checksums, per-platform native build and installed GUI evidence, a source-access review, and the byte-identical original pygame/SDL/mpg123 source companion from 3.1.0. The **exact tested application revision** is `e433d4475e22ce2b39d79cf4d656b027c17d9ef7`. All nine source/package/real-Tk+Stream-Mode review jobs passed in [native run 43355665931](https://github.com/MasynNay/anything-plays/actions/runs/43355665931), and the [eight-asset publication and anonymous-access verification passed](https://github.com/MasynNay/anything-plays/actions/runs/43358855767). The earlier [3.1.0 stable release](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0) remains available unchanged.
+The current [3.2.0 public stable release](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) ships all four native installers, a SHA-256 manifest, source-access notes and the build QA report. Exact application source revision: `0c4db50ede64646cecbadd400dd54f0ae76166c9`. [Four-platform release candidates passed](https://github.com/MasynNay/anything-plays/actions/runs/43742977770), and [the exact eight-asset publication workflow succeeded](https://github.com/MasynNay/anything-plays/actions/runs/43743526029). [Public 3.1.1 remains available](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) for rollback.
 
-**Quality distinction:** All four 3.1.1 native installers and their actual frozen Tk/Stream Mode launches passed; virtual-time controller/save checks and a real timed Linux UI soak also passed. This is **not** certification of physical controller pairing, live webcam capture, every retail-game save/audio combination, multiple hours of real gameplay or every GPU. These remain field-validation work disclosed in the [3.1.1 release notes](releases/ANYTHING_PLAYS_V3_1_1_PUBLIC_NOTES.md). The complete app is free and noncommercial, with independent emulator/library licensing and original source access; an actual gamepad is optional.
+**Quality distinction:** the 3.2 installer upgrade, application startup and saved-memory checks passed native automated QA; this is **not** a universal certification of real webcams, USB/Bluetooth controller pairs, physical audio, commercial-game saves or GameCube GPU performance. The original MIT source and bundled native dependencies remain subject to their respective licensing and source-access notices.
 
-## Continuing: 3.1.1 — Field compatibility and maintenance
+## Continuing: 3.2.0 — Field compatibility and maintenance
 
-**Goal:** Support the now-released 3.1.1 with practical hardware reports and targeted fixes, without presenting synthetic tests as physical-device certification.
+**Goal:** Support the now-released 3.2.0 with practical hardware reports and targeted fixes, without presenting synthetic tests as physical-device certification.
 
 | Workstream | Definition of done |
 | --- | --- |
@@ -32,11 +32,11 @@ The current [3.1.1 release](https://github.com/MasynNay/anything-plays/releases/
 | Windows/Linux/Mac packaging | Verify one clean installation per practical native OS, updates without overwriting 3.1.0 settings, clear unsigned/notarization warnings and installer integrity. |
 | Crash and memory hygiene | Test repeated launches/switches, camera/controller disconnects and at least a 30-minute representative session; quantify resource growth and regressions. |
 
-**3.1.1 shipped after actual fixes and focused regression evidence**, not merely a version-number change. Real-device, licensed-game and host-specific diagnostics remain ongoing; collect issue reports in [Windows #26](https://github.com/MasynNay/anything-plays/issues/26) and [Linux #25](https://github.com/MasynNay/anything-plays/issues/25). A later 3.1.2 hotfix should only ship for a demonstrated issue with its own platform-specific tests. Do not confuse earlier owner 3.0/3.1 RC tests with acceptance of every new device.
+**3.2.0 shipped after genuine multi-OS native upgrade tests and targeted regression evidence**, not merely a version-number change. Real-device, licensed-game and host-specific diagnostics remain ongoing; collect issue reports in [Windows #26](https://github.com/MasynNay/anything-plays/issues/26) and [Linux #25](https://github.com/MasynNay/anything-plays/issues/25). A later 3.1.2 hotfix should only ship for a demonstrated issue with its own platform-specific tests. Do not confuse earlier owner 3.0/3.1 RC tests with acceptance of every new device.
 
-## Next: 3.2 — Setup and control experience
+## Shipped in 3.2 — Setup and control experience
 
-**Feature-complete private candidate (NOT publicly released; exact [release acceptance](V3_2_RELEASE_ACCEPTANCE.md)):** The 3.2 integration branch brings together versioned control-profile export/import and undo ([guide](V3_2_SETUP_CONTROLS.md)), guided camera calibration ([guide](V3_2_CAMERA_CALIBRATION.md)), controller/keyboard onboarding including press-to-remap ([guide](V3_2_CONTROLLER_ONBOARDING.md)), and redacted local setup diagnostics ([guide](V3_2_SETUP_DIAGNOSTICS.md)). The **Get started** launchpad, real Tk UI smoke test, and fail-closed `python run_v32_preview.py` launcher use a separate, fresh settings directory ([first-run guide](V3_2_FIRST_RUN.md)). Automated source/GUI checks and real-device acceptance remain the merge and release gates; no physical hardware compatibility is implied.
+**Released publicly as 3.2.0:** versioned control-profile export/import and Undo ([guide](V3_2_SETUP_CONTROLS.md)), guided camera calibration ([guide](V3_2_CAMERA_CALIBRATION.md)), controller/keyboard onboarding ([guide](V3_2_CONTROLLER_ONBOARDING.md)) and privacy-safe setup diagnostics ([guide](V3_2_SETUP_DIAGNOSTICS.md)). The Get started launchpad and the full 18-profile same-install upgrade were verified in four-platform native QA. The separate `run_v32_preview.py` launcher remains a historical isolated development channel, not the stable installer. Physical device behavior still depends on hardware and drivers.
 
 **Goal:** A first-time user should be able to go from installation to a working camera or keyboard-controlled game without reading technical documentation.
 
@@ -68,7 +68,7 @@ After stability, usability and performance improve, explore more accessible mult
 - Preserve exact platform-native builds, SHA256 checksums, dependency notices and recipient source/rebuild rights; do not conflate LGPL obligations with physical hardware testing. See [the scoped 3.1 release decision](V3_1_SCOPED_DISTRIBUTION_DECISION.md) and [LGPL rebuild instructions](V3_1_LGPL_REBUILD_REPLACEMENT.md).
 - The complete emulator installers remain free and **noncommercial** because bundled core licenses can be more restrictive than the MIT-licensed original application source.
 - Keep earlier [stable 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0), [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) available for rollback.
-- No dates are committed for 3.2 or 3.3. Triage 3.1.1 issues through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and only publish incremental fixes when verified.
+- Version 3.2.0 shipped November 15, 2026; no dates are committed for future 3.3 work. Triage 3.1.1 issues through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and only publish incremental fixes when verified.
 
 ## Historical engineering log
 
