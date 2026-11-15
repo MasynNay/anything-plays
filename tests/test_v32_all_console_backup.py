@@ -126,6 +126,21 @@ class AllConsoleBackupTests(unittest.TestCase):
         from tools.verify_v32_installed_gui import REQUIRED_TRUE
         self.assertIn("v32_control_archive_roundtrip_verified", REQUIRED_TRUE)
 
+    def test_frozen_ttk_undo_control_uses_native_state_instead_of_string_equality(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "anything_plays/preview_setup_smoke.py"
+        ).read_text("utf-8")
+        self.assertNotIn('.cget("state")', source)
+        self.assertIn(
+            '_undo_all_profile_restore_button.instate(["disabled"])',
+            source,
+        )
+        self.assertIn(
+            '_undo_all_profile_restore_button.instate(["!disabled"])',
+            source,
+        )
+
     def test_backup_ui_uses_atomic_full_set_and_disarms_controls(self):
         source = (Path(__file__).resolve().parents[1]
                   / "anything_plays/ui_profiles.py").read_text("utf-8")

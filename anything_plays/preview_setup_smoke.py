@@ -138,7 +138,10 @@ def _exercise_installed_control_archive(app, root):
             return_value=False,
         ):
             _click_button(root, "Restore all 18")
-        if app._undo_all_profile_restore_button.cget("state") != "disabled":
+        # ttk.Button.cget("state") may return a Tcl index object that
+        # looks like "disabled" but does not compare equal to that string.
+        # Ask Tk's state engine directly; this tests the actual button.
+        if not app._undo_all_profile_restore_button.instate(["disabled"]):
             raise RuntimeError("Declined control restore enabled undo")
         for name in BUTTONS_BY_SYSTEM:
             if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
@@ -158,7 +161,7 @@ def _exercise_installed_control_archive(app, root):
             if app.profile_store.get(name)["tolerance"] != expected:
                 raise RuntimeError("Full-profile restore did not apply atomically")
         if (app.cfg["tolerance"] != modified[selected]["tolerance"]
-                or app._undo_all_profile_restore_button.cget("state") != "normal"
+                or not app._undo_all_profile_restore_button.instate(["!disabled"])
                 or app.armed):
             raise RuntimeError("Frozen restore left incorrect live/undo state")
 
@@ -167,7 +170,7 @@ def _exercise_installed_control_archive(app, root):
             if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
                 raise RuntimeError("Undo all did not restore previous profiles")
         if (app.cfg["tolerance"] != original[selected]["tolerance"]
-                or app._undo_all_profile_restore_button.cget("state") != "disabled"
+                or not app._undo_all_profile_restore_button.instate(["disabled"])
                 or app.armed or app.cap is not None
                 or app._gamepad.api is not None):
             raise RuntimeError("Frozen restore undo changed devices or controls")
