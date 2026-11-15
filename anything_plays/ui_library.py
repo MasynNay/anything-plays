@@ -440,8 +440,18 @@ class LibraryMixin:
                 if (getattr(self.emu, "running", False) is True or
                         getattr(self.emu, "launching", False) is True):
                     self.emu.stop()
-                from anything_plays.game_display_lifecycle import clear_game_video
-                clear_game_video(self)
+                # Only clear a prior *rendered* game. On first launch the
+                # canvas is already empty, and headless UI hosts may not
+                # have an emulator frame lock or stream widgets yet.
+                prior_render = any(
+                    getattr(self, attr, None) is not None for attr in (
+                        "game_photo", "_last_game_render",
+                        "_stream_game_frame", "_stream_photo",
+                    )
+                )
+                if prior_render:
+                    from anything_plays.game_display_lifecycle import clear_game_video
+                    clear_game_video(self)
                 self.emu.start(str(path))
             self.current_rom = str(path)
             if self.uses_embedded_emulator():
