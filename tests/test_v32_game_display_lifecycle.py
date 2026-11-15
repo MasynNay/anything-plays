@@ -100,6 +100,7 @@ class GameVideoLifecycleTests(unittest.TestCase):
 
     def test_rom_replacement_clears_old_frame_before_native_start(self):
         app = LibraryHost()
+        app.emu.running = True
         camera = app._stream_camera_frame
         order = []
         app.emu.stop.side_effect = lambda: order.append("native stop")
@@ -123,6 +124,7 @@ class GameVideoLifecycleTests(unittest.TestCase):
     def test_repeated_rom_replacement_does_not_retain_prior_pixels(self):
         app = LibraryHost()
         for index in range(6):
+            app.emu.running = True
             app.emu.frame = object()
             app.game_photo = object()
             app._stream_game_frame = object()
@@ -136,18 +138,23 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertEqual(app.emu.stop.call_count, 6)
         self.assertEqual(app._stream_canvas.delete.call_count, 6)
 
-    def test_missing_core_clears_old_frame_and_does_not_launch(self):
+    def test_stable_missing_core_keeps_prior_game_intact(self):
         app = LibraryHost()
+        app.emu.running = True
+        frame = app.emu.frame
+        previous_stream = app._stream_game_frame
         app.emu.find_system_core.return_value = None
         with patch("anything_plays.preview_storage.is_v32_preview",
                    return_value=False), patch(
                        "anything_plays.ui_library.messagebox.showerror"
                    ):
             app.start_rom("/synthetic/missing-core.gba")
-        self.assertIsNone(app.emu.frame)
-        self.assertIsNone(app._stream_game_frame)
+        # A failed lookup must not stop a still-playing title. The separate
+        # limited-preview missing-core path still unloads as before.
+        self.assertIs(app.emu.frame, frame)
+        self.assertIs(app._stream_game_frame, previous_stream)
+        app.emu.stop.assert_not_called()
         app.emu.start.assert_not_called()
-        self.assertIsNone(app._stream_photo)
         self.assertIn("A bundled emulator core is missing",
                       app.game_status.set.call_args.args[0])
 
