@@ -78,6 +78,53 @@ class CaptureHost(GamepadMixin):
 
 
 class ControllerCaptureTests(unittest.TestCase):
+    def test_failed_press_mapping_retries_without_claiming_assignment(self):
+        app = CaptureHost()
+        status, row = Setting(), Setting("A")
+        app._controller_capture = {
+            "system": "gba", "target": "B",
+            "baseline": frozenset(), "status": status,
+            "rows": {"A": row},
+        }
+        app.save_preferences = lambda: False
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app._controller_capture_tick("gba")
+        self.assertEqual(app._gamepad_bindings, {})
+        self.assertIsNotNone(app._controller_capture)
+        self.assertEqual(row.get(), "A")
+        self.assertIn("could not be saved", status.get())
+        self.assertNotIn("assigned to", status.get())
+        app.save_preferences = lambda: True
+        app._gamepad.physical_buttons = frozenset()
+        app._controller_capture_tick("gba")
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app._controller_capture_tick("gba")
+        self.assertEqual(app._gamepad_bindings["gba"]["A"], "B")
+        self.assertEqual(row.get(), "B")
+        self.assertIsNone(app._controller_capture)
+
+    def test_failed_manual_mapping_restores_selector_and_prior_binding(self):
+        app = CaptureHost()
+        app._gamepad_bindings["gba"] = {"A": "X"}
+        row = Setting("B")
+        app.save_preferences = lambda: False
+        self.assertFalse(app._save_gamepad_binding(
+            "gba", "A", "B", display_var=row,
+        ))
+        self.assertEqual(app._gamepad_bindings["gba"], {"A": "X"})
+        self.assertEqual(row.get(), "X")
+
+    def test_failed_reset_defaults_keeps_mapping_and_dialog_open(self):
+        app = CaptureHost()
+        app._gamepad_bindings["gba"] = {"A": "B"}
+        app.save_preferences = lambda: False
+        closed = []
+        self.assertFalse(app._reset_gamepad_mappings(
+            "gba", lambda: closed.append(True),
+        ))
+        self.assertEqual(app._gamepad_bindings["gba"], {"A": "B"})
+        self.assertEqual(closed, [])
+
     def test_one_edge_is_selected_and_held_button_is_not_repeated(self):
         src, baseline, ambiguous = newly_pressed_source(
             frozenset(), {"A"},

@@ -85,6 +85,8 @@ class ProfilesMixin:
             if strict:
                 raise
             messagebox.showwarning('Preferences', f'Could not save preferences: {exc}')
+            return False
+        return True
 
     def update_button_mapping(self, name):
         # The combobox already contains the new value when this callback runs.

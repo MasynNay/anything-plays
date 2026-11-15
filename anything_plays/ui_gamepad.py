@@ -383,7 +383,12 @@ class GamepadMixin:
             )
         if source is not None:
             target = capture["target"]
-            self._save_gamepad_binding(system, source, target)
+            if self._save_gamepad_binding(system, source, target) is False:
+                capture["status"].set(
+                    "Controller mapping could not be saved. Check preferences "
+                    "storage, release the input and press again to retry."
+                )
+                return
             row = capture["rows"].get(source)
             if row is not None:
                 row.set(target)
@@ -627,7 +632,9 @@ class GamepadMixin:
                 choice.bind(
                     "<<ComboboxSelected>>",
                     lambda _event, source=physical, v=value:
-                    self._save_gamepad_binding(system, source, v.get())
+                    self._save_gamepad_binding(
+                        system, source, v.get(), display_var=v,
+                    )
                 )
 
         footer = ttk.Frame(content)
@@ -647,22 +654,53 @@ class GamepadMixin:
         ).pack(anchor="w", pady=(5, 0))
 
     def _reset_gamepad_mappings(self, system, close):
-        """Reset just the selected console; leave other console maps alone."""
+        """Reset only one console after its preferences write succeeds."""
+        previous = self._gamepad_bindings.get(system)
         self._gamepad_bindings.pop(system, None)
-        self.save_preferences()
+        try:
+            persisted = self.save_preferences()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            persisted = False
+        if persisted is False:
+            if previous is not None:
+                self._gamepad_bindings[system] = previous
+            notice = getattr(self, "gamepad_diagnostics_status", None)
+            if notice is not None:
+                notice.set("Controller defaults were not saved. Check storage and retry.")
+            return False
         close()
         self.open_controller_settings(system)
+        return True
 
     def configure_gamepad_mappings(self, system, parent):
         """Compatibility alias for existing controller-map entry points."""
         return self.open_controller_settings(system, parent)
 
-    def _save_gamepad_binding(self, system, source, button):
-        if source not in SOURCES or button not in (DISABLED, *BUTTONS_BY_SYSTEM[system]):
-            return
-        saved = self._gamepad_bindings.get(system)
-        if not isinstance(saved, dict):
-            saved = {}
-            self._gamepad_bindings[system] = saved
-        saved[source] = button
-        self.save_preferences()
+    def _save_gamepad_binding(self, system, source, button, display_var=None):
+        """Do not claim assignment when disk persistence was rejected."""
+        if (system not in BUTTONS_BY_SYSTEM or source not in SOURCES
+                or button not in (DISABLED, *BUTTONS_BY_SYSTEM[system])):
+            return False
+        previous = self._gamepad_bindings.get(system)
+        candidate = dict(previous) if isinstance(previous, dict) else {}
+        previous_button = normalize_bindings(system, previous).get(source, DISABLED)
+        candidate[source] = button
+        self._gamepad_bindings[system] = candidate
+        try:
+            persisted = self.save_preferences()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            persisted = False
+        if persisted is False:
+            if previous is None:
+                self._gamepad_bindings.pop(system, None)
+            else:
+                self._gamepad_bindings[system] = previous
+            if display_var is not None:
+                display_var.set(previous_button)
+            notice = getattr(self, "gamepad_diagnostics_status", None)
+            if notice is not None:
+                notice.set(
+                    "Controller mapping could not be saved. Check preferences storage."
+                )
+            return False
+        return True
