@@ -284,6 +284,8 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "gamecube_rgb_callback_frames", "distinct_rgb_frame_hashes",
         "native_controller_polls", "nonzero_controller_polls",
         "native_pcm_frame_samples", "native_pcm_nonzero_values",
+        "audio_output_callback_calls", "audio_output_requested_frames",
+        "audio_output_underrun_frames", "audio_queue_dropped_frames",
         "continuous_render_fps", "gpu_readback_calls",
         "gpu_readback_mean_ms", "gpu_readback_max_ms",
         "native_run_calls", "native_reported_core_fps",
