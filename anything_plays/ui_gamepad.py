@@ -119,9 +119,13 @@ class GamepadMixin:
         self._gamepad_last_controller = None
         self._gamepad_seen_controller = False
         self._gamepad_reconnect_release_pending = False
+        # A held button while no embedded game is running must not carry
+        # into the next newly started game. First-ever active play is unchanged.
+        self._gamepad_game_resume_release_pending = False
 
     def close_gamepad(self):
         """Release gamepad state even for partially constructed App objects."""
+        self._gamepad_game_resume_release_pending = False
         self._gamepad_last_controller = None
         self._gamepad_seen_controller = False
         self._gamepad_reconnect_release_pending = False
@@ -138,6 +142,7 @@ class GamepadMixin:
 
     def toggle_gamepad(self):
         """Enable an optional local gamepad; keep keyboard play available."""
+        self._gamepad_game_resume_release_pending = False
         self._gamepad_last_controller = None
         self._gamepad_seen_controller = False
         self._gamepad_reconnect_release_pending = False
@@ -307,10 +312,27 @@ class GamepadMixin:
                         status += " · Release controller inputs after refocusing"
                     else:
                         self._gamepad_focus_release_pending = False
-                if not self.uses_embedded_emulator():
+                # A controller held while no embedded game is active must
+                # return to neutral before controlling a newly started game.
+                # This prevents Start/A being carried from a loading screen
+                # or external backend into the new title. It never delays a
+                # normal first press during a running game.
+                embedded = self.uses_embedded_emulator()
+                playing = embedded and bool(self.emu.running)
+                if not playing:
+                    self._gamepad_game_resume_release_pending = bool(
+                        self._gamepad.physical_buttons
+                    )
                     buttons = frozenset()
-                    status += " · Embedded emulators only"
-                elif not self.emu.running or unfocused:
+                    if not embedded:
+                        status += " · Embedded emulators only"
+                elif getattr(self, "_gamepad_game_resume_release_pending", False):
+                    if self._gamepad.physical_buttons:
+                        buttons = frozenset()
+                        status += " · Release controller inputs after starting game"
+                    else:
+                        self._gamepad_game_resume_release_pending = False
+                if unfocused:
                     buttons = frozenset()
                 self.emu.set_gamepad_buttons(buttons)
                 status_changed = status != self.gamepad_status.get()
@@ -329,6 +351,7 @@ class GamepadMixin:
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception as exc:
+            self._gamepad_game_resume_release_pending = False
             self._gamepad_last_controller = None
             self._gamepad_seen_controller = False
             self._gamepad_reconnect_release_pending = False
