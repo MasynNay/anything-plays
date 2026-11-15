@@ -116,6 +116,16 @@ action auto-saved a change while calibration was open. This prevents a
 canceled sample from discarding an unrelated unsaved layout or unexpectedly
 committing it to the local profile store.
 
+## Keyboard shortcuts are protected against failed saves
+
+**Game Controls → Keyboard shortcuts** now saves each changed key before
+closing the key-capture prompt or updating the visible assignment. If disk
+persistence fails, the previous keyboard mapping stays active and the player
+can press a new key again to retry. **Reset this console's keys** also keeps
+the dialog open and leaves the existing bindings unchanged after a failed
+write. These changes affect only the selected console and do not alter
+controller mappings or physical input.
+
 ## Reversible Reset controls
 
 Approving **Reset controls** now enables a session-only **Undo reset** button

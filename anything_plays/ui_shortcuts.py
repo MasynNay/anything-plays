@@ -94,14 +94,23 @@ class ShortcutsMixin:
                 prompt.destroy()
                 return "break"
             try:
-                current = self._shortcut_bindings.get(system, {})
-                updated = rebind(system, current, button, event.keysym)
+                updated = self._save_shortcut_binding(
+                    system, button, event.keysym,
+                )
             except ValueError as exc:
-                messagebox.showwarning("Shortcut unavailable", str(exc), parent=prompt)
+                messagebox.showwarning(
+                    "Shortcut unavailable", str(exc), parent=prompt,
+                )
                 return "break"
-            self._shortcut_bindings[system] = updated
+            if updated is False:
+                messagebox.showwarning(
+                    "Shortcut not saved",
+                    "The keyboard mapping could not be saved. Check "
+                    "preferences storage and press a key again to retry.",
+                    parent=prompt,
+                )
+                return "break"
             label.config(text=updated[button])
-            self.save_preferences()
             prompt.destroy()
             return "break"
 
@@ -109,9 +118,47 @@ class ShortcutsMixin:
         prompt.grab_set()
         prompt.focus_force()
 
+    def _save_shortcut_binding(self, system, button, keysym):
+        """Commit a key change only after preferences can be saved.
+
+        Invalid or reserved keys still raise ValueError to show the
+        existing collision warning. A failed write returns False and leaves
+        the old mapping active for keyboard input.
+        """
+        previous = self._shortcut_bindings.get(system)
+        updated = rebind(system, previous, button, keysym)
+        self._shortcut_bindings[system] = updated
+        try:
+            saved = self.save_preferences()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            saved = False
+        if saved is False:
+            if previous is None:
+                self._shortcut_bindings.pop(system, None)
+            else:
+                self._shortcut_bindings[system] = previous
+            return False
+        return updated
+
     def _reset_shortcuts(self, system, parent):
+        """Keep the keyboard dialog open if defaults cannot be saved."""
+        previous = self._shortcut_bindings.get(system)
         self._shortcut_bindings.pop(system, None)
-        self.save_preferences()
+        try:
+            saved = self.save_preferences()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            saved = False
+        if saved is False:
+            if previous is not None:
+                self._shortcut_bindings[system] = previous
+            messagebox.showwarning(
+                "Shortcut defaults not saved",
+                "The original keyboard settings are still active. "
+                "Check preferences storage and retry.",
+                parent=parent,
+            )
+            return False
         parent.destroy()
         self._shortcut_window = None
         self.configure_shortcuts()
+        return True
