@@ -20,6 +20,13 @@ class GameCubeNativeTiming:
         self.native_run_over_100ms = 0
         self.scheduler_wait_total_seconds = 0.0
         self.scheduler_wait_calls = 0
+        # Aggregates only: how often Dolphin missed its frame deadline,
+        # how far behind it was, and whether the scheduler reset its clock.
+        # No timestamps or individual frame history are retained.
+        self.scheduler_late_frames = 0
+        self.scheduler_late_total_seconds = 0.0
+        self.scheduler_late_max_seconds = 0.0
+        self.scheduler_resyncs = 0
         self.reported_core_fps = None
 
     def record_native_run(self, duration):
@@ -37,6 +44,23 @@ class GameCubeNativeTiming:
             return
         self.scheduler_wait_calls += 1
         self.scheduler_wait_total_seconds += duration
+
+    def record_lateness(self, seconds, *, resynchronized=False):
+        """Record missed native deadlines separately from GL readback cost.
+
+        Ignore sub-5ms scheduling jitter and malformed clocks; the native
+        run duration already includes the GPU readback and must not be added
+        to this separate missed-deadline counter.
+        """
+        if type(seconds) not in (float, int) or not math.isfinite(seconds):
+            return
+        if seconds < 0.005:
+            return
+        self.scheduler_late_frames += 1
+        self.scheduler_late_total_seconds += seconds
+        self.scheduler_late_max_seconds = max(self.scheduler_late_max_seconds, seconds)
+        if resynchronized:
+            self.scheduler_resyncs += 1
 
     def snapshot(self, *, gpu_readback_seconds=0.0):
         reported = self.reported_core_fps
@@ -65,6 +89,14 @@ class GameCubeNativeTiming:
             "gpu_readback_share_of_native_run": (
                 round(readback / native, 4) if native else 0.0
             ),
+            "scheduler_late_frames": self.scheduler_late_frames,
+            "scheduler_late_total_seconds": round(
+                self.scheduler_late_total_seconds, 4
+            ),
+            "scheduler_late_max_ms": round(
+                self.scheduler_late_max_seconds * 1000, 3
+            ),
+            "scheduler_resyncs": self.scheduler_resyncs,
             "scheduler_wait_calls": self.scheduler_wait_calls,
             "scheduler_wait_total_seconds": round(
                 self.scheduler_wait_total_seconds, 4

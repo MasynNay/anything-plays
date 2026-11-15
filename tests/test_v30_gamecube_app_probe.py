@@ -35,6 +35,18 @@ class ProductionGameCubeProbeTests(TestCase):
         self.assertIn("--max-growth-mb 192", workflow)
         self.assertIn("--seconds 900", workflow)
 
+    def test_gpu_readback_failure_is_classified_without_private_driver_text(self):
+        from tools.probe_gamecube_app import classify_gamecube_boot_failure
+        self.assertEqual(
+            classify_gamecube_boot_failure(
+                "RuntimeError: GPU readback failed (OSError)", "game_loaded"
+            ),
+            "gpu_surface_readback_failed",
+        )
+        self.assertEqual(
+            classify_gamecube_boot_failure(None, "game_loaded"), "none"
+        )
+
     def test_native_crash_is_reported_without_marking_embedded_playback_ready(self):
         with TemporaryDirectory() as root:
             folder = Path(root)

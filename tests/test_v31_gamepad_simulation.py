@@ -309,6 +309,22 @@ class VirtualControllerTests(unittest.TestCase):
                          "a fresh press is accepted after neutral release")
         self.assertEqual([delay for delay, _cb in app.root.jobs], [65] * 5)
 
+    def test_game_start_does_not_inherit_pressed_menu_button(self):
+        app = self.ui()
+        app.emu.running = False
+        self.pad.buttons = {"A"}
+        app.gamepad_tick()
+        app.emu.running = True
+        app.gamepad_tick()
+        app.emu.inputs.before_frame(False)
+        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 0)
+        self.pad.buttons = set()
+        app.gamepad_tick()
+        self.pad.buttons = {"A"}
+        app.gamepad_tick()
+        app.emu.inputs.before_frame(False)
+        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 1)
+
     def test_ui_stops_gamepad_for_no_game_or_external_emulator(self):
         app = self.ui()
         self.pad.buttons = {"A"}

@@ -342,6 +342,9 @@ class LibraryMixin:
         self.start_rom(str(path))
 
     def unload_rom(self):
+        prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
+        if callable(prepare):
+            prepare()
         self.stop_external_emulator()
         self.deactivate_manual()
         self.stop_controls()
@@ -363,6 +366,11 @@ class LibraryMixin:
                 parent=self.root,
             )
             return
+        # Switching directly between ROMs can finish before the next SDL
+        # poll; explicitly disarm the outgoing controller snapshot now.
+        prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
+        if callable(prepare):
+            prepare()
         self.deactivate_manual()
         self.stop_controls()
         bezel = getattr(self, "game_bezel", None)
@@ -425,6 +433,25 @@ class LibraryMixin:
                         'Repair or reinstall Anything Plays 3.0; every console '
                         'is included and must work offline.'
                     )
+                # Existing native sessions must be fully stopped before any
+                # framebuffer cleanup. CoreSession.start() already stops an
+                # inactive session, so avoid an extra stop on first launch.
+                # Keep missing-core preview's own unload/stop path unchanged.
+                if (getattr(self.emu, "running", False) is True or
+                        getattr(self.emu, "launching", False) is True):
+                    self.emu.stop()
+                # Only clear a prior *rendered* game. On first launch the
+                # canvas is already empty, and headless UI hosts may not
+                # have an emulator frame lock or stream widgets yet.
+                prior_render = any(
+                    getattr(self, attr, None) is not None for attr in (
+                        "game_photo", "_last_game_render",
+                        "_stream_game_frame", "_stream_photo",
+                    )
+                )
+                if prior_render:
+                    from anything_plays.game_display_lifecycle import clear_game_video
+                    clear_game_video(self)
                 self.emu.start(str(path))
             self.current_rom = str(path)
             if self.uses_embedded_emulator():

@@ -32,11 +32,27 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertAlmostEqual(sample["gpu_readback_share_of_native_run"], 0.031, places=3)
         self.assertEqual(sample["scheduler_wait_calls"], 1)
 
+    def test_scheduler_missed_deadlines_are_aggregate_and_do_not_change_pacing(self):
+        t = GameCubeNativeTiming()
+        t.record_lateness(0.004)  # Ignore minor timer jitter
+        t.record_lateness(0.012)
+        t.record_lateness(0.320, resynchronized=True)
+        snap = t.snapshot()
+        self.assertEqual(snap["scheduler_late_frames"], 2)
+        self.assertAlmostEqual(snap["scheduler_late_total_seconds"], 0.332)
+        self.assertEqual(snap["scheduler_late_max_ms"], 320.0)
+        self.assertEqual(snap["scheduler_resyncs"], 1)
+        self.assertEqual(snap["native_run_calls"], 0)
+        self.assertEqual(snap["scheduler_wait_calls"], 0)
+
     def test_bad_clock_data_never_produces_nan_or_unsafe_counter(self):
         t = GameCubeNativeTiming()
         for value in (float("nan"), float("inf"), float("-inf"), -1, None, "1"):
             t.record_native_run(value)
             t.record_wait(value)
+            t.record_lateness(value, resynchronized=True)
+        self.assertEqual(t.scheduler_late_frames, 0)
+        self.assertEqual(t.scheduler_resyncs, 0)
         self.assertEqual(t.native_run_calls, 0)
         self.assertEqual(t.scheduler_wait_calls, 0)
         snap = t.snapshot(gpu_readback_seconds=float("nan"))
@@ -55,7 +71,7 @@ class NativeLoopTimingTests(unittest.TestCase):
         for _ in range(10000):
             t.record_native_run(0.006)
         self.assertEqual(t.native_run_calls, 10000)
-        self.assertLessEqual(len(vars(t)), 9)
+        self.assertLessEqual(len(vars(t)), 13)
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):
@@ -118,6 +134,67 @@ class NativeLoopTimingTests(unittest.TestCase):
             self.assertTrue(emu.running)
             self.assertGreaterEqual(session.native_run_timing.native_run_total_seconds, 0)
 
+    def test_real_core_loop_records_behind_schedule_and_resyncs(self):
+        # Synthetic, deterministic slow native core. The real CoreSession
+        # scheduling loop must count missed deadlines without dropping any
+        # retro_run() calls or depending on a physical GPU/audio device.
+        try:
+            from anything_plays.gba_emulator import CoreSession
+        except ModuleNotFoundError as exc:
+            if exc.name in ("numpy", "PIL", "cv2", "sounddevice", "pygame"):
+                self.skipTest("Full emulator dependencies installed in later CI stage")
+            raise
+        with tempfile.TemporaryDirectory() as td:
+            core = Path(td) / "dolphin_libretro.so"
+            core.write_bytes(b"original-synthetic-core")
+            session = object.__new__(CoreSession)
+            session.system = "gamecube"
+            session.rom = Path(td) / "test-homebrew.dol"
+            session.rom.write_bytes(b"original test fixture")
+            session.core_path = str(core)
+            session._load_game = Mock()
+            session.persist_game_progress = Mock()
+            session.audio = Mock(output_error=None)
+            session.save_ram = None
+            session.enable_state_resume = False
+            session.native_run_timing = GameCubeNativeTiming()
+            stop = threading.Event()
+            emu = SimpleNamespace(
+                inputs=Mock(system="gamecube"), stop_event=stop,
+                armed=False, running=False, launching=True,
+                audio_sink=None, audio_warning=None, save_warning=None,
+            )
+            session.emulator = emu
+            fake = MagicMock()
+            fake.av_info = Mock()
+            fake.memory_data = Mock(return_value=None)
+            fake.memory_size = Mock(return_value=0)
+            virtual_clock = [0.0]
+            core_calls = []
+
+            def slow_native_step():
+                core_calls.append(True)
+                virtual_clock[0] += 0.35  # >250ms catch-up reset threshold
+                if len(core_calls) == 3:
+                    stop.set()
+
+            fake.run.side_effect = slow_native_step
+            with (
+                patch("anything_plays.gba_emulator.NativeCore", return_value=fake),
+                patch("anything_plays.gba_emulator.SaveRAM"),
+                patch("anything_plays.gba_emulator.time.monotonic",
+                      side_effect=lambda: virtual_clock[0]),
+            ):
+                session.run()
+            snapshot = session.native_run_timing.snapshot()
+            self.assertEqual(len(core_calls), 3)
+            self.assertEqual(snapshot["native_run_calls"], 3)
+            self.assertEqual(snapshot["scheduler_late_frames"], 3)
+            self.assertEqual(snapshot["scheduler_resyncs"], 3)
+            self.assertGreater(snapshot["scheduler_late_max_ms"], 250)
+            self.assertEqual(snapshot["scheduler_wait_calls"], 0)
+            fake.close.assert_called_once()
+
     def test_research_metrics_are_allowlisted_not_raw_logs(self):
         from tools.v32_extended_native_runtime import safe_evidence
         raw = {
@@ -133,6 +210,15 @@ class NativeLoopTimingTests(unittest.TestCase):
                 "distinct_rgb_frame_hashes": 10,
                 "native_controller_polls": 2000,
                 "native_pcm_frame_samples": 5000,
+                "audio_output_callback_calls": 22,
+                "audio_output_requested_frames": 22000,
+                "audio_output_underrun_frames": 1024,
+                "audio_queue_dropped_frames": 512,
+                "audio_output_device_underflow_callbacks": 3,
+                "scheduler_late_frames": 12,
+                "scheduler_late_total_seconds": 1.6,
+                "scheduler_late_max_ms": 320.0,
+                "scheduler_resyncs": 2,
                 "native_run_calls": 120,
                 "native_reported_core_fps": 59.7,
                 "native_run_loop_fps": 49.0,
@@ -149,6 +235,16 @@ class NativeLoopTimingTests(unittest.TestCase):
         record = safe_evidence("gamecube", raw, 0, False)
         self.assertTrue(record["native_probe_verified"])
         self.assertEqual(record["native_run_calls"], 120)
+        self.assertEqual(record["audio_output_callback_calls"], 22)
+        self.assertEqual(record["audio_output_requested_frames"], 22000)
+        self.assertEqual(record["audio_output_underrun_frames"], 1024)
+        self.assertEqual(record["audio_queue_dropped_frames"], 512)
+        self.assertEqual(record["audio_output_device_underflow_callbacks"], 3)
+        self.assertEqual(record["scheduler_late_frames"], 12)
+        self.assertEqual(record["scheduler_late_total_seconds"], 1.6)
+        self.assertEqual(record["scheduler_late_max_ms"], 320.0)
+        self.assertEqual(record["scheduler_resyncs"], 2)
+        self.assertFalse(record["physical_speakers_tested"])
         self.assertEqual(record["native_run_loop_fps"], 49.0)
         self.assertEqual(record["gamecube_preview_capture_fps"], 5.8)
         self.assertEqual(record["raw_libretro_video_callbacks"], 150)

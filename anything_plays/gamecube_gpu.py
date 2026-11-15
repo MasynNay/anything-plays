@@ -100,6 +100,12 @@ class GameCubeHardwareSession(CoreSession):
         if not data:
             self.null_video_callbacks += 1
             return
+        # After a hardware error Dolphin may briefly emit *software* video
+        # callbacks too. Never publish ANY frame after graphics failure or
+        # while a native Stop request is in progress.
+        if (self.opengl_error is not None or
+                self.emulator.stop_event.is_set()):
+            return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
             # glReadPixels blocks on GPU/CPU synchronization. Copy only as
             # fast as the selected preview rate, but NEVER skip retro_run()
@@ -114,10 +120,24 @@ class GameCubeHardwareSession(CoreSession):
             begun = time.perf_counter()
             try:
                 rgb = self.host.read_frame(width, height)
-            except (RuntimeError, ValueError) as exc:
-                # Surface loss is a real playback failure, not an invitation
-                # to keep emulating silently with black graphics.
-                self.opengl_error = f"{type(exc).__name__}: {exc}"
+                shape = getattr(rgb, "shape", ())
+                # A torn GL context can return an empty or malformed buffer
+                # without raising. Never publish it to Tk/OBS as a fresh
+                # game image or count it as a valid hardware frame.
+                if (len(shape) != 3 or shape[0] <= 0 or shape[1] <= 0
+                        or shape[2] != 3 or
+                        str(getattr(rgb, "dtype", "")) != "uint8"):
+                    raise ValueError("GPU readback returned invalid RGB pixels")
+            except (RuntimeError, ValueError, OSError, TypeError,
+                    OverflowError, MemoryError) as exc:
+                # A native driver can disappear during glReadPixels. Request
+                # shutdown while inside this Python callback: an uncaught
+                # exception crossing ctypes can leave Dolphin running with a
+                # permanently stale display. Do not retry this broken host.
+                # Native GL/driver messages can include private filesystem
+                # locations or attached-device identifiers. Preserve only a
+                # fixed failure type for the app and private research report.
+                self.opengl_error = f"GPU readback failed ({type(exc).__name__})"
                 self.emulator.stop_event.set()
                 return
             duration = max(0.0, time.perf_counter() - begun)
@@ -126,6 +146,11 @@ class GameCubeHardwareSession(CoreSession):
             self.gpu_readback_calls += 1
             self._last_preview_capture = now
             with self.emulator.lock:
+                # A Stop can arrive while glReadPixels is blocking. Never
+                # let that late result repaint a stopped/failed session even
+                # though the pre-read callback guard saw an active game.
+                if self.emulator.stop_event.is_set() or self.opengl_error is not None:
+                    return
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1

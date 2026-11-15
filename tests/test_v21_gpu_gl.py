@@ -284,7 +284,7 @@ class OffscreenGpuFrontendTests(unittest.TestCase):
             session.host.read_frame.side_effect = RuntimeError("FBO unavailable")
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 640, 480, 0)
             self.assertTrue(emu.stop_event.is_set())
-            self.assertIn("FBO unavailable", session.opengl_error)
+            # Native driver messages may contain device IDs or file paths.\n            # Report the failure category and exception type, never the raw\n            # string from the driver. A failed GPU still stops the game.\n            self.assertEqual(\n                session.opengl_error, "GPU readback failed (RuntimeError)"\n            )\n            self.assertNotIn("FBO unavailable", session.opengl_error)
 
     def test_hardware_core_session_never_uses_an_external_emulator(self):
         from tools.probe_gamecube_gl import GLCoreSession

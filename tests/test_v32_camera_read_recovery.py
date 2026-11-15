@@ -195,6 +195,46 @@ class CameraDriverReadRecoveryTests(unittest.TestCase):
         self.assertEqual(app._camera_reconnect_job, "scheduled-new-webcam-retry")
         self.assertEqual(app._camera_reconnect_name, "Selected webcam (device 0)")
 
+    def test_canceled_same_device_retry_never_overrides_new_timer(self):
+        app = CameraHarness()
+        name = "Selected webcam (device 0)"
+        app._queue_camera_retry(name)
+        stale_callback = app.root.after.call_args.args[1]
+        first_generation = app._camera_retry_generation
+
+        # Tk may still deliver the old callback after after_cancel(). A
+        # user can stop and then reselect the *same* camera meanwhile.
+        app.cancel_camera_reconnect()
+        app._queue_camera_retry(name)
+        current_callback = app.root.after.call_args.args[1]
+        current_job = app._camera_reconnect_job
+        self.assertGreater(app._camera_retry_generation, first_generation)
+        app.start_camera = Mock()
+        before_status = app.status.set.call_count
+
+        stale_callback()
+        self.assertEqual(app._camera_reconnect_job, current_job)
+        self.assertEqual(app._camera_reconnect_name, name)
+        self.assertEqual(app.status.set.call_count, before_status)
+        app.start_camera.assert_not_called()
+
+        # The live callback still owns the retry and may attempt recovery.
+        current_callback()
+        self.assertIsNone(app._camera_reconnect_job)
+        app.start_camera.assert_called_once_with(reconnecting=True)
+
+    def test_stale_same_name_callback_after_stop_does_not_open_camera(self):
+        app = CameraHarness()
+        name = "Selected webcam (device 0)"
+        app._queue_camera_retry(name)
+        old_callback = app.root.after.call_args.args[1]
+        app.cancel_camera_reconnect()
+        app.start_camera = Mock()
+        old_callback()
+        app.start_camera.assert_not_called()
+        self.assertIsNone(app._camera_reconnect_job)
+        self.assertIsNone(app._camera_reconnect_name)
+
     def test_changed_dropdown_cancels_old_reconnect_without_opening(self):
         app = CameraHarness()
         old = app.cap

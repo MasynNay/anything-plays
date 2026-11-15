@@ -41,6 +41,14 @@ class AudioSink:
         self.output_active = False
         self.source_sample_rate = None
         self.output_sample_rate = None
+        # Bounded-size, aggregate diagnostics only. PCM generation is not
+        # proof that PortAudio consumed a block or a speaker played sound.
+        # No samples, filenames, devices or per-callback timestamps retained.
+        self.output_callback_calls = 0
+        self.output_callback_requested_frames = 0
+        self.output_underrun_frames = 0
+        self.output_device_underflow_callbacks = 0
+        self.queue_dropped_frames = 0
         # AudioSink by itself is a transparent PCM sink for native testing.
         # CoreSession explicitly applies the user's 35% default or saved gain
         # before playback, leaving existing raw audio contracts unchanged.
@@ -112,13 +120,17 @@ class AudioSink:
                 self.chunks.put_nowait(part)
             except Full:
                 try:
-                    self.chunks.get_nowait()
+                    dropped = self.chunks.get_nowait()
                 except Empty:
                     pass
+                else:
+                    self.queue_dropped_frames += len(dropped)
                 try:
                     self.chunks.put_nowait(part)
                 except Full:
-                    pass
+                    # Another producer can race for space after eviction.
+                    # Count this chunk too: its PCM was never delivered.
+                    self.queue_dropped_frames += len(part)
 
     def push(self, samples):
         if not len(samples):
@@ -171,6 +183,16 @@ class AudioSink:
 
     def callback(self, outdata, frames, time_info, status):
         """Fill every output frame, including silence during underruns."""
+        # PortAudio invokes this from its audio thread. Track only aggregate
+        # counts; do not record private audio or equate callback activity
+        # with proof of audible playback on physical speakers.
+        self.output_callback_calls += 1
+        self.output_callback_requested_frames += frames
+        # PortAudio's output-underflow flag detects device scheduling
+        # problems independently of our own empty PCM queue. In particular,
+        # a healthy queue can still underrun at the speaker interface.
+        if status is not None and getattr(status, "output_underflow", False):
+            self.output_device_underflow_callbacks += 1
         outdata.fill(0)
         written = 0
         while written < frames:
@@ -197,6 +219,19 @@ class AudioSink:
             # queue is still consumed so unmuting never replays old audio.
             written += count
             self.position += count
+        self.output_underrun_frames += max(0, frames - written)
+
+    def delivery_snapshot(self):
+        """Aggregate callback/queue telemetry, not verified speaker output."""
+        return {
+            "audio_output_callback_calls": self.output_callback_calls,
+            "audio_output_requested_frames": self.output_callback_requested_frames,
+            "audio_output_underrun_frames": self.output_underrun_frames,
+            "audio_output_device_underflow_callbacks": (
+                self.output_device_underflow_callbacks
+            ),
+            "audio_queue_dropped_frames": self.queue_dropped_frames,
+        }
 
     def start(self, sample_rate):
         self.output_error = None

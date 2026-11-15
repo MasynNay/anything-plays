@@ -40,6 +40,13 @@ class LibraryHost(VideoHost, LibraryMixin):
         self.stop_controls = Mock()
         self.game_status = Mock()
         self.show_library = Mock()
+        self.show_playing_info = Mock()
+        self.uses_embedded_emulator = lambda: True
+        self.system_key = Mock()
+        self.system_key.get.return_value = "gba"
+        self.prepare_gamepad_for_game_transition = Mock()
+        self.emu.find_system_core.return_value = "/synthetic/test-core.so"
+        self.root = Mock()
 
 
 class GameVideoLifecycleTests(unittest.TestCase):
@@ -77,6 +84,103 @@ class GameVideoLifecycleTests(unittest.TestCase):
         app.stop_controls.assert_called_once()
         app.deactivate_manual.assert_called_once()
         app.show_library.assert_called_once()
+
+    def test_repeated_same_console_rom_switches_prepare_gamepad_first(self):
+        app = LibraryHost()
+        paths = [f"/synthetic/test-{number}.gba" for number in range(8)]
+        for number, path in enumerate(paths, 1):
+            app.start_rom(path)
+            self.assertEqual(app.current_rom, path)
+            self.assertEqual(app.prepare_gamepad_for_game_transition.call_count,
+                             number)
+            self.assertEqual(app.emu.start.call_count, number)
+            self.assertEqual(app.emu.start.call_args.args, (path,))
+            app.stop_controls.assert_called()
+        self.assertEqual(app.show_playing_info.call_count, len(paths))
+
+    def test_first_launch_does_not_clear_nonexistent_render(self):
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app.start_rom("/synthetic/first.gba")
+        app.emu.start.assert_called_once_with("/synthetic/first.gba")
+        app.game_canvas.delete.assert_not_called()
+        self.assertEqual(
+            [call.args for call in app.game_bezel.set_active.call_args_list],
+            [(False,), (True,)],
+        )
+
+    def test_rom_replacement_clears_old_frame_before_native_start(self):
+        app = LibraryHost()
+        app.emu.running = True
+        camera = app._stream_camera_frame
+        order = []
+        app.emu.stop.side_effect = lambda: order.append("native stop")
+
+        def start_new(path):
+            order.append("native start")
+            self.assertEqual(path, "/synthetic/replacement.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_photo)
+            self.assertIs(app._stream_camera_frame, camera)
+
+        app.emu.start.side_effect = start_new
+        app.start_rom("/synthetic/replacement.gba")
+        self.assertEqual(order, ["native stop", "native start"])
+        self.assertEqual(app.emu.frame_serial, 13)
+        app.game_canvas.delete.assert_called_with("all")
+        app._stream_canvas.delete.assert_called_with("all")
+
+    def test_repeated_rom_replacement_does_not_retain_prior_pixels(self):
+        app = LibraryHost()
+        for index in range(6):
+            app.emu.running = True
+            app.emu.frame = object()
+            app.game_photo = object()
+            app._stream_game_frame = object()
+            app._stream_photo = object()
+            app.start_rom(f"/synthetic/replacement-{index}.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_photo)
+        self.assertEqual(app.emu.frame_serial, 18)
+        self.assertEqual(app.emu.stop.call_count, 6)
+        self.assertEqual(app._stream_canvas.delete.call_count, 6)
+
+    def test_stable_missing_core_keeps_prior_game_intact(self):
+        app = LibraryHost()
+        app.emu.running = True
+        frame = app.emu.frame
+        previous_stream = app._stream_game_frame
+        app.emu.find_system_core.return_value = None
+        with patch("anything_plays.preview_storage.is_v32_preview",
+                   return_value=False), patch(
+                       "anything_plays.ui_library.messagebox.showerror"
+                   ):
+            app.start_rom("/synthetic/missing-core.gba")
+        # A failed lookup must not stop a still-playing title. The separate
+        # limited-preview missing-core path still unloads as before.
+        self.assertIs(app.emu.frame, frame)
+        self.assertIs(app._stream_game_frame, previous_stream)
+        app.emu.stop.assert_not_called()
+        app.emu.start.assert_not_called()
+        self.assertIn("A bundled emulator core is missing",
+                      app.game_status.set.call_args.args[0])
+
+    def test_rom_unload_disarms_gamepad_before_stop(self):
+        app = LibraryHost()
+        sequence = []
+        app.prepare_gamepad_for_game_transition.side_effect = (
+            lambda: sequence.append("controller release")
+        )
+        app.emu.stop.side_effect = lambda: sequence.append("native stop")
+        app.unload_rom()
+        self.assertEqual(sequence, ["controller release", "native stop"])
 
     def test_closed_secondary_windows_do_not_prevent_unloading(self):
         import tkinter as tk

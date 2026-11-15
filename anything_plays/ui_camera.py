@@ -98,6 +98,11 @@ class CameraMixin:
 
     def cancel_camera_reconnect(self):
         """Cancel any pending retry when the user chooses Stop or another camera."""
+        # after_cancel() cannot recall a callback already queued by Tk.
+        # Invalidate its generation even if a new retry targets the same name.
+        self._camera_retry_generation = (
+            getattr(self, "_camera_retry_generation", 0) + 1
+        )
         job = getattr(self, "_camera_reconnect_job", None)
         self._camera_reconnect_job = None
         self._camera_reconnect_name = None
@@ -118,18 +123,27 @@ class CameraMixin:
         self._camera_reconnect_attempts = attempt
         delay_seconds = min(30, 2 ** min(attempt, 5))
         self._camera_reconnect_name = name
+        # Each timer owns a unique generation: matching camera names alone
+        # cannot distinguish a canceled retry from a newer retry.
+        generation = getattr(self, "_camera_retry_generation", 0) + 1
+        self._camera_retry_generation = generation
         self.status.set(
             f'Camera disconnected. Retrying {name} in {delay_seconds}s; '
             'object controls remain paused.'
         )
         self._camera_reconnect_job = self.root.after(
-            delay_seconds * 1000, lambda: self._retry_camera(name)
+            delay_seconds * 1000,
+            lambda: self._retry_camera(name, generation),
         )
 
-    def _retry_camera(self, name):
-        """Reconnect only the original webcam, never a newly chosen device."""
-        # A callback canceled during a camera change must not clear a newer
-        # device's pending retry token.
+    def _retry_camera(self, name, generation=None):
+        """Reconnect only the intended webcam and the current retry timer."""
+        # Old callbacks can still run after after_cancel, including when a
+        # new retry targets the *same* named camera. Do not clear its timer
+        # or reopen the camera using stale permission to reconnect.
+        if (generation is not None and generation !=
+                getattr(self, "_camera_retry_generation", 0)):
+            return
         if getattr(self, "_camera_reconnect_name", None) != name:
             return
         self._camera_reconnect_job = None

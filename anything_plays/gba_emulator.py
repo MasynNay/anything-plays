@@ -414,6 +414,12 @@ class CoreSession:
 
                 next_frame += 1 / frames_per_second
                 remaining = next_frame - time.monotonic()
+                if gamecube_timing is not None and remaining < 0:
+                    # Missed-frame diagnostics only. Do not alter native
+                    # pacing, queue audio, or skip a Dolphin frame.
+                    gamecube_timing.record_lateness(
+                        -remaining, resynchronized=remaining < -0.25
+                    )
                 if remaining > 0:
                     wait_start = time.perf_counter() if gamecube_timing else None
                     self.emulator.stop_event.wait(remaining)
