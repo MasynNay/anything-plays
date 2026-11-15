@@ -14,7 +14,8 @@
 | **3.1.0** | **Public stable, November 11, 2026 (Mountain Time)** | OBS-friendly two-screen Stream Mode, 16 themes, configurable bezels, optional SDL gamepad mapping/tester, safer reconnect/focus handling, isolated preferences, all 18 consoles |
 | **3.1.1** | **Public stable, November 12, 2026 (Mountain Time)** | Camera recovery, controller/SDL resilience, atomic game-save reliability, ROM/art shelf fault isolation, expanded four-platform tests; same 18 consoles |
 | **3.2.0** | **Public stable, November 15, 2026** | Guided onboarding, camera calibration, controller/keyboard setup, portable control backups and Undo, privacy-safe diagnostics; 11 original native cores / 18 console profiles, four native installers and verified 3.1.x upgrade path |
-| **3.3** | Proposed | GameCube and 3D performance, smoother streaming capture, lower latency and extended-session optimization |
+| **3.2 maintenance** | Source merged November 15, 2026 | Camera/controller recovery, ROM handoff and GameCube GPU/A/V diagnostics in [PR #245](https://github.com/MasynNay/anything-plays/pull/245); **not yet included in the published v3.2.0 binaries** |
+| **3.3** | Development underway | Frame-lock isolation for Stream Mode and measurable capture/input responsiveness, followed by GPU and 30-minute field profiling; not released |
 
 The current [3.2.0 public stable release](https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0) ships all four native installers, a SHA-256 manifest, source-access notes and the build QA report. Exact application source revision: `0c4db50ede64646cecbadd400dd54f0ae76166c9`. [Four-platform release candidates passed](https://github.com/MasynNay/anything-plays/actions/runs/43742977770), and [the exact eight-asset publication workflow succeeded](https://github.com/MasynNay/anything-plays/actions/runs/43743526029). [Public 3.1.1 remains available](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1) for rollback.
 
@@ -47,9 +48,21 @@ The current [3.2.0 public stable release](https://github.com/MasynNay/anything-p
 
 **Success:** Successful setup with fewer steps, measured reduction in spurious tracking triggers, deterministic validation tests and clean migration between supported operating systems.
 
-## Then: 3.3 — Performance and creator tools
+## Now developing: 3.3 — Performance and creator tools
 
-**Goal:** Improve actual gameplay responsiveness and make Stream Mode resilient during long streams.
+**Goal:** Improve actual gameplay responsiveness and make Stream Mode resilient during long streams. This is a development track, **not** a public release announcement. The first source changes live in a separate draft PR so the existing 3.2.0 installers remain safe.
+
+### Delivery order and acceptance gates
+
+| Priority | Increment | Proof required before merging or calling it complete |
+| --- | --- | --- |
+| 1 | Stream Mode native-frame lock isolation | Only copy native pixels under the emulator lock; convert to PIL outside the lock. Verify the lock boundary, unchanged-frame caching, correct output and source checks on Python 3.12/3.13. |
+| 2 | Stream refresh cadence | Compare requested 15/24/30 FPS with achieved capture refresh under load. Fix avoidable timer drift without skipping game frames or saturating Tk's event loop; regression-test scheduling and window close. |
+| 3 | Camera-to-game input latency | Measure tracking → control buffer → native frame on simulated and actual devices, record median and tail latency separately; prioritize correctness and no stuck controls. |
+| 4 | GameCube A/V performance and stability | Use actual emulation frame timing, GL readback cost and audio underflow counters on real machines; run a 30-minute game and repeated switches. CI-only results do not certify a physical GPU. |
+| 5 | Native packaging and patch candidate | Review notices and provenance, perform upgrade/revert and hardware acceptance, produce exact four-platform assets and SHA-256 manifest only after approval. Never rewrite old 3.2.0 installers. |
+
+**Current implementation:** work on lock isolation has begun on the [3.3 Stream Mode branch](https://github.com/MasynNay/anything-plays/tree/feature/v3.3-stream-render-latency). No before/after real-device latency measurements have been collected yet; do not claim a speedup until measurements exist.
 
 - **GameCube performance.** Measure real emulation FPS, frame-time variance, audio underruns and camera/preview frame rate separately. Compare preview 15/24/30 FPS without claiming higher gameplay FPS. Investigate OpenGL readback stalls only when benchmarks demonstrate a benefit. [Performance issue #27](https://github.com/MasynNay/anything-plays/issues/27).
 - **Lower camera-to-game latency.** Profile detection, UI frame pacing and game input propagation under one and multiple tracked objects; prevent slow preview rendering from blocking gameplay.
@@ -68,7 +81,7 @@ After stability, usability and performance improve, explore more accessible mult
 - Preserve exact platform-native builds, SHA256 checksums, dependency notices and recipient source/rebuild rights; do not conflate LGPL obligations with physical hardware testing. See [the scoped 3.1 release decision](V3_1_SCOPED_DISTRIBUTION_DECISION.md) and [LGPL rebuild instructions](V3_1_LGPL_REBUILD_REPLACEMENT.md).
 - The complete emulator installers remain free and **noncommercial** because bundled core licenses can be more restrictive than the MIT-licensed original application source.
 - Keep earlier [stable 3.1.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0), [stable 3.0](https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0) and [3.1 RC2](https://github.com/MasynNay/anything-plays/releases/tag/v3.1.0-rc2) available for rollback.
-- Version 3.2.0 shipped November 15, 2026; no dates are committed for future 3.3 work. Triage 3.1.1 issues through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and only publish incremental fixes when verified.
+- Version 3.2.0 shipped November 15, 2026. PR #245 merged later as source-only maintenance; its fixes are not retroactively present in already published 3.2.0 installers. No dates are committed for future 3.3 work. Triage 3.1.1 issues through [GitHub Issues](https://github.com/MasynNay/anything-plays/issues), test changes and only publish incremental fixes when verified.
 
 ## Historical engineering log
 
