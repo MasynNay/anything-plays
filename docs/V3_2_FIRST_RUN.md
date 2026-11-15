@@ -123,7 +123,11 @@ of making an unsuccessful reset appear permanent.
 ## Isolated preview zone artwork and safe grid saves
 
 A user-requested HTTPS PNG zone-art download in the 3.2 preview now saves
-**only** to the private 3.2 preview settings directory. It never uses the
+**only** to the private 3.2 preview settings directory. New downloads use
+one cache per console (for example, `zone-art-gba.png` and
+`zone-art-snes.png`), so selecting artwork on another console cannot
+replace the previous console's downloaded image. Older private
+`zone-art.png` references remain readable for compatibility. It never uses the
 older shared `~/.config/anything-plays/zone-art.png` cache. The download
 is bounded to 5 MiB, decoded and resized locally, then published through
 an atomic PNG file replacement. Unsafe linked preview cache paths are rejected,

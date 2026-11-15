@@ -47,6 +47,64 @@ class ZoneStorageTests(unittest.TestCase):
                 self.assertEqual(written.getpixel((0, 0)), (12, 43, 76))
             self.assertEqual(list(path.parent.glob(".zone-art-*.tmp")), [])
 
+    def test_consoles_have_independent_downloaded_png_caches(self):
+        with TemporaryDirectory() as td:
+            prefs = Path(td) / "anything-plays-32-preview" / "preferences.json"
+            identity = make_identity("v32_preview")
+            blue = Image.new("RGB", (3, 3), (10, 50, 200))
+            amber = Image.new("RGB", (3, 3), (240, 150, 10))
+            gba = save_cached_zone_art(
+                blue, prefs, identity=identity, system="gba"
+            )
+            snes = save_cached_zone_art(
+                amber, prefs, identity=identity, system="snes"
+            )
+            self.assertEqual(gba, prefs.with_name("zone-art-gba.png"))
+            self.assertEqual(snes, prefs.with_name("zone-art-snes.png"))
+            self.assertNotEqual(gba, snes)
+            gba_before = gba.read_bytes()
+            save_cached_zone_art(
+                amber, prefs, identity=identity, system="snes"
+            )
+            self.assertEqual(gba.read_bytes(), gba_before)
+            with Image.open(gba) as pic:
+                self.assertEqual(pic.getpixel((0, 0)), (10, 50, 200))
+            with Image.open(snes) as pic:
+                self.assertEqual(pic.getpixel((0, 0)), (240, 150, 10))
+            self.assertEqual(list(prefs.parent.glob("*.tmp")), [])
+
+    def test_preview_rejects_untrusted_console_filename(self):
+        with TemporaryDirectory() as td:
+            prefs = Path(td) / "anything-plays-32-preview" / "preferences.json"
+            identity = make_identity("v32_preview")
+            image = Image.new("RGB", (2, 2))
+            for system in ("../stable", "gba/../../bad", "", "not-a-console"):
+                with self.subTest(system=system), self.assertRaises(ValueError):
+                    save_cached_zone_art(
+                        image, prefs, identity=identity, system=system,
+                    )
+            self.assertFalse(prefs.parent.exists())
+
+    def test_preview_rejects_linked_console_artwork_cache(self):
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            prefs = root / "anything-plays-32-preview" / "preferences.json"
+            prefs.parent.mkdir()
+            stable = root / "stable-art.png"
+            stable.write_bytes(b"original image")
+            target = prefs.with_name("zone-art-gba.png")
+            image = Image.new("RGB", (2, 2))
+            try:
+                target.symlink_to(stable)
+            except (OSError, NotImplementedError):
+                self.skipTest("This filesystem cannot create a symlink")
+            with self.assertRaises(ValueError):
+                save_cached_zone_art(
+                    image, prefs, identity=make_identity("v32_preview"),
+                    system="gba",
+                )
+            self.assertEqual(stable.read_bytes(), b"original image")
+
     def test_preview_rejects_bad_namespace_symlinks_and_hardlinks(self):
         with TemporaryDirectory() as td:
             base = Path(td)

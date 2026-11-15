@@ -80,7 +80,9 @@ class ZonesMixin:
             # Private 3.2 builds must never write into a stable/legacy
             # artwork cache. The new cache also commits complete PNG bytes
             # atomically and refuses linked preview destinations.
-            cache = save_cached_zone_art(image, self.preferences_path)
+            cache = save_cached_zone_art(
+                image, self.preferences_path, system=self.system_key.get(),
+            )
             self.zone_image_path.set(str(cache))
             self.load_zone_art()
         except Exception as exc:

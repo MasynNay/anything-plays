@@ -12,10 +12,15 @@ import tempfile
 
 from anything_plays.build_identity import current_identity
 from anything_plays.preview_storage import checked_preview_directory
+from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 
 
-def zone_art_cache_path(preferences_path, *, identity=None, home=None):
-    """Locate the artwork cache without opening files or devices."""
+def zone_art_cache_path(preferences_path, *, identity=None, home=None, system=None):
+    """Locate console-scoped artwork without opening any files or devices.
+
+    Keep the original private 3.2 filename when a previous caller supplies
+    no console; all new preview UI downloads include the current console.
+    """
     identity = current_identity() if identity is None else identity
     if identity["channel"] != "v32_preview":
         home = Path.home() if home is None else Path(home)
@@ -25,8 +30,11 @@ def zone_art_cache_path(preferences_path, *, identity=None, home=None):
     if (prefs.name != "preferences.json"
             or prefs.parent.name != identity["settings_namespace"]):
         raise ValueError("3.2 artwork requires private preview preferences")
+    if system is not None and system not in BUTTONS_BY_SYSTEM:
+        raise ValueError("Unknown console in preview artwork cache.")
+    filename = f"zone-art-{system}.png" if system else "zone-art.png"
     return checked_preview_directory(
-        prefs.with_name("zone-art.png"), identity["settings_namespace"]
+        prefs.with_name(filename), identity["settings_namespace"]
     )
 
 
@@ -41,7 +49,9 @@ def _check_cache_target(target, *, preview):
             raise ValueError("Preview artwork must be an independent regular file")
 
 
-def save_cached_zone_art(image, preferences_path, *, identity=None, home=None):
+def save_cached_zone_art(
+    image, preferences_path, *, identity=None, home=None, system=None,
+):
     """Atomically publish an already-decoded, resized PNG image.
 
     The caller enforces the 5 MiB source download limit and thumbnail size.
@@ -50,7 +60,7 @@ def save_cached_zone_art(image, preferences_path, *, identity=None, home=None):
     identity = current_identity() if identity is None else identity
     preview = identity["channel"] == "v32_preview"
     target = zone_art_cache_path(
-        preferences_path, identity=identity, home=home
+        preferences_path, identity=identity, home=home, system=system
     )
     _check_cache_target(target, preview=preview)
     target.parent.mkdir(parents=True, exist_ok=True)
