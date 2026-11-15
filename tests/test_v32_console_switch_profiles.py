@@ -36,18 +36,24 @@ class FakeSwitchState:
         self.mapping_vars["A"] = Value("B")
         self.mapping_vars["X"] = Value("Y")
 
+    def read_settings(self, system=None):
+        # Exercise the actual mixin method through the duck-typed fake app.
+        return ProfilesMixin.read_settings(self, system)
+
 
 class ProfileConsoleSwitchTests(unittest.TestCase):
     def test_failed_switch_reverts_selector_and_keeps_previous_editor(self):
         app = FakeSwitchState()
         app._active_profile_system = "gb"
         app.status = Value("")
-        app.view_mode = Value("Windowed")
+        app.view_mode = Value("Game only")
         app._zone_label_save_job = None
         app._calibration_window = None
         app.stopped = 0
         app.stop_controls = lambda: setattr(app, "stopped", app.stopped + 1)
-        app.uses_embedded_emulator = lambda _key: True
+        app.uses_embedded_emulator = lambda _key: False
+        app.view_transitions = []
+        app.set_view_mode = lambda mode: app.view_transitions.append(mode)
 
         class FailStore:
             def put(self, system, profile):
@@ -64,6 +70,27 @@ class ProfileConsoleSwitchTests(unittest.TestCase):
         self.assertIn("Switch canceled", app.status.get())
         self.assertNotIn("full disk", app.status.get())
         self.assertEqual(app.stopped, 1)
+        self.assertEqual(app.view_mode.get(), "Game only")
+        self.assertEqual(app.view_transitions, [])
+
+    def test_invalid_editor_input_prevents_switch_without_disk_write(self):
+        app = FakeSwitchState()
+        app._active_profile_system = "gb"
+        app.status = Value("")
+        app._zone_label_save_job = None
+        app._calibration_window = None
+        app.tolerance.set("not a number")
+        app.stop_controls = lambda: None
+
+        class NoWriteStore:
+            def put(self, *_args):
+                raise AssertionError("Invalid editor must not persist anything")
+
+        app.profile_store = NoWriteStore()
+        self.assertFalse(ProfilesMixin.switch_system(app))
+        self.assertEqual(app.system_key.get(), "gb")
+        self.assertEqual(app._active_profile_system, "gb")
+        self.assertIn("Switch canceled", app.status.get())
 
     def test_explicit_previous_console_excludes_hidden_new_console_rows(self):
         app = FakeSwitchState()
