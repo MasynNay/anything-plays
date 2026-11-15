@@ -14,6 +14,8 @@ on:
       - 'tools/verify_v32_stable_upgrade_source.py'
       - 'tools/stage_v32_stable_full_linux.py'
       - 'tests/test_v32_stable_full_linux_gate.py'
+      - 'tools/stage_v32_stable_full_windows.py'
+      - 'tests/test_v32_stable_full_windows_gate.py'
       - 'tools/v32_stable_data_rehearsal.py'
       - 'tests/test_v32_stable_data_rehearsal.py'
       - 'tests/test_v32_upgrade_identity.py'
@@ -92,6 +94,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_v32_upgrade_identity.py' -v
           python -m unittest discover -s tests -p 'test_v32_upgrade_source_checker.py' -v
           python -m unittest discover -s tests -p 'test_v32_stable_data_rehearsal.py' -v
+          python -m unittest discover -s tests -p 'test_v32_stable_full_linux_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v32_stable_full_windows_gate.py' -v
       - name: Install Debian extraction and headless prerequisites
         if: runner.os == 'Linux'
         shell: bash
@@ -304,6 +308,52 @@ jobs:
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/full-installed-gui.json" \
             --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+      - name: Assemble 18-profile full-native Windows stable upgrade privately
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path baseline311 | Out-Null
+          gh release download v3.1.1 --repo $env:GITHUB_REPOSITORY --pattern "AnythingPlaysSetup-3.1.1.exe" --dir baseline311
+          if ($LASTEXITCODE -ne 0) { throw 'Public 3.1.1 Windows setup unavailable' }
+          gh release download v3.1.1 --repo $env:GITHUB_REPOSITORY --pattern "SHA256SUMS.txt" --dir baseline311
+          if ($LASTEXITCODE -ne 0) { throw 'Public 3.1.1 checksums unavailable' }
+          python -m tools.stage_v32_stable_full_windows --stable baseline311/AnythingPlaysSetup-3.1.1.exe --source release/AnythingPlaysSetup-3.2.0-PRIVATE-UPGRADE-QA.exe --checksums baseline311/SHA256SUMS.txt --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json --source-sha $env:QA_SOURCE_SHA --output release/v32-stable-full-windows
+          if ($LASTEXITCODE -ne 0) { throw 'Private full-native Windows stable upgrade failed to assemble' }
+          $receipt = Get-Content -Raw release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json | ConvertFrom-Json
+          if ($receipt.native_core_count -ne 11 -or $receipt.console_profiles -ne 18 -or $receipt.stable_windows_inno_identity -ne $true -or $receipt.public_release_approved -ne $false) {
+            throw 'Windows full-native stable upgrade receipt is invalid'
+          }
+      - name: Full-native frozen Windows 3.2 app preserves synthetic 3.1.1 data
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $qa = Join-Path $env:RUNNER_TEMP "AP32-stable-full-data-$env:GITHUB_RUN_ID"
+          $homeDir = Join-Path $qa 'home'
+          $installed = Join-Path $qa 'installed'
+          New-Item -ItemType Directory -Force -Path $qa | Out-Null
+          python -m tools.v32_stable_data_rehearsal seed --home $homeDir
+          if ($LASTEXITCODE -ne 0) { throw 'Could not seed synthetic 3.1.1 data' }
+          $installer = (Resolve-Path 'release/v32-stable-full-windows/AnythingPlaysSetup-3.2.0-fullupgradeqa1-PRIVATE-UPGRADE-QA.exe').Path
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Could not extract full-native private 3.2 stable setup' }
+          $exe = Join-Path $installed 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Windows stable full package has no executable' }
+          $env:HOME = $homeDir
+          $env:USERPROFILE = $homeDir
+          $env:APPDATA = Join-Path $homeDir 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
+          $env:AP_V30_UI_SMOKE_CHECK = '1'
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $qa 'full-frozen-report.json'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
+          $run = Start-Process -FilePath $exe -ArgumentList '--ap-v30-ui-smoke' -Wait -PassThru
+          if ($run.ExitCode -ne 0) { throw 'Frozen 11-core 3.2 Windows stable app failed' }
+          python -m tools.v32_stable_data_rehearsal verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows upgrade lost synthetic old data' }
       - name: Retain only exact SHA and identity receipts, NEVER an upgrade installer
         uses: actions/upload-artifact@v4
         with:
@@ -314,5 +364,6 @@ jobs:
             release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
             release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
+            release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
           if-no-files-found: error
           retention-days: 7
