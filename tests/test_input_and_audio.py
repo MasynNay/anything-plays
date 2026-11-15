@@ -66,8 +66,25 @@ class AudioBufferTests(unittest.TestCase):
             "audio_output_callback_calls": 2,
             "audio_output_requested_frames": 5,
             "audio_output_underrun_frames": 3,
+            "audio_output_device_underflow_callbacks": 0,
             "audio_queue_dropped_frames": 0,
         })
+
+    def test_backend_underflow_is_distinct_from_empty_application_queue(self):
+        from types import SimpleNamespace
+        audio = AudioSink()
+        audio.push(np.array([[1, 2], [3, 4]], dtype=np.int16))
+        out = np.zeros((2, 2), dtype=np.int16)
+        audio.callback(out, 2, None, SimpleNamespace(output_underflow=True))
+        snap = audio.delivery_snapshot()
+        self.assertEqual(snap["audio_output_device_underflow_callbacks"], 1)
+        self.assertEqual(snap["audio_output_underrun_frames"], 0)
+        self.assertEqual(snap["audio_queue_dropped_frames"], 0)
+        # A quiet application queue is a separate failure mode.
+        audio.callback(out, 2, None, SimpleNamespace(output_underflow=False))
+        snap = audio.delivery_snapshot()
+        self.assertEqual(snap["audio_output_device_underflow_callbacks"], 1)
+        self.assertEqual(snap["audio_output_underrun_frames"], 2)
 
     def test_bounded_audio_queue_reports_evicted_frames(self):
         audio = AudioSink()
