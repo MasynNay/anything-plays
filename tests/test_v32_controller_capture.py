@@ -238,6 +238,55 @@ class ControllerCaptureTests(unittest.TestCase):
         app.gamepad_tick()
         self.assertEqual(app.emu.published[-1], frozenset({"A"}))
 
+    def test_held_input_during_loading_does_not_enter_new_game(self):
+        app = CaptureHost()
+        app.emu.running = False
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertTrue(app._gamepad_game_resume_release_pending)
+
+        app.emu.running = True
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        self.assertIn("Release controller inputs after starting game",
+                      app.gamepad_status.get())
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_game_resume_release_pending)
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_releasing_before_game_starts_keeps_first_press_responsive(self):
+        app = CaptureHost()
+        app.emu.running = False
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        self.assertFalse(app._gamepad_game_resume_release_pending)
+
+        app.emu.running = True
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
+    def test_external_backend_held_input_requires_release_on_return(self):
+        app = CaptureHost()
+        app.uses_embedded_emulator = lambda: False
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        app.uses_embedded_emulator = lambda: True
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset())
+        app._gamepad.physical_buttons = frozenset()
+        app.gamepad_tick()
+        app._gamepad.physical_buttons = frozenset({"A"})
+        app.gamepad_tick()
+        self.assertEqual(app.emu.published[-1], frozenset({"A"}))
+
     def test_hot_unplug_new_pad_requires_release_before_game_input(self):
         app = CaptureHost()
         app._gamepad.physical_buttons = frozenset({"A"})
