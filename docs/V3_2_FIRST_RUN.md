@@ -45,6 +45,20 @@ and asks before replacing these newer edits. Cancel leaves every saved profile
 unchanged. Local-only backgrounds are preserved even when Undo is approved.
 An unfinished camera calibration must be canceled or saved before an undo.
 
+## Single-console import and Undo preserve local customizations
+
+The one-console Import controls action now merges approved camera controls into
+the current local profile instead of replacing it with a stripped portable
+file. Custom zone artwork, ROM directories and other device-local fields
+survive both import and Undo. If controls or an imported theme were edited
+after the import, Undo asks before replacing those newer choices. Declining
+keeps the edits, while confirming restores the earlier portable controls.
+Import and Undo both reject unfinished camera calibration.
+
+These guarantees are exercised through pure unit tests and the actual
+frozen Tk Import controls and Undo import buttons, without a camera, game,
+controller or network connection.
+
 ## Profile save and console-switch recovery
 
 Changing consoles now commits the previous console's controls before leaving.

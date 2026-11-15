@@ -65,6 +65,7 @@ def _exercise_installed_control_archive(app, root):
     from anything_plays.portable_profile_library import (
         load_library_archive, save_library_archive,
     )
+    from anything_plays.portable_profiles import save_bundle
     from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 
     if app.cap is not None or app.armed or app._gamepad.api is not None:
@@ -78,6 +79,7 @@ def _exercise_installed_control_archive(app, root):
         base = Path(td)
         archive = base / "all-console-controls.json"
         tampered = base / "invalid-archive.json"
+        single_archive = base / "one-console-controls.json"
 
         # These are real Tk buttons owned by the installed application, not
         # direct calls to a mocked profile-controller implementation.
@@ -233,6 +235,68 @@ def _exercise_installed_control_archive(app, root):
                 or app.armed or app.cap is not None
                 or app._gamepad.api is not None):
             raise RuntimeError("Frozen restore undo changed devices or controls")
+
+        # Repeat the important privacy and Undo checks with the one-console
+        # UI. Portable files omit zone_image but must never erase its path.
+        active = app.profile_store.get(selected)
+        original_tolerance = active["tolerance"]
+        active["zone_image"] = "my-local-background.png"
+        app.profile_store.put(selected, active)
+        app.cfg = app.profile_store.get(selected)
+        app.refresh_settings()
+        imported = copy.deepcopy(app.cfg)
+        imported["tolerance"] = (
+            original_tolerance + 2 if original_tolerance <= 88
+            else original_tolerance - 2
+        )
+        save_bundle(single_archive, selected, imported)
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(single_archive),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ) as confirmed_import:
+            _click_button(root, "Import controls")
+        if confirmed_import.call_count != 1:
+            raise RuntimeError("Single-console import lacked confirmation")
+        if (app.profile_store.get(selected)["zone_image"]
+                != "my-local-background.png"):
+            raise RuntimeError("Single-console import erased local artwork")
+        if (app.profile_store.get(selected)["tolerance"]
+                != imported["tolerance"]):
+            raise RuntimeError("Single-console import did not apply controls")
+        if not app._undo_import_button.instate(["!disabled"]):
+            raise RuntimeError("Single-console import did not offer Undo")
+
+        # A later control edit must cause Undo to ask rather than silently
+        # losing the new value. A local-only background must never be undone.
+        newer_tolerance = 47 if imported["tolerance"] != 47 else 48
+        app.tolerance.set(newer_tolerance)
+        app.zone_image_path.set("my-newer-local-background.png")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=False,
+        ) as declined_single:
+            _click_button(root, "Undo import")
+        if declined_single.call_count != 1:
+            raise RuntimeError("Single-console Undo did not warn about new edits")
+        if app.tolerance.get() != newer_tolerance:
+            raise RuntimeError("Declined single-console Undo discarded new edits")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ) as accepted_single:
+            _click_button(root, "Undo import")
+        if accepted_single.call_count != 1:
+            raise RuntimeError("Single-console Undo did not require approval")
+        if (app.profile_store.get(selected)["tolerance"] != original_tolerance
+                or app.profile_store.get(selected)["zone_image"]
+                != "my-newer-local-background.png"
+                or not app._undo_import_button.instate(["disabled"])):
+            raise RuntimeError("Single-console Undo lost local data or old controls")
+        if app.armed or app.cap is not None or app._gamepad.api is not None:
+            raise RuntimeError("Single-console import activated gameplay devices")
     return True
 
 

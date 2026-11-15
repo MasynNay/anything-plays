@@ -1,5 +1,6 @@
 """3.2 portable-profile validation without cameras, ROMs or native drivers."""
 
+import copy
 import json
 import tempfile
 import unittest
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from anything_plays.portable_profiles import (
     FORMAT, MAX_FILE_BYTES, load_bundle, make_bundle, parse_bundle,
-    save_bundle,
+    save_bundle, merge_portable_profile,
 )
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import default_for
@@ -40,6 +41,42 @@ class PortableProfilesTests(unittest.TestCase):
             self.assertEqual(settings["rgb"], [44, 99, 150])
             self.assertEqual(settings["zones"]["A"], [.1, .2, .3, .4])
             self.assertEqual(settings["mapping"]["A"], "A")
+
+    def test_import_merges_controls_without_erasing_local_artwork(self):
+        source = copy.deepcopy(self.profile)
+        original = copy.deepcopy(source)
+        incoming = parse_bundle(
+            json.dumps(self.bundle()),
+            selected_system="gba", allowed_themes=self.themes,
+        )[0]
+        incoming["tolerance"] = 39
+        merged = merge_portable_profile("gba", source, incoming)
+        self.assertEqual(merged["tolerance"], 39)
+        self.assertEqual(merged["zone_image"], source["zone_image"])
+        self.assertEqual(merged["rom_directory"], source["rom_directory"])
+        self.assertEqual(source, original)
+        self.assertNotIn("zone_image", incoming)
+        merged["zones"]["A"][0] = 0.05
+        self.assertEqual(source["zones"]["A"], [.1, .2, .3, .4])
+
+    def test_legacy_profile_merge_disallows_private_path_injection(self):
+        incoming = copy.deepcopy(self.profile)
+        incoming["zone_image"] = "/not-the-local-zone-background.png"
+        incoming["rom_directory"] = "/injected-game-library"
+        cleaned, _, legacy = parse_bundle(
+            json.dumps(incoming), selected_system="gba",
+            allowed_themes=self.themes,
+        )
+        self.assertTrue(legacy)
+        merged = merge_portable_profile("gba", self.profile, cleaned)
+        self.assertEqual(merged["zone_image"], self.profile["zone_image"])
+        self.assertEqual(merged["rom_directory"], self.profile["rom_directory"])
+        with self.assertRaises(ValueError):
+            merge_portable_profile(
+                "gba", self.profile, dict(cleaned, zone_image="/bad")
+            )
+        with self.assertRaises(ValueError):
+            merge_portable_profile("snes", self.profile, cleaned)
 
     def test_no_rom_paths_image_paths_or_credentials_leave_machine(self):
         document = self.bundle()

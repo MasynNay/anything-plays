@@ -8,6 +8,7 @@ Import is a *validation step*, not an apply operation. The UI separately
 previews and confirms changes before persisting anything.
 """
 
+import copy
 import json
 import math
 from pathlib import Path
@@ -114,6 +115,24 @@ def sanitize_profile(system, profile, *, legacy=False):
         clean_mapping[name] = action
     clean["mapping"] = clean_mapping
     return clean
+
+
+def merge_portable_profile(system, current, imported):
+    """Apply validated portable controls without erasing local-only settings.
+
+    Portable files deliberately omit local artwork, game paths and device
+    preferences. A restore must never treat those omissions as a request to
+    delete them. Missing portable fields still use the existing normalizer's
+    defaults, matching the original import behavior.
+    """
+    if not isinstance(current, dict):
+        raise ValueError("Current console controls must be an object.")
+    clean = sanitize_profile(system, imported)
+    merged = copy.deepcopy(current)
+    for field in _ALLOWED:
+        merged.pop(field, None)
+    merged.update(clean)
+    return merged
 
 
 def make_bundle(system, profile, *, theme=None, allowed_themes=()):

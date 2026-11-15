@@ -7,7 +7,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from anything_plays.atomic_storage import write_json_atomically
-from anything_plays.portable_profiles import load_bundle, save_bundle
+from anything_plays.portable_profiles import (
+    load_bundle, save_bundle, make_bundle, merge_portable_profile,
+)
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import (BUTTONS_BY_SYSTEM, DISABLED_MAPPING,
                              default_for, normalize)
@@ -435,6 +437,7 @@ class ProfilesMixin:
             undo.configure(state="normal")
         # Any older one-console undo snapshot no longer reflects this state.
         self._last_profile_import = None
+        self._last_profile_import_applied = None
         single_undo = getattr(self, "_undo_import_button", None)
         if single_undo is not None:
             single_undo.configure(state="disabled")
@@ -513,7 +516,14 @@ class ProfilesMixin:
         )
 
     def load_profile(self):
-        """Preview and confirm safe settings; preserve an undo snapshot."""
+        """Validate, preview and merge portable controls into one console."""
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                'Import controls',
+                'Finish or cancel camera calibration before importing controls.',
+                parent=self.root,
+            )
+            return
         path = filedialog.askopenfilename(
             parent=self.root,
             filetypes=[('Anything Plays control profile', '*.json')],
@@ -537,10 +547,10 @@ class ProfilesMixin:
             f'Mapped controls: {len(imported["mapping"])}\n'
             f'Appearance theme: {theme or "keep current"}\n'
             f'Format: {"legacy profile (review console carefully)" if legacy else "version 1"}\n\n'
-            'This replaces the selected console’s camera control settings. '
-            'Your other consoles, ROMs, saves and controller preferences '
-            'are not changed.\n\n'
-            'Object controls will remain stopped until you enable them again. '
+            'This replaces camera controls for the selected console only. '
+            'Local zone backgrounds, ROMs, saves, device settings and other '
+            'consoles are not changed.\n\n'
+            'Object controls remain stopped until you enable them again. '
             'You can undo this import afterward.\n\n'
             'Apply these settings?'
         )
@@ -550,11 +560,14 @@ class ProfilesMixin:
             return
 
         try:
+            if self.system_key.get() != system:
+                raise ValueError('Selected console changed during import.')
             self.read_settings()
             previous = copy.deepcopy(self.cfg)
+            candidate = merge_portable_profile(system, previous, imported)
         except (ValueError, TypeError, tk.TclError) as exc:
             messagebox.showerror(
-                'Import controls', f'Could not read current settings: {exc}',
+                'Import controls', f'Could not prepare current settings: {exc}',
                 parent=self.root,
             )
             return
@@ -562,7 +575,7 @@ class ProfilesMixin:
         previous_theme = self.theme_name.get()
         self.stop_controls()
         try:
-            self.profile_store.put(system, imported)
+            self.profile_store.put(system, candidate)
             self.cfg = self.profile_store.get(system)
             self.refresh_settings()
             if theme is not None and theme != previous_theme:
@@ -570,12 +583,9 @@ class ProfilesMixin:
                 self.apply_theme(theme)
             self.save_preferences()
         except Exception as exc:
-            # Storage writes are transactional, but a later theme/UI failure
-            # can still occur after the profile commit. Roll back that commit
-            # and the visible controls together.
             try:
                 self.profile_store.put(system, previous_saved)
-            except OSError:
+            except (OSError, ValueError, TypeError):
                 pass
             self.cfg = previous
             try:
@@ -585,51 +595,124 @@ class ProfilesMixin:
             except (ValueError, tk.TclError):
                 pass
             messagebox.showerror(
-                'Import controls', f'Import failed; previous controls restored: {exc}',
+                'Import controls',
+                f'Import failed; check your controls before playing: {exc}',
                 parent=self.root,
             )
             return
         self._last_profile_import = (system, previous, previous_theme)
+        self._last_profile_import_applied = (
+            self.profile_store.get(system), self.theme_name.get(),
+        )
         undo = getattr(self, '_undo_import_button', None)
         if undo is not None:
             undo.configure(state='normal')
         self.status.set(
-            f'{system.upper()} controls imported. Object input is paused. '
-            'Use Undo import to restore your previous layout.'
+            f'{system.upper()} controls imported. Local zone artwork was kept. '
+            'Object input is paused; use Undo import to restore your layout.'
         )
 
     def undo_profile_import(self):
-        """Undo the most recent profile import without changing other consoles."""
+        """Undo a portable profile without silently losing later local edits."""
         snapshot = getattr(self, '_last_profile_import', None)
         if snapshot is None:
             return
-        system, previous, theme = snapshot
+        system, previous, prior_theme = snapshot
         if self.system_key.get() != system:
             messagebox.showinfo(
                 'Undo import', f'Switch back to {system.upper()} to undo.',
                 parent=self.root,
             )
             return
+        if getattr(self, '_calibration_window', None) is not None:
+            messagebox.showinfo(
+                'Undo import',
+                'Finish or cancel camera calibration before undoing an import.',
+                parent=self.root,
+            )
+            return
+        applied = getattr(self, '_last_profile_import_applied', None)
+        if applied is None:
+            messagebox.showerror(
+                'Undo import',
+                'Cannot safely verify the imported profile. Nothing was changed.',
+                parent=self.root,
+            )
+            return
+        applied_profile, applied_theme = applied
+        theme_was_imported = applied_theme != prior_theme
+        try:
+            self.read_settings()
+            current = copy.deepcopy(self.cfg)
+            previous_controls = make_bundle(system, previous)['profile']
+            applied_controls = make_bundle(system, applied_profile)['profile']
+            current_controls = make_bundle(system, current)['profile']
+            changed_controls = current_controls != applied_controls
+            changed_theme = (
+                theme_was_imported and self.theme_name.get() != applied_theme
+            )
+            target = merge_portable_profile(
+                system, current, previous_controls,
+            )
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                'Undo import', f'Cannot review current settings: {exc}',
+                parent=self.root,
+            )
+            return
+        if changed_controls or changed_theme:
+            if not messagebox.askyesno(
+                'Review newer control edits',
+                'You edited controls or changed the imported theme after '
+                'importing this profile. Undo will replace those newer '
+                'control edits with the pre-import layout. Local zone '
+                'backgrounds, ROMs and saves will be preserved.\n\n'
+                'Continue with Undo?',
+                parent=self.root,
+            ):
+                self.status.set(
+                    'Undo import canceled; newer controls were preserved.'
+                )
+                return
+
+        previous_saved = self.profile_store.get(system)
+        current_theme = self.theme_name.get()
         self.stop_controls()
         try:
-            self.profile_store.put(system, previous)
+            self.profile_store.put(system, target)
             self.cfg = self.profile_store.get(system)
             self.refresh_settings()
-            if self.theme_name.get() != theme:
-                self.theme_name.set(theme)
-                self.apply_theme(theme)
+            if theme_was_imported and current_theme != prior_theme:
+                self.theme_name.set(prior_theme)
+                self.apply_theme(prior_theme)
             self.save_preferences()
-        except (OSError, ValueError, tk.TclError) as exc:
+        except (OSError, ValueError, TypeError, tk.TclError) as exc:
+            try:
+                self.profile_store.put(system, previous_saved)
+            except (OSError, ValueError, TypeError):
+                pass
+            self.cfg = current
+            try:
+                self.refresh_settings()
+                self.theme_name.set(current_theme)
+                self.apply_theme(current_theme)
+            except (ValueError, tk.TclError):
+                pass
             messagebox.showerror(
-                'Undo import', f'Could not restore the previous controls: {exc}',
+                'Undo import',
+                'Could not undo controls; check profile storage and retry.',
                 parent=self.root,
             )
             return
         self._last_profile_import = None
+        self._last_profile_import_applied = None
         undo = getattr(self, '_undo_import_button', None)
         if undo is not None:
             undo.configure(state='disabled')
-        self.status.set('Previous control settings restored. Object input remains paused.')
+        self.status.set(
+            'Previous camera controls restored. Local artwork was kept; '
+            'object input remains paused.'
+        )
 
     def reset_profile(self):
         """Only show reset defaults after a durable profile write succeeds."""
