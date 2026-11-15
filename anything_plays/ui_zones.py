@@ -1,8 +1,10 @@
 """Manage editable camera control zones and their visual overlays."""
 
+import copy
 import io
 from pathlib import Path
 import random
+import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import urllib.request
 
@@ -10,6 +12,7 @@ from PIL import Image
 from anything_plays.zone_rendering import render_zone_overlay
 
 from anything_plays.system_profiles import DISABLED_MAPPING, fit_to_grid
+from anything_plays.zone_art_storage import save_cached_zone_art
 
 
 class ZonesMixin:
@@ -38,8 +41,16 @@ class ZonesMixin:
         self._zone_label_save_job = None
         if getattr(self, '_closing', False):
             return
-        self.read_settings()
-        self.profile_store.put(self.system_key.get(), self.cfg)
+        try:
+            self.read_settings()
+            self.profile_store.put(self.system_key.get(), self.cfg)
+        except (OSError, ValueError, TypeError, tk.TclError):
+            # A Tk timer callback must not crash the application if the
+            # profile disk is unavailable. Keep the new slider value visible
+            # so the player can retry saving it.
+            self.status.set(
+                'Zone label size was not saved. Check profile storage and retry.'
+            )
 
     def choose_zone_art(self):
         path = filedialog.askopenfilename(title='Choose zone artwork',
@@ -66,9 +77,10 @@ class ZonesMixin:
             if image.format != 'PNG':
                 raise ValueError('The URL must point to a PNG image')
             image.thumbnail((1024, 1024))
-            cache = Path.home() / '.config' / 'anything-plays' / 'zone-art.png'
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            image.save(cache)
+            # Private 3.2 builds must never write into a stable/legacy
+            # artwork cache. The new cache also commits complete PNG bytes
+            # atomically and refuses linked preview destinations.
+            cache = save_cached_zone_art(image, self.preferences_path)
             self.zone_image_path.set(str(cache))
             self.load_zone_art()
         except Exception as exc:
@@ -106,16 +118,29 @@ class ZonesMixin:
                         else 'Custom drawing disabled. Symmetrical zones remain active.')
 
     def make_symmetric_grid(self):
-        """Reset only the active console's controls to an even grid."""
-        self.read_settings()
-        fit_to_grid(self.cfg, self.system_key.get())
+        """Save the active console's fitted grid before showing it as applied."""
+        original = copy.deepcopy(self.cfg)
+        system = self.system_key.get()
+        try:
+            self.read_settings()
+            candidate = copy.deepcopy(self.cfg)
+            fit_to_grid(candidate, system)
+            self.profile_store.put(system, candidate)
+        except (OSError, ValueError, TypeError, tk.TclError):
+            self.cfg = original
+            self.status.set(
+                'Grid changes were not saved. Previous control zones are kept; '
+                'check profile storage and retry.'
+            )
+            return False
+        self.cfg = candidate
         self._shuffle_latched = False
-        self.profile_store.put(self.system_key.get(), self.cfg)
         self.status.set(
             'Enabled buttons and Shuffle snapped to an even grid.'
             if self.shuffle_enabled.get() else
             'Enabled buttons snapped to an even grid; hidden Shuffle preserved.'
         )
+        return True
 
     def shuffle_zones(self):
         """Shuffle every visible control, including the camera-triggered Shuffle zone."""

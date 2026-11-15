@@ -54,6 +54,21 @@ camera gameplay stays disarmed. Reset controls also writes default settings
 before refreshing the editor. A failed reset retains the previous editor
 configuration instead of making an unsuccessful reset appear permanent.
 
+## Isolated preview zone artwork and safe grid saves
+
+A user-requested HTTPS PNG zone-art download in the 3.2 preview now saves
+**only** to the private 3.2 preview settings directory. It never uses the
+older shared `~/.config/anything-plays/zone-art.png` cache. The download
+is bounded to 5 MiB, decoded and resized locally, then published through
+an atomic PNG file replacement. Unsafe linked preview cache paths are rejected,
+and a failed write preserves the prior image. Older, non-3.2 identities retain
+their established cache location for compatibility.
+
+**Fit buttons to grid** now commits its candidate geometry before adopting
+it in the editor. Storage failures leave the previous zones intact and report
+the problem instead of silently implying success. A failed delayed zone-label
+size write is also reported without crashing the Tk callback.
+
 ## One clear entrance
 
 A **Get started** button appears beside the Anything Plays title. The
