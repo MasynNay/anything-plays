@@ -96,6 +96,58 @@ class GameVideoLifecycleTests(unittest.TestCase):
             app.stop_controls.assert_called()
         self.assertEqual(app.show_playing_info.call_count, len(paths))
 
+    def test_rom_replacement_clears_old_frame_before_native_start(self):
+        app = LibraryHost()
+        camera = app._stream_camera_frame
+        order = []
+        app.emu.stop.side_effect = lambda: order.append("native stop")
+
+        def start_new(path):
+            order.append("native start")
+            self.assertEqual(path, "/synthetic/replacement.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_photo)
+            self.assertIs(app._stream_camera_frame, camera)
+
+        app.emu.start.side_effect = start_new
+        app.start_rom("/synthetic/replacement.gba")
+        self.assertEqual(order, ["native stop", "native start"])
+        self.assertEqual(app.emu.frame_serial, 13)
+        app.game_canvas.delete.assert_called_with("all")
+        app._stream_canvas.delete.assert_called_with("all")
+
+    def test_repeated_rom_replacement_does_not_retain_prior_pixels(self):
+        app = LibraryHost()
+        for index in range(6):
+            app.emu.frame = object()
+            app.game_photo = object()
+            app._stream_game_frame = object()
+            app._stream_photo = object()
+            app.start_rom(f"/synthetic/replacement-{index}.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_photo)
+        self.assertEqual(app.emu.frame_serial, 18)
+        self.assertEqual(app.emu.stop.call_count, 6)
+        self.assertEqual(app._stream_canvas.delete.call_count, 6)
+
+    def test_missing_core_clears_old_frame_and_does_not_launch(self):
+        app = LibraryHost()
+        app.emu.find_system_core.return_value = None
+        with patch("anything_plays.preview_storage.is_v32_preview",
+                   return_value=False), patch(
+                       "anything_plays.ui_library.messagebox.showerror"
+                   ):
+            app.start_rom("/synthetic/missing-core.gba")
+        self.assertIsNone(app.emu.frame)
+        self.assertIsNone(app._stream_game_frame)
+        app.emu.start.assert_not_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIn("Game could not start", app.game_status.set.call_args.args[0])
+
     def test_rom_unload_disarms_gamepad_before_stop(self):
         app = LibraryHost()
         sequence = []
