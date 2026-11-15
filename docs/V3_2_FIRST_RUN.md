@@ -106,6 +106,16 @@ and reports an error. If rollback itself fails, it warns users to inspect
 control storage before continuing. The failure paths are covered by unit
 tests and an installed frozen Tk import/write-failure smoke.
 
+## Calibration Cancel keeps pre-existing unsaved edits
+
+The camera guide now snapshots both the controls visible in the editor
+(including unsaved changes made before opening the guide) and the separately
+saved console profile. Cancel restores the pre-guide editor, not stale values
+from an earlier disk save. It only writes a rollback to disk if another UI
+action auto-saved a change while calibration was open. This prevents a
+canceled sample from discarding an unrelated unsaved layout or unexpectedly
+committing it to the local profile store.
+
 ## Profile save and console-switch recovery
 
 Changing consoles now commits the previous console's controls before leaving.

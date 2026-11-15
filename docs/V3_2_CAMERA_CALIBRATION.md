@@ -46,10 +46,14 @@ sent to a server, or included in diagnostics exports.
 The test is opt-in, and completing it is not required to save a calibration.
 It preserves the same no-gameplay-arming behavior as the rest of the guide.
 
-**Cancel** restores the original primary target color and initial tolerance
-and minimum-area values; **Save & finish** persists the selected console's
-settings. Switching consoles cancels the guide before the previous console
-profile is saved. The guide never re-arms object controls.
+**Cancel** restores the control values that were visible immediately before
+the guide opened, including pre-existing unsaved edits. The guide snapshots
+the already-saved console profile separately. Cancel does not write to disk if
+the saved profile is unchanged; if an advanced control auto-saved during the
+guide, Cancel rolls that temporary write back to the original saved value.
+**Save & finish** explicitly commits the selected console's settings.
+Switching consoles cancels the guide before the previous console profile
+is saved. The guide never re-arms object controls.
 
 ## Verification needed
 

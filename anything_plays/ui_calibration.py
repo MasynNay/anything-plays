@@ -64,13 +64,19 @@ class CalibrationMixin:
                 pass
 
         self.stop_controls()
-        self._calibration_original = {
-            "system": self.system_key.get(),
-            "profile": copy.deepcopy(self.cfg),
-            "rgb": list(self.cfg["rgb"]),
-            "tolerance": int(self.tolerance.get()),
-            "min_area": int(self.min_area.get()),
-        }
+        try:
+            # Capture the *visible* editor, including controls that have not
+            # yet been written to disk. The guide is a temporary transaction,
+            # not a request to throw away pre-existing unsaved edits.
+            self._calibration_capture_original()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            messagebox.showerror(
+                "Camera calibration",
+                "Correct the current console settings or profile storage "
+                "before starting calibration. No changes were saved.",
+                parent=self.root,
+            )
+            return
         self._calibration_history = deque(maxlen=90)
         self._calibration_stability_history = deque(
             maxlen=STATIONARY_SAMPLE_FRAMES
@@ -179,6 +185,20 @@ class CalibrationMixin:
         self._calibration_next.pack(side="right")
         self._calibration_render_step()
         self._calibration_refresh()
+
+    def _calibration_capture_original(self):
+        """Snapshot both the live editor and disk prior to camera calibration."""
+        system = self.system_key.get()
+        saved_profile = self.profile_store.get(system)
+        self.read_settings()
+        self._calibration_original = {
+            "system": system,
+            "profile": copy.deepcopy(self.cfg),
+            "stored_profile": saved_profile,
+            "rgb": list(self.cfg["rgb"]),
+            "tolerance": int(self.tolerance.get()),
+            "min_area": int(self.min_area.get()),
+        }
 
     def _calibration_render_step(self):
         step = self._calibration_step
@@ -436,16 +456,23 @@ class CalibrationMixin:
                 self.refresh_color()
             if self.pick_mode is True:
                 self.pick_mode = False
+            # Canceling a guide that made no durable changes must not write
+            # to profile storage. If a separately bound advanced control
+            # auto-saved during calibration, restore the exact pre-guide
+            # on-disk profile rather than committing unsaved editor values.
             try:
-                self.profile_store.put(saved["system"], self.cfg)
-            except (ValueError, OSError, tk.TclError):
+                saved_disk = saved["stored_profile"]
+                if self.profile_store.get(saved["system"]) != saved_disk:
+                    self.profile_store.put(saved["system"], saved_disk)
+            except (ValueError, TypeError, OSError, tk.TclError):
                 self.status.set(
-                    "Calibration canceled but restored controls could not be saved. "
-                    "Please check your configuration folder."
+                    "Calibration canceled, but a temporary saved change "
+                    "could not be rolled back. Check profile storage."
                 )
             else:
                 self.status.set(
-                    "Calibration canceled. Previous control settings restored."
+                    "Calibration canceled. Pre-guide controls restored; "
+                    "unsaved editor changes were kept."
                 )
         self._calibration_history.clear()
         CalibrationMixin._calibration_reset_stability(self)
