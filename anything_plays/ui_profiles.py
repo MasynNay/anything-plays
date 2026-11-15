@@ -265,6 +265,158 @@ class ProfilesMixin:
             'camera footage were not included.'
         )
 
+    def export_all_profiles(self):
+        """Back up all 18 camera-control layouts, excluding private settings."""
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                "Back up all controls",
+                "Finish or cancel camera calibration before backing up controls.",
+                parent=self.root,
+            )
+            return
+        from anything_plays.portable_profile_library import (
+            make_library_archive, save_library_archive,
+        )
+        try:
+            self.read_settings()
+            profiles = {
+                system: self.profile_store.get(system)
+                for system in BUTTONS_BY_SYSTEM
+            }
+            profiles[self.system_key.get()] = copy.deepcopy(self.cfg)
+            make_library_archive(profiles)  # validate before opening a picker
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                "Back up all controls", f"Cannot export these layouts: {exc}",
+                parent=self.root,
+            )
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self.root, defaultextension=".json",
+            filetypes=[("Anything Plays all-console backup", "*.json")],
+            initialfile="anything-plays-all-18-console-controls.json",
+        )
+        if not path:
+            return
+        try:
+            save_library_archive(path, profiles)
+        except (OSError, ValueError, TypeError) as exc:
+            messagebox.showerror(
+                "Back up all controls", f"Could not save the backup: {exc}",
+                parent=self.root,
+            )
+            return
+        self.status.set(
+            "All console control layouts backed up. No ROMs, saves, "
+            "camera images, device names or private file paths included."
+        )
+
+    def restore_all_profiles(self):
+        """Confirm one validated all-console backup and apply it atomically."""
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                "Restore all controls",
+                "Finish or cancel camera calibration before restoring controls.",
+                parent=self.root,
+            )
+            return
+        from anything_plays.portable_profile_library import load_library_archive
+        path = filedialog.askopenfilename(
+            parent=self.root,
+            filetypes=[("Anything Plays all-console backup", "*.json")],
+        )
+        if not path:
+            return
+        try:
+            imported = load_library_archive(path)
+        except (OSError, ValueError, TypeError) as exc:
+            messagebox.showerror(
+                "Restore all controls", f"Could not validate this backup: {exc}",
+                parent=self.root,
+            )
+            return
+        if not messagebox.askyesno(
+            "Review all-console restore",
+            f"This will replace control settings for all {len(imported)} "
+            "consoles at once. Camera control will be stopped.\n\n"
+            "ROMs, native saves, controller mappings, and other preferences "
+            "will not be touched. You can undo this restore afterward.\n\n"
+            "Restore all console control layouts?",
+            parent=self.root,
+        ):
+            return
+        try:
+            self.read_settings()
+            selected = self.system_key.get()
+            prior = {
+                system: self.profile_store.get(system)
+                for system in BUTTONS_BY_SYSTEM
+            }
+            prior[selected] = copy.deepcopy(self.cfg)
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                "Restore all controls", f"Cannot capture current settings: {exc}",
+                parent=self.root,
+            )
+            return
+        self.stop_controls()
+        try:
+            self.profile_store.put_many(imported)
+            self.cfg = self.profile_store.get(selected)
+            self.refresh_settings()
+        except (OSError, ValueError, TypeError, tk.TclError) as exc:
+            try:
+                self.profile_store.put_many(prior)
+                self.cfg = self.profile_store.get(selected)
+                self.refresh_settings()
+            except (OSError, ValueError, TypeError, tk.TclError):
+                self.status.set(
+                    "Restore failed. Check your control profiles before playing."
+                )
+            messagebox.showerror(
+                "Restore all controls",
+                f"Restore was not completed: {exc}", parent=self.root,
+            )
+            return
+        self._last_profile_archive_import = prior
+        undo = getattr(self, "_undo_all_profile_restore_button", None)
+        if undo is not None:
+            undo.configure(state="normal")
+        # Any older one-console undo snapshot no longer reflects this state.
+        self._last_profile_import = None
+        single_undo = getattr(self, "_undo_import_button", None)
+        if single_undo is not None:
+            single_undo.configure(state="disabled")
+        self.status.set(
+            "All console controls restored. Object input remains paused. "
+            "Use Undo all restore to return to the previous layouts."
+        )
+
+    def undo_all_profile_restore(self):
+        """Restore the entire pre-import set in one atomic write."""
+        prior = getattr(self, "_last_profile_archive_import", None)
+        if prior is None:
+            return
+        self.stop_controls()
+        try:
+            self.profile_store.put_many(prior)
+            self.cfg = self.profile_store.get(self.system_key.get())
+            self.refresh_settings()
+        except (OSError, ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                "Undo all restore", f"Could not undo control restore: {exc}",
+                parent=self.root,
+            )
+            return
+        self._last_profile_archive_import = None
+        undo = getattr(self, "_undo_all_profile_restore_button", None)
+        if undo is not None:
+            undo.configure(state="disabled")
+        self.status.set(
+            "Previous control layouts restored for all consoles. "
+            "Object input remains paused."
+        )
+
     def load_profile(self):
         """Preview and confirm safe settings; preserve an undo snapshot."""
         path = filedialog.askopenfilename(

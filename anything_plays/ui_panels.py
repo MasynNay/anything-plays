@@ -124,6 +124,19 @@ class AuxiliaryPanelsMixin:
             state='disabled',
         )
         self._undo_import_button.grid(row=1, column=1, sticky='ew', padx=(4, 0))
+        ttk.Button(
+            profiles, text='Back up all 18', command=self.export_all_profiles,
+        ).grid(row=2, column=0, sticky='ew', padx=(0, 4), pady=(6, 0))
+        ttk.Button(
+            profiles, text='Restore all 18', command=self.restore_all_profiles,
+        ).grid(row=2, column=1, sticky='ew', padx=(4, 0), pady=(6, 0))
+        self._undo_all_profile_restore_button = ttk.Button(
+            profiles, text='Undo all restore',
+            command=self.undo_all_profile_restore, state='disabled',
+        )
+        self._undo_all_profile_restore_button.grid(
+            row=3, column=0, columnspan=2, sticky='ew', pady=(5, 0),
+        )
         ttk.Label(
             right,
             text='Exported profiles contain controls and theme only. '
