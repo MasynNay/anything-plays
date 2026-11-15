@@ -140,9 +140,6 @@ class ProfilesMixin:
         if key not in SYSTEMS:
             return
         self.stop_controls()
-        # External games have their own window. Close any blank game-only overlay.
-        if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
-            self.set_view_mode("Windowed")
         # The combobox has already changed, so save the previous system explicitly.
         previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
         # Flush any pending size change against the previous console before
@@ -155,8 +152,20 @@ class ProfilesMixin:
             if not calibration_was_open:
                 self.read_settings(previous)
             self.profile_store.put(previous, self.cfg)
-        except (ValueError, tk.TclError, OSError):
-            pass
+        except (ValueError, TypeError, tk.TclError, OSError):
+            # Never discard an unsaved layout if storage is full/unavailable
+            # or the active spinboxes cannot be serialized. The Tk selector
+            # has already moved; restore it without emitting another event.
+            self.system_key.set(previous)
+            self.status.set(
+                "Could not save the previous console controls. "
+                "Switch canceled; correct the settings or storage and retry."
+            )
+            return False
+        # External games have their own window. Close any blank game-only
+        # overlay only after the old console profile has been persisted.
+        if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
+            self.set_view_mode("Windowed")
         self.cfg = self.profile_store.get(key)
         self.refresh_settings()
         self.refresh_system_buttons()
@@ -178,6 +187,7 @@ class ProfilesMixin:
         self.show_library()
         self.populate_inline_library()
         self.save_preferences()
+        return True
 
     def refresh_settings(self):
         """Update every Tk variable from one validated, per-console profile."""
@@ -472,10 +482,10 @@ class ProfilesMixin:
             if not messagebox.askyesno(
                 "Review newer control edits",
                 f"Controls were edited after the backup restore in "
-                f"{len(conflicts)} console(s):\\n{preview}\\n\\n"
+                f"{len(conflicts)} console(s):\n{preview}\n\n"
                 "Undo will replace those newer control edits with their "
                 "pre-restore layouts. Local backgrounds and other private "
-                "settings will be kept.\\n\\nContinue with Undo?",
+                "settings will be kept.\n\nContinue with Undo?",
                 parent=self.root,
             ):
                 self.status.set("Undo canceled; newer control edits were kept.")
@@ -622,7 +632,39 @@ class ProfilesMixin:
         self.status.set('Previous control settings restored. Object input remains paused.')
 
     def reset_profile(self):
+        """Only show reset defaults after a durable profile write succeeds."""
+        system = self.system_key.get()
+        prior_ui = copy.deepcopy(self.cfg)
+        prior_saved = self.profile_store.get(system)
+        candidate = default_for(system, DEFAULT)
         self.stop_controls()
-        self.cfg = default_for(self.system_key.get(), DEFAULT)
-        self.refresh_settings()
-        self.profile_store.put(self.system_key.get(), self.cfg)
+        committed = False
+        try:
+            self.profile_store.put(system, candidate)
+            committed = True
+            self.cfg = self.profile_store.get(system)
+            self.refresh_settings()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            # A failed write never changes the visible profile; if the UI
+            # refresh failed after a successful write, try to revert both.
+            if committed:
+                try:
+                    self.profile_store.put(system, prior_saved)
+                except (OSError, ValueError, TypeError):
+                    pass
+            self.cfg = prior_ui
+            if committed:
+                try:
+                    self.refresh_settings()
+                except (ValueError, TypeError, tk.TclError):
+                    pass
+            self.status.set(
+                "Control reset was not saved. Previous settings are retained "
+                "in the editor; check profile storage before continuing."
+            )
+            return False
+        self.status.set(
+            f"{SYSTEMS[system].title} controls reset to defaults. "
+            "Camera-controlled input remains stopped."
+        )
+        return True

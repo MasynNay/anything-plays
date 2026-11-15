@@ -11,6 +11,8 @@ class Value:
         self.value = value
     def get(self):
         return self.value
+    def set(self, value):
+        self.value = value
 
 
 class FakeSwitchState:
@@ -36,6 +38,33 @@ class FakeSwitchState:
 
 
 class ProfileConsoleSwitchTests(unittest.TestCase):
+    def test_failed_switch_reverts_selector_and_keeps_previous_editor(self):
+        app = FakeSwitchState()
+        app._active_profile_system = "gb"
+        app.status = Value("")
+        app.view_mode = Value("Windowed")
+        app._zone_label_save_job = None
+        app._calibration_window = None
+        app.stopped = 0
+        app.stop_controls = lambda: setattr(app, "stopped", app.stopped + 1)
+        app.uses_embedded_emulator = lambda _key: True
+
+        class FailStore:
+            def put(self, system, profile):
+                self.attempt = (system, profile.copy())
+                raise OSError("full disk")
+
+        app.profile_store = FailStore()
+        self.assertFalse(ProfilesMixin.switch_system(app))
+        self.assertEqual(app.system_key.get(), "gb")
+        self.assertEqual(app._active_profile_system, "gb")
+        self.assertEqual(app.cfg["mapping"]["A"], "B")
+        self.assertNotIn("X", app.cfg["mapping"])
+        self.assertEqual(app.profile_store.attempt[0], "gb")
+        self.assertIn("Switch canceled", app.status.get())
+        self.assertNotIn("full disk", app.status.get())
+        self.assertEqual(app.stopped, 1)
+
     def test_explicit_previous_console_excludes_hidden_new_console_rows(self):
         app = FakeSwitchState()
         ProfilesMixin.read_settings(app, "gb")

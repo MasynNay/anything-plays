@@ -215,7 +215,9 @@ def _exercise_installed_control_archive(app, root):
             return_value=True,
         ) as accepted:
             _click_button(root, "Undo all restore")
-        if accepted.call_count != 1 or "newer control edits" not in accepted.call_args.args[1]:
+        if (accepted.call_count != 1
+                or "newer control edits" not in accepted.call_args.args[1]
+                or "\n\n" not in accepted.call_args.args[1]):
             raise RuntimeError("Approved undo did not explain destructive changes")
         if (app.profile_store.get(independent).get("zone_image")
                 != "newer-local-only-art.png"):

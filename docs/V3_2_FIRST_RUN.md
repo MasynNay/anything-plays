@@ -45,6 +45,15 @@ and asks before replacing these newer edits. Cancel leaves every saved profile
 unchanged. Local-only backgrounds are preserved even when Undo is approved.
 An unfinished camera calibration must be canceled or saved before an undo.
 
+## Profile save and console-switch recovery
+
+Changing consoles now commits the previous console's controls before leaving.
+If settings are invalid or the profile disk write fails, the selector returns
+to the previous console without discarding the in-progress editor values;
+camera gameplay stays disarmed. Reset controls also writes default settings
+before refreshing the editor. A failed reset retains the previous editor
+configuration instead of making an unsuccessful reset appear permanent.
+
 ## One clear entrance
 
 A **Get started** button appears beside the Anything Plays title. The

@@ -269,6 +269,48 @@ class AllConsoleBackupTests(unittest.TestCase):
             )
         self.assertEqual(applied["gba"]["tolerance"], 41)
 
+    def test_failed_reset_does_not_change_visible_controls(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, initial):
+                self.value = initial
+            def get(self):
+                return self.value
+            def set(self, v):
+                self.value = v
+
+        class FailingStore:
+            def __init__(self, saved):
+                self.saved = copy.deepcopy(saved)
+            def get(self, _system):
+                return copy.deepcopy(self.saved)
+            def put(self, *_args):
+                raise OSError("disk full")
+
+        class Host:
+            def __init__(self):
+                self.system_key = Value("gba")
+                self.cfg = default_for("gba", DEFAULT)
+                self.cfg["tolerance"] = 67
+                self.status = Value("")
+                self.profile_store = FailingStore(self.cfg)
+                self.stops = 0
+                self.refreshes = 0
+            def stop_controls(self):
+                self.stops += 1
+            def refresh_settings(self):
+                self.refreshes += 1
+
+        host = Host()
+        original = copy.deepcopy(host.cfg)
+        self.assertFalse(ProfilesMixin.reset_profile(host))
+        self.assertEqual(host.cfg, original)
+        self.assertEqual(host.profile_store.get("gba"), original)
+        self.assertEqual(host.refreshes, 0)
+        self.assertEqual(host.stops, 1)
+        self.assertIn("not saved", host.status.get())
+
     def test_change_preview_identifies_only_changed_portable_console_settings(self):
         from anything_plays.portable_profile_library import changed_systems
         baseline = all_profiles()
