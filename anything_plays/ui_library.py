@@ -342,6 +342,9 @@ class LibraryMixin:
         self.start_rom(str(path))
 
     def unload_rom(self):
+        prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
+        if callable(prepare):
+            prepare()
         self.stop_external_emulator()
         self.deactivate_manual()
         self.stop_controls()
@@ -363,6 +366,11 @@ class LibraryMixin:
                 parent=self.root,
             )
             return
+        # Switching directly between ROMs can finish before the next SDL
+        # poll; explicitly disarm the outgoing controller snapshot now.
+        prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
+        if callable(prepare):
+            prepare()
         self.deactivate_manual()
         self.stop_controls()
         bezel = getattr(self, "game_bezel", None)
