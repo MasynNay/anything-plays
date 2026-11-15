@@ -109,14 +109,16 @@ class ControllerCaptureTests(unittest.TestCase):
 
     def test_failed_manual_mapping_restores_selector_and_prior_binding(self):
         app = CaptureHost()
-        app._gamepad_bindings["gba"] = {"A": "X"}
+        # L is a valid GBA target. X belongs to different consoles and is
+        # intentionally normalized away, so it cannot test a saved mapping.
+        app._gamepad_bindings["gba"] = {"A": "L"}
         row = Setting("B")
         app.save_preferences = lambda: False
         self.assertFalse(app._save_gamepad_binding(
             "gba", "A", "B", display_var=row,
         ))
-        self.assertEqual(app._gamepad_bindings["gba"], {"A": "X"})
-        self.assertEqual(row.get(), "X")
+        self.assertEqual(app._gamepad_bindings["gba"], {"A": "L"})
+        self.assertEqual(row.get(), "L")
 
     def test_failed_reset_defaults_keeps_mapping_and_dialog_open(self):
         app = CaptureHost()
