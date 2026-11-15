@@ -207,6 +207,85 @@ class StreamModeContracts(unittest.TestCase):
                 self.assertEqual(tuple(app._stream_canvas.find_all()), ())
                 self.assertEqual(app._stream_canvas.create_image.call_count, 1)
 
+    def test_stream_pil_conversion_releases_native_frame_lock(self):
+        """PIL conversion must never hold up Libretro's native producer."""
+        import numpy as np
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class ObservedLock:
+            held = False
+
+            def __enter__(self):
+                assert not self.held
+                self.held = True
+
+            def __exit__(self, exc_type, exc, tb):
+                self.held = False
+
+        lock = ObservedLock()
+        source_pixels = np.full((24, 32, 3), 71, dtype=np.uint8)
+
+        class LockedFrame:
+            def __getitem__(self, key):
+                assert lock.held, "native pixels must be read under lock"
+                assert key == (slice(None), slice(None), slice(None, 3))
+                return self
+
+            def copy(self):
+                assert lock.held, "snapshot must be copied under lock"
+                return source_pixels.copy()
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return True
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app.emu = SimpleNamespace(
+            running=True, lock=lock, frame_serial=3, frame=LockedFrame(),
+        )
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.cap = None
+        app.reference_image = False
+        app.frame = None
+        real_fromarray = Image.fromarray
+        conversions = []
+
+        def convert_without_native_lock(pixels):
+            self.assertFalse(lock.held, "PIL conversion must not block core")
+            self.assertFalse(np.shares_memory(pixels, source_pixels))
+            conversions.append(pixels.copy())
+            return real_fromarray(pixels)
+
+        with (
+            patch("anything_plays.ui_stream.Image.fromarray",
+                  side_effect=convert_without_native_lock),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))),
+        ):
+            app._render_stream_frame()
+            self.assertEqual(len(conversions), 1)
+            self.assertEqual(app._stream_game_serial, 3)
+            self.assertFalse(lock.held)
+            # An unchanged native frame must not repeat the conversion.
+            app._render_stream_frame()
+            self.assertEqual(len(conversions), 1)
+            app.emu.frame_serial = 4
+            app._render_stream_frame()
+            self.assertEqual(len(conversions), 2)
+            self.assertEqual(app._stream_game_serial, 4)
+        self.assertFalse(lock.held)
+
     def test_reference_image_remains_visible_when_no_camera_is_connected(self):
         """An intentionally selected reference image is not a stale webcam."""
         from types import SimpleNamespace
