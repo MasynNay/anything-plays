@@ -76,7 +76,7 @@ class PortableProfilesTests(unittest.TestCase):
                 "gba", self.profile, dict(cleaned, zone_image="/bad")
             )
         with self.assertRaises(ValueError):
-            merge_portable_profile("snes", self.profile, cleaned)
+            merge_portable_profile("gb", self.profile, cleaned)
 
     def test_no_rom_paths_image_paths_or_credentials_leave_machine(self):
         document = self.bundle()
