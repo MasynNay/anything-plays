@@ -78,6 +78,26 @@ def parse_library_archive(data):
     }
 
 
+def changed_systems(current, incoming):
+    """Describe which console controls differ without mutating anything.
+
+    Compare ONLY portable control fields. Different paths, ROM libraries,
+    native gamepads, camera frames and other local preferences do not count.
+    All eighteen profiles must exist so the UI cannot imply a partial
+    restore while quietly replacing the whole set.
+    """
+    if (not isinstance(current, dict) or not isinstance(incoming, dict)
+            or set(current) != SYSTEM_NAMES or set(incoming) != SYSTEM_NAMES):
+        raise ValueError("Compare complete all-console control profiles only.")
+    changed = []
+    for system in BUTTONS_BY_SYSTEM:
+        existing = make_bundle(system, current[system])["profile"]
+        restored = sanitize_profile(system, incoming[system])
+        if existing != restored:
+            changed.append(system)
+    return tuple(changed)
+
+
 def load_library_archive(path):
     with Path(path).open("rb") as stream:
         data = stream.read(MAX_ARCHIVE_BYTES + 1)

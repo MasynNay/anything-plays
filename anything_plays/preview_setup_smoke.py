@@ -93,6 +93,18 @@ def _exercise_installed_control_archive(app, root):
         if set(exported) != set(BUTTONS_BY_SYSTEM):
             raise RuntimeError("Frozen backup omitted supported consoles")
         raw = archive.read_text("utf-8")
+        # Restoring an identical backup is a no-op, not an extra disk write
+        # or a prompt asking to replace controls that are already identical.
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(archive),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.askyesno"
+        ) as confirm_identical:
+            _click_button(root, "Restore all 18")
+        confirm_identical.assert_not_called()
+        if "No changes were made" not in app.status.get():
+            raise RuntimeError("Identical control backup did not skip restore")
         for forbidden in ("rom_directory", "zone_image", "controller_id",
                           "camera_frame", "saved_games"):
             if forbidden in raw:
@@ -153,8 +165,12 @@ def _exercise_installed_control_archive(app, root):
         ), patch(
             "anything_plays.ui_profiles.messagebox.askyesno",
             return_value=True,
-        ):
+        ) as confirmed:
             _click_button(root, "Restore all 18")
+        if confirmed.call_count != 1 or (
+            "2 of 18" not in confirmed.call_args.args[1]
+        ):
+            raise RuntimeError("Restore preview did not name the two changes")
 
         for name in BUTTONS_BY_SYSTEM:
             expected = modified[name]["tolerance"]

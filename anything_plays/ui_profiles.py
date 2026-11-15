@@ -352,16 +352,7 @@ class ProfilesMixin:
                 parent=self.root,
             )
             return
-        if not messagebox.askyesno(
-            "Review all-console restore",
-            f"This will replace control settings for all {len(imported)} "
-            "consoles at once. Camera control will be stopped.\n\n"
-            "ROMs, native saves, controller mappings, and other preferences "
-            "will not be touched. You can undo this restore afterward.\n\n"
-            "Restore all console control layouts?",
-            parent=self.root,
-        ):
-            return
+        from anything_plays.portable_profile_library import changed_systems
         try:
             self.read_settings()
             selected = self.system_key.get()
@@ -370,11 +361,34 @@ class ProfilesMixin:
                 for system in BUTTONS_BY_SYSTEM
             }
             prior[selected] = copy.deepcopy(self.cfg)
+            differences = changed_systems(prior, imported)
         except (ValueError, TypeError, tk.TclError) as exc:
             messagebox.showerror(
-                "Restore all controls", f"Cannot capture current settings: {exc}",
+                "Restore all controls", f"Cannot compare current settings: {exc}",
                 parent=self.root,
             )
+            return
+        if not differences:
+            self.status.set(
+                "This backup already matches all 18 console controls. "
+                "No changes were made."
+            )
+            return
+
+        # Show only built-in console titles, not file paths or profile values.
+        preview = ", ".join(SYSTEMS[key].title for key in differences[:7])
+        remaining = len(differences) - 7
+        if remaining:
+            preview += f" (+{remaining} more)"
+        if not messagebox.askyesno(
+            "Review all-console restore",
+            f"Change controls for {len(differences)} of {len(imported)} "
+            f"consoles:\n{preview}\n\n"
+            "Camera-controlled gameplay will be stopped. ROMs, native saves, "
+            "controller mappings and other preferences are not changed.\n\n"
+            "You can undo the restore afterward. Apply these changes?",
+            parent=self.root,
+        ):
             return
         self.stop_controls()
         try:

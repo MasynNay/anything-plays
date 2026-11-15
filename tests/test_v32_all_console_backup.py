@@ -193,6 +193,40 @@ class AllConsoleBackupTests(unittest.TestCase):
                 "B",
             )
 
+    def test_change_preview_identifies_only_changed_portable_console_settings(self):
+        from anything_plays.portable_profile_library import changed_systems
+        baseline = all_profiles()
+        identical = parse_library_archive(
+            json.dumps(make_library_archive(baseline))
+        )
+        self.assertEqual(changed_systems(baseline, identical), ())
+        altered = copy.deepcopy(identical)
+        altered["gba"]["tolerance"] = 33
+        altered["gamecube"]["mapping"]["A"] = "B"
+        self.assertEqual(
+            changed_systems(baseline, altered), ("gba", "gamecube")
+        )
+        baseline["snes"]["rom_directory"] = "/private/roms"
+        baseline["snes"]["zone_image"] = "/private/camera.jpg"
+        self.assertEqual(
+            changed_systems(baseline, altered), ("gba", "gamecube")
+        )
+
+    def test_change_preview_rejects_incomplete_profiles_without_side_effects(self):
+        from anything_plays.portable_profile_library import changed_systems
+        baseline = all_profiles()
+        incoming = parse_library_archive(
+            json.dumps(make_library_archive(baseline))
+        )
+        original = copy.deepcopy(incoming)
+        with self.assertRaises(ValueError):
+            changed_systems({"gba": baseline["gba"]}, incoming)
+        tampered = copy.deepcopy(incoming)
+        del tampered["gb"]
+        with self.assertRaises(ValueError):
+            changed_systems(baseline, tampered)
+        self.assertEqual(incoming, original)
+
     def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
         source = (
             Path(__file__).resolve().parents[1]
