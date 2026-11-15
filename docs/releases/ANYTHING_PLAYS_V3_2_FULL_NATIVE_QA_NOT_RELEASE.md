@@ -49,3 +49,21 @@ This is not an installed real-user 3.1.1-to-3.2.0 migration, physical
 controller acceptance, commercial-game save test, or approval of third-party
 redistribution. Private full-native Preview installers remain the only
 3.2 packages offered for direct testing. Public 3.1.1 remains unchanged.
+
+## Native old-then-new package upgrade acceptance (still private)
+
+At source revision `0da314541e2c6e9f739ca2add2e8001bbfb8a9d0`, all
+four jobs in [native workflow 43735551340](https://github.com/MasynNay/anything-plays/actions/runs/43735551340)
+passed. These are now **actual old-then-new package rehearsal tests** in
+disposable runner install locations: Linux isolated `dpkg --root` upgrade,
+Windows original 3.1.1 then 3.2 Inno installation, and Mac replacement of
+the same named application bundle on both architectures. The frozen 3.2
+program launched and preserved a synthetic prior control profile, settings,
+ROM-folder metadata and byte-exact fake save file. Full 11-core native
+payload provenance and identities were checked throughout. The workflow
+uploads **test receipts only**, not in-place upgrade installers.
+
+Real commercial/legal game-save reloads, device hotplug, live camera
+calibration, audio and long gameplay sessions were NOT performed. Final
+source/redistribution rights and public installer authorization remain
+unapproved. Do not distribute or install this private same-identity build.
