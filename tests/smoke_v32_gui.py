@@ -116,11 +116,29 @@ def smoke():
                         app.switch_system()
                         click_named_button(launchpad, "Refresh status")
 
-                        # Entering the color wizard does not open a webcam.
+                        # Opening calibration takes a snapshot of the
+                        # *visible* controls, even if they were never saved.
+                        # Cancel must restore that editor without writing it
+                        # into the private on-disk console profile.
+                        before_calibration_disk = app.profile_store.get(selected)
+                        pre_guide_tolerance = app.tolerance.get()
+                        unsaved_tolerance = (
+                            63 if pre_guide_tolerance != 63 else 64
+                        )
+                        app.tolerance.set(unsaved_tolerance)
                         click_named_button(launchpad, "Calibrate camera (optional)")
                         root.update_idletasks()
                         assert app._calibration_window.winfo_exists()
                         assert app.cap is None
+                        assert app._calibration_original["profile"]["tolerance"] == (
+                            unsaved_tolerance
+                        )
+                        assert app._calibration_original["stored_profile"] == (
+                            before_calibration_disk
+                        )
+                        # These simulated wizard edits never use a webcam.
+                        app.tolerance.set(80)
+                        app.cfg["tolerance"] = 80
                         click_named_button(
                             app._calibration_window, "Check stationary jitter",
                         )
@@ -134,6 +152,12 @@ def smoke():
                         app.close_camera_calibration(restore=True)
                         assert app._calibration_window is None
                         assert not app.armed
+                        assert app.tolerance.get() == unsaved_tolerance
+                        assert app.cfg["tolerance"] == unsaved_tolerance
+                        assert app.profile_store.get(selected) == before_calibration_disk
+                        # Do not influence unrelated following GUI checks.
+                        app.tolerance.set(pre_guide_tolerance)
+                        app.cfg["tolerance"] = pre_guide_tolerance
 
                         # Controller guidance is display-only until activated.
                         click_named_button(launchpad, "Set up controller or keyboard")
