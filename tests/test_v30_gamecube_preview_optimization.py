@@ -80,6 +80,75 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.preview_readback_skips, 4)
         self.assertEqual(session.raw_video_callbacks, 7)
 
+    def test_native_gpu_readback_errors_stop_without_publishing_stale_frames(self):
+        for error in (
+            OSError("USB GPU device reset"),
+            RuntimeError("OpenGL context destroyed"),
+            MemoryError("native allocation failed"),
+            TypeError("invalid video surface"),
+        ):
+            with self.subTest(error=type(error).__name__):
+                session = object.__new__(GameCubeHardwareSession)
+                stale_frame = np.zeros((4, 4, 3), dtype=np.uint8)
+                session.host = Mock(read_frame=Mock(side_effect=error))
+                session.emulator = SimpleNamespace(
+                    frame=stale_frame, frame_serial=11,
+                    lock=threading.Lock(), stop_event=threading.Event(),
+                    gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+                )
+                session.opengl_error = None
+                session.raw_video_callbacks = 0
+                session.null_video_callbacks = 0
+                session.preview_readback_skips = 0
+                session._last_preview_capture = None
+                session.hardware_frames = 0
+                session.gpu_readback_seconds = 0.0
+                session.gpu_readback_max_seconds = 0.0
+                session.gpu_readback_calls = 0
+                session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+                self.assertTrue(session.emulator.stop_event.is_set())
+                self.assertIn(type(error).__name__, session.opengl_error)
+                self.assertIs(session.emulator.frame, stale_frame)
+                self.assertEqual(session.emulator.frame_serial, 11)
+                self.assertEqual(session.hardware_frames, 0)
+                self.assertEqual(session.gpu_readback_calls, 0)
+                # A second callback during native shutdown must not retry
+                # a broken GL host or publish a frame after Stop.
+                session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+                session.host.read_frame.assert_called_once()
+
+    def test_empty_or_malformed_gpu_pixels_are_rejected_safely(self):
+        for malformed in (
+            None, np.empty((0, 8, 3), dtype=np.uint8),
+            np.zeros((8, 8), dtype=np.uint8),
+            np.zeros((8, 8, 4), dtype=np.uint8),
+            np.zeros((8, 8, 3), dtype=np.float32),
+        ):
+            with self.subTest(frame_type=type(malformed).__name__,
+                              shape=getattr(malformed, "shape", None)):
+                session = object.__new__(GameCubeHardwareSession)
+                session.host = Mock(read_frame=Mock(return_value=malformed))
+                session.emulator = SimpleNamespace(
+                    frame=None, frame_serial=1, lock=threading.Lock(),
+                    stop_event=threading.Event(),
+                    gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+                )
+                session.opengl_error = None
+                session.raw_video_callbacks = 0
+                session.null_video_callbacks = 0
+                session.preview_readback_skips = 0
+                session._last_preview_capture = None
+                session.hardware_frames = 0
+                session.gpu_readback_seconds = 0.0
+                session.gpu_readback_max_seconds = 0.0
+                session.gpu_readback_calls = 0
+                session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+                self.assertTrue(session.emulator.stop_event.is_set())
+                self.assertIsNotNone(session.opengl_error)
+                self.assertIsNone(session.emulator.frame)
+                self.assertEqual(session.emulator.frame_serial, 1)
+                self.assertEqual(session.hardware_frames, 0)
+
     def test_null_callbacks_stay_null_without_copy(self):
         session = object.__new__(GameCubeHardwareSession)
         session.raw_video_callbacks = 0
