@@ -114,6 +114,13 @@ def _exercise_installed_control_archive(app, root):
         # A batch restore must apply both, not only the visible console.
         others = [name for name in BUTTONS_BY_SYSTEM if name != selected]
         independent = others[-1]
+        untouched = next(name for name in others if name != independent)
+        # These fields are local-only, absent from the portable archive.
+        # Both affected and unaffected consoles must retain them.
+        for name in (independent, untouched):
+            local = app.profile_store.get(name)
+            local["zone_image"] = f"local-only-{name}.png"
+            app.profile_store.put(name, local)
         modified = copy.deepcopy(exported)
         for system in (selected, independent):
             old = modified[system].get("tolerance", 20)
@@ -176,12 +183,24 @@ def _exercise_installed_control_archive(app, root):
             expected = modified[name]["tolerance"]
             if app.profile_store.get(name)["tolerance"] != expected:
                 raise RuntimeError("Full-profile restore did not apply atomically")
+        if any(
+            app.profile_store.get(name).get("zone_image")
+            != f"local-only-{name}.png"
+            for name in (independent, untouched)
+        ):
+            raise RuntimeError("Full restore erased local-only console data")
         if (app.cfg["tolerance"] != modified[selected]["tolerance"]
                 or not app._undo_all_profile_restore_button.instate(["!disabled"])
                 or app.armed):
             raise RuntimeError("Frozen restore left incorrect live/undo state")
 
         _click_button(root, "Undo all restore")
+        if any(
+            app.profile_store.get(name).get("zone_image")
+            != f"local-only-{name}.png"
+            for name in (independent, untouched)
+        ):
+            raise RuntimeError("Undo restore erased local-only console data")
         for name in BUTTONS_BY_SYSTEM:
             if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
                 raise RuntimeError("Undo all did not restore previous profiles")

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from anything_plays.portable_profile_library import (
     FORMAT, MAX_ARCHIVE_BYTES, make_library_archive, parse_library_archive,
-    load_library_archive, save_library_archive,
+    load_library_archive, save_library_archive, portable_restore_delta,
 )
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import (
@@ -191,6 +191,45 @@ class AllConsoleBackupTests(unittest.TestCase):
             self.assertEqual(
                 ProfileStore(host.profile_store.path, DEFAULT).get("gb")["mapping"]["A"],
                 "B",
+            )
+
+    def test_restore_delta_preserves_local_data_and_untouched_consoles(self):
+        with TemporaryDirectory() as td:
+            current = all_profiles()
+            current["gba"]["zone_image"] = "/private/local-gba-art.png"
+            current["gba"]["rom_directory"] = "/private/rom-directory"
+            current["gb"]["zone_image"] = "/private/untouched-gb-art.png"
+            original = copy.deepcopy(current)
+            imported = parse_library_archive(
+                json.dumps(make_library_archive(current))
+            )
+            imported["gba"]["tolerance"] = 43
+            delta = portable_restore_delta(current, imported)
+            self.assertEqual(tuple(delta), ("gba",))
+            self.assertEqual(
+                delta["gba"]["zone_image"], "/private/local-gba-art.png"
+            )
+            self.assertEqual(
+                delta["gba"]["rom_directory"], "/private/rom-directory"
+            )
+            self.assertNotIn("zone_image", imported["gba"])
+            self.assertNotIn("rom_directory", imported["gba"])
+            self.assertEqual(current, original)
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            store.put_many(current)
+            before_gb = store.get("gb")
+            store.put_many(delta)
+            fresh = ProfileStore(store.path, DEFAULT)
+            self.assertEqual(fresh.get("gba")["tolerance"], 43)
+            self.assertEqual(
+                fresh.get("gba")["zone_image"], "/private/local-gba-art.png"
+            )
+            self.assertEqual(
+                fresh.get("gba")["rom_directory"], "/private/rom-directory"
+            )
+            self.assertEqual(fresh.get("gb"), before_gb)
+            self.assertEqual(
+                portable_restore_delta(fresh.profiles, imported), {}
             )
 
     def test_change_preview_identifies_only_changed_portable_console_settings(self):

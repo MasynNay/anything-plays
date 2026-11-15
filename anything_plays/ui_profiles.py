@@ -352,7 +352,7 @@ class ProfilesMixin:
                 parent=self.root,
             )
             return
-        from anything_plays.portable_profile_library import changed_systems
+        from anything_plays.portable_profile_library import portable_restore_delta
         try:
             self.read_settings()
             selected = self.system_key.get()
@@ -361,7 +361,8 @@ class ProfilesMixin:
                 for system in BUTTONS_BY_SYSTEM
             }
             prior[selected] = copy.deepcopy(self.cfg)
-            differences = changed_systems(prior, imported)
+            changes = portable_restore_delta(prior, imported)
+            differences = tuple(changes)
         except (ValueError, TypeError, tk.TclError) as exc:
             messagebox.showerror(
                 "Restore all controls", f"Cannot compare current settings: {exc}",
@@ -391,15 +392,19 @@ class ProfilesMixin:
         ):
             return
         self.stop_controls()
+        selected_changed = selected in changes
+        previous_changed = {system: prior[system] for system in differences}
         try:
-            self.profile_store.put_many(imported)
-            self.cfg = self.profile_store.get(selected)
-            self.refresh_settings()
-        except (OSError, ValueError, TypeError, tk.TclError) as exc:
-            try:
-                self.profile_store.put_many(prior)
+            self.profile_store.put_many(changes)
+            if selected_changed:
                 self.cfg = self.profile_store.get(selected)
                 self.refresh_settings()
+        except (OSError, ValueError, TypeError, tk.TclError) as exc:
+            try:
+                self.profile_store.put_many(previous_changed)
+                if selected_changed:
+                    self.cfg = self.profile_store.get(selected)
+                    self.refresh_settings()
             except (OSError, ValueError, TypeError, tk.TclError):
                 self.status.set(
                     "Restore failed. Check your control profiles before playing."
@@ -409,7 +414,7 @@ class ProfilesMixin:
                 f"Restore was not completed: {exc}", parent=self.root,
             )
             return
-        self._last_profile_archive_import = prior
+        self._last_profile_archive_import = previous_changed
         undo = getattr(self, "_undo_all_profile_restore_button", None)
         if undo is not None:
             undo.configure(state="normal")
@@ -419,8 +424,9 @@ class ProfilesMixin:
         if single_undo is not None:
             single_undo.configure(state="disabled")
         self.status.set(
-            "All console controls restored. Object input remains paused. "
-            "Use Undo all restore to return to the previous layouts."
+            f"Controls restored for {len(changes)} of 18 consoles. "
+            "Object input remains paused. Use Undo all restore "
+            "to return to the previous layouts."
         )
 
     def undo_all_profile_restore(self):
@@ -431,8 +437,9 @@ class ProfilesMixin:
         self.stop_controls()
         try:
             self.profile_store.put_many(prior)
-            self.cfg = self.profile_store.get(self.system_key.get())
-            self.refresh_settings()
+            if self.system_key.get() in prior:
+                self.cfg = self.profile_store.get(self.system_key.get())
+                self.refresh_settings()
         except (OSError, ValueError, TypeError, tk.TclError) as exc:
             messagebox.showerror(
                 "Undo all restore", f"Could not undo control restore: {exc}",
@@ -444,7 +451,7 @@ class ProfilesMixin:
         if undo is not None:
             undo.configure(state="disabled")
         self.status.set(
-            "Previous control layouts restored for all consoles. "
+            f"Previous layouts restored for {len(prior)} consoles. "
             "Object input remains paused."
         )
 

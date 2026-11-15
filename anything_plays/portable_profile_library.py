@@ -6,6 +6,7 @@ preferences. Restores are parsed/validated completely before a UI confirmation.
 """
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -96,6 +97,27 @@ def changed_systems(current, incoming):
         if existing != restored:
             changed.append(system)
     return tuple(changed)
+
+
+def portable_restore_delta(current, incoming):
+    """Prepare ONLY changed console profiles for one atomic restore.
+
+    A portable backup is intentionally missing local-only fields, such as
+    zone_image and paths. Merge approved imported controls into deep copies
+    of the current profiles so restoring a backup never clears those local
+    settings. Omitting unchanged consoles also avoids rewriting them.
+    """
+    changed = changed_systems(current, incoming)
+    result = {}
+    for system in changed:
+        existing = copy.deepcopy(current[system])
+        existing_portable = make_bundle(system, existing)["profile"]
+        restored = sanitize_profile(system, incoming[system])
+        for key in existing_portable:
+            existing.pop(key, None)
+        existing.update(restored)
+        result[system] = existing
+    return result
 
 
 def load_library_archive(path):
