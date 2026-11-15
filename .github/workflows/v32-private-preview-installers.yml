@@ -285,8 +285,13 @@ jobs:
               timeout=120,
           )
           if task.returncode:
-              print(task.stderr[-4000:])
-              print(task.stdout[-1000:])
+              # The frozen process writes an explicit bounded error receipt.
+              # Print only exception type + safe source location, not host
+              # paths, ROMs, private profile data or raw Tk tracebacks.
+              from tools.v32_gui_failure_summary import summarize
+              import json
+              print(json.dumps(summarize(os.environ["AP_V30_UI_SMOKE_REPORT"]),
+                               sort_keys=True))
               raise SystemExit(f"Mounted 3.2 DMG frozen GUI exit: {task.returncode}")
           print("Verified actual signed mounted preview Tk executable started")
           PY
