@@ -170,7 +170,14 @@ def main():
                     assert app.cfg['multi_fish_enabled'] is True
                     assert app.cfg['color2_enabled'] is True
                     assert app.cfg['color2_player'] == 'Player 1'
-                    app.reset_profile()
+                    # Reset now requires explicit user confirmation.
+                    # This unattended GUI smoke approves it deliberately.
+                    with patch(
+                        "anything_plays.ui_profiles.messagebox.askyesno",
+                        return_value=True,
+                    ) as reset_confirmation:
+                        assert app.reset_profile() is True
+                    reset_confirmation.assert_called_once()
                     assert app.multi_fish_enabled.get() is False
                     assert app.color2_enabled.get() is False
                     assert app.view_mode.get() == "Windowed"
