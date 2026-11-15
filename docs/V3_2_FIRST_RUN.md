@@ -116,6 +116,18 @@ action auto-saved a change while calibration was open. This prevents a
 canceled sample from discarding an unrelated unsaved layout or unexpectedly
 committing it to the local profile store.
 
+## Transactional console-editor switching
+
+Reading controls from the editor now builds a complete candidate profile
+before replacing the active one. If a later numeric field is malformed, none
+of the earlier fields leak into a partially updated in-memory profile.
+
+The console switch also reads and validates the destination profile before
+saving or tearing down the previous game. If a destination read fails or its
+Tk controls cannot refresh, the selector returns to the previous console,
+the previous editor remains visible, and the game/Stream Mode view is not
+switched. No failed destination read can silently trigger emulator teardown.
+
 ## Profile save and console-switch recovery
 
 Changing consoles now commits the previous console's controls before leaving.

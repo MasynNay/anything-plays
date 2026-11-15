@@ -182,6 +182,12 @@ class ProfilesMixin:
         try:
             if not calibration_was_open:
                 self.read_settings(previous)
+            # Probe the destination while the previous profile and game
+            # window are still intact. A broken profile must not switch the
+            # picker, discard the editor, or close a running emulator.
+            incoming = self.profile_store.get(key)
+            if not isinstance(incoming, dict):
+                raise ValueError("Destination profile is invalid")
             self.profile_store.put(previous, self.cfg)
         except (ValueError, TypeError, tk.TclError, OSError):
             # Never discard an unsaved layout if storage is full/unavailable
@@ -193,13 +199,33 @@ class ProfilesMixin:
                 "Switch canceled; correct the settings or storage and retry."
             )
             return False
-        # External games have their own window. Close any blank game-only
-        # overlay only after the old console profile has been persisted.
+        # A damaged destination Tk profile can also fail while applying it.
+        # Keep game/video teardown and view transitions AFTER the new editor
+        # is ready, so a failed switch remains on the prior console.
+        old_editor = copy.deepcopy(self.cfg)
+        try:
+            self.cfg = incoming
+            self.refresh_settings()
+            self.refresh_system_buttons()
+        except (ValueError, TypeError, tk.TclError, RuntimeError):
+            self.system_key.set(previous)
+            self.cfg = old_editor
+            try:
+                self.refresh_settings()
+                self.refresh_system_buttons()
+            except (ValueError, TypeError, tk.TclError, RuntimeError):
+                # A failing Tcl widget should not turn recovery into another
+                # uncaught exception or close an otherwise usable game.
+                pass
+            self.status.set(
+                "Could not display the selected console controls. "
+                "Switch canceled; previous controls were retained."
+            )
+            return False
+        # External games have their own window. Change the overlay only
+        # after the incoming controls have been displayed successfully.
         if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
             self.set_view_mode("Windowed")
-        self.cfg = self.profile_store.get(key)
-        self.refresh_settings()
-        self.refresh_system_buttons()
         self._active_profile_system = key
         self.deactivate_manual()
         self.emu.stop()
@@ -248,38 +274,46 @@ class ProfilesMixin:
         self.refresh_color()
 
     def read_settings(self, system=None):
-        self.cfg['tolerance'] = max(1, min(90, int(self.tolerance.get())))
-        self.cfg['min_area'] = max(5, int(self.min_area.get()))
-        self.cfg['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
-        self.cfg['cooldown_ms'] = max(50, int(self.cooldown.get()))
-        self.cfg['mirror'] = self.mirror.get()
-        self.cfg['color2_enabled'] = bool(self.color2_enabled.get())
-        self.cfg['color2_player'] = (
+        """Validate every visible control before replacing the active cfg.
+
+        A malformed late spinbox must not leave a half-read mix of old and
+        new values in the live profile.
+        """
+        candidate = copy.deepcopy(self.cfg)
+        candidate['tolerance'] = max(1, min(90, int(self.tolerance.get())))
+        candidate['min_area'] = max(5, int(self.min_area.get()))
+        candidate['hold_frames'] = max(1, min(60, int(self.hold_frames.get())))
+        candidate['cooldown_ms'] = max(50, int(self.cooldown.get()))
+        candidate['mirror'] = self.mirror.get()
+        candidate['color2_enabled'] = bool(self.color2_enabled.get())
+        candidate['color2_player'] = (
             self.color2_player.get() if self.color2_player.get()
             in ('Player 1', 'Player 2') else 'Player 2'
         )
-        self.cfg['multi_fish_enabled'] = bool(self.multi_fish_enabled.get())
-        self.cfg['camera_input_mode'] = (
+        candidate['multi_fish_enabled'] = bool(self.multi_fish_enabled.get())
+        candidate['camera_input_mode'] = (
             self.camera_input_mode.get() if self.camera_input_mode.get()
             in ('Held while visible', 'Pulse (classic)')
             else 'Held while visible'
         )
-        self.cfg['zone_font_size'] = max(8, min(160, int(self.zone_font_size.get())))
-        self.cfg['zone_opacity'] = max(75, min(100, int(self.zone_opacity.get())))
-        self.cfg['zone_style'] = self.zone_style.get()
-        self.cfg['zone_border_width'] = max(2, min(16, int(self.zone_border_width.get())))
-        self.cfg['zone_label_position'] = self.zone_label_position.get()
-        self.cfg['shuffle_enabled'] = bool(self.shuffle_enabled.get())
-        self.cfg['zone_image'] = self.zone_image_path.get()
+        candidate['zone_font_size'] = max(8, min(160, int(self.zone_font_size.get())))
+        candidate['zone_opacity'] = max(75, min(100, int(self.zone_opacity.get())))
+        candidate['zone_style'] = self.zone_style.get()
+        candidate['zone_border_width'] = max(2, min(16, int(self.zone_border_width.get())))
+        candidate['zone_label_position'] = self.zone_label_position.get()
+        candidate['shuffle_enabled'] = bool(self.shuffle_enabled.get())
+        candidate['zone_image'] = self.zone_image_path.get()
         # The UI has fields for all console families; a portable profile
         # must contain mappings for the selected console only.
         # The combobox may already show the NEXT console during a switch.
         # Persist the old console's visible mappings under its own identity.
         selected = system if system in BUTTONS_BY_SYSTEM else self.system_key.get()
         allowed = BUTTONS_BY_SYSTEM[selected]
-        self.cfg['mapping'] = {
+        candidate['mapping'] = {
             name: self.mapping_vars[name].get() for name in allowed
         }
+
+        self.cfg = candidate
 
     def save_profile(self):
         """Export only portable control settings, never paths or ROM metadata."""
