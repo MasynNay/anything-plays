@@ -229,6 +229,9 @@ class ProfilesMixin:
         if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
             self.set_view_mode("Windowed")
         self._active_profile_system = key
+        prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
+        if callable(prepare):
+            prepare()
         self.deactivate_manual()
         self.emu.stop()
         self.stop_external_emulator()
