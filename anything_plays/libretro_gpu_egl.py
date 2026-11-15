@@ -237,6 +237,17 @@ class EGLFrameHost:
         w, h = bounded_dimensions(width, height, self.width, self.height)
         import numpy as np
 
+        # Dolphin may have left a GL error from earlier rendering. Drain a
+        # bounded set BEFORE our readback so an unrelated old error does not
+        # turn a valid game frame into a fatal new readback failure.
+        get_error = self._gl("glGetError", C.c_uint, [])
+        for _ in range(8):
+            if not get_error():
+                break
+        else:
+            self.last_gl_error = 1
+            raise RuntimeError("GPU readback OpenGL error")
+
         old_read = C.c_int()
         self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])(
             GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read)
@@ -256,7 +267,7 @@ class EGLFrameHost:
             self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
                 GL_READ_FRAMEBUFFER, old_read.value
             )
-        self.last_gl_error = self._gl("glGetError", C.c_uint, [])()
+        self.last_gl_error = get_error()
         if self.last_gl_error:
             # glReadPixels can fail without raising a Python exception. The
             # destination buffer remains zero-filled, which otherwise looks
