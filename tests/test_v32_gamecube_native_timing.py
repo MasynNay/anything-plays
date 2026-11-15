@@ -32,11 +32,27 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertAlmostEqual(sample["gpu_readback_share_of_native_run"], 0.031, places=3)
         self.assertEqual(sample["scheduler_wait_calls"], 1)
 
+    def test_scheduler_missed_deadlines_are_aggregate_and_do_not_change_pacing(self):
+        t = GameCubeNativeTiming()
+        t.record_lateness(0.004)  # Ignore minor timer jitter
+        t.record_lateness(0.012)
+        t.record_lateness(0.320, resynchronized=True)
+        snap = t.snapshot()
+        self.assertEqual(snap["scheduler_late_frames"], 2)
+        self.assertAlmostEqual(snap["scheduler_late_total_seconds"], 0.332)
+        self.assertEqual(snap["scheduler_late_max_ms"], 320.0)
+        self.assertEqual(snap["scheduler_resyncs"], 1)
+        self.assertEqual(snap["native_run_calls"], 0)
+        self.assertEqual(snap["scheduler_wait_calls"], 0)
+
     def test_bad_clock_data_never_produces_nan_or_unsafe_counter(self):
         t = GameCubeNativeTiming()
         for value in (float("nan"), float("inf"), float("-inf"), -1, None, "1"):
             t.record_native_run(value)
             t.record_wait(value)
+            t.record_lateness(value, resynchronized=True)
+        self.assertEqual(t.scheduler_late_frames, 0)
+        self.assertEqual(t.scheduler_resyncs, 0)
         self.assertEqual(t.native_run_calls, 0)
         self.assertEqual(t.scheduler_wait_calls, 0)
         snap = t.snapshot(gpu_readback_seconds=float("nan"))
@@ -55,7 +71,7 @@ class NativeLoopTimingTests(unittest.TestCase):
         for _ in range(10000):
             t.record_native_run(0.006)
         self.assertEqual(t.native_run_calls, 10000)
-        self.assertLessEqual(len(vars(t)), 9)
+        self.assertLessEqual(len(vars(t)), 13)
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):
@@ -137,6 +153,11 @@ class NativeLoopTimingTests(unittest.TestCase):
                 "audio_output_requested_frames": 22000,
                 "audio_output_underrun_frames": 1024,
                 "audio_queue_dropped_frames": 512,
+                "audio_output_device_underflow_callbacks": 3,
+                "scheduler_late_frames": 12,
+                "scheduler_late_total_seconds": 1.6,
+                "scheduler_late_max_ms": 320.0,
+                "scheduler_resyncs": 2,
                 "native_run_calls": 120,
                 "native_reported_core_fps": 59.7,
                 "native_run_loop_fps": 49.0,
@@ -157,6 +178,11 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertEqual(record["audio_output_requested_frames"], 22000)
         self.assertEqual(record["audio_output_underrun_frames"], 1024)
         self.assertEqual(record["audio_queue_dropped_frames"], 512)
+        self.assertEqual(record["audio_output_device_underflow_callbacks"], 3)
+        self.assertEqual(record["scheduler_late_frames"], 12)
+        self.assertEqual(record["scheduler_late_total_seconds"], 1.6)
+        self.assertEqual(record["scheduler_late_max_ms"], 320.0)
+        self.assertEqual(record["scheduler_resyncs"], 2)
         self.assertFalse(record["physical_speakers_tested"])
         self.assertEqual(record["native_run_loop_fps"], 49.0)
         self.assertEqual(record["gamecube_preview_capture_fps"], 5.8)
