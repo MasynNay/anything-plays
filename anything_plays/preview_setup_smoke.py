@@ -65,7 +65,7 @@ def _exercise_installed_control_archive(app, root):
     from anything_plays.portable_profile_library import (
         load_library_archive, save_library_archive,
     )
-    from anything_plays.portable_profiles import save_bundle
+    from anything_plays.portable_profiles import load_bundle, save_bundle
     from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 
     if app.cap is not None or app.armed or app._gamepad.api is not None:
@@ -80,6 +80,32 @@ def _exercise_installed_control_archive(app, root):
         archive = base / "all-console-controls.json"
         tampered = base / "invalid-archive.json"
         single_archive = base / "one-console-controls.json"
+        standalone_export = base / "selected-console-export.json"
+
+        # Export is a pure backup action. Verify the actual installed GUI
+        # does not attempt a second write to the local profile store.
+        with patch(
+            "anything_plays.ui_profiles.filedialog.asksaveasfilename",
+            return_value=str(standalone_export),
+        ), patch.object(
+            app.profile_store, "put",
+            side_effect=RuntimeError("Export attempted local profile write"),
+        ) as forbidden_write:
+            _click_button(root, "Export controls")
+        forbidden_write.assert_not_called()
+        if not standalone_export.is_file():
+            raise RuntimeError("Frozen Export controls created no portable file")
+        exported_one, _theme, legacy_one = load_bundle(
+            standalone_export, selected_system=selected,
+            allowed_themes=app.THEMES,
+        )
+        if legacy_one or not exported_one["zones"]:
+            raise RuntimeError("Frozen one-console export was not usable")
+        file_text = standalone_export.read_text("utf-8")
+        if any(key in file_text for key in (
+                "zone_image", "rom_directory", "controller_id",
+                "camera_frame", "saved_games")):
+            raise RuntimeError("Frozen one-console export leaked private fields")
 
         # These are real Tk buttons owned by the installed application, not
         # direct calls to a mocked profile-controller implementation.
@@ -579,5 +605,6 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
         "v32_control_archive_roundtrip_verified": control_archive_verified,
+        "v32_single_control_export_isolated": True,
         "v32_unsaved_shutdown_guard_verified": True,
     }

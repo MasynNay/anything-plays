@@ -29,6 +29,7 @@ REQUIRED_TRUE = (
     "v32_setup_gamepad_untouched",
     "v32_setup_still_disarmed",
     "v32_control_archive_roundtrip_verified",
+    "v32_single_control_export_isolated",
     "v32_unsaved_shutdown_guard_verified",
     "v32_setup_no_orphan_windows",
     "v32_setup_theme_traces_stable",

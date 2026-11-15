@@ -13,6 +13,7 @@ from anything_plays.portable_profiles import load_bundle
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import default_for
 from anything_plays.ui_profiles import ProfilesMixin
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 class Variable:
@@ -42,6 +43,9 @@ class Host:
 
 
 class ExportIsolationTests(unittest.TestCase):
+    def test_frozen_installer_requires_export_only_behavior(self):
+        self.assertIn("v32_single_control_export_isolated", REQUIRED_TRUE)
+
     def test_export_writes_portable_file_without_modifying_live_storage(self):
         with TemporaryDirectory() as td:
             target = Path(td) / "portable.json"

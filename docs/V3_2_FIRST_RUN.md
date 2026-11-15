@@ -62,7 +62,8 @@ controller or network connection.
 ## Backup export does not silently change local controls
 
 **Export controls** writes only the selected console's portable JSON backup.
-It does not save or mutate the active on-disk control profile. This means an
+It does not save or mutate the active on-disk control profile; the private
+frozen-installer GUI smoke explicitly checks that restriction. This means an
 unsaved editor layout can be safely exported even when local profile storage
 is unavailable, and a completed export is never mislabeled as a failure of
 another disk write. ROM paths, zone artwork, device identity and saves remain
