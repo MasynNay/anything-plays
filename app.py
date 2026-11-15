@@ -9,7 +9,6 @@ import copy
 import os
 import sys
 import tkinter as tk
-from tkinter import messagebox
 from anything_plays.gba_emulator import Emulator
 from anything_plays.systems import SYSTEMS
 from anything_plays.settings_defaults import DEFAULT
@@ -179,33 +178,12 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, Calibratio
         """Persist settings, release devices, and stop scheduling UI callbacks."""
         if self._closing:
             return
-        # Do not tear down callbacks, devices, or the window until the last
-        # editor save has succeeded. If storage is unavailable, the player
-        # must get an explicit chance to keep the editor open and retry.
-        # This also rolls back unfinished calibration before persistence.
         try:
             self.persist_on_exit()
         except (OSError, ValueError, TypeError, tk.TclError):
-            try:
-                discard = messagebox.askyesno(
-                    "Unsaved console controls",
-                    "Anything Plays could not save your current console "
-                    "controls. Closing now may lose your recent edits.\n\n"
-                    "Exit without saving?",
-                    parent=self.root,
-                )
-            except (tk.TclError, RuntimeError):
-                # If the dialog itself cannot open, never silently discard
-                # the unsaved profile as if shutdown had succeeded.
-                discard = False
-            if not discard:
-                self.status.set(
-                    "Exit canceled: console controls were not saved. "
-                    "Check profile storage and retry closing when ready."
-                )
+            if not self.confirm_unsaved_exit():
                 return False
         self._closing = True
-        # Stopping a camera manually or closing the app always cancels retries.
         self.cancel_camera_reconnect()
         for job_name in ("_camera_tick_job", "_game_tick_job",
                          "_gamepad_tick_job", "_updates_start_job", "_updates_repeat_job"):
@@ -219,8 +197,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, Calibratio
         pending_rom_scan = getattr(self, "_rom_scan_cancel", None)
         if pending_rom_scan is not None:
             pending_rom_scan.set()
-        # Cleanup each driver separately: a USB camera can fail while
-        # releasing without blocking native emulators or Tk shutdown.
         def cleanup(label, callback):
             try:
                 callback()

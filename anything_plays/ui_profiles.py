@@ -138,6 +138,30 @@ class ProfilesMixin:
             self.close_camera_calibration(restore=True)
         self.persist_system_profile()
 
+    def confirm_unsaved_exit(self):
+        """Protect unsaved console edits when final persistence fails.
+
+        Never leak exception text (which may contain private paths), and
+        never destroy the window if even the confirmation cannot be shown.
+        """
+        try:
+            discard = messagebox.askyesno(
+                "Unsaved console controls",
+                "Anything Plays could not save your current console "
+                "controls. Closing now may lose your recent edits.\n\n"
+                "Exit without saving?",
+                parent=self.root,
+            )
+        except (tk.TclError, RuntimeError):
+            discard = False
+        if not discard:
+            self.status.set(
+                "Exit canceled: console controls were not saved. "
+                "Check profile storage and retry closing when ready."
+            )
+            return False
+        return True
+
     def switch_system(self, event=None):
         calibration_was_open = getattr(self, '_calibration_window', None) is not None
         close_guide = getattr(self, 'close_camera_calibration', None)

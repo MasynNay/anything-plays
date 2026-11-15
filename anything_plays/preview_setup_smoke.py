@@ -555,7 +555,7 @@ def exercise_installed_preview_setup(app, root):
         app, "persist_on_exit",
         side_effect=OSError("private fake disk failure"),
     ), patch(
-        "app.messagebox.askyesno", return_value=False,
+        "anything_plays.ui_profiles.messagebox.askyesno", return_value=False,
     ) as decline:
         canceled = app.close()
     if (canceled is not False or decline.call_count != 1

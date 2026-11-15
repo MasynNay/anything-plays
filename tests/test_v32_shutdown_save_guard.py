@@ -45,7 +45,7 @@ class ShutdownSaveGuardTests(unittest.TestCase):
         app = fake_app()
         old_cap = app.cap
         app.persist_on_exit.side_effect = OSError("secret disk location")
-        with patch("app.messagebox.askyesno", return_value=False) as prompt:
+        with patch("anything_plays.ui_profiles.messagebox.askyesno", return_value=False) as prompt:
             self.assertFalse(app.close())
         prompt.assert_called_once()
         self.assertIn("Exit without saving?", prompt.call_args.args[1])
@@ -62,7 +62,7 @@ class ShutdownSaveGuardTests(unittest.TestCase):
         # Once the storage problem is resolved, closing again should succeed
         # without another prompt, and release all resources exactly once.
         app.persist_on_exit.side_effect = None
-        with patch("app.messagebox.askyesno") as prompt:
+        with patch("anything_plays.ui_profiles.messagebox.askyesno") as prompt:
             self.assertTrue(app.close())
         prompt.assert_not_called()
         self.assertTrue(app._closing)
@@ -73,18 +73,19 @@ class ShutdownSaveGuardTests(unittest.TestCase):
     def test_failed_save_and_explicit_approval_exit_with_normal_cleanup(self):
         app = fake_app()
         app.persist_on_exit.side_effect = OSError("simulated failed write")
-        with patch("app.messagebox.askyesno", return_value=True) as prompt:
+        capture = app.cap
+        with patch("anything_plays.ui_profiles.messagebox.askyesno", return_value=True) as prompt:
             self.assertTrue(app.close())
         prompt.assert_called_once()
         self.assertTrue(app._closing)
         app.root.destroy.assert_called_once()
-        app.cap.release.assert_called_once()
+        capture.release.assert_called_once()
         app.emu.stop.assert_called_once()
 
     def test_dialog_failure_does_not_silently_discard_editor(self):
         app = fake_app()
         app.persist_on_exit.side_effect = ValueError("invalid field")
-        with patch("app.messagebox.askyesno",
+        with patch("anything_plays.ui_profiles.messagebox.askyesno",
                    side_effect=RuntimeError("destroyed window")):
             self.assertFalse(app.close())
         self.assertFalse(app._closing)
@@ -93,7 +94,7 @@ class ShutdownSaveGuardTests(unittest.TestCase):
 
     def test_successful_save_does_not_show_close_prompt(self):
         app = fake_app()
-        with patch("app.messagebox.askyesno") as prompt:
+        with patch("anything_plays.ui_profiles.messagebox.askyesno") as prompt:
             self.assertTrue(app.close())
         prompt.assert_not_called()
         app.persist_on_exit.assert_called_once()

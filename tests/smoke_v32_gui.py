@@ -323,7 +323,7 @@ def smoke():
                             app, "persist_on_exit",
                             side_effect=OSError("private simulated disk full"),
                         ), patch(
-                            "app.messagebox.askyesno", return_value=False,
+                            "anything_plays.ui_profiles.messagebox.askyesno", return_value=False,
                         ) as decline:
                             assert app.close() is False
                         assert decline.call_count == 1
