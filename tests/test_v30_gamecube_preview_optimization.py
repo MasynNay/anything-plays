@@ -121,6 +121,36 @@ class PreviewRatePolicyTests(unittest.TestCase):
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
                 session.host.read_frame.assert_called_once()
 
+    def test_stop_during_readback_must_not_repaint_old_game(self):
+        session = object.__new__(GameCubeHardwareSession)
+        stale_frame = np.ones((4, 4, 3), dtype=np.uint8)
+        session.emulator = SimpleNamespace(
+            frame=stale_frame, frame_serial=9, lock=threading.Lock(),
+            stop_event=threading.Event(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+        )
+        def slow_return(_width, _height):
+            # Simulates Stop arriving while glReadPixels blocks.
+            session.emulator.stop_event.set()
+            return np.zeros((4, 4, 3), dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(side_effect=slow_return))
+        session.opengl_error = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        self.assertTrue(session.emulator.stop_event.is_set())
+        self.assertIs(session.emulator.frame, stale_frame)
+        self.assertEqual(session.emulator.frame_serial, 9)
+        self.assertEqual(session.hardware_frames, 0)
+        self.assertEqual(session.gpu_readback_calls, 1)
+        session.host.read_frame.assert_called_once()
+
     def test_failed_gpu_blocks_software_frame_fallback_and_redacts_driver(self):
         # The core may emit software callbacks while the native EGL host is
         # shutting down. A broken driver path must never re-enter Tk or leak
