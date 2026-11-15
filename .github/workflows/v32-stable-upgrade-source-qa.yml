@@ -340,10 +340,24 @@ jobs:
           New-Item -ItemType Directory -Force -Path $qa | Out-Null
           python -m tools.v32_stable_data_rehearsal seed --home $homeDir
           if ($LASTEXITCODE -ne 0) { throw 'Could not seed synthetic 3.1.1 data' }
+          # Exercise Inno's actual 3.1.1 -> 3.2 same-AppId upgrade
+          # transaction in one disposable installation directory, not just
+          # two isolated source app extractions.
+          $oldInstaller = (Resolve-Path 'baseline311/AnythingPlaysSetup-3.1.1.exe').Path
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $oldInstaller $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install original public 3.1.1 into CI' }
+          python -c "import sys; from pathlib import Path; from tools.verify_v31_rc import validate_staged_identity; validate_staged_identity(Path(sys.argv[1]),channel='v311_stable_candidate')" $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Original 3.1.1 app identity not installed' }
+          $exe = Join-Path $installed 'AnythingPlays.exe'
+          $oldExeHash = (Get-FileHash -Algorithm SHA256 $exe).Hash
           $installer = (Resolve-Path 'release/v32-stable-full-windows/AnythingPlaysSetup-3.2.0-fullupgradeqa1-PRIVATE-UPGRADE-QA.exe').Path
           python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $installed
-          if ($LASTEXITCODE -ne 0) { throw 'Could not extract full-native private 3.2 stable setup' }
-          $exe = Join-Path $installed 'AnythingPlays.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows in-place Inno 3.2 upgrade transaction failed' }
+          python -c "import sys; from pathlib import Path; from tools.verify_v31_rc import validate_staged_identity; validate_staged_identity(Path(sys.argv[1]),channel='v32_stable_candidate')" $installed
+          if ($LASTEXITCODE -ne 0) { throw 'In-place upgrade did not replace the old 3.1.1 app identity' }
+          if ((Get-FileHash -Algorithm SHA256 $exe).Hash -eq $oldExeHash) {
+            throw 'The original 3.1.1 executable was not updated in place'
+          }
           if (-not (Test-Path $exe)) { throw 'Windows stable full package has no executable' }
           $env:HOME = $homeDir
           $env:USERPROFILE = $homeDir
@@ -357,6 +371,19 @@ jobs:
           if ($run.ExitCode -ne 0) { throw 'Frozen 11-core 3.2 Windows stable app failed' }
           python -m tools.v32_stable_data_rehearsal verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
           if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows upgrade lost synthetic old data' }
+          $receipt = @{
+            schema_version = 1
+            source_revision = $env:QA_SOURCE_SHA
+            old_version = '3.1.1'
+            new_version = '3.2.0'
+            old_and_new_installed_in_same_directory = $true
+            actual_inno_upgrade_rehearsal_passed = $true
+            synthetic_old_data_preserved = $true
+            real_user_save_game_tested = $false
+            physical_hardware_tested = $false
+            public_release_approved = $false
+          }
+          $receipt | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 release/V32_PRIVATE_WINDOWS_INSTALLED_UPGRADE_RECEIPT.json
       - name: Assemble full-native stable-identity 3.2 Mac DMG privately
         if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
         shell: bash
@@ -438,6 +465,7 @@ jobs:
             release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+            release/V32_PRIVATE_WINDOWS_INSTALLED_UPGRADE_RECEIPT.json
             release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
             release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
             release/v32-stable-full-macos/V32_FULL_MACOS_QA_RECEIPT.json
