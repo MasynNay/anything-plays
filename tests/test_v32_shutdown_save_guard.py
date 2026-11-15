@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 import unittest
 
 from app import App
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 def fake_app():
@@ -37,6 +38,9 @@ def fake_app():
 
 
 class ShutdownSaveGuardTests(unittest.TestCase):
+    def test_installed_acceptance_requires_unsaved_close_safety(self):
+        self.assertIn("v32_unsaved_shutdown_guard_verified", REQUIRED_TRUE)
+
     def test_failed_save_and_declined_exit_leave_app_and_devices_intact(self):
         app = fake_app()
         old_cap = app.cap

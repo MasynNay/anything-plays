@@ -547,6 +547,25 @@ def exercise_installed_preview_setup(app, root):
     if app.cap is not None or app.armed is not False:
         raise RuntimeError("Core guidance changed camera input safety")
 
+    # A real packaged Tk app must remain alive when shutdown persistence
+    # fails and the player declines to lose unsaved camera-control edits.
+    # Use the actual App.close callback (with a synthetic disk failure);
+    # the frozen runner must retain this root for reporting afterward.
+    with patch.object(
+        app, "persist_on_exit",
+        side_effect=OSError("private fake disk failure"),
+    ), patch(
+        "app.messagebox.askyesno", return_value=False,
+    ) as decline:
+        canceled = app.close()
+    if (canceled is not False or decline.call_count != 1
+            or "Exit without saving?" not in decline.call_args.args[1]
+            or app._closing or not root.winfo_exists()):
+        raise RuntimeError("Frozen app discarded an unsaved profile on exit")
+    if (app.cap is not None or app.armed is not False
+            or app._gamepad.api is not None):
+        raise RuntimeError("Frozen shutdown guard unexpectedly activated devices")
+
     return {
         "v32_unbundled_core_launch_safe": True,
         "v32_setup_windows_verified": True,
@@ -560,4 +579,5 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
         "v32_control_archive_roundtrip_verified": control_archive_verified,
+        "v32_unsaved_shutdown_guard_verified": True,
     }
