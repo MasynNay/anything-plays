@@ -205,9 +205,12 @@ class ProfileStore:
         )
 
     def put(self, system, profile):
-        """Validate and persist a console profile without partial JSON writes."""
-        self.profiles[system] = normalize(system, profile, self.base)
-        write_json_atomically(self.path, self.profiles)
+        """Persist one console using the same transactional bulk-write path.
+
+        A disk-full or permission failure must never poison the in-memory
+        cache and cause the next successful save to persist rejected changes.
+        """
+        self.put_many({system: profile})
 
     def put_many(self, profiles):
         """Commit a full set of console profiles in one atomic file write.

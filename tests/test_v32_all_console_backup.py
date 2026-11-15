@@ -105,6 +105,94 @@ class AllConsoleBackupTests(unittest.TestCase):
                 stored.put_many({"gb": None})
             self.assertEqual(stored.path.read_bytes(), before)
 
+    def test_single_console_disk_failure_does_not_poison_later_profile_save(self):
+        with TemporaryDirectory() as td:
+            path = Path(td) / "profiles.json"
+            store = ProfileStore(path, DEFAULT)
+            original_gba = store.get("gba")
+            original_gb = store.get("gb")
+            gba_changed = copy.deepcopy(original_gba)
+            gba_changed["tolerance"] = 77
+            with patch(
+                "anything_plays.system_profiles.write_json_atomically",
+                side_effect=OSError("disk full"),
+            ), self.assertRaises(OSError):
+                store.put("gba", gba_changed)
+            self.assertEqual(store.get("gba"), original_gba)
+            self.assertFalse(path.exists())
+            gb_changed = copy.deepcopy(original_gb)
+            gb_changed["tolerance"] = 31
+            store.put("gb", gb_changed)
+            fresh = ProfileStore(path, DEFAULT)
+            self.assertEqual(fresh.get("gb")["tolerance"], 31)
+            self.assertEqual(fresh.get("gba"), original_gba)
+            self.assertEqual(store.get("gba"), original_gba)
+
+    def test_single_console_rejects_unknown_key_without_creating_state(self):
+        with TemporaryDirectory() as td:
+            path = Path(td) / "profiles.json"
+            store = ProfileStore(path, DEFAULT)
+            with self.assertRaises(ValueError):
+                store.put("../unexpected", default_for("gb", DEFAULT))
+            self.assertFalse(path.exists())
+            self.assertEqual(store.profiles, {})
+
+    def test_failed_mapping_save_rolls_back_control_and_visible_selection(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, val):
+                self.val = val
+            def get(self):
+                return self.val
+            def set(self, val):
+                self.val = val
+
+        class BrokenStore:
+            def put(self, _system, _profile):
+                raise OSError("private disk path is unavailable")
+
+        class Host:
+            system_key = Value("gba")
+            status = Value("")
+            mapping_vars = {"A": Value("B")}
+            cfg = {"mapping": {"A": "A"}}
+            profile_store = BrokenStore()
+
+        host = Host()
+        self.assertFalse(ProfilesMixin.update_button_mapping(host, "A"))
+        self.assertEqual(host.cfg["mapping"]["A"], "A")
+        self.assertEqual(host.mapping_vars["A"].get(), "A")
+        self.assertIn("not saved", host.status.get())
+        self.assertNotIn("private disk path", host.status.get())
+
+    def test_successful_mapping_save_persists_selected_control(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, val):
+                self.val = val
+            def get(self):
+                return self.val
+            def set(self, val):
+                self.val = val
+
+        with TemporaryDirectory() as td:
+            class Host:
+                system_key = Value("gb")
+                status = Value("")
+                mapping_vars = {"A": Value("B")}
+                cfg = default_for("gb", DEFAULT)
+                profile_store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            host = Host()
+            self.assertTrue(ProfilesMixin.update_button_mapping(host, "A"))
+            self.assertEqual(host.profile_store.get("gb")["mapping"]["A"], "B")
+            self.assertIn("mapping updated", host.status.get())
+            self.assertEqual(
+                ProfileStore(host.profile_store.path, DEFAULT).get("gb")["mapping"]["A"],
+                "B",
+            )
+
     def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
         source = (
             Path(__file__).resolve().parents[1]

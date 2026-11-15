@@ -80,9 +80,26 @@ class ProfilesMixin:
             messagebox.showwarning('Preferences', f'Could not save preferences: {exc}')
 
     def update_button_mapping(self, name):
-        self.cfg.setdefault('mapping', {})[name] = self.mapping_vars[name].get()
-        self.profile_store.put(self.system_key.get(), self.cfg)
-        self.status.set(f'{name} mapping updated. Use Fit buttons to grid to rearrange enabled zones.')
+        # The combobox already contains the new value when this callback runs.
+        # A failed profile write must restore both the selected row and the
+        # in-progress config; never tell the player a mapping was saved.
+        system = self.system_key.get()
+        previous = self.cfg.get('mapping', {}).get(name, name)
+        chosen = self.mapping_vars[name].get()
+        self.cfg.setdefault('mapping', {})[name] = chosen
+        try:
+            self.profile_store.put(system, self.cfg)
+        except (OSError, ValueError, TypeError):
+            self.cfg['mapping'][name] = previous
+            self.mapping_vars[name].set(previous)
+            self.status.set(
+                'Button mapping was not saved. Check profile storage and retry.'
+            )
+            return False
+        self.status.set(
+            f'{name} mapping updated. Use Fit buttons to grid to rearrange enabled zones.'
+        )
+        return True
 
     def refresh_system_buttons(self):
         names = BUTTONS_BY_SYSTEM[self.system_key.get()]
@@ -475,8 +492,9 @@ class ProfilesMixin:
                 self.apply_theme(theme)
             self.save_preferences()
         except Exception as exc:
-            # ProfileStore.put updates its in-memory cache before the disk
-            # write. Always restore both copies on an interrupted apply.
+            # Storage writes are transactional, but a later theme/UI failure
+            # can still occur after the profile commit. Roll back that commit
+            # and the visible controls together.
             try:
                 self.profile_store.put(system, previous_saved)
             except OSError:
