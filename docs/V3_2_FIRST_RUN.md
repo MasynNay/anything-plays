@@ -126,7 +126,10 @@ The console switch also reads and validates the destination profile before
 saving or tearing down the previous game. If a destination read fails or its
 Tk controls cannot refresh, the selector returns to the previous console,
 the previous editor remains visible, and the game/Stream Mode view is not
-switched. No failed destination read can silently trigger emulator teardown.
+switched. No failed destination read can silently trigger emulator teardown. The
+four-platform installed-frozen-app smoke also injects a destination read
+failure and verifies the native system, prior controls and game identity
+remain unchanged in the real Tk interface.
 
 ## Profile save and console-switch recovery
 

@@ -446,6 +446,48 @@ def _exercise_installed_artwork_downloads(app):
     return True
 
 
+def _exercise_installed_failed_console_switch(app):
+    """An unreadable incoming console may not replace the running one.
+
+    Uses the real frozen App and Tcl selector, with an injected profile-store
+    read error. No ROM, native core, camera or controller is started.
+    """
+    import copy
+
+    previous = app.system_key.get()
+    incoming = "snes" if previous != "snes" else "gba"
+    app.read_settings(previous)
+    before = copy.deepcopy(app.cfg)
+    before_system = app.emu.system
+    before_description = app.system_description.cget("text")
+    before_rom = app.current_rom
+    with patch.object(
+        app.profile_store, "get",
+        side_effect=OSError("synthetic unavailable destination"),
+    ), patch.object(
+        app.emu, "stop",
+        side_effect=AssertionError("Failed switch stopped the current game"),
+    ) as no_native_stop, patch.object(
+        app, "stop_external_emulator",
+        side_effect=AssertionError("Failed switch stopped external game"),
+    ) as no_external_stop:
+        app.system_key.set(incoming)
+        result = app.switch_system()
+    no_native_stop.assert_not_called()
+    no_external_stop.assert_not_called()
+    if result is not False or app.system_key.get() != previous:
+        raise RuntimeError("Failed frozen profile read changed selected console")
+    if app._active_profile_system != previous or app.emu.system != before_system:
+        raise RuntimeError("Failed frozen profile switch changed native system")
+    if app.system_description.cget("text") != before_description:
+        raise RuntimeError("Failed frozen switch changed the console label")
+    if app.current_rom != before_rom or app.cfg != before:
+        raise RuntimeError("Failed frozen switch discarded previous controls")
+    if app.cap is not None or app.armed or app._gamepad.api is not None:
+        raise RuntimeError("Failed console switch unexpectedly enabled input")
+    return True
+
+
 def _one_installed_setup_roundtrip(app, root):
     """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
@@ -538,6 +580,7 @@ def exercise_installed_preview_setup(app, root):
     original_traces = len(app.theme_name.trace_info())
     control_archive_verified = _exercise_installed_control_archive(app, root)
     private_artwork_verified = _exercise_installed_artwork_downloads(app)
+    rejected_switch_verified = _exercise_installed_failed_console_switch(app)
     if _live_toplevels(root) != original_windows:
         raise RuntimeError("Frozen control backup left a native Tk dialog")
     if len(app.theme_name.trace_info()) != original_traces:
@@ -704,6 +747,7 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_still_disarmed": True,
         "v32_control_archive_roundtrip_verified": control_archive_verified,
         "v32_console_artwork_isolation_verified": private_artwork_verified,
+        "v32_failed_console_switch_recovery_verified": rejected_switch_verified,
         "v32_single_control_export_isolated": True,
         "v32_unsaved_shutdown_guard_verified": True,
     }

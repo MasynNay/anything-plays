@@ -5,6 +5,7 @@ import unittest
 
 from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
 from anything_plays.ui_profiles import ProfilesMixin
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 class Value:
@@ -43,6 +44,9 @@ class FakeSwitchState:
 
 
 class ProfileConsoleSwitchTests(unittest.TestCase):
+    def test_frozen_preview_requires_rejected_switch_recovery(self):
+        self.assertIn("v32_failed_console_switch_recovery_verified", REQUIRED_TRUE)
+
     def test_failed_switch_reverts_selector_and_keeps_previous_editor(self):
         app = FakeSwitchState()
         app._active_profile_system = "gb"
