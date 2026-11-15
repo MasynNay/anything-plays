@@ -431,8 +431,29 @@ jobs:
           esac
           qa="$(mktemp -d /tmp/ap32-full-mac-data.XXXXXX)"
           volume="$(mktemp -d /tmp/ap32-full-mac-dmg.XXXXXX)"
-          trap 'hdiutil detach "$volume" >/dev/null 2>&1 || true; rm -rf "$qa"; rmdir "$volume" >/dev/null 2>&1 || true' EXIT
+          old_volume="$(mktemp -d /tmp/ap311-old-dmg.XXXXXX)"
+          trap 'hdiutil detach "$volume" >/dev/null 2>&1 || true; hdiutil detach "$old_volume" >/dev/null 2>&1 || true; rm -rf "$qa"; rmdir "$volume" "$old_volume" >/dev/null 2>&1 || true' EXIT
           python -m tools.v32_stable_data_rehearsal seed --home "$qa/home"
+          # Rehearse replacing the actual 3.1.1 application bundle with a
+          # 3.2 full-native app of the SAME name and bundle identifier.
+          # All paths live under a temporary CI directory.
+          old_dmg="baseline311/AnythingPlays-3.1.1-macos-${arch}.dmg"
+          old_mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$old_volume" "$old_dmg"; then old_mounted=1; break; fi
+            sleep "$((attempt * 3))"
+          done
+          test "$old_mounted" = 1
+          installed="$qa/Applications/AnythingPlays31.app"
+          mkdir -p "$qa/Applications"
+          ditto "$old_volume/AnythingPlays31.app" "$installed"
+          python - "$installed" <<'PY'
+          import sys
+          from pathlib import Path
+          from tools.verify_v31_rc import validate_staged_identity
+          validate_staged_identity(Path(sys.argv[1]), channel="v311_stable_candidate")
+          PY
+          old_hash="$(shasum -a 256 "$installed/Contents/MacOS/AnythingPlays" | cut -d' ' -f1)"
           dmg="release/v32-stable-full-macos/AnythingPlays-3.2.0-fullupgradeqa1-macos-${arch}.dmg"
           mounted=0
           for attempt in 1 2 3 4 5; do
@@ -440,7 +461,18 @@ jobs:
             sleep "$((attempt * 3))"
           done
           test "$mounted" = 1
-          app="$volume/AnythingPlays31.app"
+          test -x "$volume/AnythingPlays31.app/Contents/MacOS/AnythingPlays"
+          # A private Finder-style replacement only: never write /Applications.
+          rm -rf "$installed"
+          ditto "$volume/AnythingPlays31.app" "$installed"
+          app="$installed"
+          python - "$app" <<'PY'
+          import sys
+          from pathlib import Path
+          from tools.verify_v31_rc import validate_staged_identity
+          validate_staged_identity(Path(sys.argv[1]), channel="v32_stable_candidate")
+          PY
+          test "$(shasum -a 256 "$app/Contents/MacOS/AnythingPlays" | cut -d' ' -f1)" != "$old_hash"
           test -x "$app/Contents/MacOS/AnythingPlays"
           codesign --verify --verbose=2 "$app"
           HOME="$qa/home" USERPROFILE="$qa/home" \
@@ -456,6 +488,24 @@ jobs:
           python -m tools.v32_stable_data_rehearsal verify \
             --home "$qa/home" --report "$qa/full-installed-gui.json" \
             --output release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
+          python - "$arch" <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          item={
+              "schema_version":1,
+              "target":"macos-"+sys.argv[1],
+              "source_revision":os.environ["QA_SOURCE_SHA"],
+              "original_311_app_replaced_in_disposable_directory":True,
+              "new_full_native_320_bundle_identity_verified":True,
+              "synthetic_stable_data_preserved":True,
+              "real_user_game_saves_tested":False,
+              "hardware_tested":False,
+              "public_release_approved":False,
+          }
+          Path("release/V32_PRIVATE_MAC_REPLACEMENT_RECEIPT.json").write_text(
+              json.dumps(item,indent=2)+"\n","utf-8"
+          )
+          PY
       - name: Retain only exact SHA and identity receipts, NEVER an upgrade installer
         uses: actions/upload-artifact@v4
         with:
@@ -466,6 +516,7 @@ jobs:
             release/V32_PRIVATE_UPGRADE_DATA_RECEIPT.json
             release/V32_PRIVATE_UPGRADE_FULL_DATA_RECEIPT.json
             release/V32_PRIVATE_WINDOWS_INSTALLED_UPGRADE_RECEIPT.json
+            release/V32_PRIVATE_MAC_REPLACEMENT_RECEIPT.json
             release/v32-stable-full-linux/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
             release/v32-stable-full-windows/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
             release/v32-stable-full-macos/V32_FULL_MACOS_QA_RECEIPT.json
