@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 from anything_plays.shortcuts import DEFAULT_KEYS
 from anything_plays.ui_shortcuts import ShortcutsMixin
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 class ShortcutHost(ShortcutsMixin):
@@ -31,6 +32,9 @@ class ShortcutHost(ShortcutsMixin):
 
 
 class ShortcutPersistenceTests(unittest.TestCase):
+    def test_private_installers_require_keyboard_write_recovery(self):
+        self.assertIn("v32_keyboard_rejected_save_verified", REQUIRED_TRUE)
+
     def test_change_success_updates_only_active_console(self):
         app = ShortcutHost()
         new = app._save_shortcut_binding("gba", "A", "n")

@@ -582,6 +582,70 @@ def _exercise_installed_controller_write_failure(app):
     return True
 
 
+def _exercise_installed_keyboard_write_failure(app, root):
+    """Reject unsafe keyboard writes in the actual frozen Tk application.
+
+    No keyboard injection, gamepad, camera, ROM or external filesystem is
+    used. The one opened shortcut dialog is closed before normal setup QA.
+    """
+    import copy
+
+    system = app.system_key.get()
+    old_bindings = copy.deepcopy(app._shortcut_bindings)
+    prefs_before = (
+        app.preferences_path.read_bytes()
+        if app.preferences_path.exists() else None
+    )
+    app._shortcut_bindings[system] = {"A": "v"}
+    window = None
+    try:
+        app.configure_shortcuts()
+        root.update_idletasks()
+        window = _active_window(app, "_shortcut_window")
+        with patch(
+            "anything_plays.ui_profiles.write_json_atomically",
+            side_effect=OSError("simulated private keyboard save failure"),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showwarning",
+        ) as warning:
+            saved = app._save_shortcut_binding(system, "A", "n")
+        if saved is not False or warning.call_count != 1:
+            raise RuntimeError("Frozen keyboard shortcut falsely claimed a saved key")
+        if app._shortcut_bindings.get(system) != {"A": "v"}:
+            raise RuntimeError("Frozen rejected keyboard shortcut changed its mapping")
+
+        # Invoke the real keyboard reset button, not just its controller:
+        # the dialog must remain open if the settings write fails.
+        with patch(
+            "anything_plays.ui_profiles.write_json_atomically",
+            side_effect=OSError("simulated private keyboard reset failure"),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showwarning",
+        ) as warn_disk, patch(
+            "anything_plays.ui_shortcuts.messagebox.showwarning",
+        ) as warn_reset:
+            _click_button(window, "Reset this console's keys")
+        if warn_disk.call_count != 1 or warn_reset.call_count != 1:
+            raise RuntimeError("Frozen keyboard reset failed without clear warning")
+        if (not window.winfo_exists()
+                or app._shortcut_bindings.get(system) != {"A": "v"}):
+            raise RuntimeError("Frozen failed reset discarded keys or closed dialog")
+        prefs_after = (
+            app.preferences_path.read_bytes()
+            if app.preferences_path.exists() else None
+        )
+        if prefs_after != prefs_before:
+            raise RuntimeError("Frozen failed shortcut update changed preferences")
+    finally:
+        if window is not None and window.winfo_exists():
+            window.destroy()
+        app._shortcut_window = None
+        app._shortcut_bindings = old_bindings
+    if app.cap is not None or app.armed or app._gamepad.api is not None:
+        raise RuntimeError("Failed keyboard shortcut unexpectedly activated devices")
+    return True
+
+
 def _one_installed_setup_roundtrip(app, root):
     """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
@@ -676,6 +740,7 @@ def exercise_installed_preview_setup(app, root):
     private_artwork_verified = _exercise_installed_artwork_downloads(app)
     rejected_switch_verified = _exercise_installed_failed_console_switch(app)
     controller_failure_verified = _exercise_installed_controller_write_failure(app)
+    keyboard_failure_verified = _exercise_installed_keyboard_write_failure(app, root)
     if _live_toplevels(root) != original_windows:
         raise RuntimeError("Frozen control backup left a native Tk dialog")
     if len(app.theme_name.trace_info()) != original_traces:
@@ -845,6 +910,7 @@ def exercise_installed_preview_setup(app, root):
         "v32_console_artwork_isolation_verified": private_artwork_verified,
         "v32_failed_console_switch_recovery_verified": rejected_switch_verified,
         "v32_controller_remap_rejected_save_verified": controller_failure_verified,
+        "v32_keyboard_rejected_save_verified": keyboard_failure_verified,
         "v32_single_control_export_isolated": True,
         "v32_unsaved_shutdown_guard_verified": True,
     }
