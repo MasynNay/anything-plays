@@ -133,6 +133,10 @@ class NativeLoopTimingTests(unittest.TestCase):
                 "distinct_rgb_frame_hashes": 10,
                 "native_controller_polls": 2000,
                 "native_pcm_frame_samples": 5000,
+                "audio_output_callback_calls": 22,
+                "audio_output_requested_frames": 22000,
+                "audio_output_underrun_frames": 1024,
+                "audio_queue_dropped_frames": 512,
                 "native_run_calls": 120,
                 "native_reported_core_fps": 59.7,
                 "native_run_loop_fps": 49.0,
@@ -149,6 +153,11 @@ class NativeLoopTimingTests(unittest.TestCase):
         record = safe_evidence("gamecube", raw, 0, False)
         self.assertTrue(record["native_probe_verified"])
         self.assertEqual(record["native_run_calls"], 120)
+        self.assertEqual(record["audio_output_callback_calls"], 22)
+        self.assertEqual(record["audio_output_requested_frames"], 22000)
+        self.assertEqual(record["audio_output_underrun_frames"], 1024)
+        self.assertEqual(record["audio_queue_dropped_frames"], 512)
+        self.assertFalse(record["physical_speakers_tested"])
         self.assertEqual(record["native_run_loop_fps"], 49.0)
         self.assertEqual(record["gamecube_preview_capture_fps"], 5.8)
         self.assertEqual(record["raw_libretro_video_callbacks"], 150)
