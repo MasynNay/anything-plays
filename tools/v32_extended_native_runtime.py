@@ -286,6 +286,7 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "native_pcm_frame_samples", "native_pcm_nonzero_values",
         "audio_output_callback_calls", "audio_output_requested_frames",
         "audio_output_underrun_frames", "audio_queue_dropped_frames",
+        "audio_output_device_underflow_callbacks",
         "continuous_render_fps", "gpu_readback_calls",
         "gpu_readback_mean_ms", "gpu_readback_max_ms",
         "native_run_calls", "native_reported_core_fps",
@@ -298,6 +299,8 @@ def safe_evidence(profile, raw, exit_code, timed_out):
         "native_run_non_readback_mean_ms",
         "gpu_readback_share_of_native_run",
         "scheduler_wait_calls", "scheduler_wait_total_seconds",
+        "scheduler_late_frames", "scheduler_late_total_seconds",
+        "scheduler_late_max_ms", "scheduler_resyncs",
         "gpu_readback_fraction_elapsed", "native_rss_growth_mb",
     ):
         val = metrics.get(name)
