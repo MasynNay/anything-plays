@@ -391,18 +391,25 @@ class CameraMixin:
         tol = max(1, min(90, int(self.tolerance.get())))
         area = max(5, int(self.min_area.get()))
         limit = 16 if self.multi_fish_enabled.get() else 1
+        # Convert the camera frame to HSV once for both colors. HSV is
+        # read-only in locate_targets(), and overlays never touch it.
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         primary = locate_targets(
-            frame, self.cfg['rgb'], tol, area, max_targets=limit
+            frame, self.cfg['rgb'], tol, area, max_targets=limit, hsv=hsv
         )
         secondary = (
             locate_targets(
                 frame, self.cfg.get('rgb2', [255, 30, 180]),
-                tol, area, max_targets=limit,
+                tol, area, max_targets=limit, hsv=hsv,
             ) if self.color2_enabled.get() else []
         )
         mapping = {name: var.get() for name, var in self.mapping_vars.items()}
         active_zones = set()
         buttons = {0: set(), 1: set()}
+        # Draw contours only AFTER dispatching gameplay input. Rendering
+        # decorations is optional UI work and must never delay a button
+        # already detected in this camera frame.
+        annotations = []
         shuffle_seen = False
         second_player_allowed = self.system_key.get() in TWO_PLAYER_SYSTEMS
         second_player_requested = self.color2_player.get() == 'Player 2'
@@ -417,8 +424,7 @@ class CameraMixin:
                 second_player_allowed and self.external_input is None
             )
             for center, contour in matches:
-                cv2.circle(frame, center, 7, contour_color, -1)
-                cv2.drawContours(frame, [contour], -1, contour_color, 2)
+                annotations.append((center, contour, contour_color))
                 zone = zone_at(
                     center, (w, h), self.cfg['zones'], mapping,
                     self.shuffle_enabled.get(),
@@ -493,6 +499,9 @@ class CameraMixin:
         if callable(note):
             note(primary, mapping, (w, h))
 
+        for center, contour, contour_color in annotations:
+            cv2.circle(frame, center, 7, contour_color, -1)
+            cv2.drawContours(frame, [contour], -1, contour_color, 2)
         frame = self.render_zones(frame, active_zones)
         # Reuse this already-annotated camera frame in the OBS capture view.
         # No second VideoCapture instance, camera permissions or tracking run.
