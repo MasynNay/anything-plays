@@ -106,7 +106,10 @@ class ControllerPlacementContracts(unittest.TestCase):
             with self.subTest(group=group):
                 self.assertIn(group, ui)
         self.assertIn("command=close", ui)
-        self.assertIn("self._save_gamepad_binding(system, source, v.get())", ui)
+        # Manual remap must pass the Tk selector so a rejected preferences
+        # write can restore the previously displayed binding.
+        self.assertIn("self._save_gamepad_binding(", ui)
+        self.assertIn("system, source, v.get(), display_var=v,", ui)
 
     def test_keyboard_modal_links_to_right_card_not_duplicate_toggle(self):
         ui = self._load("anything_plays/ui_shortcuts.py")
