@@ -297,6 +297,29 @@ def _exercise_installed_control_archive(app, root):
             raise RuntimeError("Single-console Undo lost local data or old controls")
         if app.armed or app.cap is not None or app._gamepad.api is not None:
             raise RuntimeError("Single-console import activated gameplay devices")
+
+        # An atomic preference write can fail AFTER the control profile was
+        # stored. A strict import transaction must restore the old profile.
+        before_failed_import = app.profile_store.get(selected)
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(single_archive),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ), patch(
+            "anything_plays.ui_profiles.write_json_atomically",
+            side_effect=OSError("private simulated disk failure"),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showerror",
+        ) as save_failed:
+            _click_button(root, "Import controls")
+        if save_failed.call_count != 1:
+            raise RuntimeError("A failed preferences write was not reported")
+        if app.profile_store.get(selected) != before_failed_import:
+            raise RuntimeError("A failed preference write retained imported controls")
+        if app.armed or app.cap is not None or app._gamepad.api is not None:
+            raise RuntimeError("Failed preference write activated gameplay")
     return True
 
 

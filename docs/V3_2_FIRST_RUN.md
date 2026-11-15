@@ -59,6 +59,21 @@ These guarantees are exercised through pure unit tests and the actual
 frozen Tk Import controls and Undo import buttons, without a camera, game,
 controller or network connection.
 
+## Transaction-safe profile preferences and Undo recovery
+
+Import controls and Undo import now require their preference writes to
+succeed; a full disk or permission error is reported and triggers rollback
+of the control profile and visible theme rather than claiming the import or
+undo succeeded. Normal preference saving retains its existing nonfatal
+warning behavior.
+
+Undo all restore now also handles the case where the atomic profile write
+succeeds but refreshing the active Tk editor fails. It restores the saved
+profiles, returns the previous visible controls, retains the Undo snapshot,
+and reports an error. If rollback itself fails, it warns users to inspect
+control storage before continuing. The failure paths are covered by unit
+tests and an installed frozen Tk import/write-failure smoke.
+
 ## Profile save and console-switch recovery
 
 Changing consoles now commits the previous console's controls before leaving.

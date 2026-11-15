@@ -5,6 +5,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from anything_plays.ui_profiles import ProfilesMixin
 
 from anything_plays.portable_profiles import (
     FORMAT, MAX_FILE_BYTES, load_bundle, make_bundle, parse_bundle,
@@ -12,6 +15,43 @@ from anything_plays.portable_profiles import (
 )
 from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import default_for
+
+
+class PreferencesTransactionTests(unittest.TestCase):
+    def test_strict_preference_save_raises_for_import_rollback(self):
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+            def get(self):
+                return self.value
+        class App:
+            def read_preferences(self):
+                return {}
+        app = App()
+        app.theme_name = Variable("Dark")
+        app.system_key = Variable("gba")
+        app.rom_directories = {"gba": ""}
+        app._shortcut_bindings = {}
+        app.gamepad_enabled = Variable(False)
+        app._gamepad_bindings = {}
+        app.external_emulators = {}
+        app.n64_core_override = ""
+        app.n64_embedded = Variable(False)
+        app.gamecube_embedded = Variable(False)
+        app.gamecube_preview_mode = Variable("Disabled")
+        app.view_mode = Variable("Windowed")
+        app.volume_percent = Variable(60)
+        app._volume_before_mute = 60
+        app.preferences_path = Path("/unused/preference.json")
+        with patch("anything_plays.ui_profiles.write_json_atomically",
+                   side_effect=OSError("disk full")), patch(
+                       "anything_plays.ui_profiles.messagebox.showwarning"
+                   ) as warning:
+            with self.assertRaises(OSError):
+                ProfilesMixin.save_preferences(app, strict=True)
+            warning.assert_not_called()
+            ProfilesMixin.save_preferences(app)
+            warning.assert_called_once()
 
 
 class PortableProfilesTests(unittest.TestCase):

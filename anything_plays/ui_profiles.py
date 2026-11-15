@@ -45,7 +45,7 @@ class ProfilesMixin:
         paths = self.read_preferences().get('core_paths', {})
         return paths if isinstance(paths, dict) else {}
 
-    def save_preferences(self, core_path=None):
+    def save_preferences(self, core_path=None, *, strict=False):
         prefs = self.read_preferences()
         prefs['theme'] = self.theme_name.get()
         prefs['system'] = self.system_key.get()
@@ -79,6 +79,11 @@ class ProfilesMixin:
         try:
             write_json_atomically(self.preferences_path, prefs)
         except OSError as exc:
+            # Explicit import/undo transactions need the failure to reach
+            # their rollback handler; routine preference updates still show
+            # a nonfatal warning as before.
+            if strict:
+                raise
             messagebox.showwarning('Preferences', f'Could not save preferences: {exc}')
 
     def update_button_mapping(self, name):
@@ -493,15 +498,45 @@ class ProfilesMixin:
             ):
                 self.status.set("Undo canceled; newer control edits were kept.")
                 return
+        # A committed disk write followed by a failed Tk refresh must not
+        # leave the application with half-applied undo state. Keep both the
+        # durable profiles and the unsaved active editor values for rollback.
+        saved_before = {
+            system: self.profile_store.get(system) for system in prior
+        }
+        active_before = copy.deepcopy(self.cfg) if selected in prior else None
         self.stop_controls()
+        committed = False
         try:
             self.profile_store.put_many(changes)
+            committed = True
             if selected in prior:
                 self.cfg = self.profile_store.get(selected)
                 self.refresh_settings()
-        except (OSError, ValueError, TypeError, tk.TclError) as exc:
+        except (OSError, ValueError, TypeError, tk.TclError, RuntimeError):
+            rollback_failed = False
+            if committed:
+                try:
+                    self.profile_store.put_many(saved_before)
+                except (OSError, ValueError, TypeError):
+                    rollback_failed = True
+            if active_before is not None:
+                self.cfg = active_before
+                try:
+                    self.refresh_settings()
+                except (ValueError, TypeError, tk.TclError):
+                    pass
+            self.status.set(
+                "Undo failed; check the saved console controls before playing."
+                if rollback_failed else
+                "Undo was not completed. Previous controls are still available."
+            )
             messagebox.showerror(
-                "Undo all restore", f"Could not undo control restore: {exc}",
+                "Undo all restore",
+                "Undo could not finish. Check profile storage before retrying."
+                if rollback_failed else
+                "Undo could not finish; your imported layouts were restored. "
+                "You can retry the Undo.",
                 parent=self.root,
             )
             return
@@ -581,7 +616,7 @@ class ProfilesMixin:
             if theme is not None and theme != previous_theme:
                 self.theme_name.set(theme)
                 self.apply_theme(theme)
-            self.save_preferences()
+            self.save_preferences(strict=True)
         except Exception as exc:
             try:
                 self.profile_store.put(system, previous_saved)
@@ -685,7 +720,7 @@ class ProfilesMixin:
             if theme_was_imported and current_theme != prior_theme:
                 self.theme_name.set(prior_theme)
                 self.apply_theme(prior_theme)
-            self.save_preferences()
+            self.save_preferences(strict=True)
         except (OSError, ValueError, TypeError, tk.TclError) as exc:
             try:
                 self.profile_store.put(system, previous_saved)

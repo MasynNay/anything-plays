@@ -345,6 +345,72 @@ class AllConsoleBackupTests(unittest.TestCase):
             changed_systems(baseline, tampered)
         self.assertEqual(incoming, original)
 
+    def test_failed_tk_refresh_rolls_back_committed_all_console_undo(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        from anything_plays.system_profiles import ProfileStore
+        from anything_plays.settings_defaults import DEFAULT
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+            def get(self):
+                return self.value
+            def set(self, value):
+                self.value = value
+
+        class FakeButton:
+            def __init__(self):
+                self.state = "normal"
+            def configure(self, **kwargs):
+                self.state = kwargs["state"]
+
+        with TemporaryDirectory() as root:
+            store = ProfileStore(Path(root) / "profiles.json", DEFAULT)
+            before = store.get("gba")
+            applied = copy.deepcopy(before)
+            applied["tolerance"] = (
+                before["tolerance"] + 1 if before["tolerance"] < 90
+                else before["tolerance"] - 1
+            )
+            store.put("gba", applied)
+
+            class Host:
+                def __init__(self):
+                    self.profile_store = store
+                    self.system_key = Variable("gba")
+                    self.cfg = store.get("gba")
+                    self.root = None
+                    self.status = Variable("")
+                    self._calibration_window = None
+                    self._last_profile_archive_import = {"gba": before}
+                    self._last_profile_archive_applied = {"gba": applied}
+                    self._undo_all_profile_restore_button = FakeButton()
+                    self.refresh_attempts = 0
+                    self.stops = 0
+                def read_settings(self):
+                    pass
+                def stop_controls(self):
+                    self.stops += 1
+                def refresh_settings(self):
+                    self.refresh_attempts += 1
+                    if self.refresh_attempts == 1:
+                        raise RuntimeError("synthetic Tk refresh failure")
+
+            host = Host()
+            # A refresh can fail for reasons other than an invalid Tk
+            # input value. It must still trigger the durable rollback.
+            with patch("anything_plays.ui_profiles.messagebox.showerror") as error:
+                ProfilesMixin.undo_all_profile_restore(host)
+            self.assertEqual(error.call_count, 1)
+            self.assertEqual(host.profile_store.get("gba"), applied)
+            self.assertEqual(host.cfg, applied)
+            self.assertEqual(host._last_profile_archive_import, {"gba": before})
+            self.assertEqual(host._undo_all_profile_restore_button.state, "normal")
+            self.assertEqual(host.stops, 1)
+            self.assertEqual(host.refresh_attempts, 2)
+
     def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
         source = (
             Path(__file__).resolve().parents[1]
