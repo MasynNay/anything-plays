@@ -59,6 +59,18 @@ These guarantees are exercised through pure unit tests and the actual
 frozen Tk Import controls and Undo import buttons, without a camera, game,
 controller or network connection.
 
+## Exit protection when profile storage fails
+
+When closing the 3.2 preview, the app first attempts to persist the current
+console's control settings and safely cancels unfinished calibration. If the
+profile disk is full, read-only, or contains invalid values, an explicit
+confirmation asks whether to **Exit without saving**. Declining leaves
+the window, control editor, and device lifecycle intact so the user can
+correct settings and retry. Approving performs the normal device cleanup and
+exits, with the risk of losing unsaved edits explained. Shutdown errors never
+include private filesystem paths in the confirmation. A normal successful
+close still presents no extra dialog.
+
 ## Theme changes can no longer truncate preferences
 
 Changing the theme now updates `preferences.json` through a staged,

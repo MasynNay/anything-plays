@@ -315,6 +315,24 @@ def smoke():
                         assert app._quick_start_window is None
                         assert not app.armed
                         assert app._gamepad.api is None
+
+                        # A failed final profile write must not close the
+                        # actual Tk window or stop native drivers unless the
+                        # player explicitly approves losing unsaved edits.
+                        with patch.object(
+                            app, "persist_on_exit",
+                            side_effect=OSError("private simulated disk full"),
+                        ), patch(
+                            "app.messagebox.askyesno", return_value=False,
+                        ) as decline:
+                            assert app.close() is False
+                        assert decline.call_count == 1
+                        assert "Exit without saving?" in decline.call_args.args[1]
+                        assert app.root.winfo_exists()
+                        assert not app._closing
+                        assert app.cap is None
+                        assert app._gamepad.api is None
+                        assert "Exit canceled" in app.status.get()
                     finally:
                         if app is not None:
                             app.close()
