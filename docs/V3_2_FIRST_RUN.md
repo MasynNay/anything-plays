@@ -59,6 +59,16 @@ These guarantees are exercised through pure unit tests and the actual
 frozen Tk Import controls and Undo import buttons, without a camera, game,
 controller or network connection.
 
+## Backup export does not silently change local controls
+
+**Export controls** writes only the selected console's portable JSON backup.
+It does not save or mutate the active on-disk control profile. This means an
+unsaved editor layout can be safely exported even when local profile storage
+is unavailable, and a completed export is never mislabeled as a failure of
+another disk write. ROM paths, zone artwork, device identity and saves remain
+excluded. To commit the editor layout locally, save or switch the console
+normally; exporting the portable file is a separate action.
+
 ## Exit protection when profile storage fails
 
 When closing the 3.2 preview, the app first attempts to persist the current

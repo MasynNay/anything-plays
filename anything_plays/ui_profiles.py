@@ -307,11 +307,14 @@ class ProfilesMixin:
         if not path:
             return
         try:
+            # Exporting a backup is a read-only operation on local
+            # profile storage. A successful backup must not turn into
+            # an apparent failure because the source settings disk is
+            # full or read-only.
             save_bundle(
                 path, self.system_key.get(), self.cfg,
                 theme=self.theme_name.get(), allowed_themes=self.THEMES,
             )
-            self.profile_store.put(self.system_key.get(), self.cfg)
         except (OSError, ValueError, TypeError) as exc:
             messagebox.showerror(
                 'Export controls', f'Could not export controls: {exc}',
@@ -319,8 +322,9 @@ class ProfilesMixin:
             )
             return
         self.status.set(
-            'Control profile exported. ROMs, personal paths, saves and '
-            'camera footage were not included.'
+            'Control profile exported. Local control settings were not '
+            'changed. ROMs, personal paths, saves and camera footage '
+            'were not included.'
         )
 
     def export_all_profiles(self):
