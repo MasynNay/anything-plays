@@ -90,6 +90,7 @@ class V32InstalledGuiAcceptanceTests(unittest.TestCase):
                 ("v32_settings_namespace", "anything-plays-31"),
                 ("console_profile_count", 1),
                 ("v32_setup_dialog_count", 39),
+                ("v32_control_archive_roundtrip_verified", False),
                 ("v32_setup_repeat_cycles", 7),
                 ("v32_unbundled_core_launch_safe", False),
                 ("v32_setup_no_orphan_windows", False),

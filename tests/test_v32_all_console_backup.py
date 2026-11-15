@@ -105,6 +105,27 @@ class AllConsoleBackupTests(unittest.TestCase):
                 stored.put_many({"gb": None})
             self.assertEqual(stored.path.read_bytes(), before)
 
+    def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "anything_plays/preview_setup_smoke.py"
+        ).read_text("utf-8")
+        required = (
+            "_exercise_installed_control_archive(app, root)",
+            '_click_button(root, "Back up all 18")',
+            '_click_button(root, "Restore all 18")',
+            '_click_button(root, "Undo all restore")',
+            'return_value=False',
+            'return_value=True',
+            'rejected.call_count != 1',
+            '"v32_control_archive_roundtrip_verified"',
+        )
+        for token in required:
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        from tools.verify_v32_installed_gui import REQUIRED_TRUE
+        self.assertIn("v32_control_archive_roundtrip_verified", REQUIRED_TRUE)
+
     def test_backup_ui_uses_atomic_full_set_and_disarms_controls(self):
         source = (Path(__file__).resolve().parents[1]
                   / "anything_plays/ui_profiles.py").read_text("utf-8")

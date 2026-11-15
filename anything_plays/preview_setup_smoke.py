@@ -52,6 +52,128 @@ def _live_toplevels(parent):
     return found
 
 
+def _exercise_installed_control_archive(app, root):
+    """Use actual frozen Tk buttons to test 18-profile backup/restore/undo.
+
+    All file pickers, confirmation dialogs and profiles are disposable. No
+    physical camera, controller, real ROM or stable settings are accessed.
+    """
+    import copy
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from anything_plays.portable_profile_library import (
+        load_library_archive, save_library_archive,
+    )
+    from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
+
+    if app.cap is not None or app.armed or app._gamepad.api is not None:
+        raise RuntimeError("Control backup smoke requires no active devices")
+
+    selected = app.system_key.get()
+    if selected not in BUTTONS_BY_SYSTEM:
+        raise RuntimeError("Frozen control backup has no selected console")
+
+    with TemporaryDirectory(prefix="ap32-private-archive-smoke-") as td:
+        base = Path(td)
+        archive = base / "all-console-controls.json"
+        tampered = base / "invalid-archive.json"
+
+        # These are real Tk buttons owned by the installed application, not
+        # direct calls to a mocked profile-controller implementation.
+        with patch(
+            "anything_plays.ui_profiles.filedialog.asksaveasfilename",
+            return_value=str(archive),
+        ):
+            _click_button(root, "Back up all 18")
+        if not archive.is_file():
+            raise RuntimeError("Frozen profile backup did not create a file")
+
+        exported = load_library_archive(archive)
+        if set(exported) != set(BUTTONS_BY_SYSTEM):
+            raise RuntimeError("Frozen backup omitted supported consoles")
+        raw = archive.read_text("utf-8")
+        for forbidden in ("rom_directory", "zone_image", "controller_id",
+                          "camera_frame", "saved_games"):
+            if forbidden in raw:
+                raise RuntimeError("Frozen backup contained nonportable state")
+
+        # Deliberately change the active profile and a second console.
+        # A batch restore must apply both, not only the visible console.
+        others = [name for name in BUTTONS_BY_SYSTEM if name != selected]
+        independent = others[-1]
+        modified = copy.deepcopy(exported)
+        for system in (selected, independent):
+            old = modified[system].get("tolerance", 20)
+            modified[system]["tolerance"] = old + 1 if old < 90 else old - 1
+        save_library_archive(archive, modified)
+
+        original = {
+            name: app.profile_store.get(name)
+            for name in BUTTONS_BY_SYSTEM
+        }
+        # The active console can have edited but not yet saved Tk controls.
+        app.read_settings()
+        original[selected] = copy.deepcopy(app.cfg)
+
+        tampered.write_text(raw[:-1] + ",", "utf-8")
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(tampered),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.showerror"
+        ) as rejected:
+            _click_button(root, "Restore all 18")
+        if rejected.call_count != 1:
+            raise RuntimeError("Corrupt full-profile backup was not rejected")
+        for name in BUTTONS_BY_SYSTEM:
+            if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
+                raise RuntimeError("Invalid backup changed saved control data")
+
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(archive),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=False,
+        ):
+            _click_button(root, "Restore all 18")
+        if app._undo_all_profile_restore_button.cget("state") != "disabled":
+            raise RuntimeError("Declined control restore enabled undo")
+        for name in BUTTONS_BY_SYSTEM:
+            if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
+                raise RuntimeError("Declined backup changed saved profiles")
+
+        with patch(
+            "anything_plays.ui_profiles.filedialog.askopenfilename",
+            return_value=str(archive),
+        ), patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ):
+            _click_button(root, "Restore all 18")
+
+        for name in BUTTONS_BY_SYSTEM:
+            expected = modified[name]["tolerance"]
+            if app.profile_store.get(name)["tolerance"] != expected:
+                raise RuntimeError("Full-profile restore did not apply atomically")
+        if (app.cfg["tolerance"] != modified[selected]["tolerance"]
+                or app._undo_all_profile_restore_button.cget("state") != "normal"
+                or app.armed):
+            raise RuntimeError("Frozen restore left incorrect live/undo state")
+
+        _click_button(root, "Undo all restore")
+        for name in BUTTONS_BY_SYSTEM:
+            if app.profile_store.get(name)["tolerance"] != original[name]["tolerance"]:
+                raise RuntimeError("Undo all did not restore previous profiles")
+        if (app.cfg["tolerance"] != original[selected]["tolerance"]
+                or app._undo_all_profile_restore_button.cget("state") != "disabled"
+                or app.armed or app.cap is not None
+                or app._gamepad.api is not None):
+            raise RuntimeError("Frozen restore undo changed devices or controls")
+    return True
+
+
 def _one_installed_setup_roundtrip(app, root):
     """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
@@ -140,8 +262,14 @@ def exercise_installed_preview_setup(app, root):
     if app.camera_name.get() or app.cap is not None or app.armed:
         raise RuntimeError("Camera refresh opened or armed a substitute device")
 
-    initial_windows = _live_toplevels(root)
+    original_windows = _live_toplevels(root)
     original_traces = len(app.theme_name.trace_info())
+    control_archive_verified = _exercise_installed_control_archive(app, root)
+    if _live_toplevels(root) != original_windows:
+        raise RuntimeError("Frozen control backup left a native Tk dialog")
+    if len(app.theme_name.trace_info()) != original_traces:
+        raise RuntimeError("Frozen control backup changed theme callbacks")
+    initial_windows = _live_toplevels(root)
     for round_number in range(SETUP_LIFECYCLE_ROUNDS):
         _one_installed_setup_roundtrip(app, root)
         root.update_idletasks()
@@ -282,4 +410,5 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_camera_untouched": True,
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
+        "v32_control_archive_roundtrip_verified": control_archive_verified,
     }
