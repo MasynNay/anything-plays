@@ -31,3 +31,21 @@ owner real-device/long-session verification and explicit release approval.
 
 [Exact acceptance evidence](../V3_2_RELEASE_ACCEPTANCE.md) ·
 [Private QA workflow](https://github.com/MasynNay/anything-plays/actions/runs/43728173563)
+
+## Full-native stable-upgrade software QA (not distributable)
+
+The separate exact-version 3.2.0 same-identity development channel passed
+[private workflow 43734522415](https://github.com/MasynNay/anything-plays/actions/runs/43734522415)
+on Linux, Windows, Intel Mac and Apple Silicon at source revision
+`9ce5ec322a202fc111aaa2036794ee6a129e0c10`. The workflow builds a
+source-authenticated 3.2 upgrade using the public stable 3.1.x package /
+installer / bundle identity, replaces only the original-source 11-core
+library set using SHA256-reviewed 3.1.1 files, and proves that an actual
+frozen application launch preserves a **synthetic** old GBA profile, ROM
+folder settings and fake save file. It never uploads its same-identity
+upgrade installers.
+
+This is not an installed real-user 3.1.1-to-3.2.0 migration, physical
+controller acceptance, commercial-game save test, or approval of third-party
+redistribution. Private full-native Preview installers remain the only
+3.2 packages offered for direct testing. Public 3.1.1 remains unchanged.

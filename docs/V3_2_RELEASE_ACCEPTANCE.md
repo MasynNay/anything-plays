@@ -14,7 +14,9 @@ remains the stable application.
 | Source revision | `9f6950bc2a532375d2da5a6011571c9af11cf828` |
 | Python 3.12/3.13, Tk and mGBA | [Run 43728173567](https://github.com/MasynNay/anything-plays/actions/runs/43728173567), passed |
 | Linux/Windows/Intel Mac/Apple Silicon frozen installed apps | [Run 43728173563](https://github.com/MasynNay/anything-plays/actions/runs/43728173563), all four passed |
-| Full-native inventory | 11 native core families, 18 console profiles |
+| Full-native private preview inventory | 11 native core families, 18 console profiles |
+| Same-identity full-native stable-upgrade QA | [Run 43734522415](https://github.com/MasynNay/anything-plays/actions/runs/43734522415), all four platforms passed at source `9ce5ec322a202fc111aaa2036794ee6a129e0c10` |
+| Synthetic 3.1.1 settings/save preservation | Passed actual frozen-app startup for all four private full-native upgrade packages; no real user saves tested |
 | Linux bounded original / pinned homebrew software smoke | 18/18 positive profiles |
 | Real physical webcam/controller, retail games and extended saves | Not verified |
 | Independent 3.2 distribution/source approval | Not approved |
@@ -24,8 +26,13 @@ The private installed artifacts include separate full-native QA bundles for
 GitHub Actions artifacts expire **November 22, 2026**, and contain exact-source
 installer hashes and frozen-GUI receipts. They retain the separate 3.2 preview
 installation identity and `anything-plays-32-preview` settings namespace.
-**They are not a stable 3.1.1-to-3.2 upgrade.** No old saves or settings are
-automatically imported, and no user ROMs or BIOS files are shipped.
+**These preview packages are not a stable 3.1.1-to-3.2 upgrade.** The
+separate unpublished same-identity upgrade QA workflow passed on all four
+operating systems with eleven original/native core families and synthetic
+prior 3.1.1 data. No old user saves or settings were imported from a real
+installation, and no user ROMs or BIOS files are shipped. For safety, the
+same-identity private upgrade installers are **not uploaded or distributed**;
+only original-source and frozen-app test receipts are retained.
 
 The 18 homebrew positives come from bounded Linux native software programs,
 not commercial games or hardware tests across every OS. GameCube's separate
@@ -44,15 +51,18 @@ source tests verify import/undo recovery under failed disk writes.
 
 ## Requirements before PUBLIC 3.2
 
-1. Build and test the **real 3.2.0 stable upgrade identity** for all four
-   operating systems, preserving the installed 3.1.1 settings, ROM libraries
-   and progress. The private `AP_V32_STABLE_CANDIDATE=1` build channel
-   now declares and statically checks the same Linux package/launcher,
-   Windows Inno AppId and macOS bundle identifier as 3.1.1, while embedding
-   an exact `v32_stable_candidate` identity. It is an **mGBA-only source
-   stage**, NOT a built, verified, full-native, safe-to-install upgrade yet.
-   Native package rehearsal and safe save/ROM migration testing remain due.
-   A side-by-side preview does not satisfy this gate.
+1. Complete and independently review the **real 3.1.1-to-3.2.0 upgrade**,
+   including a disposable OS-level old-then-new installer transaction and
+   actual save-game progress under representative native cores. The private
+   `AP_V32_STABLE_CANDIDATE=1` package now preserves the original Linux
+   package/launcher, Windows Inno AppId, and Mac bundle ID and carries all
+   eleven original native cores. [Run 43734522415](https://github.com/MasynNay/anything-plays/actions/runs/43734522415)
+   successfully checked the built packages and frozen launches on all four
+   platforms, including synthetic GBA profiles, ROM-directory preferences
+   and save-file canaries. However, those source-assembled installers were
+   not installed *over a real 3.1.1 installation* with its genuine game
+   progress. They remain unapproved, withheld, and not safe for public use.
+   A side-by-side preview alone does not satisfy this gate.
 2. Independently review full native-core redistribution rights, original
    notices, current Python/SDL/OpenCV runtime provenance, corresponding
    source/replacement rights, and finalized artifact SHA256 checksums.
