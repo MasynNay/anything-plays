@@ -524,7 +524,9 @@ class ProfilesMixin:
                 self.cfg = active_before
                 try:
                     self.refresh_settings()
-                except (ValueError, TypeError, tk.TclError):
+                except (ValueError, TypeError, tk.TclError, RuntimeError):
+                    # A repeatedly broken UI refresh should not re-raise
+                    # from the failure handler or consume the Undo snapshot.
                     pass
             self.status.set(
                 "Undo failed; check the saved console controls before playing."

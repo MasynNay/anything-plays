@@ -411,6 +411,19 @@ class AllConsoleBackupTests(unittest.TestCase):
             self.assertEqual(host.stops, 1)
             self.assertEqual(host.refresh_attempts, 2)
 
+            # A persistently broken widget can also throw while rollback
+            # tries to refresh it; the Undo button must remain usable.
+            def still_broken():
+                raise RuntimeError("synthetic permanent Tk widget failure")
+            host.refresh_settings = still_broken
+            with patch("anything_plays.ui_profiles.messagebox.showerror") as error:
+                ProfilesMixin.undo_all_profile_restore(host)
+            error.assert_called_once()
+            self.assertEqual(host.profile_store.get("gba"), applied)
+            self.assertEqual(host._last_profile_archive_import, {"gba": before})
+            self.assertEqual(host._undo_all_profile_restore_button.state, "normal")
+            self.assertIn("Undo was not completed", host.status.get())
+
     def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
         source = (
             Path(__file__).resolve().parents[1]
