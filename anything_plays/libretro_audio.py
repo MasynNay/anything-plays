@@ -47,6 +47,7 @@ class AudioSink:
         self.output_callback_calls = 0
         self.output_callback_requested_frames = 0
         self.output_underrun_frames = 0
+        self.output_device_underflow_callbacks = 0
         self.queue_dropped_frames = 0
         # AudioSink by itself is a transparent PCM sink for native testing.
         # CoreSession explicitly applies the user's 35% default or saved gain
@@ -187,6 +188,11 @@ class AudioSink:
         # with proof of audible playback on physical speakers.
         self.output_callback_calls += 1
         self.output_callback_requested_frames += frames
+        # PortAudio's output-underflow flag detects device scheduling
+        # problems independently of our own empty PCM queue. In particular,
+        # a healthy queue can still underrun at the speaker interface.
+        if status is not None and getattr(status, "output_underflow", False):
+            self.output_device_underflow_callbacks += 1
         outdata.fill(0)
         written = 0
         while written < frames:
@@ -221,6 +227,9 @@ class AudioSink:
             "audio_output_callback_calls": self.output_callback_calls,
             "audio_output_requested_frames": self.output_callback_requested_frames,
             "audio_output_underrun_frames": self.output_underrun_frames,
+            "audio_output_device_underflow_callbacks": (
+                self.output_device_underflow_callbacks
+            ),
             "audio_queue_dropped_frames": self.queue_dropped_frames,
         }
 
