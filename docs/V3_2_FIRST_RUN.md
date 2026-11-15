@@ -59,6 +59,15 @@ These guarantees are exercised through pure unit tests and the actual
 frozen Tk Import controls and Undo import buttons, without a camera, game,
 controller or network connection.
 
+## Theme changes can no longer truncate preferences
+
+Changing the theme now updates `preferences.json` through a staged,
+fsynced atomic replacement instead of directly truncating and rewriting the
+existing file. The theme still updates immediately in the interface. If the
+disk write fails, the old on-disk preferences survive intact and the status
+explains that the selected theme was not saved. Other preference fields are
+preserved. A malformed existing preferences file remains untouched.
+
 ## Transaction-safe profile preferences and Undo recovery
 
 Import controls and Undo import now require their preference writes to
