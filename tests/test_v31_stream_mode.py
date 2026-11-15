@@ -8,7 +8,7 @@ from PIL import Image
 
 from anything_plays.ui_stream import (
     DEFAULT_STREAM, LAYOUTS, StreamMixin, compose_stream_output,
-    stream_panel_boxes, validate_stream_settings,
+    stream_panel_boxes, stream_render_delay_ms, validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
 
@@ -65,6 +65,57 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(good["frame_rate"], "30 FPS")
         self.assertTrue(good["swap_screens"])
         self.assertFalse(good["show_labels"])
+
+    def test_stream_refresh_interval_compensates_render_cost_without_spin(self):
+        # The timer is based on the start of composition, not the end.
+        self.assertEqual(stream_render_delay_ms(67, 0.020), 47)
+        self.assertEqual(stream_render_delay_ms(42, 0.010), 32)
+        self.assertEqual(stream_render_delay_ms(33, 0.040), 8)
+        self.assertEqual(stream_render_delay_ms(33, 999), 8)
+        self.assertEqual(stream_render_delay_ms(42, -1), 42)
+        self.assertEqual(stream_render_delay_ms(42, float("nan")), 42)
+        self.assertEqual(stream_render_delay_ms(42, None), 42)
+
+    def test_render_tick_accounts_for_composition_time(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app._stream_render_tick = StreamMixin._stream_render_tick.__get__(app)
+        app._render_stream_frame = Mock()
+        app._stream_diagnostic = Mock()
+        app.root = Mock()
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(10.0, 10.020)):
+            app._stream_render_tick()
+        app.root.after.assert_called_once_with(22, app._stream_render_tick)
+        app._render_stream_frame.assert_called_once_with()
+        self.assertIsNotNone(app._stream_frame_job)
+
+    def test_stream_render_failure_keeps_backoff(self):
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app._render_stream_frame = Mock(side_effect=RuntimeError("broken preview"))
+        app._stream_diagnostic = Mock()
+        app.root = Mock()
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   return_value=10.0):
+            app._stream_render_tick()
+        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        self.assertEqual(app._stream_last_render, None)
 
     def test_pure_stacked_and_side_by_side_geometry_never_overlaps(self):
         for size, layout in (
