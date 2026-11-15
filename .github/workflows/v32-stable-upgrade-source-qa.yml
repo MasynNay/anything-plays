@@ -1,0 +1,181 @@
+name: 3.2 | Private stable-upgrade source package QA (no release)
+
+# This is a one-core SAME-INSTALL-IDENTITY build rehearsal only. It may
+# replace a 3.1.1 installation IF a person installs the candidate, so
+# NEVER upload/install it on user hardware. Hosted CI is disposable.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v32-stable-upgrade-source-qa.yml'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'packaging/**'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v32_stable_upgrade_source.py'
+      - 'tests/test_v32_upgrade_identity.py'
+      - 'tests/test_v32_upgrade_source_checker.py'
+      - 'requirements-build.txt'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v32-stable-upgrade-private-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  private-upgrade-source:
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/v3.2-integration' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.2-integration') }}
+    name: Same-install mGBA-only source QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            installer: release/anything-plays-31_3.2.0~upgradeqa1_amd64.deb
+            bundle: dist/AnythingPlays
+          - target: windows-x64
+            runner: windows-latest
+            installer: release/AnythingPlaysSetup-3.2.0-PRIVATE-UPGRADE-QA.exe
+            bundle: dist/AnythingPlays
+          - target: macos-arm64
+            runner: macos-15
+            installer: release/AnythingPlays-3.2.0-UPGRADE-QA-macos-arm64.dmg
+            bundle: dist/AnythingPlays31.app
+          - target: macos-x64
+            runner: macos-15-intel
+            installer: release/AnythingPlays-3.2.0-UPGRADE-QA-macos-x64.dmg
+            bundle: dist/AnythingPlays31.app
+    env:
+      AP_V32_STABLE_CANDIDATE: '1'
+      AP_V32_PREVIEW_BUILD: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact private source and exclusive stable-upgrade flag
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          test "$AP_RELEASE_BUILD" = 0
+          python - <<'PY'
+          import os
+          from anything_plays.build_identity import make_identity
+          from tools.write_v31_identity import choose_channel
+          assert choose_channel(os.environ) == "v32_stable_candidate"
+          identity = make_identity("v32_stable_candidate")
+          assert identity["settings_namespace"] == "anything-plays-31"
+          assert identity["public_release_approved"] is False
+          print("Private 3.2 original stable-upgrade identity only; release disabled")
+          PY
+          python -m unittest discover -s tests -p 'test_v32_upgrade_identity.py' -v
+          python -m unittest discover -s tests -p 'test_v32_upgrade_source_checker.py' -v
+      - name: Install Debian extraction and headless prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends dpkg-dev python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup not available' }
+      - name: Build Linux private 3.2 in-place-upgrade source stage
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build Windows private 3.2 in-place-upgrade source stage
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Build Mac private 3.2 in-place-upgrade source stage
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify real frozen source, native core scope and installer version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v32_stable_upgrade_source \
+            --target '${{ matrix.target }}' \
+            --installer '${{ matrix.installer }}' \
+            --bundle '${{ matrix.bundle }}' \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json
+      - name: Verify extracted real Linux DEB has same stable upgrade identity
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          dpkg-deb -x '${{ matrix.installer }}' "$tmp"
+          test -x "$tmp/opt/anything-plays-31/AnythingPlays"
+          python -m tools.verify_v32_stable_upgrade_source \
+            --target linux-x64 \
+            --installer '${{ matrix.installer }}' \
+            --bundle "$tmp/opt/anything-plays-31" \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
+      - name: Verify extracted actual Windows Inno setup uses 3.1.x app content
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = (Resolve-Path '${{ matrix.installer }}').Path
+          $dest = Join-Path $env:RUNNER_TEMP "AP32-upgrade-installed-$env:GITHUB_RUN_ID"
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $dest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not unpack genuine Inno installer' }
+          if (-not (Test-Path (Join-Path $dest 'AnythingPlays.exe'))) { throw 'Installed EXE missing' }
+          python -m tools.verify_v32_stable_upgrade_source --target windows-x64 --installer $installer --bundle $dest --source-sha $env:QA_SOURCE_SHA --output release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows extracted identity did not match source-stage contract' }
+      - name: Verify real mounted macOS DMG uses 3.1.x app bundle ID
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          volume="$(mktemp -d /tmp/ap32-upgrade-dmg.XXXXXX)"
+          trap 'hdiutil detach "$volume" >/dev/null 2>&1 || true; rmdir "$volume" >/dev/null 2>&1 || true' EXIT
+          mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$volume" '${{ matrix.installer }}'; then mounted=1; break; fi
+            sleep "$((attempt * 3))"
+          done
+          test "$mounted" = 1
+          codesign --verify --verbose=2 "$volume/AnythingPlays31.app"
+          python -m tools.verify_v32_stable_upgrade_source \
+            --target '${{ matrix.target }}' \
+            --installer '${{ matrix.installer }}' \
+            --bundle "$volume/AnythingPlays31.app" \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
+      - name: Retain only exact SHA and identity receipts, NEVER an upgrade installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2-PRIVATE-SAME-INSTALL-ID-SOURCE-QA-${{ matrix.target }}
+          path: |
+            release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json
+            release/V32_PRIVATE_UPGRADE_INSTALLED_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 7
