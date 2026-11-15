@@ -381,6 +381,13 @@ class LibraryMixin:
         self.current_rom = str(path)
         self._save_warning_until = 0
         try:
+            # Starting another ROM may happen without an explicit Unload.
+            # Stop the old native worker BEFORE clearing game-only and stream
+            # canvases; otherwise the previous game's pixels can remain on
+            # screen while the new native core initializes (or fails).
+            self.emu.stop()
+            from anything_plays.game_display_lifecycle import clear_game_video
+            clear_game_video(self)
             if not self.uses_embedded_emulator():
                 if not self.start_external_rom(str(path)):
                     return
