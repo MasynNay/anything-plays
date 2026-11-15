@@ -111,9 +111,14 @@ tests and an installed frozen Tk import/write-failure smoke.
 Changing consoles now commits the previous console's controls before leaving.
 If settings are invalid or the profile disk write fails, the selector returns
 to the previous console without discarding the in-progress editor values;
-camera gameplay stays disarmed. Reset controls also writes default settings
-before refreshing the editor. A failed reset retains the previous editor
-configuration instead of making an unsuccessful reset appear permanent.
+camera gameplay stays disarmed. Reset controls now asks for confirmation before discarding the selected
+console's portable camera-control edits. It resets layouts and detection
+settings without erasing local zone artwork, ROM directories or other private
+settings, even if a newer artwork path is only in the visible editor. A
+declined reset does not stop gameplay or write to storage; unfinished
+calibration blocks reset. Approved resets write defaults before refreshing
+the editor. A failed reset retains the previous editor configuration instead
+of making an unsuccessful reset appear permanent.
 
 ## Isolated preview zone artwork and safe grid saves
 

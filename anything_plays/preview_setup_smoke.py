@@ -66,7 +66,8 @@ def _exercise_installed_control_archive(app, root):
         load_library_archive, save_library_archive,
     )
     from anything_plays.portable_profiles import load_bundle, save_bundle
-    from anything_plays.system_profiles import BUTTONS_BY_SYSTEM
+    from anything_plays.system_profiles import BUTTONS_BY_SYSTEM, default_for
+    from anything_plays.settings_defaults import DEFAULT
 
     if app.cap is not None or app.armed or app._gamepad.api is not None:
         raise RuntimeError("Control backup smoke requires no active devices")
@@ -346,6 +347,40 @@ def _exercise_installed_control_archive(app, root):
             raise RuntimeError("A failed preference write retained imported controls")
         if app.armed or app.cap is not None or app._gamepad.api is not None:
             raise RuntimeError("Failed preference write activated gameplay")
+
+        # Reset only portable controls. The same actual installed Tk button
+        # must ask before discarding layout edits and retain local artwork.
+        reset_source = app.profile_store.get(selected)
+        reset_source["tolerance"] = (
+            69 if default_for(selected, DEFAULT)["tolerance"] != 69 else 68
+        )
+        reset_source["zone_image"] = "local-before-reset.png"
+        app.profile_store.put(selected, reset_source)
+        app.cfg = app.profile_store.get(selected)
+        app.refresh_settings()
+        app.zone_image_path.set("new-unsaved-local-artwork.png")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=False,
+        ) as declined_reset:
+            _click_button(root, "Reset controls")
+        if declined_reset.call_count != 1:
+            raise RuntimeError("Frozen reset did not request confirmation")
+        if app.profile_store.get(selected)["tolerance"] != reset_source["tolerance"]:
+            raise RuntimeError("Declined reset changed stored controls")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ) as accepted_reset:
+            _click_button(root, "Reset controls")
+        if accepted_reset.call_count != 1:
+            raise RuntimeError("Frozen reset did not require approval")
+        after_reset = app.profile_store.get(selected)
+        if (after_reset["tolerance"] != default_for(selected, DEFAULT)["tolerance"]
+                or after_reset.get("zone_image") != "new-unsaved-local-artwork.png"
+                or app.armed or app.cap is not None
+                or app._gamepad.api is not None):
+            raise RuntimeError("Frozen reset erased local artwork or activated input")
     return True
 
 

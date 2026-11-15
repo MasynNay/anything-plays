@@ -780,11 +780,38 @@ class ProfilesMixin:
         )
 
     def reset_profile(self):
-        """Only show reset defaults after a durable profile write succeeds."""
+        """Confirm resetting portable controls while retaining local-only data."""
         system = self.system_key.get()
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                "Reset controls",
+                "Finish or cancel camera calibration before resetting controls.",
+                parent=getattr(self, "root", None),
+            )
+            return False
+        if not messagebox.askyesno(
+            "Reset console controls",
+            f"Reset {SYSTEMS[system].title} camera controls to their "
+            "original layout and detection settings?\n\n"
+            "Your custom zone artwork, ROM libraries, saved games, "
+            "controller preferences and other consoles will be kept.\n\n"
+            "Continue with reset?",
+            parent=getattr(self, "root", None),
+        ):
+            self.status.set("Reset canceled; current controls were kept.")
+            return False
         prior_ui = copy.deepcopy(self.cfg)
         prior_saved = self.profile_store.get(system)
-        candidate = default_for(system, DEFAULT)
+        # Zone artwork can have changed in Tk without being copied into cfg.
+        # Reset *controls*, not the player's local artwork or device paths.
+        local_profile = copy.deepcopy(prior_ui)
+        image_path = getattr(self, "zone_image_path", None)
+        if image_path is not None:
+            local_profile["zone_image"] = image_path.get()
+        candidate = merge_portable_profile(
+            system, local_profile,
+            make_bundle(system, default_for(system, DEFAULT))["profile"],
+        )
         self.stop_controls()
         committed = False
         try:
@@ -813,6 +840,6 @@ class ProfilesMixin:
             return False
         self.status.set(
             f"{SYSTEMS[system].title} controls reset to defaults. "
-            "Camera-controlled input remains stopped."
+            "Local artwork was kept; camera-controlled input remains stopped."
         )
         return True

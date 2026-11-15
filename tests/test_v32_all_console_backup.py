@@ -304,12 +304,100 @@ class AllConsoleBackupTests(unittest.TestCase):
 
         host = Host()
         original = copy.deepcopy(host.cfg)
-        self.assertFalse(ProfilesMixin.reset_profile(host))
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ):
+            self.assertFalse(ProfilesMixin.reset_profile(host))
         self.assertEqual(host.cfg, original)
         self.assertEqual(host.profile_store.get("gba"), original)
         self.assertEqual(host.refreshes, 0)
         self.assertEqual(host.stops, 1)
         self.assertIn("not saved", host.status.get())
+
+    def test_reset_keeps_local_artwork_paths_and_other_console_profiles(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            custom = default_for("gba", DEFAULT)
+            custom["tolerance"] = 67
+            custom["zone_image"] = "/private/original-artwork.png"
+            custom["rom_directory"] = "/private/roms"
+            custom["device_local_note"] = "keep me"
+            store.put("gba", custom)
+            other = store.get("snes")
+            other["tolerance"] = 61
+            store.put("snes", other)
+
+            class Value:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Host:
+                def __init__(self):
+                    self.system_key = Value("gba")
+                    self.zone_image_path = Value("/private/unsaved-artwork.png")
+                    self.cfg = store.get("gba")
+                    self.profile_store = store
+                    self.status = Value("")
+                    self._calibration_window = None
+                    self.stopped = 0
+                    self.refreshed = 0
+                def stop_controls(self):
+                    self.stopped += 1
+                def refresh_settings(self):
+                    self.refreshed += 1
+            app = Host()
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=False,
+            ) as declined:
+                self.assertFalse(ProfilesMixin.reset_profile(app))
+            declined.assert_called_once()
+            self.assertEqual(app.stopped, 0)
+            self.assertEqual(store.get("gba"), custom)
+            self.assertEqual(app.cfg["tolerance"], 67)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=True,
+            ) as approved:
+                self.assertTrue(ProfilesMixin.reset_profile(app))
+            approved.assert_called_once()
+            saved = store.get("gba")
+            defaults = default_for("gba", DEFAULT)
+            self.assertEqual(saved["zones"], defaults["zones"])
+            self.assertEqual(saved["mapping"], defaults["mapping"])
+            self.assertEqual(saved["tolerance"], defaults["tolerance"])
+            self.assertEqual(saved["zone_image"], "/private/unsaved-artwork.png")
+            self.assertEqual(saved["rom_directory"], "/private/roms")
+            self.assertEqual(saved["device_local_note"], "keep me")
+            self.assertEqual(store.get("snes"), other)
+            self.assertEqual(app.cfg, saved)
+            self.assertEqual(app.stopped, 1)
+            self.assertEqual(app.refreshed, 1)
+            self.assertIn("Local artwork was kept", app.status.get())
+
+    def test_reset_does_not_change_controls_during_calibration(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        class Value:
+            def get(self):
+                return "gba"
+        class Host:
+            system_key = Value()
+            _calibration_window = object()
+            root = None
+        app = Host()
+        with patch(
+            "anything_plays.ui_profiles.messagebox.showinfo",
+        ) as notice, patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+        ) as confirm:
+            self.assertFalse(ProfilesMixin.reset_profile(app))
+        notice.assert_called_once()
+        confirm.assert_not_called()
 
     def test_change_preview_identifies_only_changed_portable_console_settings(self):
         from anything_plays.portable_profile_library import changed_systems
