@@ -61,6 +61,8 @@ class ProfileConsoleSwitchTests(unittest.TestCase):
         app.set_view_mode = lambda mode: app.view_transitions.append(mode)
 
         class FailStore:
+            def get(self, _system):
+                return {"zones": {}, "mapping": {}}
             def put(self, system, profile):
                 self.attempt = (system, profile.copy())
                 raise OSError("full disk")
