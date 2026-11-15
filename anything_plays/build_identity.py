@@ -51,6 +51,17 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-32-preview",
         "public_release_approved": False,
     },
+    # Private source-only candidate for an actual 3.1.1 -> 3.2.0 upgrade.
+    # It deliberately reuses the stable 3.1.x namespace, so testing MUST
+    # happen under disposable CI homes, never in the user's live install.
+    # Selecting this marker never authorizes core redistribution or release.
+    "v32_stable_candidate": {
+        "version": "3.2.0",
+        "channel": "v32_stable_candidate",
+        "title": "Anything Plays 3.2",
+        "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
     "v311_candidate": {
         "version": "3.1.1",
         "channel": "v311_candidate",

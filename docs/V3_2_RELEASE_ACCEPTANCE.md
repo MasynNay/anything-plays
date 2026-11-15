@@ -46,7 +46,13 @@ source tests verify import/undo recovery under failed disk writes.
 
 1. Build and test the **real 3.2.0 stable upgrade identity** for all four
    operating systems, preserving the installed 3.1.1 settings, ROM libraries
-   and progress. A side-by-side preview does not satisfy this gate.
+   and progress. The private `AP_V32_STABLE_CANDIDATE=1` build channel
+   now declares and statically checks the same Linux package/launcher,
+   Windows Inno AppId and macOS bundle identifier as 3.1.1, while embedding
+   an exact `v32_stable_candidate` identity. It is an **mGBA-only source
+   stage**, NOT a built, verified, full-native, safe-to-install upgrade yet.
+   Native package rehearsal and safe save/ROM migration testing remain due.
+   A side-by-side preview does not satisfy this gate.
 2. Independently review full native-core redistribution rights, original
    notices, current Python/SDL/OpenCV runtime provenance, corresponding
    source/replacement rights, and finalized artifact SHA256 checksums.

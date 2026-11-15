@@ -108,12 +108,33 @@ if [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
   PACKAGE_NAME="anything-plays-31"
   INSTALL_ID="anything-plays-31"
 fi
+# Never-publish, in-place 3.2 stable-upgrade source candidate.
+# This REUSES the public 3.1.x Linux package and settings identity, so
+# it must only be installed inside a disposable CI root/home.
+if [[ "${AP_V32_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  for forbidden in AP_V31_PREVIEW AP_V31_RC AP_V31_RC2 \
+      AP_V31_FINAL_CANDIDATE AP_V311_CANDIDATE AP_V311_STABLE_CANDIDATE \
+      AP_V32_PREVIEW_BUILD AP_RELEASE_BUILD AP_V30_APPROVED_RELEASE \
+      AP_V30_STABLE_CANDIDATE AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL; do
+    [[ "${!forbidden:-0}" != "1" ]] || {
+      echo "3.2 upgrade source cannot mix release or trial flags: $forbidden" >&2
+      exit 1
+    }
+  done
+  [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || {
+    echo "Private 3.2 stable-upgrade source stage is mGBA only" >&2; exit 1
+  }
+  VERSION="3.2.0~upgradeqa1"
+  PACKAGE_NAME="anything-plays-31"
+  INSTALL_ID="anything-plays-31"
+fi
 # Isolated 3.2 owner-only QA package: mGBA only, no publication.
 if [[ "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
   for forbidden in AP_V31_PREVIEW AP_V31_RC AP_V31_RC2 \
       AP_V31_FINAL_CANDIDATE AP_V311_CANDIDATE AP_V311_STABLE_CANDIDATE \
       AP_RELEASE_BUILD AP_V30_APPROVED_RELEASE AP_V30_STABLE_CANDIDATE \
-      AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL; do
+      AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL \
+      AP_V32_STABLE_CANDIDATE; do
     [[ "${!forbidden:-0}" != "1" ]] || {
       echo "3.2 preview cannot combine legacy/release/core-trial flags: $forbidden" >&2
       exit 1
@@ -143,7 +164,7 @@ fi
 # Preserve stable source art and generate corrected test-only Linux icons.
 .build-venv/bin/python tools/render_v21_icon.py
 V31_IDENTITY_ARGS=()
-if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" ]]; then
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" || "${AP_V32_STABLE_CANDIDATE:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
   V31_IDENTITY_ARGS=(--add-data "build/v31_build_identity.json:assets")
 fi
@@ -464,6 +485,24 @@ if [[ "${AP_V311_STABLE_CANDIDATE:-0}" == "1" ]]; then
     "$PKG/usr/bin/$INSTALL_ID"
   sed -i \
     -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays 3.1.1@g' \
+    -e 's@Exec=anything-plays-30-preview@Exec=anything-plays-31@g' \
+    -e 's@Icon=anything-plays-preview@Icon=anything-plays-31@g' \
+    "$PKG/usr/share/applications/anything-plays-preview.desktop"
+  mv "$PKG/usr/share/applications/anything-plays-preview.desktop" \
+     "$PKG/usr/share/applications/anything-plays-31.desktop"
+  mv "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-preview.png" \
+     "$PKG/usr/share/icons/hicolor/256x256/apps/anything-plays-31.png"
+fi
+# Rehearse a true 3.1.1 -> 3.2.0 upgrade only in ephemeral CI, retaining
+# the public 3.1.x package, launcher, icon and settings namespace.
+if [[ "${AP_V32_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  sed -i \
+    -e 's@anything-plays-30-preview@anything-plays-31@g' \
+    -e 's@anything-plays-preview@anything-plays-31@g' \
+    -e 's@Anything Plays 3.0@Anything Plays 3.2@g' \
+    "$PKG/usr/bin/$INSTALL_ID"
+  sed -i \
+    -e 's@Name=Anything Plays 3.0 Preview@Name=Anything Plays 3.2@g' \
     -e 's@Exec=anything-plays-30-preview@Exec=anything-plays-31@g' \
     -e 's@Icon=anything-plays-preview@Icon=anything-plays-31@g' \
     "$PKG/usr/share/applications/anything-plays-preview.desktop"
