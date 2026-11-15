@@ -616,17 +616,20 @@ def _exercise_installed_keyboard_write_failure(app, root):
 
         # Invoke the real keyboard reset button, not just its controller:
         # the dialog must remain open if the settings write fails.
+        # Both modules use tkinter.messagebox, so capture its shared
+        # warning function once; the disk error and retry guidance must
+        # both be visible, not accidentally shadowed by nested patches.
         with patch(
             "anything_plays.ui_profiles.write_json_atomically",
             side_effect=OSError("simulated private keyboard reset failure"),
         ), patch(
             "anything_plays.ui_profiles.messagebox.showwarning",
-        ) as warn_disk, patch(
-            "anything_plays.ui_shortcuts.messagebox.showwarning",
-        ) as warn_reset:
+        ) as warnings:
             _click_button(window, "Reset this console's keys")
-        if warn_disk.call_count != 1 or warn_reset.call_count != 1:
-            raise RuntimeError("Frozen keyboard reset failed without clear warning")
+        if (warnings.call_count != 2
+                or warnings.call_args_list[0].args[0] != "Preferences"
+                or warnings.call_args_list[1].args[0] != "Shortcut defaults not saved"):
+            raise RuntimeError("Frozen keyboard reset failed without clear warnings")
         if (not window.winfo_exists()
                 or app._shortcut_bindings.get(system) != {"A": "v"}):
             raise RuntimeError("Frozen failed reset discarded keys or closed dialog")
