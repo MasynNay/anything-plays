@@ -108,6 +108,10 @@ class PreviewRatePolicyTests(unittest.TestCase):
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
                 self.assertTrue(session.emulator.stop_event.is_set())
                 self.assertIn(type(error).__name__, session.opengl_error)
+                self.assertEqual(
+                    session.opengl_error,
+                    f"GPU readback failed ({type(error).__name__})",
+                )
                 self.assertIs(session.emulator.frame, stale_frame)
                 self.assertEqual(session.emulator.frame_serial, 11)
                 self.assertEqual(session.hardware_frames, 0)
@@ -116,6 +120,40 @@ class PreviewRatePolicyTests(unittest.TestCase):
                 # a broken GL host or publish a frame after Stop.
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
                 session.host.read_frame.assert_called_once()
+
+    def test_failed_gpu_blocks_software_frame_fallback_and_redacts_driver(self):
+        # The core may emit software callbacks while the native EGL host is
+        # shutting down. A broken driver path must never re-enter Tk or leak
+        # native exception text containing private device identifiers.
+        from anything_plays.gba_emulator import CoreSession
+        session = object.__new__(GameCubeHardwareSession)
+        session.host = Mock(read_frame=Mock(side_effect=OSError(
+            "device /home/private/graphics-driver serial XYZ123 lost"
+        )))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=4, lock=threading.Lock(),
+            stop_event=threading.Event(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+        )
+        session.opengl_error = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        self.assertEqual(session.opengl_error, "GPU readback failed (OSError)")
+        self.assertNotIn("/home/", session.opengl_error)
+        self.assertNotIn("XYZ123", session.opengl_error)
+        with patch.object(CoreSession, "video") as native_fallback:
+            session.video(1, 4, 4, 12)  # native software RGB frame
+            native_fallback.assert_not_called()
+        self.assertEqual(session.raw_video_callbacks, 2)
+        self.assertEqual(session.emulator.frame_serial, 4)
+        session.host.read_frame.assert_called_once()
 
     def test_empty_or_malformed_gpu_pixels_are_rejected_safely(self):
         for malformed in (
