@@ -14,10 +14,23 @@ class LayoutMixin:
     and ``LayoutMixin.build``. They are not standalone widgets.
     """
 
+    def open_getting_started(self):
+        """Open the optional 3.2 setup launchpad without starting devices."""
+        from anything_plays.ui_quickstart import show_quick_start
+        return show_quick_start(self)
+
     def build(self):
         main = ttk.Frame(self.root, padding=18)
         main.pack(fill='both', expand=True)
-        ttk.Label(main, text='Anything Plays', style='Title.TLabel').pack(anchor='w')
+        heading = ttk.Frame(main)
+        heading.pack(fill='x')
+        ttk.Label(
+            heading, text='Anything Plays', style='Title.TLabel'
+        ).pack(side='left')
+        ttk.Button(
+            heading, text='Get started', command=self.open_getting_started,
+            style='Accent.TButton',
+        ).pack(side='right', padx=(10, 0))
         theme_row = ttk.Frame(main)
         theme_row.pack(anchor='e', pady=(0, 5))
         ttk.Label(theme_row, text='Theme:').pack(side='left', padx=(0, 6))

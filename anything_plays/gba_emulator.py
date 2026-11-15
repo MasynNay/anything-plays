@@ -30,6 +30,7 @@ from anything_plays.libretro_input import (
     BUTTONS, IDS, InputBuffer, TWO_PLAYER_SYSTEMS,
 )
 from anything_plays.libretro_save import SaveRAM, native_core_save_directory
+from anything_plays.preview_storage import is_v32_preview, preview_system_directory
 from anything_plays.libretro_state import LibretroRecoveryState
 from anything_plays.neopop_flash import check_cartridge_flash, InvalidNeoPopFlash
 from anything_plays.n64_software import SoftwareN64Options, find_parallel_n64_core
@@ -159,9 +160,13 @@ class CoreSession:
         if system in ("gamecube", "ngp", "ngpc"):
             save_folder = native_core_save_directory(self.rom, system)
             save_folder.mkdir(parents=True, exist_ok=True)
+        elif is_v32_preview():
+            # Some cores use GET_SAVE_DIRECTORY even when SRAM is handled
+            # elsewhere. The preview cannot write into stable's system area.
+            save_folder = preview_system_directory()
+            save_folder.mkdir(parents=True, exist_ok=True)
         else:
-            # Unused by generic SRAM-only cores. The native environment
-            # callback continues to point their save request at system_dir.
+            # Stable legacy system paths are deliberately unchanged.
             save_folder = Path.home() / ".config" / "anything-plays"
         self._save_dir_buffer = C.create_string_buffer(
             os.fsencode(str(save_folder))
@@ -176,6 +181,9 @@ class CoreSession:
             # the bundled Sys, other OS paths, and existing save locations.
             from anything_plays.gamecube_sys import writable_dolphin_system_directory
             folder = writable_dolphin_system_directory(self.core_path)
+        elif is_v32_preview():
+            # No 3.2 native core may write firmware/cache into public 3.0/3.1.
+            folder = preview_system_directory()
         elif sys.platform == "darwin":
             folder = Path.home() / "Library" / "Application Support" / "AnythingPlays"
         else:
@@ -385,9 +393,20 @@ class CoreSession:
 
             frame_number = 0
             next_frame = time.monotonic()
+            # GameCube alone records bounded timing counters. The native
+            # timing includes GPU callback/readback time; all other systems
+            # retain their historical loop without profiling overhead.
+            gamecube_timing = getattr(self, "native_run_timing", None)
+            if gamecube_timing is not None:
+                gamecube_timing.reported_core_fps = frames_per_second
             while not self.emulator.stop_event.is_set():
                 self.emulator.inputs.before_frame(self.emulator.armed)
+                native_start = time.perf_counter() if gamecube_timing else None
                 self.native.run()
+                if gamecube_timing:
+                    gamecube_timing.record_native_run(
+                        time.perf_counter() - native_start
+                    )
                 self.emulator.inputs.after_frame()
                 frame_number += 1
                 if frame_number % 300 == 0:
@@ -396,7 +415,12 @@ class CoreSession:
                 next_frame += 1 / frames_per_second
                 remaining = next_frame - time.monotonic()
                 if remaining > 0:
+                    wait_start = time.perf_counter() if gamecube_timing else None
                     self.emulator.stop_event.wait(remaining)
+                    if gamecube_timing:
+                        gamecube_timing.record_wait(
+                            time.perf_counter() - wait_start
+                        )
                 elif remaining < -0.25:
                     next_frame = time.monotonic()
             self.persist_game_progress()

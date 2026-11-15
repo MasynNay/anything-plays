@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   build-private-final-identity:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: Genuine 3.1.0 source identity | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -311,7 +311,7 @@ jobs:
     # One Ubuntu mirror/DNS failure must not discard authentic Windows/Mac
     # sources: every OS leg still must download its OWN source-stage artifact
     # and verify the exact recorded source revision and native core hashes.
-    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     needs: build-private-final-identity
     name: Original-core full FINAL | ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -499,7 +499,7 @@ jobs:
   installed-final-four-os:
     # Launch actual full 18-console frozen app on all four hosted operating
     # systems and audit isolated stable/RC1/RC2 preference directories.
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && needs.full-final-18-console.result == 'success' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number != 239 && github.event.pull_request.head.repo.full_name == github.repository && needs.full-final-18-console.result == 'success' && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     needs: full-final-18-console
     name: Installed 3.1.0 final identity GUI and preference isolation | all four native hosts
     uses: ./.github/workflows/v31-final-installed-desktop.yml

@@ -324,7 +324,15 @@ class LibraryMixin:
 
     def retry_current_rom(self):
         """Recover a failed/stalled native emulator without restarting the UI."""
-        path = self.current_rom or getattr(self.emu, "rom", None)
+        # In the 3.2 preview, the native worker may still remember a ROM
+        # after its session was stopped or a missing core was rejected.
+        # Only the explicitly selected current game is safe to retry.
+        # Preserve the published stable channel's existing fallback.
+        path = self.current_rom
+        if not path:
+            from anything_plays.preview_storage import is_v32_preview
+            if not is_v32_preview():
+                path = getattr(self.emu, "rom", None)
         if not path:
             self.game_status.set("Choose a game ROM before restarting.")
             return
@@ -338,14 +346,9 @@ class LibraryMixin:
         self.deactivate_manual()
         self.stop_controls()
         self.emu.stop()
-        with self.emu.lock:
-            self.emu.frame = None
+        from anything_plays.game_display_lifecycle import clear_game_video
+        clear_game_video(self)
         self.current_rom = None
-        self.game_photo = None
-        self.game_canvas.delete('all')
-        bezel = getattr(self, "game_bezel", None)
-        if bezel is not None:
-            bezel.set_active(False)
         self.game_status.set('No ROM loaded')
         self.show_library()
 
@@ -383,6 +386,32 @@ class LibraryMixin:
                 # restart; an already-loaded native DLL is never replaced.
                 self.emu.core_path = self.emu.find_system_core()
                 if not self.emu.core_path:
+                    # Public 3.1.1 contains the full approved console set,
+                    # but the 3.2 QA installer intentionally contains only
+                    # mGBA. An unbundled preview core is NOT file corruption.
+                    # Reject the attempted launch before opening any native
+                    # library, and return the user to the game shelf instead
+                    # of offering a Restart action that cannot succeed.
+                    from anything_plays.preview_storage import is_v32_preview
+                    if is_v32_preview():
+                        from anything_plays.setup_health import (
+                            preview_missing_core_guidance,
+                        )
+                        title, guidance = preview_missing_core_guidance(
+                            self.system_key.get()
+                        )
+                        # If a previous game was already running, a now-
+                        # missing core must also stop its worker and clear
+                        # stale video. Use the normal shutdown path so save
+                        # state, canvas, and native resources are released.
+                        self.unload_rom()
+                        self.game_status.set(title)
+                        messagebox.showinfo(
+                            "3.2 preview emulator availability",
+                            guidance,
+                            parent=self.root,
+                        )
+                        return
                     if self.system_key.get() == 'gamecube':
                         raise RuntimeError(
                             'The installed GameCube emulator or its required '

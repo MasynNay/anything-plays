@@ -142,6 +142,61 @@ class RealMGBASupport(unittest.TestCase):
                     self.assertFalse(errors, f"Core failed: {errors}")
                     self.assertEqual(save_file.read_bytes(), changed)
 
+                    # A successful first save does not prove continuity.
+                    # Simulate a completely new application/core session:
+                    # all Libretro memory is recreated and the saved SRAM
+                    # must be restored from the previous instance's bytes.
+                    reloaded_emu = Emulator()
+                    reloaded_emu.system = system
+                    reloaded_emu.core_path = find_core(system)
+                    reloaded = CoreSession(
+                        reloaded_emu, system, rom, reloaded_emu.core_path,
+                    )
+                    restart_errors = []
+
+                    def cold_restart():
+                        try:
+                            reloaded.run()
+                        except Exception as exc:
+                            restart_errors.append(exc)
+
+                    next_worker = threading.Thread(
+                        target=cold_restart, daemon=True,
+                    )
+                    next_worker.start()
+                    try:
+                        deadline = time.monotonic() + 5.0
+                        while (not reloaded_emu.running and not restart_errors
+                               and time.monotonic() < deadline):
+                            time.sleep(0.05)
+                        self.assertFalse(
+                            restart_errors, f"Cold startup failed: {restart_errors}",
+                        )
+                        self.assertTrue(
+                            reloaded_emu.running,
+                            "A new native core could not restart the prior cartridge",
+                        )
+                        self.assertIsNotNone(reloaded.save_ram)
+                        restored_ptr, restored_size = reloaded.save_ram._memory()
+                        self.assertTrue(restored_ptr)
+                        self.assertEqual(restored_size, len(changed))
+                        self.assertEqual(
+                            C.string_at(restored_ptr, restored_size), changed,
+                            "Native mGBA did not restore previous battery-backed progress",
+                        )
+                    finally:
+                        reloaded_emu.stop_event.set()
+                        next_worker.join(timeout=5.0)
+
+                    self.assertFalse(
+                        next_worker.is_alive(), "Cold-start native core did not exit",
+                    )
+                    self.assertFalse(restart_errors, f"Cold-start error: {restart_errors}")
+                    self.assertEqual(
+                        save_file.read_bytes(), changed,
+                        "A clean second start/shutdown modified unchanged progress",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

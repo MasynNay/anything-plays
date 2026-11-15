@@ -205,6 +205,28 @@ class ProfileStore:
         )
 
     def put(self, system, profile):
-        """Validate and persist a console profile without partial JSON writes."""
-        self.profiles[system] = normalize(system, profile, self.base)
-        write_json_atomically(self.path, self.profiles)
+        """Persist one console using the same transactional bulk-write path.
+
+        A disk-full or permission failure must never poison the in-memory
+        cache and cause the next successful save to persist rejected changes.
+        """
+        self.put_many({system: profile})
+
+    def put_many(self, profiles):
+        """Commit a full set of console profiles in one atomic file write.
+
+        Validate everything before changing the in-memory cache. A failure
+        leaves the prior stored data and disk file intact, so importing
+        eighteen control layouts can never persist only the first few.
+        """
+        if not isinstance(profiles, dict) or not profiles:
+            raise ValueError("Choose valid console profiles to restore.")
+        if any(key not in BUTTONS_BY_SYSTEM for key in profiles):
+            raise ValueError("Unknown console in profile restore.")
+        merged = copy.deepcopy(self.profiles)
+        for system, profile in profiles.items():
+            if not isinstance(profile, dict):
+                raise ValueError("Invalid control profile in restore.")
+            merged[system] = normalize(system, profile, self.base)
+        write_json_atomically(self.path, merged)
+        self.profiles = merged

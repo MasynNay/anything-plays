@@ -16,8 +16,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import tempfile
+import time
 
-from anything_plays.libretro_save import _fallback_path, _user_save_directory
+from anything_plays.libretro_save import (
+    _checked_native_save_path, _fallback_path, _user_save_directory,
+)
+from anything_plays.preview_storage import is_v32_preview
 
 MAGIC = b"AP30ST\0\1"
 MAX_STATE_BYTES = 64 * 1024 * 1024
@@ -48,8 +53,9 @@ def state_file_path(rom, system):
     if system not in ("ngp", "ngpc"):
         raise ValueError("Native resume states are supported only for NGP/NGPC")
     base = _fallback_path(rom)
-    return _user_save_directory() / "native-core" / "resume" / (
-        system + "-" + base.stem + ".apstate"
+    return _checked_native_save_path(
+        _user_save_directory() / "native-core" / "resume"
+        / (system + "-" + base.stem + ".apstate")
     )
 
 
@@ -94,10 +100,13 @@ class LibretroRecoveryState:
 
     def restore(self):
         """False for a new game; reject corruption before native unserialize."""
-        if not self.path.is_file():
-            return False
         if self.path.is_symlink():
             raise ValueError("Refusing symlinked native resume file")
+        _checked_native_save_path(self.path)
+        if not self.path.is_file():
+            return False
+        if is_v32_preview() and self.path.stat().st_nlink != 1:
+            raise ValueError("Preview recovery state cannot share a stable file")
         if self.path.stat().st_size > MAX_STATE_BYTES + MAX_HEADER_BYTES + 16:
             raise ValueError("Native resume file exceeds safe size limit")
         with self.path.open("rb") as stream:
@@ -150,22 +159,54 @@ class LibretroRecoveryState:
         if len(header) > MAX_HEADER_BYTES:
             raise ValueError("Native resume metadata exceeds limit")
         packet = MAGIC + len(header).to_bytes(4, "big") + header + payload
+        # Revalidate every preview-specific parent just before touching disk.
+        # Constructor-time path checks alone cannot protect from a later
+        # symlinked native-core/resume directory.
+        _checked_native_save_path(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.is_symlink():
             raise ValueError("Refusing to replace symlinked native resume")
-        temp = self.path.with_suffix(".apstate.tmp")
+        if (is_v32_preview() and self.path.is_file()
+                and self.path.stat().st_nlink != 1):
+            raise ValueError("Preview recovery state cannot share a stable file")
+        # Never use a fixed .apstate.tmp name. Two independent instances
+        # saving the same game could truncate one another's in-flight state
+        # or unlink a buffer the other is about to publish. A unique sibling
+        # on the same filesystem gives every writer its own complete packet.
+        temporary = None
         try:
-            if temp.is_symlink():
-                raise ValueError("Refusing symlinked temporary resume file")
-            with temp.open("wb") as stream:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=self.path.name + ".",
+                suffix=".tmp",
+                dir=self.path.parent,
+                delete=False,
+            ) as stream:
+                temporary = Path(stream.name)
                 stream.write(packet)
                 stream.flush()
                 os.fsync(stream.fileno())
-            temp.replace(self.path)
+            # Concurrent Windows instances can briefly hold the destination
+            # open while publishing their own checkpoint. Keep this writer's
+            # unique, fully flushed temporary file intact and retry only
+            # documented native access/sharing violations, with a strict
+            # bounded delay. Other storage errors must fail immediately so
+            # the previous committed checkpoint stays recoverable.
+            for attempt in range(5):
+                try:
+                    os.replace(temporary, self.path)
+                    break
+                except PermissionError as exc:
+                    code = getattr(exc, "winerror", None)
+                    if (os.name != "nt" or code not in (5, 32, 33)
+                            or attempt == 4):
+                        raise
+                    time.sleep(0.025 * (attempt + 1))
         finally:
-            try:
-                temp.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
         self._last_digest = digest
         return True

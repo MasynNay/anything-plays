@@ -1,4 +1,8 @@
-#ifdef V311QABuild
+#ifdef V32UpgradeQABuild
+  #define AppName "Anything Plays 3.2"
+#elif defined(V32PreviewBuild)
+  #define AppName "Anything Plays 3.2 Private Preview"
+#elif defined(V311QABuild)
   #define AppName "Anything Plays 3.1.1 Private QA"
 #elif defined(V31FinalBuild)
   #define AppName "Anything Plays 3.1"
@@ -17,7 +21,11 @@
   #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-#ifdef V311QABuild
+#ifdef V32UpgradeQABuild
+AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
+#elif defined(V32PreviewBuild)
+AppId={{A0C96EA2-921A-49AC-AD1E-05A86EE7E320}
+#elif defined(V311QABuild)
 AppId={{D2946CA0-E7F8-4667-B1C5-A7733F570311}
 #elif defined(V31FinalBuild)
 AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
@@ -35,7 +43,13 @@ AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-#ifdef V311QABuild
+#ifdef V32UpgradeQABuild
+DefaultDirName={autopf}\Anything Plays 3.1
+DefaultGroupName=Anything Plays 3.1
+#elif defined(V32PreviewBuild)
+DefaultDirName={autopf}\Anything Plays 3.2 Private Preview
+DefaultGroupName=Anything Plays 3.2 Private Preview
+#elif defined(V311QABuild)
 DefaultDirName={autopf}\Anything Plays 3.1.1 Private QA
 DefaultGroupName=Anything Plays 3.1.1 Private QA
 #elif defined(V31FinalBuild)
@@ -59,7 +73,11 @@ DefaultGroupName=Anything Plays 3.0 Preview
 #endif
 DisableProgramGroupPage=yes
 OutputDir=..\release
+#ifdef V32UpgradeQABuild
+OutputBaseFilename=AnythingPlaysSetup-{#AppVersion}-PRIVATE-UPGRADE-QA
+#else
 OutputBaseFilename=AnythingPlaysSetup-{#AppVersion}
+#endif
 SetupIconFile=..\build\v21-icon\anything_plays.ico
 UninstallDisplayIcon={app}\AnythingPlays.exe
 Compression=lzma2
@@ -74,7 +92,13 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-#ifdef V311QABuild
+#ifdef V32UpgradeQABuild
+Name: "{group}\Anything Plays 3.2"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.2"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+#elif defined(V32PreviewBuild)
+Name: "{group}\Anything Plays 3.2 Private Preview"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.2 Private Preview"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+#elif defined(V311QABuild)
 Name: "{group}\Anything Plays 3.1.1 Private QA"; Filename: "{app}\AnythingPlays.exe"
 Name: "{autodesktop}\Anything Plays 3.1.1 Private QA"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 #elif defined(V31FinalBuild)

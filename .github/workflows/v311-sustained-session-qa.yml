@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   simulated-thirty-minutes:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: 1800 virtual seconds and native SRAM | ${{ matrix.target }}
     strategy:
       fail-fast: false
@@ -58,7 +58,7 @@ jobs:
           echo "Synthetic 1,800-second virtual time passed on ${{ matrix.target }}; not real 30-minute or device testing."
 
   wall-clock-tk-smoke:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: Actual 180-second Tk OpenCV SDL UI memory soak | Linux x64
     runs-on: ubuntu-24.04
     timeout-minutes: 18

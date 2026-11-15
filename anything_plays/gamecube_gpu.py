@@ -22,6 +22,7 @@ import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
 from anything_plays.gamecube_preview import should_capture, DEFAULT_PREVIEW_MODE
+from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
 
@@ -53,6 +54,7 @@ class GameCubeHardwareSession(CoreSession):
         self.gpu_readback_seconds = 0.0
         self.gpu_readback_max_seconds = 0.0
         self.gpu_readback_calls = 0
+        self.native_run_timing = GameCubeNativeTiming()
         self.preview_readback_skips = 0
         self._last_preview_capture = None
         self.raw_video_callbacks = 0

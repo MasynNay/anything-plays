@@ -57,15 +57,44 @@ class CameraMixin:
             self.finish_scan(cameras, error)
 
     def finish_scan(self, found, error=None):
+        """Refresh devices without silently switching away from a USB camera.
+
+        The scan already stops capture and disarms camera controls. Preserve
+        the selected name/index only if it remains present; otherwise choose
+        a visible fallback but require the user to click Use camera again.
+        """
+        previous = self.camera_name.get()
         self.camera_scanning = False
-        self.camera_options = {f'{name} (device {index})': index for index, name in found}
+        self.camera_options = {
+            f'{name} (device {index})': index for index, name in found
+        }
         self.camera_combo['values'] = list(self.camera_options)
         if found:
-            self.camera_name.set(next(iter(self.camera_options)))
-            self.status.set(f'{len(found)} camera(s) found. Select one, then click Use camera.')
+            if previous in self.camera_options:
+                self.camera_name.set(previous)
+                self.status.set(
+                    f'{len(found)} camera(s) found. {previous} is still '
+                    'selected. Click Use camera to reconnect.'
+                )
+            else:
+                self.camera_name.set(next(iter(self.camera_options)))
+                if previous:
+                    self.status.set(
+                        'Previously selected webcam is no longer listed. '
+                        'Verify the new selection, then click Use camera.'
+                    )
+                else:
+                    self.status.set(
+                        f'{len(found)} camera(s) found. Select one, then '
+                        'click Use camera.'
+                    )
         else:
             self.camera_name.set('')
-            self.status.set('No usable cameras found.' + (f' {error}' if error else ' Check permissions or click Refresh cameras.'))
+            self.status.set(
+                'No usable cameras found.'
+                + (f' {error}' if error
+                   else ' Check permissions or click Refresh cameras.')
+            )
 
     def cancel_camera_reconnect(self):
         """Cancel any pending retry when the user chooses Stop or another camera."""
@@ -98,11 +127,21 @@ class CameraMixin:
         )
 
     def _retry_camera(self, name):
-        """Reconnect only the previously chosen webcam, never a new device."""
+        """Reconnect only the original webcam, never a newly chosen device."""
+        # A callback canceled during a camera change must not clear a newer
+        # device's pending retry token.
+        if getattr(self, "_camera_reconnect_name", None) != name:
+            return
         self._camera_reconnect_job = None
-        if (self._closing or
-                getattr(self, "_camera_reconnect_name", None) != name or
-                self.camera_name.get() != name):
+        if self._closing:
+            self.cancel_camera_reconnect()
+            return
+        if self.camera_name.get() != name:
+            self.cancel_camera_reconnect()
+            self.status.set(
+                "Camera selection changed. Click Use camera to start the "
+                "selected device; controls remain paused."
+            )
             return
         try:
             self.start_camera(reconnecting=True)
@@ -140,6 +179,9 @@ class CameraMixin:
                     'using it, or refresh the list.'
                 )
             return
+        # Track the camera actually opened rather than the dropdown value.
+        # A later selection change is not permission to auto-open a new one.
+        self._active_camera_name = name
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
             bezel.set_active(True)
@@ -159,12 +201,17 @@ class CameraMixin:
 
     def stop_camera(self, *, keep_reconnect=False):
         """Release camera, stale frames, and pending reconnect when requested."""
+        camera_changed = getattr(self, "calibration_camera_changed", None)
+        if callable(camera_changed):
+            camera_changed()
         if not keep_reconnect:
             self.cancel_camera_reconnect()
         self.stop_controls()
-        # Detach the handle before calling into the native driver. Some
-        # drivers raise while closing a just-unplugged device; those errors
-        # must not strand the Tk preview, bezel or Stream Mode on screen.
+        # Clear the active identity before releasing a native device. The
+        # polling loop remembers the original name before stopping it.
+        self._active_camera_name = None
+        # Some drivers raise while closing a just-unplugged device; those
+        # errors must not strand Tk preview, bezel or Stream Mode on screen.
         cap, self.cap = self.cap, None
         if cap is not None:
             try:
@@ -299,6 +346,9 @@ class CameraMixin:
                 self.status.set('Secondary object color sampled. Choose its player.')
             else:
                 self.status.set('Primary object color sampled. Multi-object tracking is optional.')
+                sampled = getattr(self, 'calibration_color_sampled', None)
+                if callable(sampled):
+                    sampled()
         elif self.custom_draw_enabled.get():
             self.drag_start = point
 
@@ -422,6 +472,12 @@ class CameraMixin:
                 )
             if self.action.get() != message:
                 self.action.set(message)
+
+        # Calibration consumes observations from the same tracking pass.
+        # Never open another webcam or duplicate color processing.
+        note = getattr(self, "calibration_note_frame", None)
+        if callable(note):
+            note(primary, mapping, (w, h))
 
         frame = self.render_zones(frame, active_zones)
         # Reuse this already-annotated camera frame in the OBS capture view.

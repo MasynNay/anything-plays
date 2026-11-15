@@ -16,6 +16,7 @@ from anything_plays.test_preferences import prepare_test_preferences
 from anything_plays.build_identity import app_title
 from anything_plays.system_profiles import ProfileStore
 from anything_plays.ui_camera import CameraMixin
+from anything_plays.ui_calibration import CalibrationMixin
 from anything_plays.ui_gameplay import GameplayMixin
 from anything_plays.ui_volume import VolumeMixin
 from anything_plays.ui_layout import LayoutMixin
@@ -32,8 +33,7 @@ from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_updates import UpdatesMixin
 from anything_plays.ui_icon import IconMixin
 
-
-class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMixin,
+class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, CalibrationMixin, GameplayMixin,
           VolumeMixin, ProfilesMixin, LibraryMixin, ZonesMixin, ViewMixin, StreamMixin,
           ShortcutsMixin, GamepadMixin, ExternalBackendMixin, UpdatesMixin, IconMixin):
     """Own application state and delegate UI behavior to focused modules."""
@@ -178,8 +178,12 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         """Persist settings, release devices, and stop scheduling UI callbacks."""
         if self._closing:
             return
+        try:
+            self.persist_on_exit()
+        except (OSError, ValueError, TypeError, tk.TclError):
+            if not self.confirm_unsaved_exit():
+                return False
         self._closing = True
-        # Stopping a camera manually or closing the app always cancels retries.
         self.cancel_camera_reconnect()
         for job_name in ("_camera_tick_job", "_game_tick_job",
                          "_gamepad_tick_job", "_updates_start_job", "_updates_repeat_job"):
@@ -193,12 +197,6 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
         pending_rom_scan = getattr(self, "_rom_scan_cancel", None)
         if pending_rom_scan is not None:
             pending_rom_scan.set()
-        try:
-            self.persist_system_profile()
-        except (OSError, ValueError, tk.TclError):
-            pass
-        # Cleanup each driver separately: a USB camera can fail while
-        # releasing without blocking native emulators or Tk shutdown.
         def cleanup(label, callback):
             try:
                 callback()
@@ -232,6 +230,8 @@ class App(ThemeMixin, LayoutMixin, AuxiliaryPanelsMixin, CameraMixin, GameplayMi
                 self.root.destroy()
             except tk.TclError:
                 pass
+        return True
+
 def main():
     """Start the Tkinter event loop when launched from source or a bundle."""
     if "--ap-v30-ui-smoke" in sys.argv:

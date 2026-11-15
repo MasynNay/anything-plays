@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   source-camera-errors:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: OpenCV and camera fault isolation | ${{ matrix.target }}
     strategy:
       fail-fast: false

@@ -1,0 +1,105 @@
+"""Game stop cleanup uses the same data path for unload and console switch."""
+
+import threading
+import unittest
+from unittest.mock import Mock, patch
+
+from anything_plays.game_display_lifecycle import clear_game_video
+from anything_plays.ui_library import LibraryMixin
+
+
+class VideoHost:
+    def __init__(self):
+        self.emu = Mock()
+        self.emu.lock = threading.Lock()
+        self.emu.frame = object()
+        self.emu.frame_serial = 12
+        self.game_canvas = Mock()
+        self._game_only_canvas = Mock()
+        self._stream_canvas = Mock()
+        self.game_photo = object()
+        self._last_game_render = (12, "canvas")
+        self._game_image_item = 7
+        self._game_image_canvas = object()
+        self._stream_game_frame = object()
+        self._stream_game_serial = 12
+        self._stream_last_render = ("prior",)
+        self._stream_canvas_item = 11
+        self._stream_photo = object()
+        self._stream_camera_frame = object()
+        self._stream_camera_serial = 4
+        self.game_bezel = Mock()
+
+
+class LibraryHost(VideoHost, LibraryMixin):
+    def __init__(self):
+        super().__init__()
+        self.current_rom = "/synthetic/previous-game.gba"
+        self.stop_external_emulator = Mock()
+        self.deactivate_manual = Mock()
+        self.stop_controls = Mock()
+        self.game_status = Mock()
+        self.show_library = Mock()
+
+
+class GameVideoLifecycleTests(unittest.TestCase):
+    def check_cleared(self, app):
+        self.assertIsNone(app.emu.frame)
+        self.assertEqual(app.emu.frame_serial, 13)
+        self.assertIsNone(app.game_photo)
+        self.assertIsNone(app._last_game_render)
+        self.assertIsNone(app._game_image_item)
+        self.assertIsNone(app._game_image_canvas)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        self.assertIsNone(app._stream_last_render)
+        self.assertIsNone(app._stream_canvas_item)
+        self.assertIsNone(app._stream_photo)
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._game_only_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        app.game_bezel.set_active.assert_called_once_with(False)
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 4)
+
+    def test_shared_cleanup_clears_every_game_surface(self):
+        app = VideoHost()
+        clear_game_video(app)
+        self.check_cleared(app)
+
+    def test_real_library_unload_invokes_shared_cleanup_after_stop(self):
+        app = LibraryHost()
+        app.emu.stop.side_effect = lambda: None
+        app.unload_rom()
+        self.check_cleared(app)
+        self.assertIsNone(app.current_rom)
+        app.emu.stop.assert_called_once()
+        app.stop_controls.assert_called_once()
+        app.deactivate_manual.assert_called_once()
+        app.show_library.assert_called_once()
+
+    def test_closed_secondary_windows_do_not_prevent_unloading(self):
+        import tkinter as tk
+
+        app = LibraryHost()
+        app._game_only_canvas.delete.side_effect = tk.TclError("destroyed")
+        app._stream_canvas.delete.side_effect = tk.TclError("destroyed")
+        app.unload_rom()
+        self.assertIsNone(app.current_rom)
+        self.assertIsNone(app.emu.frame)
+        self.assertIsNone(app._stream_game_frame)
+        app.game_canvas.delete.assert_called_once_with("all")
+
+    def test_double_cleanup_is_idempotent_and_never_touches_camera(self):
+        app = VideoHost()
+        camera = app._stream_camera_frame
+        clear_game_video(app)
+        clear_game_video(app)
+        self.assertIsNone(app.emu.frame)
+        self.assertEqual(app.emu.frame_serial, 14)
+        self.assertIs(app._stream_camera_frame, camera)
+        self.assertEqual(app._stream_camera_serial, 4)
+
+
+if __name__ == "__main__":
+    unittest.main()

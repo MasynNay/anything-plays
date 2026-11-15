@@ -3,6 +3,8 @@
 import json
 from tkinter import ttk
 
+from anything_plays.atomic_storage import write_json_atomically
+
 
 class ThemeMixin:
     """Tkinter behavior shared with the main application controller.
@@ -62,7 +64,10 @@ class ThemeMixin:
                 if not isinstance(data, dict):
                     data = {}
             data['theme'] = theme
-            self.preferences_path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+            # A crash or full disk must never truncate the existing
+            # preferences document. Use the same durable commit protocol
+            # as profile saves, even for a one-field theme change.
+            write_json_atomically(self.preferences_path, data)
         except (OSError, ValueError, TypeError):
             self.status.set('Theme applied, but could not save preference.')
 

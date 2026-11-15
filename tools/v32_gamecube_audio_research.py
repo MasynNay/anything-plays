@@ -1,0 +1,435 @@
+"""Private 3.2 GameCube native SOUND research using ORIGINAL source-built DOL.
+
+The existing pinned zlib controller program is silent by design. Measuring
+zero nonzero PCM from that program does not diagnose Dolphin's DSP output.
+Build the repository's original GX + ASND tone generator with devkitPPC in
+an isolated offline Docker build, then run it through the same frozen-app
+Dolphin native core and actual production GameCubeHardwareSession.
+
+This optional research is NOT a commercial-game test, speaker test, public
+permission, or a hard 3.2 release gate. Never retain DOL, screenshots,
+Docker logs, subprocess logs, ROM paths, user identifiers or error traces.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+
+from tools.v32_extended_native_runtime import check_sources
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "tools/gamecube-3d-homebrew"
+DOL_NAME = "anythingplays-gc-gx-gamecube.dol"
+FIXTURE_PROGRAMS = {
+    "gx3d": (SOURCE, DOL_NAME),
+    "console_av": (
+        ROOT / "tools/gamecube-av-homebrew",
+        "anythingplays-gc-av-gamecube.dol",
+    ),
+}
+STATUS = "PRIVATE_V32_ORIGINAL_GC_AUDIO_AND_GPU_RESEARCH_NOT_RELEASE"
+BUILD_LIMIT = 300
+PROBE_LIMIT = 140
+DOL_HEADER_SIZE = 0x100
+DOL_RAM_START = 0x80000000
+DOL_RAM_END = 0x81800000
+
+
+def inspect_original_dol(path):
+    """Inspect a DOL's fixed header without retaining binary or paths.
+
+    There are seven code and eleven data slots, with big-endian addresses.
+    All returned observations are bounded, privacy-safe types and codes.
+    """
+    result = {
+        "structure_verified": False,
+        "layout_code": "header_unreadable",
+        "text_section_count": 0,
+        "data_section_count": 0,
+        "entry_within_text": False,
+    }
+    try:
+        file = Path(path)
+        file_size = file.stat().st_size
+        if file_size < DOL_HEADER_SIZE:
+            result["layout_code"] = "truncated_header"
+            return result
+        with file.open("rb") as fp:
+            header = fp.read(DOL_HEADER_SIZE)
+        if len(header) != DOL_HEADER_SIZE:
+            return result
+        offsets = struct.unpack_from(">18I", header, 0x00)
+        addresses = struct.unpack_from(">18I", header, 0x48)
+        lengths = struct.unpack_from(">18I", header, 0x90)
+        entry = struct.unpack_from(">I", header, 0xE0)[0]
+        code_ranges = []
+        for slot, (offset, address, length) in enumerate(
+            zip(offsets, addresses, lengths)
+        ):
+            if offset == address == length == 0:
+                continue
+            if (offset < DOL_HEADER_SIZE or length == 0
+                    or offset + length > file_size
+                    or address < DOL_RAM_START
+                    or address + length > DOL_RAM_END):
+                result["layout_code"] = "invalid_section_bounds"
+                return result
+            if slot < 7:
+                code_ranges.append((address, address + length))
+                result["text_section_count"] += 1
+            else:
+                result["data_section_count"] += 1
+        if not code_ranges:
+            result["layout_code"] = "missing_text_sections"
+            return result
+        result["entry_within_text"] = any(
+            first <= entry < last for first, last in code_ranges
+        )
+        if not result["entry_within_text"]:
+            result["layout_code"] = "entry_not_in_text"
+            return result
+        result["structure_verified"] = True
+        result["layout_code"] = "valid_gamecube_dol_layout"
+    except OSError:
+        pass
+    return result
+
+
+def digest(file):
+    h = hashlib.sha256()
+    with Path(file).open("rb") as fp:
+        for part in iter(lambda: fp.read(1024 * 1024), b""):
+            h.update(part)
+    return h.hexdigest()
+
+
+def check_source_program(kind="gx3d"):
+    """Verify source-authored ASND tone and video before any compiler run."""
+    if kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Unrecognized owned GameCube audio program")
+    folder, _ = FIXTURE_PROGRAMS[kind]
+    main = folder/"source/main.c"
+    make = folder/"Makefile"
+    if any(not f.is_file() or f.is_symlink() for f in (main, make)):
+        raise ValueError("Original GameCube AV source missing or symlinked")
+    src = main.read_text("utf-8")
+    options = make.read_text("utf-8")
+    essentials = ("#include <asndlib.h>", "ASND_Init();",
+                  "ASND_SetInfiniteVoice(", "ASND_Pause(0);")
+    video_and_tone = (
+        ("DCFlushRange(audio_tone", "GX_Begin(GX_QUADS")
+        if kind == "gx3d"
+        else ("DCFlushRange(tone", "console_init(", "VIDEO_WaitVSync()")
+    )
+    for needle in essentials + video_and_tone:
+        if needle not in src:
+            raise ValueError("Original GameCube source AV code missing: " + needle)
+    if "-lasnd" not in options:
+        raise ValueError("Original GX/ASND linker rule missing")
+    return {"main_c_sha256": digest(main), "makefile_sha256": digest(make)}
+
+
+def evaluate_evidence(raw, child_exit, dol_digest, source_sha, built,
+                      reason=None, *, source_kind="gx3d"):
+    """Retain only bounded numeric native A/V facts, no raw subprocess data."""
+    raw = raw if isinstance(raw, dict) else {}
+    details = raw.get("details") if isinstance(raw.get("details"), dict) else {}
+    native_exit = raw.get("native_exit_code")
+    pcm = details.get("native_pcm_nonzero_values")
+    pcm_samples = details.get("native_pcm_frame_samples")
+    source_matches = (
+        built is True and isinstance(dol_digest, str)
+        and re.fullmatch(r"[a-f0-9]{64}", dol_digest) is not None
+        and raw.get("original_av_dol_sha256") == dol_digest
+        and raw.get("fixture_sha256") == dol_digest
+    )
+    # Requiring audio makes the child exit 1 even when it rendered video.
+    # Record bounded video observations separately, never as release proof.
+    video_observed = (
+        source_matches
+        and type(child_exit) is int and child_exit in (0, 1)
+        and type(native_exit) is int and native_exit in (0, 1)
+        and details.get("error") is None
+        and details.get("backend")
+        == "production GameCubeHardwareSession + platform GPU host"
+        and details.get("passes_in_app_frame_queue") is True
+        and type(details.get("gamecube_rgb_callback_frames")) is int
+        and details["gamecube_rgb_callback_frames"] >= 12
+        and type(details.get("sampled_nonblank_frames")) is int
+        and details["sampled_nonblank_frames"] >= 6
+        and type(details.get("distinct_rgb_frame_hashes")) is int
+        and details["distinct_rgb_frame_hashes"] >= 3
+        and type(details.get("native_controller_polls")) is int
+        and details["native_controller_polls"] >= 100
+        and type(details.get("nonzero_controller_polls")) is int
+        and details["nonzero_controller_polls"] >= 10
+    )
+    rendered = (
+        video_observed and child_exit == 0
+        and raw.get("passed") is True and native_exit == 0
+    )
+    audio = (
+        rendered and details.get("native_nonzero_pcm_requirement_met") is True
+        and type(pcm) is int and pcm >= 200
+        and type(pcm_samples) is int and pcm_samples >= 1000
+        and type(details.get("native_pcm_sample_rate")) in (float, int)
+        and 8000 <= details["native_pcm_sample_rate"] <= 192000
+    )
+    # A failed *optional* sound test must still explain which stage failed
+    # without uploading stdout, ROM paths, native stack traces or personal
+    # device names from upstream error strings.
+    reason_code = reason
+    child_code = raw.get("native_exit_code")
+    if not reason_code and not audio:
+        if not raw:
+            reason_code = "native_parent_report_absent"
+        elif raw.get("timed_out") is True:
+            reason_code = "native_child_timed_out"
+        elif not isinstance(raw.get("details"), dict):
+            reason_code = "native_child_details_absent"
+        elif not source_matches:
+            reason_code = "original_source_identity_not_verified"
+        elif type(child_code) is int and child_code not in (0, 1):
+            reason_code = "native_child_nonzero_exit"
+        elif details.get("error") is not None:
+            reason_code = "native_child_exception"
+        elif video_observed and (type(pcm) is not int or pcm == 0):
+            reason_code = "native_video_observed_without_nonzero_pcm"
+        elif video_observed and pcm < 200:
+            reason_code = "native_video_observed_with_insufficient_pcm"
+        elif not video_observed:
+            reason_code = "native_gpu_video_conditions_not_met"
+        else:
+            reason_code = "nonzero_pcm_conditions_not_met"
+    if source_kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Original GameCube AV fixture kind not recognized")
+    # Only emit a strict allowlist of exception CLASS names, never text
+    # containing a path, device label, game title or native backtrace.
+    exception = details.get("error")
+    if isinstance(exception, str):
+        exception = exception.partition(":")[0].strip()
+        if exception not in {
+            "RuntimeError", "OSError", "ValueError", "MemoryError",
+            "FileNotFoundError", "SystemError", "TypeError", "AssertionError",
+        }:
+            exception = "other_native_exception"
+    else:
+        exception = None
+    # Only an authenticated, bounded stage identifier is preserved.
+    from tools.probe_gamecube_app import GC_BOOT_PHASES, GC_FAILURE_CODES
+    phase = details.get("native_startup_phase")
+    category = details.get("native_boot_failure_category")
+    phase = (
+        phase if source_matches and type(phase) is str
+        and phase in GC_BOOT_PHASES else "unavailable"
+    )
+    category = (
+        category if source_matches and type(category) is str
+        and category in GC_FAILURE_CODES else "unavailable"
+    )
+    result = {
+        "schema_version": 1,
+        "status": STATUS,
+        "source_revision": source_sha,
+        "fixture": (
+            "original_source_generated_gx_3d_and_asnd_stereo_pcm"
+            if source_kind == "gx3d"
+            else "original_source_generated_console_video_and_asnd_stereo_pcm"
+        ),
+        "source_program_kind": source_kind,
+        "native_child_exception_class": exception,
+        "native_startup_phase": phase,
+        "native_boot_failure_category": category,
+        "native_hw_context_request_count": (
+            details.get("native_hw_context_request_count")
+            if source_matches
+            and type(details.get("native_hw_context_request_count")) is int
+            and 0 <= details["native_hw_context_request_count"] <= 16 else 0
+        ),
+        "native_hw_context_accepted": (
+            details.get("native_hw_context_accepted") is True
+            if source_matches else False
+        ),
+        "original_program_compiled_in_private_ci": built,
+        "program_sha256": dol_digest if built else None,
+        "parent_report_received": bool(raw),
+        "native_child_details_received": bool(details),
+        "native_child_exit_code": (
+            child_code if type(child_code) is int and -255 <= child_code <= 255
+            else None
+        ),
+        "native_subprocess_timed_out": raw.get("timed_out") is True,
+        "native_gpu_homebrew_rendering_verified": rendered,
+        "owned_program_native_video_observed": video_observed,
+        "original_program_identity_verified": source_matches,
+        "core_generated_nonzero_pcm_verified": audio,
+        "core_generated_pcm_sample_frames": (
+            pcm_samples if type(pcm_samples) is int and 0 <= pcm_samples < 1e9 else 0
+        ),
+        "core_generated_nonzero_pcm_values": (
+            pcm if type(pcm) is int and 0 <= pcm < 1e9 else 0
+        ),
+        "native_rgb_callback_frames": (
+            details.get("gamecube_rgb_callback_frames")
+            if type(details.get("gamecube_rgb_callback_frames")) is int
+            and 0 <= details["gamecube_rgb_callback_frames"] < 1e8 else 0
+        ),
+        "headless_20fps_threshold_met": (
+            type(details.get("continuous_render_fps")) in (int, float)
+            and details["continuous_render_fps"] >= 20
+        ),
+        "experiment_outcome": (
+            "observed_original_tone_pcm" if audio else reason_code
+        ),
+        "speaker_hardware_tested": False,
+        "physical_gamepad_tested": False,
+        "physical_camera_tested": False,
+        "sustained_gameplay_tested": False,
+        "retail_game_compatibility_verified": False,
+        "macos_notarized": False,
+        "public_release_approved": False,
+        "ready_for_release": False,
+    }
+    return result
+
+
+def execute(bundle, receipt, sha, report, *, source_kind="gx3d"):
+    report = Path(report)
+    if report.exists() or report.is_symlink():
+        raise ValueError("Cannot overwrite or follow a research report")
+    if type(sha) is not str or re.fullmatch(r"[a-f0-9]{40}", sha) is None:
+        raise ValueError("Exact 3.2 Git SHA required")
+    # No Docker, compiled ROM, or native library is opened before the
+    # original 11-core preview identity + native source receipt is checked.
+    if source_kind not in FIXTURE_PROGRAMS:
+        raise ValueError("Original audio research fixture not recognized")
+    core = check_sources(bundle, receipt, sha)["gamecube"]
+    source_folder, dol_name = FIXTURE_PROGRAMS[source_kind]
+    source_digests = check_source_program(source_kind)
+    with tempfile.TemporaryDirectory(prefix="ap32-gc-audio-research-") as td:
+        tmp = Path(td)
+        # Compile ONLY copies of the repository-owned original source.
+        project = tmp/"project"
+        shutil.copytree(source_folder, project, ignore=shutil.ignore_patterns(
+            "build_*", "*.dol", "*.elf", "*.map"
+        ), symlinks=False)
+        dol = project/dol_name
+        result = {}
+        layout = {
+            "structure_verified": False,
+            "layout_code": "not_compiled",
+            "text_section_count": 0,
+            "data_section_count": 0,
+            "entry_within_text": False,
+        }
+        report_path = tmp/"probe.json"
+        try:
+            uid_args = (
+                ["-u", f"{os.getuid()}:{os.getgid()}"]
+                if hasattr(os, "getuid") else []
+            )
+            build = subprocess.run(
+                ["docker", "run", "--rm", "--network", "none",
+                 "-v", f"{project}:/project", "-w", "/project",
+                 "-e", "TARGET_CONSOLE=gamecube",
+                 *uid_args, "devkitpro/devkitppc", "make"],
+                cwd=ROOT, capture_output=True, text=True,
+                check=False, timeout=BUILD_LIMIT,
+            )
+            if build.returncode or not dol.is_file() or dol.is_symlink():
+                result = evaluate_evidence({}, -1, None, sha, False,
+                                           "original_source_compiler_unavailable",
+                                           source_kind=source_kind)
+            elif not 100 <= dol.stat().st_size <= 4 * 1024 * 1024:
+                result = evaluate_evidence({}, -1, None, sha, False,
+                                           "original_source_binary_invalid",
+                                           source_kind=source_kind)
+            else:
+                sh = digest(dol)
+                layout = inspect_original_dol(dol)
+                if not layout["structure_verified"]:
+                    result = evaluate_evidence(
+                        {}, -1, sh, sha, True,
+                        "original_source_dol_layout_invalid",
+                        source_kind=source_kind,
+                    )
+                env = dict(os.environ)
+                env.update({
+                    "HOME": str(tmp/"home"),
+                    "XDG_CONFIG_HOME": str(tmp/"home"/".config"),
+                    "SDL_AUDIODRIVER": "dummy",
+                    "PYGAME_HIDE_SUPPORT_PROMPT": "1",
+                    "AP_V32_PREVIEW": "1",
+                })
+                if layout["structure_verified"]:
+                    (tmp/"home").mkdir()
+                    executed = subprocess.run(
+                        [sys.executable, "-m", "tools.probe_gamecube_app",
+                         "--core", str(core), "--rom", str(dol),
+                         "--require-audio", "--seconds", "25",
+                         "--report", str(report_path)],
+                        cwd=ROOT, env=env, capture_output=True,
+                        text=True, check=False, timeout=PROBE_LIMIT,
+                    )
+                    try:
+                        raw = json.loads(report_path.read_text("utf-8"))
+                    except (OSError, ValueError):
+                        raw = {}
+                    result = evaluate_evidence(
+                        raw, executed.returncode, sh, sha, True,
+                        source_kind=source_kind,
+                    )
+        except FileNotFoundError:
+            result = evaluate_evidence({}, -1, None, sha, False,
+                                       "source_compiler_not_installed",
+                                       source_kind=source_kind)
+        except subprocess.TimeoutExpired:
+            result = evaluate_evidence({}, -1, None, sha, False,
+                                       "research_compile_or_native_timeout",
+                                       source_kind=source_kind)
+    result["original_program_source_sha256"] = source_digests
+    result["original_dol_bootstrap_layout"] = layout
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(result, indent=2, sort_keys=True)+"\n", "utf-8")
+    print(json.dumps({
+        "status": result["status"],
+        "native_gpu_homebrew_rendering_verified":
+            result["native_gpu_homebrew_rendering_verified"],
+        "core_generated_nonzero_pcm_verified":
+            result["core_generated_nonzero_pcm_verified"],
+        "experiment_outcome": result["experiment_outcome"],
+        "native_startup_phase": result["native_startup_phase"],
+        "native_boot_failure_category": result["native_boot_failure_category"],
+        "native_child_exception_class": result["native_child_exception_class"],
+        "original_dol_bootstrap_layout": result["original_dol_bootstrap_layout"],
+        "ready_for_release": False,
+    }, indent=2, sort_keys=True))
+    # This is separate exploratory research. A missing compiler or failure
+    # is visible in the receipt and can NEVER masquerade as sound working.
+    return result
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--bundle", type=Path, required=True)
+    p.add_argument("--source-receipt", type=Path, required=True)
+    p.add_argument("--source-sha", required=True)
+    p.add_argument("--source-kind", choices=tuple(FIXTURE_PROGRAMS),
+                   default="gx3d")
+    p.add_argument("--output", type=Path, required=True)
+    a = p.parse_args()
+    execute(a.bundle, a.source_receipt, a.source_sha, a.output,
+            source_kind=a.source_kind)
+
+
+if __name__ == "__main__":
+    main()

@@ -296,8 +296,18 @@ class VirtualControllerTests(unittest.TestCase):
         app.root.focus = object()
         app.gamepad_tick()
         app.emu.inputs.before_frame(False)
-        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 1)
-        self.assertEqual([delay for delay, _cb in app.root.jobs], [65] * 3)
+        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 0,
+                         "held buttons must stay released on focus return")
+        self.pad.buttons = set()
+        app.gamepad_tick()
+        app.emu.inputs.before_frame(False)
+        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 0)
+        self.pad.buttons = {"A"}
+        app.gamepad_tick()
+        app.emu.inputs.before_frame(False)
+        self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["B"]), 1,
+                         "a fresh press is accepted after neutral release")
+        self.assertEqual([delay for delay, _cb in app.root.jobs], [65] * 5)
 
     def test_ui_stops_gamepad_for_no_game_or_external_emulator(self):
         app = self.ui()

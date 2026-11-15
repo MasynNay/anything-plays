@@ -92,6 +92,13 @@ class GameplayMixin:
         if self.armed:
             self.stop_controls()
             return
+        if getattr(self, "_calibration_window", None) is not None:
+            # Calibration is intentionally non-modal so users can click the
+            # camera preview. Never arm gameplay input during that workflow.
+            self.action.set(
+                "Finish or cancel calibration before enabling object controls."
+            )
+            return
         backend = (
             "libretro" if self.uses_embedded_emulator()
             else SYSTEMS[self.system_key.get()].backend
@@ -198,13 +205,42 @@ class GameplayMixin:
                 # the same disconnect, clearing the bezel and held controls
                 # through stop_camera() before queuing a bounded retry.
                 camera_open = GameplayMixin._camera_is_open(self)
-                ok, frame = self.cap.read() if camera_open else (False, None)
+                try:
+                    ok, frame = self.cap.read() if camera_open else (False, None)
+                    # Native camera backends sometimes report success while
+                    # returning None/empty pixels during a USB transition.
+                    # Treat this just like a failed read, not a tracking
+                    # exception that silently disables future reconnects.
+                    shape = getattr(frame, "shape", ())
+                    ok = (
+                        bool(ok) and frame is not None and len(shape) >= 2
+                        and shape[0] > 0 and shape[1] > 0
+                    )
+                    if ok:
+                        frame = cv2.flip(frame, 1) if self.mirror.get() else frame
+                except (cv2.error, OSError, RuntimeError, ValueError, TypeError):
+                    # read() and flip() can raise after camera.isOpened()
+                    # returned True. Re-enter the same bounded reconnect
+                    # path used for False/None frames instead of leaving
+                    # the camera silently stopped for the rest of the session.
+                    ok, frame = False, None
                 if ok:
-                    self.frame = cv2.flip(frame, 1) if self.mirror.get() else frame
+                    self.frame = frame
                 else:
-                    chosen = self.camera_name.get()
+                    # The dropdown may have changed without pressing Use
+                    # camera. Reconnect only the original active device,
+                    # never another one that happened to be selected.
+                    chosen = getattr(self, "_active_camera_name", None)
+                    chosen = chosen or self.camera_name.get()
                     self.stop_camera()
-                    self._queue_camera_retry(chosen)
+                    if chosen == self.camera_name.get():
+                        self._queue_camera_retry(chosen)
+                    else:
+                        self.status.set(
+                            "Camera disconnected after selection changed. "
+                            "Click Use camera to start the chosen device; "
+                            "object controls remain paused."
+                        )
             if self.frame is not None:
                 # A still reference image needs only periodic redraw. Without
                 # a live camera, repeatedly detecting the same pixels wastes

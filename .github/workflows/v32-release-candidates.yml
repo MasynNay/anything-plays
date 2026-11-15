@@ -1,0 +1,219 @@
+name: 3.2 | Four-platform final-version release candidates (not public)
+
+# This workflow produces *real-version* native 3.2 installers for final
+# owner-authorized review. It DOES NOT publish, create tags or edit releases.
+# The installed identity is inherited from existing 3.1.x stable packages.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v32-release-candidates.yml'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'packaging/**'
+      - 'tools/finalize_v32_stable_installers.py'
+      - 'tools/stage_v32_stable_full_*.py'
+      - 'tools/verify_v32_stable_upgrade_source.py'
+      - 'tools/v32_real_windows_inno_upgrade.py'
+      - 'tests/test_v32_finalize_stable_installers.py'
+      - 'requirements-build.txt'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v32-real-release-candidates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stage-real-320:
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 244 && github.event.pull_request.head.ref == 'feature/v3.2-integration' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.2-integration') }}
+    name: Final 3.2.0 full-native candidate | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 115
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            source: release/anything-plays-31_3.2.0~upgradeqa1_amd64.deb
+            bundle: dist/AnythingPlays
+            stage: release/private-full/anything-plays-31_3.2.0~fullupgradeqa1_amd64.deb
+            stage_receipt: release/private-full/V32_STABLE_FULL_LINUX_QA_RECEIPT.json
+          - target: windows-x64
+            runner: windows-latest
+            source: release/AnythingPlaysSetup-3.2.0-PRIVATE-UPGRADE-QA.exe
+            bundle: dist/AnythingPlays
+            stage: release/private-full/AnythingPlaysSetup-3.2.0-fullupgradeqa1-PRIVATE-UPGRADE-QA.exe
+            stage_receipt: release/private-full/V32_STABLE_FULL_WINDOWS_QA_RECEIPT.json
+          - target: macos-arm64
+            runner: macos-15
+            source: release/AnythingPlays-3.2.0-UPGRADE-QA-macos-arm64.dmg
+            bundle: dist/AnythingPlays31.app
+            stage: release/private-full/AnythingPlays-3.2.0-fullupgradeqa1-macos-arm64.dmg
+            stage_receipt: release/private-full/V32_FULL_MACOS_QA_RECEIPT.json
+          - target: macos-x64
+            runner: macos-15-intel
+            source: release/AnythingPlays-3.2.0-UPGRADE-QA-macos-x64.dmg
+            bundle: dist/AnythingPlays31.app
+            stage: release/private-full/AnythingPlays-3.2.0-fullupgradeqa1-macos-x64.dmg
+            stage_receipt: release/private-full/V32_FULL_MACOS_QA_RECEIPT.json
+    env:
+      AP_V32_STABLE_CANDIDATE: '1'
+      AP_V32_PREVIEW_BUILD: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify exact checked-out application revision and private flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python - <<'PY'
+          import os
+          from tools.write_v31_identity import choose_channel
+          from anything_plays.build_identity import make_identity
+          assert choose_channel(os.environ) == 'v32_stable_candidate'
+          identity = make_identity('v32_stable_candidate')
+          assert identity['version']=='3.2.0'
+          assert identity['settings_namespace']=='anything-plays-31'
+          assert identity['public_release_approved'] is False
+          print('Exact 3.2 private source selected, no public approval inferred')
+          PY
+          python -m unittest discover -s tests -p 'test_v32_finalize_stable_installers.py' -v
+          python -m unittest discover -s tests -p 'test_v32_real_windows_inno_upgrade.py' -v
+      - name: Install Linux native package and GUI prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends dpkg-dev python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup is unavailable' }
+      - name: Build Linux 3.2 stable-identity frozen source
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Build Windows 3.2 stable-identity frozen source
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Build Mac 3.2 stable-identity frozen source
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify frozen 3.2.0 source identity and mGBA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v32_stable_upgrade_source \
+            --target '${{ matrix.target }}' \
+            --installer '${{ matrix.source }}' \
+            --bundle '${{ matrix.bundle }}' \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json
+      - name: Retrieve unchanged published 3.1.1 native core sources and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p baseline311
+          case '${{ matrix.target }}' in
+            linux-x64) baseline='anything-plays-31_3.1.1_amd64.deb' ;;
+            windows-x64) baseline='AnythingPlaysSetup-3.1.1.exe' ;;
+            macos-arm64) baseline='AnythingPlays-3.1.1-macos-arm64.dmg' ;;
+            macos-x64) baseline='AnythingPlays-3.1.1-macos-x64.dmg' ;;
+            *) exit 1 ;;
+          esac
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" --pattern "$baseline" --dir baseline311
+          gh release download v3.1.1 --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt --dir baseline311
+          (cd baseline311 && sha256sum --check --ignore-missing SHA256SUMS.txt)
+      - name: Assemble full 11-core Linux same-identity upgrade
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          python -m tools.stage_v32_stable_full_linux \
+            --stable baseline311/anything-plays-31_3.1.1_amd64.deb \
+            --source '${{ matrix.source }}' \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" --output release/private-full
+      - name: Assemble full 11-core Windows same-identity upgrade
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          python -m tools.stage_v32_stable_full_windows --stable baseline311/AnythingPlaysSetup-3.1.1.exe --source '${{ matrix.source }}' --checksums baseline311/SHA256SUMS.txt --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json --source-sha $env:QA_SOURCE_SHA --output release/private-full
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows assembly failed' }
+      - name: Assemble full 11-core Mac same-identity upgrade
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          case '${{ matrix.target }}' in
+            macos-arm64) arch=arm64 ;;
+            macos-x64) arch=x64 ;;
+          esac
+          python -m tools.stage_v32_stable_full_macos \
+            --arch "$arch" \
+            --stable "baseline311/AnythingPlays-3.1.1-macos-$arch.dmg" \
+            --preview '${{ matrix.source }}' \
+            --checksums baseline311/SHA256SUMS.txt \
+            --source-receipt release/V32_PRIVATE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" --output release/private-full
+      - name: Finalize internally versioned public 3.2.0 installer, reverify native cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.finalize_v32_stable_installers \
+            --target '${{ matrix.target }}' \
+            --source '${{ matrix.stage }}' \
+            --receipt '${{ matrix.stage_receipt }}' \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/final-3.2
+      - name: Verify the release candidate contains exactly one 3.2.0 installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from tools.finalize_v32_stable_installers import TARGETS, STATUS
+          target='${{ matrix.target }}'
+          report=json.loads(Path('release/final-3.2/V32_NATIVE_RELEASE_CANDIDATE.json').read_text('utf-8'))
+          expected=TARGETS[target][1]
+          assert report['status']==STATUS and report['source_revision']==os.environ['QA_SOURCE_SHA']
+          assert report['file']==expected and report['native_core_families']==11
+          assert report['same_stable_311_install_identity'] is True
+          assert report['installer_release_version']=='3.2.0'
+          assert report['published'] is False and report['final_redistribution_approved'] is False
+          assert {p.name for p in Path('release/final-3.2').iterdir()}=={expected,'V32_NATIVE_RELEASE_CANDIDATE.json'}
+          print('Prepared genuine 3.2.0 native installer, NOT published:', expected)
+          PY
+      - name: Retain exact full-native candidate only; separate publication authorization required
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.2.0-FINAL-CANDIDATE-${{ matrix.target }}
+          path: release/final-3.2/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

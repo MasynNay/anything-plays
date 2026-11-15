@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   native-gamepad-ui:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref != 'feature/v3.2-integration' }}
     name: SDL + Tk controller QA | ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35

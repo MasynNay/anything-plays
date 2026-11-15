@@ -1,0 +1,679 @@
+"""3.2 complete control-layout backup: strict privacy and atomic restore."""
+import copy
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+from unittest.mock import patch
+
+from anything_plays.portable_profile_library import (
+    FORMAT, MAX_ARCHIVE_BYTES, make_library_archive, parse_library_archive,
+    load_library_archive, save_library_archive, portable_restore_delta,
+    prepare_restore_undo,
+)
+from anything_plays.settings_defaults import DEFAULT
+from anything_plays.system_profiles import (
+    BUTTONS_BY_SYSTEM, ProfileStore, default_for,
+)
+
+
+def all_profiles():
+    return {
+        key: default_for(key, DEFAULT)
+        for key in BUTTONS_BY_SYSTEM
+    }
+
+
+class AllConsoleBackupTests(unittest.TestCase):
+    def test_all_18_console_profiles_round_trip_without_private_fields(self):
+        source = all_profiles()
+        self.assertEqual(len(source), 18)
+        source["gamecube"]["zone_image"] = "/Users/private/photo.png"
+        source["gba"]["rom_directory"] = "/home/secret/roms"
+        source["gba"]["rgb"] = [9, 31, 117]
+        source["snes"]["mapping"]["A"] = "B"
+        original = copy.deepcopy(source)
+        doc = make_library_archive(source)
+        text = json.dumps(doc)
+        self.assertEqual(doc["format"], FORMAT)
+        self.assertNotIn("photo.png", text)
+        self.assertNotIn("/home/secret", text)
+        self.assertEqual(source, original)
+        result = parse_library_archive(text)
+        self.assertEqual(set(result), set(BUTTONS_BY_SYSTEM))
+        self.assertEqual(result["gba"]["rgb"], [9, 31, 117])
+        self.assertEqual(result["snes"]["mapping"]["A"], "B")
+
+    def test_missing_extra_and_forged_console_rejected_before_apply(self):
+        doc = make_library_archive(all_profiles())
+        for key in ("gb", "gamecube"):
+            altered = copy.deepcopy(doc)
+            altered["profiles"].pop(key)
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                parse_library_archive(json.dumps(altered))
+        altered = copy.deepcopy(doc)
+        altered["profiles"]["../../../evil"] = altered["profiles"]["gb"]
+        with self.assertRaises(ValueError):
+            parse_library_archive(json.dumps(altered))
+        altered = copy.deepcopy(doc)
+        altered["profiles"]["gba"]["rom_directory"] = "/private/location"
+        with self.assertRaises(ValueError):
+            parse_library_archive(json.dumps(altered))
+        with self.assertRaises(ValueError):
+            make_library_archive({"gb": all_profiles()["gb"]})
+
+    def test_rejects_unsafe_json_payloads_and_tampered_version(self):
+        doc = make_library_archive(all_profiles())
+        for bad in (
+            "{\"format\":1,\"format\":2}",  # duplicate keys
+            json.dumps(dict(doc, version=True)),
+            json.dumps(dict(doc, version=99)),
+            json.dumps(dict(doc, theme="private")),
+            json.dumps(dict(doc, system_count=17)),
+            json.dumps(doc).replace('"tolerance": 20', '"tolerance": NaN'),
+            "[]" , "{",
+        ):
+            with self.subTest(payload=bad[:30]), self.assertRaises(ValueError):
+                parse_library_archive(bad)
+        with self.assertRaises(ValueError):
+            parse_library_archive(b"x" * (MAX_ARCHIVE_BYTES + 1))
+
+    def test_atomic_save_load_and_store_bulk_commit(self):
+        with TemporaryDirectory() as td:
+            base = Path(td)
+            target = base / "controls.json"
+            profiles = all_profiles()
+            save_library_archive(target, profiles)
+            self.assertEqual(set(load_library_archive(target)), set(profiles))
+            stored = ProfileStore(base / "state.json", DEFAULT)
+            original = stored.get("gb")
+            edited = copy.deepcopy(original)
+            edited["tolerance"] = 41
+            changes = {"gb": edited, "gamecube": profiles["gamecube"]}
+            stored.put_many(changes)
+            self.assertEqual(stored.get("gb")["tolerance"], 41)
+            before = stored.path.read_bytes()
+            with patch(
+                "anything_plays.system_profiles.write_json_atomically",
+                side_effect=OSError("disk disconnected"),
+            ), self.assertRaises(OSError):
+                stored.put_many({"gb": original})
+            self.assertEqual(stored.get("gb")["tolerance"], 41)
+            self.assertEqual(stored.path.read_bytes(), before)
+            with self.assertRaises(ValueError):
+                stored.put_many({"forged": edited})
+            with self.assertRaises(ValueError):
+                stored.put_many({"gb": None})
+            self.assertEqual(stored.path.read_bytes(), before)
+
+    def test_single_console_disk_failure_does_not_poison_later_profile_save(self):
+        with TemporaryDirectory() as td:
+            path = Path(td) / "profiles.json"
+            store = ProfileStore(path, DEFAULT)
+            original_gba = store.get("gba")
+            original_gb = store.get("gb")
+            gba_changed = copy.deepcopy(original_gba)
+            gba_changed["tolerance"] = 77
+            with patch(
+                "anything_plays.system_profiles.write_json_atomically",
+                side_effect=OSError("disk full"),
+            ), self.assertRaises(OSError):
+                store.put("gba", gba_changed)
+            self.assertEqual(store.get("gba"), original_gba)
+            self.assertFalse(path.exists())
+            gb_changed = copy.deepcopy(original_gb)
+            gb_changed["tolerance"] = 31
+            store.put("gb", gb_changed)
+            fresh = ProfileStore(path, DEFAULT)
+            self.assertEqual(fresh.get("gb")["tolerance"], 31)
+            self.assertEqual(fresh.get("gba"), original_gba)
+            self.assertEqual(store.get("gba"), original_gba)
+
+    def test_single_console_rejects_unknown_key_without_creating_state(self):
+        with TemporaryDirectory() as td:
+            path = Path(td) / "profiles.json"
+            store = ProfileStore(path, DEFAULT)
+            with self.assertRaises(ValueError):
+                store.put("../unexpected", default_for("gb", DEFAULT))
+            self.assertFalse(path.exists())
+            self.assertEqual(store.profiles, {})
+
+    def test_failed_mapping_save_rolls_back_control_and_visible_selection(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, val):
+                self.val = val
+            def get(self):
+                return self.val
+            def set(self, val):
+                self.val = val
+
+        class BrokenStore:
+            def put(self, _system, _profile):
+                raise OSError("private disk path is unavailable")
+
+        class Host:
+            system_key = Value("gba")
+            status = Value("")
+            mapping_vars = {"A": Value("B")}
+            cfg = {"mapping": {"A": "A"}}
+            profile_store = BrokenStore()
+
+        host = Host()
+        self.assertFalse(ProfilesMixin.update_button_mapping(host, "A"))
+        self.assertEqual(host.cfg["mapping"]["A"], "A")
+        self.assertEqual(host.mapping_vars["A"].get(), "A")
+        self.assertIn("not saved", host.status.get())
+        self.assertNotIn("private disk path", host.status.get())
+
+    def test_successful_mapping_save_persists_selected_control(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, val):
+                self.val = val
+            def get(self):
+                return self.val
+            def set(self, val):
+                self.val = val
+
+        with TemporaryDirectory() as td:
+            class Host:
+                system_key = Value("gb")
+                status = Value("")
+                mapping_vars = {"A": Value("B")}
+                cfg = default_for("gb", DEFAULT)
+                profile_store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            host = Host()
+            self.assertTrue(ProfilesMixin.update_button_mapping(host, "A"))
+            self.assertEqual(host.profile_store.get("gb")["mapping"]["A"], "B")
+            self.assertIn("mapping updated", host.status.get())
+            self.assertEqual(
+                ProfileStore(host.profile_store.path, DEFAULT).get("gb")["mapping"]["A"],
+                "B",
+            )
+
+    def test_restore_delta_preserves_local_data_and_untouched_consoles(self):
+        with TemporaryDirectory() as td:
+            current = all_profiles()
+            current["gba"]["zone_image"] = "/private/local-gba-art.png"
+            current["gba"]["rom_directory"] = "/private/rom-directory"
+            current["gb"]["zone_image"] = "/private/untouched-gb-art.png"
+            original = copy.deepcopy(current)
+            imported = parse_library_archive(
+                json.dumps(make_library_archive(current))
+            )
+            imported["gba"]["tolerance"] = 43
+            delta = portable_restore_delta(current, imported)
+            self.assertEqual(tuple(delta), ("gba",))
+            self.assertEqual(
+                delta["gba"]["zone_image"], "/private/local-gba-art.png"
+            )
+            self.assertEqual(
+                delta["gba"]["rom_directory"], "/private/rom-directory"
+            )
+            self.assertNotIn("zone_image", imported["gba"])
+            self.assertNotIn("rom_directory", imported["gba"])
+            self.assertEqual(current, original)
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            store.put_many(current)
+            before_gb = store.get("gb")
+            store.put_many(delta)
+            fresh = ProfileStore(store.path, DEFAULT)
+            self.assertEqual(fresh.get("gba")["tolerance"], 43)
+            self.assertEqual(
+                fresh.get("gba")["zone_image"], "/private/local-gba-art.png"
+            )
+            self.assertEqual(
+                fresh.get("gba")["rom_directory"], "/private/rom-directory"
+            )
+            self.assertEqual(fresh.get("gb"), before_gb)
+            self.assertEqual(
+                portable_restore_delta(fresh.profiles, imported), {}
+            )
+
+    def test_undo_conflicts_and_local_only_edits_are_preserved(self):
+        before = all_profiles()
+        before["gba"]["zone_image"] = "before-local-background.png"
+        applied = copy.deepcopy(before)
+        applied["gba"]["tolerance"] = 41
+        applied["snes"]["mapping"]["A"] = "B"
+        current = copy.deepcopy(applied)
+        current["gba"]["zone_image"] = "newer-local-background.png"
+        previous = {key: before[key] for key in ("gba", "snes")}
+        applied_subset = {key: applied[key] for key in previous}
+        current_subset = {key: current[key] for key in previous}
+        candidate, conflicts = prepare_restore_undo(
+            current_subset, applied_subset, previous
+        )
+        self.assertEqual(conflicts, ())
+        self.assertEqual(candidate["gba"]["tolerance"], before["gba"]["tolerance"])
+        self.assertEqual(
+            candidate["gba"]["zone_image"], "newer-local-background.png"
+        )
+        self.assertEqual(candidate["snes"]["mapping"], before["snes"]["mapping"])
+        self.assertEqual(current, applied | {"gba": current["gba"]})
+
+        current_subset["snes"]["mapping"]["A"] = "X"
+        current_subset["gba"]["tolerance"] = 55
+        _, conflicts = prepare_restore_undo(
+            current_subset, applied_subset, previous
+        )
+        self.assertEqual(conflicts, ("gba", "snes"))
+        with self.assertRaises(ValueError):
+            prepare_restore_undo(
+                {"gba": current_subset["gba"]},
+                applied_subset,
+                previous,
+            )
+        self.assertEqual(applied["gba"]["tolerance"], 41)
+
+    def test_failed_reset_does_not_change_visible_controls(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+
+        class Value:
+            def __init__(self, initial):
+                self.value = initial
+            def get(self):
+                return self.value
+            def set(self, v):
+                self.value = v
+
+        class FailingStore:
+            def __init__(self, saved):
+                self.saved = copy.deepcopy(saved)
+            def get(self, _system):
+                return copy.deepcopy(self.saved)
+            def put(self, *_args):
+                raise OSError("disk full")
+
+        class Host:
+            def __init__(self):
+                self.system_key = Value("gba")
+                self.cfg = default_for("gba", DEFAULT)
+                self.cfg["tolerance"] = 67
+                self.status = Value("")
+                self.profile_store = FailingStore(self.cfg)
+                self.stops = 0
+                self.refreshes = 0
+            def stop_controls(self):
+                self.stops += 1
+            def refresh_settings(self):
+                self.refreshes += 1
+
+        host = Host()
+        original = copy.deepcopy(host.cfg)
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ):
+            self.assertFalse(ProfilesMixin.reset_profile(host))
+        self.assertEqual(host.cfg, original)
+        self.assertEqual(host.profile_store.get("gba"), original)
+        self.assertEqual(host.refreshes, 0)
+        self.assertEqual(host.stops, 1)
+        self.assertIn("not saved", host.status.get())
+
+    def test_reset_keeps_local_artwork_paths_and_other_console_profiles(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            custom = default_for("gba", DEFAULT)
+            custom["tolerance"] = 67
+            custom["zone_image"] = "/private/original-artwork.png"
+            custom["rom_directory"] = "/private/roms"
+            custom["device_local_note"] = "keep me"
+            store.put("gba", custom)
+            other = store.get("snes")
+            other["tolerance"] = 61
+            store.put("snes", other)
+
+            class Value:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Host:
+                def __init__(self):
+                    self.system_key = Value("gba")
+                    self.zone_image_path = Value("/private/unsaved-artwork.png")
+                    self.cfg = store.get("gba")
+                    self.profile_store = store
+                    self.status = Value("")
+                    self._calibration_window = None
+                    self.stopped = 0
+                    self.refreshed = 0
+                def stop_controls(self):
+                    self.stopped += 1
+                def refresh_settings(self):
+                    self.refreshed += 1
+            app = Host()
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=False,
+            ) as declined:
+                self.assertFalse(ProfilesMixin.reset_profile(app))
+            declined.assert_called_once()
+            self.assertEqual(app.stopped, 0)
+            self.assertEqual(store.get("gba"), custom)
+            self.assertEqual(app.cfg["tolerance"], 67)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=True,
+            ) as approved:
+                self.assertTrue(ProfilesMixin.reset_profile(app))
+            approved.assert_called_once()
+            saved = store.get("gba")
+            defaults = default_for("gba", DEFAULT)
+            self.assertEqual(saved["zones"], defaults["zones"])
+            self.assertEqual(saved["mapping"], defaults["mapping"])
+            self.assertEqual(saved["tolerance"], defaults["tolerance"])
+            self.assertEqual(saved["zone_image"], "/private/unsaved-artwork.png")
+            self.assertEqual(saved["rom_directory"], "/private/roms")
+            self.assertEqual(saved["device_local_note"], "keep me")
+            self.assertEqual(store.get("snes"), other)
+            self.assertEqual(app.cfg, saved)
+            self.assertEqual(app.stopped, 1)
+            self.assertEqual(app.refreshed, 1)
+            self.assertIn("Local artwork was kept", app.status.get())
+
+    def test_reset_does_not_change_controls_during_calibration(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        class Value:
+            def get(self):
+                return "gba"
+        class Host:
+            system_key = Value()
+            _calibration_window = object()
+            root = None
+        app = Host()
+        with patch(
+            "anything_plays.ui_profiles.messagebox.showinfo",
+        ) as notice, patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+        ) as confirm:
+            self.assertFalse(ProfilesMixin.reset_profile(app))
+        notice.assert_called_once()
+        confirm.assert_not_called()
+
+    def test_last_reset_offers_undo_without_replacing_local_artwork(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            source = default_for("gba", DEFAULT)
+            source["tolerance"] = 72
+            source["zone_image"] = "/private/before.png"
+            store.put("gba", source)
+
+            class V:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Button:
+                def __init__(self):
+                    self.state = "disabled"
+                def configure(self, **kwargs):
+                    self.state = kwargs["state"]
+            class Host:
+                def __init__(self):
+                    self.system_key = V("gba")
+                    self.zone_image_path = V("/private/before.png")
+                    self.status = V("")
+                    self._calibration_window = None
+                    self.profile_store = store
+                    self.cfg = store.get("gba")
+                    self._undo_profile_reset_button = Button()
+                    self.stops = 0
+                def read_settings(self):
+                    self.cfg["tolerance"] = self.tolerance.get()
+                    self.cfg["zone_image"] = self.zone_image_path.get()
+                def stop_controls(self):
+                    self.stops += 1
+                def refresh_settings(self):
+                    self.tolerance.set(self.cfg["tolerance"])
+                    self.zone_image_path.set(self.cfg["zone_image"])
+            host = Host()
+            host.tolerance = V(72)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=True,
+            ):
+                self.assertTrue(ProfilesMixin.reset_profile(host))
+            self.assertEqual(host._undo_profile_reset_button.state, "normal")
+            self.assertEqual(
+                store.get("gba")["tolerance"],
+                default_for("gba", DEFAULT)["tolerance"],
+            )
+            host.zone_image_path.set("/private/newer-artwork.png")
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+            ) as no_conflict:
+                self.assertTrue(ProfilesMixin.undo_profile_reset(host))
+            no_conflict.assert_not_called()
+            restored = store.get("gba")
+            self.assertEqual(restored["tolerance"], 72)
+            self.assertEqual(restored["zone_image"], "/private/newer-artwork.png")
+            self.assertEqual(host._undo_profile_reset_button.state, "disabled")
+            self.assertIsNone(host._last_profile_reset)
+            self.assertEqual(host.stops, 2)
+
+    def test_undo_reset_requires_consent_before_overriding_later_edits(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "p.json", DEFAULT)
+            class V:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Host:
+                def __init__(self):
+                    self.system_key = V("gb")
+                    self.cfg = default_for("gb", DEFAULT)
+                    self.tolerance = V(61)
+                    self.status = V("")
+                    self.profile_store = store
+                    self._calibration_window = None
+                    self._last_profile_reset = (
+                        "gb",
+                        {**default_for("gb", DEFAULT), "tolerance": 61},
+                        default_for("gb", DEFAULT),
+                    )
+                def read_settings(self):
+                    self.cfg["tolerance"] = self.tolerance.get()
+            host = Host()
+            host.tolerance.set(41)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=False,
+            ) as declined:
+                self.assertFalse(ProfilesMixin.undo_profile_reset(host))
+            declined.assert_called_once()
+            self.assertIn("newer control edits", declined.call_args.args[0].lower())
+            self.assertEqual(host.tolerance.get(), 41)
+            self.assertIsNotNone(host._last_profile_reset)
+            self.assertEqual(store.get("gb")["tolerance"],
+                             default_for("gb", DEFAULT)["tolerance"])
+
+    def test_change_preview_identifies_only_changed_portable_console_settings(self):
+        from anything_plays.portable_profile_library import changed_systems
+        baseline = all_profiles()
+        identical = parse_library_archive(
+            json.dumps(make_library_archive(baseline))
+        )
+        self.assertEqual(changed_systems(baseline, identical), ())
+        altered = copy.deepcopy(identical)
+        altered["gba"]["tolerance"] = 33
+        altered["gamecube"]["mapping"]["A"] = "B"
+        self.assertEqual(
+            changed_systems(baseline, altered), ("gba", "gamecube")
+        )
+        baseline["snes"]["rom_directory"] = "/private/roms"
+        baseline["snes"]["zone_image"] = "/private/camera.jpg"
+        self.assertEqual(
+            changed_systems(baseline, altered), ("gba", "gamecube")
+        )
+
+    def test_change_preview_rejects_incomplete_profiles_without_side_effects(self):
+        from anything_plays.portable_profile_library import changed_systems
+        baseline = all_profiles()
+        incoming = parse_library_archive(
+            json.dumps(make_library_archive(baseline))
+        )
+        original = copy.deepcopy(incoming)
+        with self.assertRaises(ValueError):
+            changed_systems({"gba": baseline["gba"]}, incoming)
+        tampered = copy.deepcopy(incoming)
+        del tampered["gb"]
+        with self.assertRaises(ValueError):
+            changed_systems(baseline, tampered)
+        self.assertEqual(incoming, original)
+
+    def test_failed_tk_refresh_rolls_back_committed_all_console_undo(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        from anything_plays.system_profiles import ProfileStore
+        from anything_plays.settings_defaults import DEFAULT
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+
+        class Variable:
+            def __init__(self, value):
+                self.value = value
+            def get(self):
+                return self.value
+            def set(self, value):
+                self.value = value
+
+        class FakeButton:
+            def __init__(self):
+                self.state = "normal"
+            def configure(self, **kwargs):
+                self.state = kwargs["state"]
+
+        with TemporaryDirectory() as root:
+            store = ProfileStore(Path(root) / "profiles.json", DEFAULT)
+            before = store.get("gba")
+            applied = copy.deepcopy(before)
+            applied["tolerance"] = (
+                before["tolerance"] + 1 if before["tolerance"] < 90
+                else before["tolerance"] - 1
+            )
+            store.put("gba", applied)
+
+            class Host:
+                def __init__(self):
+                    self.profile_store = store
+                    self.system_key = Variable("gba")
+                    self.cfg = store.get("gba")
+                    self.root = None
+                    self.status = Variable("")
+                    self._calibration_window = None
+                    self._last_profile_archive_import = {"gba": before}
+                    self._last_profile_archive_applied = {"gba": applied}
+                    self._undo_all_profile_restore_button = FakeButton()
+                    self.refresh_attempts = 0
+                    self.stops = 0
+                def read_settings(self):
+                    pass
+                def stop_controls(self):
+                    self.stops += 1
+                def refresh_settings(self):
+                    self.refresh_attempts += 1
+                    if self.refresh_attempts == 1:
+                        raise RuntimeError("synthetic Tk refresh failure")
+
+            host = Host()
+            # A refresh can fail for reasons other than an invalid Tk
+            # input value. It must still trigger the durable rollback.
+            with patch("anything_plays.ui_profiles.messagebox.showerror") as error:
+                ProfilesMixin.undo_all_profile_restore(host)
+            self.assertEqual(error.call_count, 1)
+            self.assertEqual(host.profile_store.get("gba"), applied)
+            self.assertEqual(host.cfg, applied)
+            self.assertEqual(host._last_profile_archive_import, {"gba": before})
+            self.assertEqual(host._undo_all_profile_restore_button.state, "normal")
+            self.assertEqual(host.stops, 1)
+            self.assertEqual(host.refresh_attempts, 2)
+
+            # A persistently broken widget can also throw while rollback
+            # tries to refresh it; the Undo button must remain usable.
+            def still_broken():
+                raise RuntimeError("synthetic permanent Tk widget failure")
+            host.refresh_settings = still_broken
+            with patch("anything_plays.ui_profiles.messagebox.showerror") as error:
+                ProfilesMixin.undo_all_profile_restore(host)
+            error.assert_called_once()
+            self.assertEqual(host.profile_store.get("gba"), applied)
+            self.assertEqual(host._last_profile_archive_import, {"gba": before})
+            self.assertEqual(host._undo_all_profile_restore_button.state, "normal")
+            self.assertIn("Undo was not completed", host.status.get())
+
+    def test_actual_installed_preview_smoke_exercises_backup_restore_undo(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "anything_plays/preview_setup_smoke.py"
+        ).read_text("utf-8")
+        required = (
+            "_exercise_installed_control_archive(app, root)",
+            '_click_button(root, "Back up all 18")',
+            '_click_button(root, "Restore all 18")',
+            '_click_button(root, "Undo all restore")',
+            'return_value=False',
+            'return_value=True',
+            'rejected.call_count != 1',
+            '"v32_control_archive_roundtrip_verified"',
+        )
+        for token in required:
+            with self.subTest(token=token):
+                self.assertIn(token, source)
+        from tools.verify_v32_installed_gui import REQUIRED_TRUE
+        self.assertIn("v32_control_archive_roundtrip_verified", REQUIRED_TRUE)
+
+    def test_frozen_ttk_undo_control_uses_native_state_instead_of_string_equality(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "anything_plays/preview_setup_smoke.py"
+        ).read_text("utf-8")
+        # Restrict the assertion to calls on this specific Undo widget:
+        # the nearby explanatory comment legitimately mentions cget().
+        self.assertNotIn(
+            '_undo_all_profile_restore_button.cget("state")', source,
+        )
+        self.assertIn(
+            '_undo_all_profile_restore_button.instate(["disabled"])',
+            source,
+        )
+        self.assertIn(
+            '_undo_all_profile_restore_button.instate(["!disabled"])',
+            source,
+        )
+
+    def test_backup_ui_uses_atomic_full_set_and_disarms_controls(self):
+        source = (Path(__file__).resolve().parents[1]
+                  / "anything_plays/ui_profiles.py").read_text("utf-8")
+        from ast import parse, FunctionDef, ClassDef, walk, Call, Attribute
+        tree = parse(source)
+        cls = next(item for item in tree.body
+                   if isinstance(item, ClassDef) and item.name == "ProfilesMixin")
+        methods = {item.name: item for item in cls.body
+                   if isinstance(item, FunctionDef)}
+        for method in ("restore_all_profiles", "undo_all_profile_restore"):
+            fn = methods[method]
+            calls = [node.func.attr for node in walk(fn)
+                     if isinstance(node, Call) and isinstance(node.func, Attribute)]
+            self.assertIn("stop_controls", calls)
+            self.assertIn("put_many", calls)
+        self.assertIn("askyesno", source)
+        self.assertIn("_last_profile_archive_import", source)
+
+
+if __name__ == "__main__":
+    unittest.main()

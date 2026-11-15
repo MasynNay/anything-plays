@@ -7,6 +7,7 @@ development defaults to the existing safe Preview 1 settings namespace.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -39,6 +40,25 @@ IDENTITIES = {
         "version": "3.1.0",
         "channel": "final_candidate",
         "title": "Anything Plays 3.1",
+        "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
+    "v32_preview": {
+        "version": "3.2.0-preview",
+        "channel": "v32_preview",
+        "title": "Anything Plays 3.2 · Development Preview",
+        # No previous public/RC app uses this folder.
+        "settings_namespace": "anything-plays-32-preview",
+        "public_release_approved": False,
+    },
+    # Private source-only candidate for an actual 3.1.1 -> 3.2.0 upgrade.
+    # It deliberately reuses the stable 3.1.x namespace, so testing MUST
+    # happen under disposable CI homes, never in the user's live install.
+    # Selecting this marker never authorizes core redistribution or release.
+    "v32_stable_candidate": {
+        "version": "3.2.0",
+        "channel": "v32_stable_candidate",
+        "title": "Anything Plays 3.2",
         "settings_namespace": "anything-plays-31",
         "public_release_approved": False,
     },
@@ -92,6 +112,11 @@ def current_identity(path=None):
     """Fail closed on a corrupt embedded marker; never guess an RC identity."""
     marker = Path(path) if path is not None else embedded_identity_path()
     if not marker.is_file():
+        # Explicit source-only preview launcher; frozen installers always
+        # require their embedded, reviewed identity, never an env override.
+        if (not getattr(sys, "frozen", False)
+                and os.environ.get("AP_V32_PREVIEW") == "1"):
+            return make_identity("v32_preview")
         return make_identity(FALLBACK_CHANNEL)
     return validate_identity(json.loads(marker.read_text(encoding="utf-8")))
 
