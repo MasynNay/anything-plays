@@ -146,6 +146,11 @@ class GameCubeHardwareSession(CoreSession):
             self.gpu_readback_calls += 1
             self._last_preview_capture = now
             with self.emulator.lock:
+                # A Stop can arrive while glReadPixels is blocking. Never
+                # let that late result repaint a stopped/failed session even
+                # though the pre-read callback guard saw an active game.
+                if self.emulator.stop_event.is_set() or self.opengl_error is not None:
+                    return
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1
