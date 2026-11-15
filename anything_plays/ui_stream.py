@@ -504,15 +504,23 @@ class StreamMixin:
         h = max(400, min(1600, canvas.winfo_height()))
         active_game = bool(self.emu.running and self.uses_embedded_emulator())
         if active_game:
+            # Protect only the native-owned pixel snapshot. Converting a
+            # possibly large NumPy array to a PIL image can allocate/copy
+            # more memory; doing that under the emulator lock blocks native
+            # frame publishing and adds avoidable gameplay latency.
+            changed = False
+            fresh = None
             with self.emu.lock:
                 serial = getattr(self.emu, "frame_serial", 0)
                 if serial != self._stream_game_serial:
                     fresh = (None if self.emu.frame is None
                              else self.emu.frame[:, :, :3].copy())
-                    self._stream_game_frame = (
-                        Image.fromarray(fresh) if fresh is not None else None
-                    )
-                    self._stream_game_serial = serial
+                    changed = True
+            if changed:
+                self._stream_game_frame = (
+                    Image.fromarray(fresh) if fresh is not None else None
+                )
+                self._stream_game_serial = serial
         else:
             serial = None
             self._stream_game_frame = None
