@@ -137,6 +137,13 @@ class AuxiliaryPanelsMixin:
         self._undo_all_profile_restore_button.grid(
             row=3, column=0, columnspan=2, sticky='ew', pady=(5, 0),
         )
+        self._undo_profile_reset_button = ttk.Button(
+            profiles, text='Undo reset',
+            command=self.undo_profile_reset, state='disabled',
+        )
+        self._undo_profile_reset_button.grid(
+            row=4, column=0, columnspan=2, sticky='ew', pady=(5, 0),
+        )
         ttk.Label(
             right,
             text='Exported profiles contain controls and theme only. '

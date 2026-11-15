@@ -399,6 +399,110 @@ class AllConsoleBackupTests(unittest.TestCase):
         notice.assert_called_once()
         confirm.assert_not_called()
 
+    def test_last_reset_offers_undo_without_replacing_local_artwork(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "profiles.json", DEFAULT)
+            source = default_for("gba", DEFAULT)
+            source["tolerance"] = 72
+            source["zone_image"] = "/private/before.png"
+            store.put("gba", source)
+
+            class V:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Button:
+                def __init__(self):
+                    self.state = "disabled"
+                def configure(self, **kwargs):
+                    self.state = kwargs["state"]
+            class Host:
+                def __init__(self):
+                    self.system_key = V("gba")
+                    self.zone_image_path = V("/private/before.png")
+                    self.status = V("")
+                    self._calibration_window = None
+                    self.profile_store = store
+                    self.cfg = store.get("gba")
+                    self._undo_profile_reset_button = Button()
+                    self.stops = 0
+                def read_settings(self):
+                    self.cfg["tolerance"] = self.tolerance.get()
+                    self.cfg["zone_image"] = self.zone_image_path.get()
+                def stop_controls(self):
+                    self.stops += 1
+                def refresh_settings(self):
+                    self.tolerance.set(self.cfg["tolerance"])
+                    self.zone_image_path.set(self.cfg["zone_image"])
+            host = Host()
+            host.tolerance = V(72)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=True,
+            ):
+                self.assertTrue(ProfilesMixin.reset_profile(host))
+            self.assertEqual(host._undo_profile_reset_button.state, "normal")
+            self.assertEqual(
+                store.get("gba")["tolerance"],
+                default_for("gba", DEFAULT)["tolerance"],
+            )
+            host.zone_image_path.set("/private/newer-artwork.png")
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+            ) as no_conflict:
+                self.assertTrue(ProfilesMixin.undo_profile_reset(host))
+            no_conflict.assert_not_called()
+            restored = store.get("gba")
+            self.assertEqual(restored["tolerance"], 72)
+            self.assertEqual(restored["zone_image"], "/private/newer-artwork.png")
+            self.assertEqual(host._undo_profile_reset_button.state, "disabled")
+            self.assertIsNone(host._last_profile_reset)
+            self.assertEqual(host.stops, 2)
+
+    def test_undo_reset_requires_consent_before_overriding_later_edits(self):
+        from anything_plays.ui_profiles import ProfilesMixin
+        with TemporaryDirectory() as td:
+            store = ProfileStore(Path(td) / "p.json", DEFAULT)
+            class V:
+                def __init__(self, value):
+                    self.value = value
+                def get(self):
+                    return self.value
+                def set(self, value):
+                    self.value = value
+            class Host:
+                def __init__(self):
+                    self.system_key = V("gb")
+                    self.cfg = default_for("gb", DEFAULT)
+                    self.tolerance = V(61)
+                    self.status = V("")
+                    self.profile_store = store
+                    self._calibration_window = None
+                    self._last_profile_reset = (
+                        "gb",
+                        {**default_for("gb", DEFAULT), "tolerance": 61},
+                        default_for("gb", DEFAULT),
+                    )
+                def read_settings(self):
+                    self.cfg["tolerance"] = self.tolerance.get()
+            host = Host()
+            host.tolerance.set(41)
+            with patch(
+                "anything_plays.ui_profiles.messagebox.askyesno",
+                return_value=False,
+            ) as declined:
+                self.assertFalse(ProfilesMixin.undo_profile_reset(host))
+            declined.assert_called_once()
+            self.assertIn("newer control edits", declined.call_args.args[0].lower())
+            self.assertEqual(host.tolerance.get(), 41)
+            self.assertIsNotNone(host._last_profile_reset)
+            self.assertEqual(store.get("gb")["tolerance"],
+                             default_for("gb", DEFAULT)["tolerance"])
+
     def test_change_preview_identifies_only_changed_portable_console_settings(self):
         from anything_plays.portable_profile_library import changed_systems
         baseline = all_profiles()

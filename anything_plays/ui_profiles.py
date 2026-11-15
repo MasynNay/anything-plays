@@ -834,6 +834,14 @@ class ProfilesMixin:
         ):
             self.status.set("Reset canceled; current controls were kept.")
             return False
+        # Reset may follow unsaved edits to advanced spinboxes. Capture
+        # validated visible values when possible so Undo reset can recover
+        # the player's exact pre-reset layout. Invalid settings can still
+        # be reset using the last validated in-memory control profile.
+        try:
+            self.read_settings()
+        except (ValueError, TypeError, tk.TclError, AttributeError):
+            pass
         prior_ui = copy.deepcopy(self.cfg)
         prior_saved = self.profile_store.get(system)
         # Zone artwork can have changed in Tk without being copied into cfg.
@@ -872,8 +880,103 @@ class ProfilesMixin:
                 "in the editor; check profile storage before continuing."
             )
             return False
+        self._last_profile_reset = (
+            system, copy.deepcopy(local_profile), copy.deepcopy(self.cfg),
+        )
+        undo_reset = getattr(self, "_undo_profile_reset_button", None)
+        if undo_reset is not None:
+            undo_reset.configure(state="normal")
         self.status.set(
             f"{SYSTEMS[system].title} controls reset to defaults. "
-            "Local artwork was kept; camera-controlled input remains stopped."
+            "Local artwork was kept. Use Undo reset to restore your previous "
+            "controls; camera-controlled input remains stopped."
+        )
+        return True
+
+    def undo_profile_reset(self):
+        """Restore the last reset without discarding newer private settings."""
+        snapshot = getattr(self, "_last_profile_reset", None)
+        if snapshot is None:
+            return False
+        system, previous, applied = snapshot
+        if self.system_key.get() != system:
+            messagebox.showinfo(
+                "Undo reset", f"Switch back to {SYSTEMS[system].title} to undo reset.",
+                parent=getattr(self, "root", None),
+            )
+            return False
+        if getattr(self, "_calibration_window", None) is not None:
+            messagebox.showinfo(
+                "Undo reset", "Finish or cancel camera calibration before undoing.",
+                parent=getattr(self, "root", None),
+            )
+            return False
+        try:
+            self.read_settings()
+            current = copy.deepcopy(self.cfg)
+            old_controls = make_bundle(system, previous)["profile"]
+            applied_controls = make_bundle(system, applied)["profile"]
+            current_controls = make_bundle(system, current)["profile"]
+            target = merge_portable_profile(system, current, old_controls)
+        except (ValueError, TypeError, tk.TclError) as exc:
+            messagebox.showerror(
+                "Undo reset", "Cannot review current controls. Correct invalid "
+                "settings before retrying Undo reset.",
+                parent=getattr(self, "root", None),
+            )
+            return False
+        if current_controls != applied_controls:
+            if not messagebox.askyesno(
+                "Review newer control edits",
+                "Camera controls changed after Reset. Undo reset will "
+                "replace those newer control changes with the pre-reset "
+                "layout. Local artwork and ROM paths will be kept.\n\n"
+                "Continue with Undo reset?",
+                parent=getattr(self, "root", None),
+            ):
+                self.status.set(
+                    "Undo reset canceled; newer control edits were kept."
+                )
+                return False
+        saved_before = self.profile_store.get(system)
+        self.stop_controls()
+        committed = False
+        try:
+            self.profile_store.put(system, target)
+            committed = True
+            self.cfg = self.profile_store.get(system)
+            self.refresh_settings()
+        except (OSError, ValueError, TypeError, tk.TclError, RuntimeError):
+            rollback_failed = False
+            if committed:
+                try:
+                    self.profile_store.put(system, saved_before)
+                except (OSError, ValueError, TypeError):
+                    rollback_failed = True
+            self.cfg = current
+            try:
+                self.refresh_settings()
+            except (ValueError, TypeError, tk.TclError, RuntimeError):
+                pass
+            self.status.set(
+                "Undo reset failed; inspect profile storage before playing."
+                if rollback_failed else
+                "Undo reset did not finish. Previous controls were retained."
+            )
+            messagebox.showerror(
+                "Undo reset",
+                "Undo failed and saved profile recovery was unsuccessful."
+                if rollback_failed else
+                "Undo reset could not be completed. You may retry.",
+                parent=getattr(self, "root", None),
+            )
+            return False
+        self._last_profile_reset = None
+        undo_reset = getattr(self, "_undo_profile_reset_button", None)
+        if undo_reset is not None:
+            undo_reset.configure(state="disabled")
+        self.status.set(
+            "Pre-reset controls restored. Later local artwork and private "
+            "settings were kept; object controls remain paused."
         )
         return True

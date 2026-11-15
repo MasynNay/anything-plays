@@ -381,6 +381,35 @@ def _exercise_installed_control_archive(app, root):
                 or app.armed or app.cap is not None
                 or app._gamepad.api is not None):
             raise RuntimeError("Frozen reset erased local artwork or activated input")
+        # Undo reset must recover the original controls without undoing
+        # subsequent artwork changes or silently discarding newer controls.
+        if not app._undo_profile_reset_button.instate(["!disabled"]):
+            raise RuntimeError("Frozen reset failed to offer Undo")
+        app.zone_image_path.set("artwork-after-reset.png")
+        app.tolerance.set(
+            49 if default_for(selected, DEFAULT)["tolerance"] != 49 else 48
+        )
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=False,
+        ) as decline_undo_reset:
+            _click_button(root, "Undo reset")
+        if decline_undo_reset.call_count != 1:
+            raise RuntimeError("Frozen Undo reset discarded newer control edits")
+        with patch(
+            "anything_plays.ui_profiles.messagebox.askyesno",
+            return_value=True,
+        ) as approve_undo_reset:
+            _click_button(root, "Undo reset")
+        if approve_undo_reset.call_count != 1:
+            raise RuntimeError("Frozen Undo reset lacked conflict confirmation")
+        after_undo_reset = app.profile_store.get(selected)
+        if (after_undo_reset["tolerance"] != reset_source["tolerance"]
+                or after_undo_reset["zone_image"] != "artwork-after-reset.png"
+                or not app._undo_profile_reset_button.instate(["disabled"])
+                or app.armed or app.cap is not None
+                or app._gamepad.api is not None):
+            raise RuntimeError("Frozen Undo reset failed to restore controls safely")
     return True
 
 

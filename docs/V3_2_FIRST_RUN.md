@@ -116,6 +116,18 @@ action auto-saved a change while calibration was open. This prevents a
 canceled sample from discarding an unrelated unsaved layout or unexpectedly
 committing it to the local profile store.
 
+## Reversible Reset controls
+
+Approving **Reset controls** now enables a session-only **Undo reset** button
+in Safety & Profiles. Undo restores the prior camera-control layout and
+detection settings without overwriting newer local zone-art paths, ROM folders
+or unrelated settings. New control edits made after resetting trigger an
+explicit confirmation before they are replaced. A failed disk write or
+interface refresh leaves the Undo snapshot available for retry, and camera
+controls remain stopped. Switching to another console does not discard the
+snapshot; switch back to the reset console to use Undo. The private frozen
+Tk GUI smoke exercises a rejected and approved Undo reset with later edits.
+
 ## Transactional console-editor switching
 
 Reading controls from the editor now builds a complete candidate profile
