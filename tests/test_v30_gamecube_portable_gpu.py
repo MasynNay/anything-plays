@@ -20,12 +20,13 @@ class PortableGameCubeHostTests(TestCase):
         host.width = host.height = 4
         host.fbo = 7
         calls = []
+        readback_errors = [0, 0x0506]
 
         def gl(name, _result, _arguments):
             def call(*args):
                 calls.append(name)
                 if name == "glGetError":
-                    return 0x0506  # GL_INVALID_FRAMEBUFFER_OPERATION
+                    return readback_errors.pop(0)
                 return None
             return call
 
@@ -36,6 +37,31 @@ class PortableGameCubeHostTests(TestCase):
         self.assertIn("glReadPixels", calls)
         self.assertIn("glBindFramebuffer", calls)
         self.assertEqual(calls[-1], "glGetError")
+
+    def test_old_gl_error_does_not_invalidate_successful_readback(self):
+        # An unrelated stale error from an earlier Dolphin render should be
+        # drained, while a new error from glReadPixels remains fatal.
+        host = EGLFrameHost.__new__(EGLFrameHost)
+        host.owner = threading.get_ident()
+        host.width = host.height = 2
+        host.fbo = 11
+        errors = [0x0502, 0, 0]
+        calls = []
+
+        def gl(name, _result, _arguments):
+            def call(*args):
+                calls.append(name)
+                if name == "glGetError":
+                    return errors.pop(0)
+                return None
+            return call
+
+        host._gl = gl
+        frame = host.read_frame(2, 2)
+        self.assertEqual(frame.shape, (2, 2, 3))
+        self.assertEqual(host.last_gl_error, 0)
+        self.assertIn("glReadPixels", calls)
+        self.assertEqual(errors, [])
 
     def test_shared_framebuffer_reader_accepts_successful_gl_readback(self):
         host = EGLFrameHost.__new__(EGLFrameHost)
