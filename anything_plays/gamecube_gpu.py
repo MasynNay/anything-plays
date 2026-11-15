@@ -100,13 +100,13 @@ class GameCubeHardwareSession(CoreSession):
         if not data:
             self.null_video_callbacks += 1
             return
+        # After a hardware error Dolphin may briefly emit *software* video
+        # callbacks too. Never publish ANY frame after graphics failure or
+        # while a native Stop request is in progress.
+        if (self.opengl_error is not None or
+                self.emulator.stop_event.is_set()):
+            return
         if data == RETRO_HW_FRAME_BUFFER_VALID:
-            # Stop promptly after a failed native readback. Dolphin can issue
-            # another video callback while its worker exits; avoid reopening
-            # a failed GL path or retaining new frames after shutdown.
-            if (self.opengl_error is not None or
-                    self.emulator.stop_event.is_set()):
-                return
             # glReadPixels blocks on GPU/CPU synchronization. Copy only as
             # fast as the selected preview rate, but NEVER skip retro_run()
             # frames, audio, controller updates, or internal Dolphin work.
@@ -134,7 +134,10 @@ class GameCubeHardwareSession(CoreSession):
                 # shutdown while inside this Python callback: an uncaught
                 # exception crossing ctypes can leave Dolphin running with a
                 # permanently stale display. Do not retry this broken host.
-                self.opengl_error = f"{type(exc).__name__}: {str(exc)[:120]}"
+                # Native GL/driver messages can include private filesystem
+                # locations or attached-device identifiers. Preserve only a
+                # fixed failure type for the app and private research report.
+                self.opengl_error = f"GPU readback failed ({type(exc).__name__})"
                 self.emulator.stop_event.set()
                 return
             duration = max(0.0, time.perf_counter() - begun)
