@@ -257,6 +257,12 @@ class EGLFrameHost:
                 GL_READ_FRAMEBUFFER, old_read.value
             )
         self.last_gl_error = self._gl("glGetError", C.c_uint, [])()
+        if self.last_gl_error:
+            # glReadPixels can fail without raising a Python exception. The
+            # destination buffer remains zero-filled, which otherwise looks
+            # like a valid (but permanently black) video frame. Fail closed
+            # with a fixed error category; do not include GPU vendor strings.
+            raise RuntimeError("GPU readback OpenGL error")
         arr = np.frombuffer(image, dtype=np.uint8).reshape(h, w, 4)[:, :, :3]
         return arr[::-1].copy() if flip_vertical else arr.copy()
 
