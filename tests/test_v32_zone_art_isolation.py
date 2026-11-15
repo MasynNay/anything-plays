@@ -18,6 +18,7 @@ from anything_plays.ui_zones import ZonesMixin
 from anything_plays.zone_art_storage import (
     save_cached_zone_art, zone_art_cache_path,
 )
+from tools.verify_v32_installed_gui import REQUIRED_TRUE
 
 
 class Value:
@@ -30,6 +31,9 @@ class Value:
 
 
 class ZoneStorageTests(unittest.TestCase):
+    def test_frozen_installer_must_verify_console_specific_cache(self):
+        self.assertIn("v32_console_artwork_isolation_verified", REQUIRED_TRUE)
+
     def test_preview_image_stays_private_and_legacy_cache_untouched(self):
         with TemporaryDirectory() as td:
             base = Path(td)

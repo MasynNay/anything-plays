@@ -384,6 +384,68 @@ def _exercise_installed_control_archive(app, root):
     return True
 
 
+def _exercise_installed_artwork_downloads(app):
+    """Prove the actual frozen URL action keeps separate images per console.
+
+    Synthetic PNG responses are injected, so no network traffic, webcam,
+    ROM or controller hardware is involved in this acceptance check.
+    """
+    import io
+    from pathlib import Path
+    from PIL import Image
+
+    initial = app.system_key.get()
+    other = "snes" if initial != "snes" else "gba"
+
+    def download_color(system, rgb):
+        source = io.BytesIO()
+        Image.new("RGB", (3, 4), rgb).save(source, format="PNG")
+        source.seek(0)
+        with patch(
+            "anything_plays.ui_zones.simpledialog.askstring",
+            return_value=f"https://example.invalid/{system}.png",
+        ), patch(
+            "anything_plays.ui_zones.urllib.request.urlopen",
+            return_value=source,
+        ) as network, patch(
+            "anything_plays.ui_zones.messagebox.showerror",
+        ) as errors:
+            app.ask_zone_url()
+        network.assert_called_once()
+        errors.assert_not_called()
+        cache = Path(app.zone_image_path.get())
+        if cache.name != f"zone-art-{system}.png":
+            raise RuntimeError("Frozen preview used a shared artwork filename")
+        if cache.parent != app.preferences_path.parent or not cache.is_file():
+            raise RuntimeError("Frozen artwork escaped private preview settings")
+        with Image.open(cache) as saved:
+            if saved.getpixel((0, 0)) != rgb:
+                raise RuntimeError("Frozen artwork colors changed after caching")
+        return cache
+
+    try:
+        first = download_color(initial, (14, 44, 190))
+        original_bytes = first.read_bytes()
+        app.system_key.set(other)
+        if app.switch_system() is not True:
+            raise RuntimeError("Frozen preview could not select second console")
+        second = download_color(other, (205, 112, 18))
+        if first == second or first.read_bytes() != original_bytes:
+            raise RuntimeError("Second console overwrote first console artwork")
+        app.system_key.set(initial)
+        if app.switch_system() is not True:
+            raise RuntimeError("Frozen preview could not restore first console")
+        if app.zone_image_path.get() != str(first):
+            raise RuntimeError("Frozen console switch lost prior artwork path")
+    finally:
+        if app.system_key.get() != initial:
+            app.system_key.set(initial)
+            app.switch_system()
+    if app.cap is not None or app.armed or app._gamepad.api is not None:
+        raise RuntimeError("Artwork download unexpectedly activated hardware")
+    return True
+
+
 def _one_installed_setup_roundtrip(app, root):
     """Open/close five real dialogs, including the no-device safety checks."""
     # Get started is the single onboarding entry. Verify the real native
@@ -475,6 +537,7 @@ def exercise_installed_preview_setup(app, root):
     original_windows = _live_toplevels(root)
     original_traces = len(app.theme_name.trace_info())
     control_archive_verified = _exercise_installed_control_archive(app, root)
+    private_artwork_verified = _exercise_installed_artwork_downloads(app)
     if _live_toplevels(root) != original_windows:
         raise RuntimeError("Frozen control backup left a native Tk dialog")
     if len(app.theme_name.trace_info()) != original_traces:
@@ -640,6 +703,7 @@ def exercise_installed_preview_setup(app, root):
         "v32_setup_gamepad_untouched": True,
         "v32_setup_still_disarmed": True,
         "v32_control_archive_roundtrip_verified": control_archive_verified,
+        "v32_console_artwork_isolation_verified": private_artwork_verified,
         "v32_single_control_export_isolated": True,
         "v32_unsaved_shutdown_guard_verified": True,
     }
