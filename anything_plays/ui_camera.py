@@ -39,8 +39,11 @@ class CameraMixin:
             # queue or keep the entire interface alive after it closes.
             try:
                 results.put((discover(), None))
-            except Exception as exc:
-                results.put(([], str(exc)))
+            except Exception:
+                # Discovery backends sometimes include camera serials, user
+                # directories and driver paths in exception text. Only a
+                # boolean failure flag crosses to Tk; no raw error strings.
+                results.put(([], True))
 
         threading.Thread(target=worker, daemon=True, name='camera-discovery').start()
         self.root.after(80, self._poll_camera_scan)
@@ -91,9 +94,9 @@ class CameraMixin:
         else:
             self.camera_name.set('')
             self.status.set(
-                'No usable cameras found.'
-                + (f' {error}' if error
-                   else ' Check permissions or click Refresh cameras.')
+                'No usable cameras found. '
+                + ('Camera search failed; ' if error else '')
+                + 'check permissions or click Refresh cameras.'
             )
 
     def cancel_camera_reconnect(self):
