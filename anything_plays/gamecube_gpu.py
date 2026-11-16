@@ -117,6 +117,11 @@ class GameCubeHardwareSession(CoreSession):
             mode = getattr(
                 self.emulator, "gamecube_preview_mode", DEFAULT_PREVIEW_MODE
             )
+            tracker = getattr(self, "_preview_cadence", None)
+            if tracker is not None:
+                # Show the requested new preview cap immediately, even when
+                # throttling skips the first callback after a mode change.
+                tracker.reset_for(mode)
             if not should_capture(self._last_preview_capture, now, mode):
                 self.preview_readback_skips += 1
                 return
