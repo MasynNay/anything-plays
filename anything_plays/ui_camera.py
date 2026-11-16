@@ -556,41 +556,87 @@ class CameraMixin:
             if self.action.get() != message:
                 self.action.set(message)
 
-        # Calibration consumes observations from the same tracking pass.
-        # Never open another webcam or duplicate color processing.
+        # Gameplay input has ALREADY been dispatched. Cosmetic overlays,
+        # calibration, the OBS mirror and primary Tk preview are optional;
+        # errors here may not disarm P1/P2 or stop a healthy camera.
         note = getattr(self, "calibration_note_frame", None)
         if callable(note):
-            note(primary, mapping, (w, h))
+            try:
+                note(primary, mapping, (w, h))
+            except Exception:
+                pass  # No private native driver/ROM path text in UI.
 
-        for center, contour, contour_color in annotations:
-            cv2.circle(frame, center, 7, contour_color, -1)
-            cv2.drawContours(frame, [contour], -1, contour_color, 2)
-        frame = self.render_zones(frame, active_zones)
-        # Reuse this already-annotated camera frame in the OBS capture view.
-        # No second VideoCapture instance, camera permissions or tracking run.
+        try:
+            for center, contour, contour_color in annotations:
+                cv2.circle(frame, center, 7, contour_color, -1)
+                cv2.drawContours(frame, [contour], -1, contour_color, 2)
+            frame = self.render_zones(frame, active_zones)
+        except Exception:
+            # The already-dispatched controls remain valid; draw an
+            # unannotated frame instead of exposing partial overlays.
+            try:
+                frame = self.frame.copy()
+            except Exception:
+                self._clear_failed_camera_preview()
+                clear = getattr(self, "stream_clear_camera", None)
+                if callable(clear):
+                    try:
+                        clear()
+                    except Exception:
+                        pass
+                return
+
         if getattr(self, "_stream_output_window", None) is not None:
-            self.stream_camera_snapshot(frame)
-        geom = self.geometry()
-        if geom:
-            x, y, dw, dh, _, _ = geom
-            rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)), cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(rgb)
-            photo = self.camera_photo
-            if (photo is None or photo.width() != dw or
-                    photo.height() != dh):
-                # Reuse the Tcl image buffer while webcam dimensions stay
-                # stable, preventing native allocation growth for long runs.
-                photo = ImageTk.PhotoImage(image)
-            else:
-                photo.paste(image)
-            item = getattr(self, "_camera_canvas_item", None)
-            if item is None or not self.canvas.type(item):
-                self.canvas.delete("all")
-                item = self.canvas.create_image(
-                    x, y, anchor="nw", image=photo
-                )
-                self._camera_canvas_item = item
-            else:
-                self.canvas.coords(item, x, y)
-                self.canvas.itemconfigure(item, image=photo)
-            self.camera_photo = photo
+            try:
+                self.stream_camera_snapshot(frame)
+            except Exception:
+                # A failed OBS-only mirror must not stop the primary camera
+                # or leave an old private snapshot visible in capture.
+                clear = getattr(self, "stream_clear_camera", None)
+                if callable(clear):
+                    try:
+                        clear()
+                    except Exception:
+                        pass
+
+        try:
+            geom = self.geometry()
+            if geom:
+                x, y, dw, dh, _, _ = geom
+                rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)),
+                                   cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(rgb)
+                photo = self.camera_photo
+                if (photo is None or photo.width() != dw or
+                        photo.height() != dh):
+                    # Reuse the Tcl image buffer while dimensions are
+                    # stable, bounding native allocations in long sessions.
+                    photo = ImageTk.PhotoImage(image)
+                else:
+                    photo.paste(image)
+                item = getattr(self, "_camera_canvas_item", None)
+                if item is None or not self.canvas.type(item):
+                    self.canvas.delete("all")
+                    item = self.canvas.create_image(
+                        x, y, anchor="nw", image=photo
+                    )
+                    self._camera_canvas_item = item
+                else:
+                    self.canvas.coords(item, x, y)
+                    self.canvas.itemconfigure(item, image=photo)
+                self.camera_photo = photo
+        except Exception:
+            # Main preview/PIL/Tk errors are cosmetic, not capture faults.
+            # Revoke stale pixels and retry on the next real camera frame.
+            self._clear_failed_camera_preview()
+
+    def _clear_failed_camera_preview(self):
+        """Clear failed preview pixels only, never disarm gameplay input."""
+        self.camera_photo = None
+        self._camera_canvas_item = None
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            try:
+                canvas.delete("all")
+            except Exception:
+                pass

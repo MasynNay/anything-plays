@@ -590,6 +590,88 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertFalse(app.emu.held("A", 0))
         self.assertFalse(app.emu.held("B", 1))
 
+    def test_post_dispatch_annotation_and_calibration_faults_keep_both_ports(self):
+        app = self.app
+        self.pad.buttons = {"X"}
+        app.emu.set_manual("Start", True)
+        original_draw = cv2.drawContours
+        for broken in ("contours", "zones", "calibration"):
+            with self.subTest(stage=broken):
+                app.render_zones = lambda pixels, zones: pixels
+                app.calibration_note_frame = lambda *args: None
+                if broken == "zones":
+                    def fail_zone(*args):
+                        raise RuntimeError("private /home/user/driver")
+                    app.render_zones = fail_zone
+                if broken == "calibration":
+                    def fail_calibration(*args):
+                        raise OSError("USB serial /Users/owner")
+                    app.calibration_note_frame = fail_calibration
+                app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+                with patch.object(
+                    cv2, "drawContours",
+                    side_effect=(RuntimeError("private OpenCV display")
+                                 if broken == "contours" else original_draw),
+                ):
+                    app.one_frame()
+                self.assertTrue(app.armed)
+                self.assertTrue(app.emu.held("A", 0))
+                self.assertTrue(app.emu.held("B", 1))
+                self.assertTrue(app.emu.held("X", 0))
+                self.assertTrue(app.emu.held("Start", 0))
+                app.set_pixels()
+                app.one_frame()
+                self.assertFalse(app.emu.held("A", 0))
+                self.assertFalse(app.emu.held("B", 1))
+                self.assertTrue(app.emu.held("X", 0))
+                self.assertTrue(app.emu.held("Start", 0))
+
+    def test_broken_primary_tk_resize_never_sticks_native_camera_buttons(self):
+        from unittest.mock import MagicMock
+        app = self.app
+        app.geometry = lambda: (0, 0, 192, 128, 192, 128)
+        app.canvas = MagicMock()
+        app.camera_photo = object()
+        app._camera_canvas_item = 8
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(cv2, "resize",
+                          side_effect=OSError("private camera id /home/user")):
+            app.one_frame()
+        self.assertTrue(app.armed)
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        self.assertIsNone(app.camera_photo)
+        self.assertIsNone(app._camera_canvas_item)
+        app.canvas.delete.assert_called_once_with("all")
+        app.set_pixels()
+        with patch("anything_plays.ui_camera.ImageTk.PhotoImage") as photo:
+            photo.return_value.width.return_value = 192
+            photo.return_value.height.return_value = 128
+            app.one_frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+        self.assertIsNotNone(app.camera_photo)
+        self.assertTrue(app.armed)
+
+    def test_broken_optional_stream_hook_does_not_interrupt_native_camera(self):
+        from unittest.mock import Mock
+        app = self.app
+        app._stream_output_window = object()
+        app.stream_camera_snapshot = Mock(
+            side_effect=OSError("private OBS camera serial")
+        )
+        app.stream_clear_camera = Mock()
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        app.one_frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        app.set_pixels()
+        app.one_frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+        self.assertEqual(app.stream_clear_camera.call_count, 2)
+        self.assertTrue(app.armed)
+
     def test_camera_controls_dispatch_before_contour_annotations(self):
         app = self.app
         app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])

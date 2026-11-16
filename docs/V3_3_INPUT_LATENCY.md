@@ -67,6 +67,21 @@ keyboard input remain independent of these optional camera clocks. These cases r
 measurement, not just the software probe. Do not compare bucket bounds as
 precise measurements or report them as a verified FPS improvement.
 
+## Post-tracking preview failure isolation
+
+Once a camera frame's P1/P2 controls have been delivered, optional
+calibration observations, OpenCV contour/zone annotations, OBS mirroring,
+and primary PIL/Tk camera resizing may fail without changing those native
+held buttons. A broken contour overlay falls back to the raw frame when
+available; failed primary preview rendering revokes its previous Tk image
+rather than leaving private camera pixels frozen; failed optional stream
+mirroring clears its own cached image when possible. The next camera frame
+retries. Errors in real capture or **pre-dispatch tracking** still use the
+existing fail-closed Stop/disarm logic in the application camera tick.
+
+These guarantees are covered by synthetic tests; they do not establish
+physical USB camera recovery or end-to-end sensor latency.
+
 ## Manual 3.3 acceptance
 
 Capture separate baselines per host/OS, camera resolution, single vs two
