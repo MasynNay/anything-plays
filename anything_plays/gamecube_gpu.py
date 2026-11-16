@@ -18,6 +18,7 @@ from __future__ import annotations
 import sys
 import platform
 import time
+import math
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
@@ -30,6 +31,23 @@ from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
 class GameCubeHardwareSession(CoreSession):
     """Connect Libretro Dolphin to the same framebuffer the GUI displays."""
+
+    @staticmethod
+    def _optional_clock(clock):
+        """Never let a failed diagnostic timer unwind a ctypes callback.
+
+        A nonfinite or non-monotonic clock is *not* a frame timestamp.
+        A missing readback duration is simply omitted from aggregate
+        timing; the real native frame and audio work still proceed.
+        """
+        try:
+            value = clock()
+            if (type(value) in (int, float) and math.isfinite(value)
+                    and value >= 0):
+                return value
+        except Exception:
+            pass
+        return None
 
     def __init__(self, emulator, rom, core_path, *, host_factory=None):
         super().__init__(emulator, "gamecube", rom, core_path)
@@ -113,7 +131,7 @@ class GameCubeHardwareSession(CoreSession):
             # glReadPixels blocks on GPU/CPU synchronization. Copy only as
             # fast as the selected preview rate, but NEVER skip retro_run()
             # frames, audio, controller updates, or internal Dolphin work.
-            now = time.monotonic()
+            now = self._optional_clock(time.monotonic)
             mode = getattr(
                 self.emulator, "gamecube_preview_mode", DEFAULT_PREVIEW_MODE
             )
@@ -125,7 +143,7 @@ class GameCubeHardwareSession(CoreSession):
             if not should_capture(self._last_preview_capture, now, mode):
                 self.preview_readback_skips += 1
                 return
-            begun = time.perf_counter()
+            begun = self._optional_clock(time.perf_counter)
             try:
                 rgb = self.host.read_frame(width, height)
                 shape = getattr(rgb, "shape", ())
@@ -148,9 +166,14 @@ class GameCubeHardwareSession(CoreSession):
                 self.opengl_error = f"GPU readback failed ({type(exc).__name__})"
                 self.emulator.stop_event.set()
                 return
-            duration = max(0.0, time.perf_counter() - begun)
-            self.gpu_readback_seconds += duration
-            self.gpu_readback_max_seconds = max(self.gpu_readback_max_seconds, duration)
+            finished = self._optional_clock(time.perf_counter)
+            if (begun is not None and finished is not None
+                    and finished >= begun):
+                duration = finished - begun
+                self.gpu_readback_seconds += duration
+                self.gpu_readback_max_seconds = max(
+                    self.gpu_readback_max_seconds, duration
+                )
             self.gpu_readback_calls += 1
             self._last_preview_capture = now
             with self.emulator.lock:
@@ -166,7 +189,9 @@ class GameCubeHardwareSession(CoreSession):
             if tracker is not None:
                 # Record the completed publication time, *after* GL readback,
                 # not the earlier callback start used for throttle checks.
-                tracker.record_published(time.monotonic(), mode)
+                tracker.record_published(
+                    self._optional_clock(time.monotonic), mode
+                )
             return
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
