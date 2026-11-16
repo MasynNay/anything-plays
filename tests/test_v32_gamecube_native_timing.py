@@ -75,12 +75,41 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertEqual(snap["gpu_readback_share_of_native_run"], 1.0)
         self.assertEqual(snap["native_run_non_readback_mean_ms"], 0.0)
 
+    def test_p95_frame_time_histogram_is_bounded_and_not_average(self):
+        t = GameCubeNativeTiming()
+        self.assertEqual(t.snapshot()["native_run_p95_bucket_code"], -1)
+        # A single 900ms stall does not distort the 95th percentile of
+        # twenty native calls; it still affects max and mean as expected.
+        for _ in range(19):
+            t.record_native_run(0.010)
+        t.record_native_run(0.900)
+        metrics = t.snapshot()
+        self.assertEqual(metrics["native_run_calls"], 20)
+        self.assertEqual(metrics["native_run_p95_bucket_code"], 1)  # 8–16ms
+        self.assertEqual(metrics["native_run_max_ms"], 900)
+        self.assertEqual(sum(t.native_run_histogram), 20)
+        # Adding a second >500ms frame moves rank 19 into the slow bucket.
+        t.record_native_run(0.900)
+        self.assertEqual(t.snapshot()["native_run_p95_bucket_code"], 8)
+        self.assertEqual(len(t.native_run_histogram), 9)
+        self.assertNotIn("native_run_histogram", metrics)
+
+    def test_nonfinite_or_giant_native_timing_never_crashes_gameplay(self):
+        t = GameCubeNativeTiming()
+        for bad in (None, "private device", True, float("nan"),
+                    float("inf"), -0.1, 10**1000):
+            t.record_native_run(bad)
+        self.assertEqual(t.native_run_calls, 0)
+        self.assertEqual(t.snapshot()["native_run_p95_bucket_code"], -1)
+        t.record_native_run(0.2)
+        self.assertEqual(t.snapshot()["native_run_p95_bucket_code"], 6)
+
     def test_counters_do_not_hold_frames_timestamps_or_game_data(self):
         t = GameCubeNativeTiming()
         for _ in range(10000):
             t.record_native_run(0.006)
         self.assertEqual(t.native_run_calls, 10000)
-        self.assertLessEqual(len(vars(t)), 13)
+        self.assertLessEqual(len(vars(t)), 14)
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):
