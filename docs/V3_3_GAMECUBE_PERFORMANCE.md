@@ -17,8 +17,9 @@ frames or audio, benchmark an external emulator, or verify a real speaker.
    session has provided an aggregate snapshot. No extra tracing mode or
    network service is needed.
 3. Play for at least 2 minutes. Refresh the window and inspect native
-   `retro_run` calls/mean/max cost, GPU readback captures/max/share,
-   >5 ms scheduler deadline misses/resyncs, and audio delivery counters.
+   `retro_run` calls/mean/max cost and P95 frame-time **bucket**,
+   GPU readback captures/max/share, >5 ms scheduler deadline misses/resyncs,
+   and audio delivery counters.
 4. Repeat the same segment with the embedded GameCube preview rate set to
    **20, 30 and 60 FPS** (Performance, Balanced, Quality). The separately
    configured **Stream Mode** supports 15, 24 and 30 FPS; those numbers
@@ -47,6 +48,7 @@ alongside it unless you have reviewed them for personal data.
 | Observed field | Meaning | Important limit |
 | --- | --- | --- |
 | `native_run_calls`, `native_run_mean_ms`, `native_run_max_ms` | Number and elapsed time of completed native `retro_run` calls | Does **not** measure displayed FPS or completed game scenes |
+| `native_run_p95_bucket_code` | Nearest-rank P95 `retro_run` duration bucket, using fixed ranges 0–8, 8–16, 16–25, 25–33, 33–50, 50–100, 100–250, 250–500 and >500 ms (codes 0–8). -1 means no valid native frames | This is an interval, not a fabricated precise percentile or physical FPS; only nine aggregate counters are retained, no per-frame timing history |
 | `gpu_readback_calls`, `gpu_readback_max_ms`, `gpu_readback_share_of_native_run` | Synchronous UI preview pixel readbacks and their portion of native run cost | Readback time is **included in**, not added to, `retro_run` time |
 | `scheduler_late_frames`, `scheduler_late_max_ms`, `scheduler_resyncs` | Delays beyond the native frame deadline and scheduler resets | Missing a deadline does not prove a hardware driver fault |
 | `audio_output_device_underflow_callbacks` | PortAudio reported output-device underrun callbacks | A nonzero value signals a scheduling symptom, not its root cause |
