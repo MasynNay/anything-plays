@@ -92,8 +92,11 @@ canvas image item.
 An invalid, missing or exceptional performance clock is also treated as a
 failed optional update; it does not fabricate a zero-duration frame or let
 the failed timer escape a Tk callback. The bounded failure count can advance
-even when no clock sample exists. An invalid camera freshness clock clears
-only the optional camera preview; static reference images are preserved.
+even when no clock sample exists. An invalid camera freshness clock **or a missing/corrupt timestamp for
+a cached live camera frame** clears only the optional OBS camera preview.
+An open device alone does not authenticate an old frame's age. Static
+reference images deliberately bypass webcam timestamp expiry; the actual
+camera tracking and native game input are unaffected.
 
 These safeguards prevent **application-retained** stale Stream Mode imagery,
 but OBS itself can retain the last captured frame depending on its capture

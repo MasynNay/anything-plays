@@ -1038,13 +1038,23 @@ class StreamMixin:
                 )
             except Exception:
                 clock_valid = False
-            if (not clock_valid or stream_camera_frame_is_stale(
-                    getattr(self, "_stream_camera_last_snapshot", None),
-                    observed_at,
-            )):
-                # A device-open flag is not proof of fresh video. If even
-                # the optional clock breaks, erase old private camera pixels
-                # without disrupting native input or static reference art.
+            last_success = getattr(
+                self, "_stream_camera_last_snapshot", None
+            )
+            try:
+                last_valid = (
+                    type(last_success) in (int, float)
+                    and math.isfinite(last_success) and last_success >= 0
+                )
+            except (OverflowError, TypeError, ValueError):
+                last_valid = False
+            if (not clock_valid or not last_valid
+                    or stream_camera_frame_is_stale(last_success, observed_at)):
+                # A device-open flag and a cached PIL image do not prove a
+                # recent, successful capture. A malformed/missing previous
+                # timestamp also invalidates the OBS-facing webcam image.
+                # Intentional static reference art bypasses this guard.
+                # Neither the camera tracking nor native buttons are touched.
                 self._stream_stale_camera_clears = (
                     getattr(self, "_stream_stale_camera_clears", 0) + 1
                 )

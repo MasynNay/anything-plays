@@ -264,6 +264,73 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(compose.call_args.args[1])
         self.assertTrue(app.cap.isOpened())
 
+    def test_invalid_previous_camera_timestamp_revokes_cached_private_pixels(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.emu = SimpleNamespace(running=False)
+        app.cap = MagicMock()
+        app.cap.isOpened.return_value = True
+        app.frame = None
+        app.reference_image = False
+
+        for missing_or_corrupt in (
+            None, float("nan"), float("inf"), -1.0, True,
+            10**1000, "private webcam /home/owner",
+        ):
+            with self.subTest(kind=type(missing_or_corrupt).__name__):
+                app._stream_camera_frame = Image.new(
+                    "RGB", (24, 18), "#c134ab"
+                )
+                app._stream_camera_last_snapshot = missing_or_corrupt
+                app._stream_camera_serial = 5
+                with (
+                    patch("anything_plays.ui_stream.time.monotonic",
+                          return_value=10.0),
+                    patch("anything_plays.ui_stream.compose_stream_output",
+                          return_value=Image.new("RGB", (760, 980))) as compose,
+                    patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+                ):
+                    self.assertTrue(app._render_stream_frame())
+                self.assertIsNone(app._stream_camera_frame)
+                self.assertEqual(app._stream_camera_serial, 6)
+                self.assertIsNone(compose.call_args.args[1])
+                self.assertTrue(compose.call_args.kwargs["camera_active"])
+                self.assertTrue(app.cap.isOpened())
+
+        # The same cached image must remain valid for a deliberate static
+        # reference source, where no live webcam timestamp is required.
+        app.reference_image = True
+        app.frame = Image.new("RGB", (24, 18))
+        app._stream_camera_frame = Image.new("RGB", (24, 18), "#112233")
+        app._stream_camera_last_snapshot = None
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=RuntimeError("clock unavailable")),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertIsNotNone(compose.call_args.args[1])
+        self.assertTrue(compose.call_args.kwargs["camera_reference"])
+
     def test_session_fault_and_recovery_survive_fps_mode_changes(self):
         from unittest.mock import Mock, patch
 
