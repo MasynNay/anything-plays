@@ -620,6 +620,60 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertIn("Secondary object cannot use Player 2", app.action.get())
 
 
+class CameraScanErrorPrivacyTests(TestCase):
+    """Background discovery must not leak raw camera driver exceptions."""
+
+    def test_failed_worker_reports_only_safe_failure_flag(self):
+        from unittest.mock import Mock
+
+        class ImmediateThread:
+            def __init__(self, *, target, **_kwargs):
+                self.target = target
+
+            def start(self):
+                self.target()
+
+        app = CameraMixin()
+        app.camera_scanning = False
+        app.stop_camera = Mock()
+        app.status = Variable("")
+        app.root = Mock()
+        with (
+            patch("anything_plays.ui_camera.discover",
+                  side_effect=OSError(
+                      "private webcam serial XYZ /home/user/driver.log"
+                  )),
+            patch("anything_plays.ui_camera.threading.Thread",
+                  ImmediateThread),
+        ):
+            app.scan_cameras()
+        self.assertTrue(app.camera_scanning)
+        found, failure = app._camera_scan_results.get_nowait()
+        self.assertEqual(found, [])
+        self.assertIs(failure, True)
+        self.assertNotIn("XYZ", str((found, failure)))
+        app.root.after.assert_called_once()
+
+    def test_error_ui_redacts_raw_exception_and_normal_discovery_still_works(self):
+        app = CameraMixin()
+        app.camera_name = Variable("Previously selected (device 3)")
+        app.camera_options = {}
+        app.camera_combo = {}
+        app.status = Variable("")
+        app.camera_scanning = True
+
+        app.finish_scan([], "/Users/private/Driver/secret-device serial ABC")
+        self.assertFalse(app.camera_scanning)
+        self.assertIn("Camera search failed", app.status.get())
+        for private in ("/Users", "secret-device", "ABC"):
+            self.assertNotIn(private, app.status.get())
+        app.finish_scan([(3, "Previously selected")])
+        self.assertEqual(app.camera_name.get(), "Previously selected (device 3)")
+        self.assertEqual(app.camera_options, {
+            "Previously selected (device 3)": "Previously selected"
+        })
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()
