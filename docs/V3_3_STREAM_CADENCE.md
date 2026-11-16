@@ -285,6 +285,30 @@ hardware, OBS recording, or owner-installed desktop compatibility. Each
 platform's CI job is only considered passed when its own frozen test and
 receipt succeed.
 
+## Collect privacy-safe Stream Mode QA evidence
+
+While **Stream Output** and **Stream Settings** are open, use
+**Copy safe diagnostics** in the uncaptured Settings window. Paste the
+clipboard JSON into a private QA note or [acceptance issue #247](https://github.com/MasynNay/anything-plays/issues/247)
+after reviewing it. The button copies allowlisted finite aggregate counters:
+Tk target/observed refresh, changed-image publication, compositor render
+cost and fixed-bucket P95, failure/recovery counts, cache hits and
+camera-preview privacy clears. It never sends data over the network,
+saves a file automatically, or includes camera pixels, device IDs, full
+frames, ROM filenames, paths or exception strings. Clipboard integration
+is best effort and copying is unavailable when Stream Output is closed.
+
+The JSON intentionally labels its scope as **Tk UI refresh and changed-image
+publication**, not OBS encoder FPS, native emulation FPS, real camera sensor
+FPS or hardware input latency. Its hardware-verification fields remain
+`false` even when the tester has devices connected, because the local
+aggregate by itself cannot prove those physical checks. Capture physical
+acceptance separately: host/OS, controller and webcam model (only if
+comfortable sharing), OBS capture-source settings, OBS dropped-frame
+statistics, audio, disconnect/Stop behavior, a real 30-minute elapsed
+session and any visible problems. Do not paste private video, ROMs,
+camera identifiers, driver dumps or OS home directory paths in GitHub.
+
 ## Before claiming a 3.3 speedup
 
 Compare the same host, window size, theme, camera resolution, game state and

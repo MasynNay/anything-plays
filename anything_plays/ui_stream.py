@@ -11,6 +11,7 @@ item and a single cancellable, bounded-rate update job.
 from __future__ import annotations
 
 import re
+import json
 import math
 import time
 from functools import lru_cache
@@ -139,6 +140,67 @@ def _contained(image, bounds, *, nearest=False):
         x0 + (width - dest_w) // 2,
         y0 + (height - dest_h) // 2,
     )
+
+
+
+# Strict scalar allowlist: never export a camera frame, path or device name.
+_STREAM_QA_FIELDS = (
+    "stream_target_refresh_fps",
+    "stream_observed_refresh_fps",
+    "stream_refresh_intervals",
+    "stream_max_refresh_gap_ms",
+    "stream_observed_publication_fps",
+    "stream_publication_intervals",
+    "stream_published_images",
+    "stream_unchanged_ticks",
+    "stream_failed_ticks",
+    "stream_render_samples",
+    "stream_render_mean_ms",
+    "stream_render_max_ms",
+    "stream_render_p95_bucket_code",
+    "stream_render_over_budget_ticks",
+    "stream_resize_cache_hits",
+    "stream_resize_cache_misses",
+    "stream_stale_camera_clears",
+    "stream_session_faults",
+    "stream_session_recoveries",
+    "stream_recovery_pending",
+)
+
+
+def stream_safe_qa_report(snapshot):
+    """Only finite aggregate scalars; never claim camera/OBS/hardware QA."""
+    if not isinstance(snapshot, dict):
+        return None
+    incoming = snapshot.get("metrics")
+    if not isinstance(incoming, dict):
+        return None
+    safe = {}
+    for name in _STREAM_QA_FIELDS:
+        value = incoming.get(name)
+        if name == "stream_recovery_pending":
+            if type(value) is bool:
+                safe[name] = value
+        elif type(value) in (int, float):
+            try:
+                if math.isfinite(value) and (
+                        value >= 0 or
+                        (name == "stream_render_p95_bucket_code" and value == -1)
+                ):
+                    safe[name] = value
+            except (OverflowError, ValueError, TypeError):
+                pass
+    if not safe:
+        return None
+    return {
+        "format": "anything-plays-stream-qa-aggregate",
+        "version": 1,
+        "scope": "tk_refresh_and_changed_images_not_obs_or_camera_fps",
+        "physical_camera_verified_by_report": False,
+        "native_gamecube_verified_by_report": False,
+        "obs_encoder_verified_by_report": False,
+        "metrics": safe,
+    }
 
 
 class StreamPanelResizeCache:
@@ -704,8 +766,16 @@ class StreamMixin:
                  "current game and camera; it never launches another device.",
             style="Helper.TLabel", wraplength=360,
         ).pack(fill="x", pady=(7, 0))
-        ttk.Button(root, text="Close Stream Mode",
-                   command=self.close_stream_mode).pack(fill="x", pady=(10, 0))
+        actions = ttk.Frame(root)
+        actions.pack(fill="x", pady=(10, 0))
+        ttk.Button(
+            actions, text="Copy safe diagnostics",
+            command=self._copy_stream_diagnostics,
+        ).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ttk.Button(
+            actions, text="Close Stream Mode",
+            command=self.close_stream_mode,
+        ).pack(side="left", fill="x", expand=True, padx=(5, 0))
 
     def _close_stream_controls(self):
         panel = getattr(self, "_stream_controls_window", None)
@@ -950,6 +1020,30 @@ class StreamMixin:
                 )),
             },
         }
+
+    def _copy_stream_diagnostics(self):
+        """User-initiated clipboard copy of aggregate Tk metrics only."""
+        try:
+            report = stream_safe_qa_report(self.stream_performance_snapshot())
+        except Exception:
+            report = None
+        if report is None:
+            self._stream_update_diagnostic("No active stream metrics to copy")
+            return False
+        try:
+            encoded = json.dumps(report, indent=2, sort_keys=True,
+                                 ensure_ascii=True, allow_nan=False)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(encoded)
+            self.root.update_idletasks()
+        except Exception:
+            # No raw exception/driver string may appear in the UI.
+            self._stream_update_diagnostic("Could not copy stream diagnostics")
+            return False
+        self._stream_update_diagnostic(
+            "Copied Tk stream metrics (not OBS or physical-camera FPS)"
+        )
+        return True
 
     def _stream_update_diagnostic(self, message):
         """Avoid changing Tk state every frame when the text is identical."""
