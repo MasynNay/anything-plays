@@ -99,6 +99,38 @@ class StreamModeContracts(unittest.TestCase):
         app._render_stream_frame.assert_called_once_with()
         self.assertIsNotNone(app._stream_frame_job)
 
+    def test_stream_render_failure_redacts_driver_device_and_private_paths(self):
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app._stream_last_render = {}
+        app._stream_diagnostic = Mock()
+        app._stream_cadence = StreamCadenceTracker()
+        app.root = Mock()
+        app._render_stream_frame = Mock(side_effect=RuntimeError(
+            "GPU /home/private/ROMs/secret.iso camera SERIAL-123"
+        ))
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   return_value=10.0):
+            app._stream_render_tick()
+        status = app._stream_diagnostic.set.call_args.args[0]
+        self.assertIn("RuntimeError", status)
+        self.assertNotIn("/home/", status)
+        self.assertNotIn("secret.iso", status)
+        self.assertNotIn("SERIAL-123", status)
+        app.root.after.assert_called_once_with(
+            1000, app._stream_render_tick
+        )
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_failed_ticks"], 1
+        )
+
     def test_stream_render_failure_keeps_backoff(self):
         from unittest.mock import Mock, patch
 
