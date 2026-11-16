@@ -72,6 +72,18 @@ user's actual GPU and speakers.
 | `gamecube_preview_target_fps`, `gamecube_preview_observed_capture_fps` | Selected 20/30/60 FPS preview cap versus aggregate **successful frame publication cadence** since the most recent preview mode switch | Observed publication frequency is not native Dolphin emulation FPS or physical monitor FPS |
 | `gamecube_preview_cadence_intervals`, `gamecube_preview_max_interval_ms` | Number of measured gaps between published preview images and longest such gap | With fewer than two published frames, observed cadence is zero meaning **insufficient samples**, not a 0 FPS performance result |
 
+Readback diagnostics now distinguish **successful GL pixel captures**
+(`gpu_readback_calls`) from **valid readback timing samples**
+(`gpu_readback_timing_samples`). An optional clock exception does not make
+glReadPixels free and must not be labeled as a zero-cost frame. If captures
+were published but none could be timed, **Check my setup** displays
+**share unavailable** and **maximum unmeasured** rather than a fabricated
+0.0% cost. If only a subset was measured, the percentage is explicitly
+a *lower bound* and the report says **partial timing**. The counter
+`gamecube_preview_clock_failures` counts rejected optional timer readings;
+it does not represent a native Dolphin `retro_run` failure. Failed timing
+reads are never counted as deliberately throttled readback skips.
+
 A high readback **share** suggests the synchronous GL pixel copy is an area
 to investigate, but no frame-rate increase is proven unless a controlled
 before/after physical-device benchmark actually measures one. If native
