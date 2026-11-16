@@ -289,8 +289,13 @@ class AudioSink:
                         candidate.close()
                     except Exception:
                         pass
-        self.output_error = "No usable audio output device: " + str(error)[:110]
-        print("Audio output unavailable: " + str(error), file=sys.stderr)
+        # OS PortAudio failures may include a device name, home directory,
+        # USB identifier or driver path. The UI, stderr and diagnostic
+        # reports must never forward that untrusted platform exception text.
+        # Retain just the fixed error class for actionable troubleshooting.
+        reason = type(error).__name__ if error is not None else "UnknownError"
+        self.output_error = "No usable audio output device (" + reason + ")"
+        print("Audio output unavailable (" + reason + ")", file=sys.stderr)
         self.close()
 
     def close(self):
@@ -302,4 +307,9 @@ class AudioSink:
                 stream.stop()
                 stream.close()
             except Exception as exc:
-                print(f"Could not close audio output: {exc}", file=sys.stderr)
+                # Teardown errors can contain the same private PortAudio
+                # device details as startup failures. Close best-effort.
+                print(
+                    "Could not close audio output ("
+                    + type(exc).__name__ + ")", file=sys.stderr
+                )
