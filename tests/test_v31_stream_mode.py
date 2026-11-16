@@ -10,7 +10,8 @@ from anything_plays.ui_stream import (
     DEFAULT_STREAM, FRAME_RATES, LAYOUTS, StreamMixin, compose_stream_output,
     stream_panel_boxes, stream_render_delay_ms, StreamCadenceTracker,
     StreamPanelResizeCache, _contained,
-    stream_camera_snapshot_due, validate_stream_settings,
+    stream_camera_snapshot_due, stream_camera_frame_is_stale,
+    validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
 
@@ -321,6 +322,122 @@ class StreamModeContracts(unittest.TestCase):
                     2.0, 0.1, rate
                 ))
         self.assertTrue(stream_camera_snapshot_due(None, 0.0, "invalid"))
+
+    def test_stream_camera_stale_policy_requires_a_real_success_timestamp(self):
+        self.assertFalse(stream_camera_frame_is_stale(None, 4.0))
+        self.assertFalse(stream_camera_frame_is_stale(1.0, 4.0))
+        self.assertTrue(stream_camera_frame_is_stale(1.0, 4.001))
+        self.assertTrue(stream_camera_frame_is_stale(5.0, 4.0))
+        for invalid in (float("nan"), float("inf"), None,
+                        "private /home/camera", 10**1000, True):
+            self.assertFalse(stream_camera_frame_is_stale(invalid, 100.0))
+            self.assertFalse(stream_camera_frame_is_stale(1.0, invalid))
+
+    def test_stalled_open_camera_disappears_then_recovers_without_restart(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.emu = SimpleNamespace(running=False)
+        app.cap = MagicMock()
+        app.cap.isOpened.return_value = True
+        app.frame = None
+        app.reference_image = False
+        app._stream_camera_frame = Image.new("RGB", (24, 18), "#c134ab")
+        app._stream_camera_last_snapshot = 1.0
+        app._stream_camera_serial = 5
+
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=4.01),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertEqual(app._stream_camera_serial, 6)
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+        self.assertTrue(compose.call_args.kwargs["camera_active"])
+        self.assertIsNone(compose.call_args.args[1])
+        self.assertEqual(
+            app.stream_performance_snapshot()["metrics"][
+                "stream_stale_camera_clears"
+            ], 1
+        )
+        # A second Tk tick cannot count one stale frame multiple times.
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=4.05),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            app._render_stream_frame()
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+
+        fresh = np.zeros((18, 24, 3), dtype=np.uint8)
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=4.10):
+            app.stream_camera_snapshot(fresh)
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 7)
+        self.assertEqual(app._stream_camera_last_snapshot, 4.10)
+        self.assertTrue(app.cap.isOpened())
+
+    def test_static_reference_image_is_not_expired_by_stream_stale_guard(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.emu = SimpleNamespace(running=False)
+        app.cap = MagicMock()
+        app.cap.isOpened.return_value = True
+        app.reference_image = True
+        app.frame = object()
+        reference = Image.new("RGB", (24, 18), "#ab34dd")
+        app._stream_camera_frame = reference
+        app._stream_camera_last_snapshot = 1.0
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=5000.0),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            app._render_stream_frame()
+        self.assertIs(app._stream_camera_frame, reference)
+        self.assertEqual(app._stream_stale_camera_clears, 0)
 
     def test_stream_cadence_separates_refresh_ticks_from_changed_images(self):
         for target in (15, 24, 30):

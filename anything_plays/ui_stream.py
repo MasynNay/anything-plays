@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 LAYOUTS = ("DS stacked", "Side by side")
 FRAME_RATES = ("15 FPS", "24 FPS", "30 FPS")
+STREAM_CAMERA_STALE_AFTER_SECONDS = 3.0
 # Fixed-duration buckets for opt-in-style local aggregate diagnostics.
 # Only an integer code is exported, never a sequence of frame timings.
 _STREAM_RENDER_BIN_UPPER_MS = (5, 10, 16, 25, 33, 50, 67, 100, 200, 500)
@@ -342,6 +343,24 @@ class StreamCadenceTracker:
         }
 
 
+def stream_camera_frame_is_stale(last_success, now):
+    """Decide only OBS preview freshness, never camera/control liveness.
+
+    A capture backend can claim that its device remains open while frames
+    stop arriving. Do not label an old image as live indefinitely. Static
+    reference images bypass this check at the caller.
+    """
+    if type(last_success) not in (float, int) or type(now) not in (float, int):
+        return False
+    try:
+        if not math.isfinite(last_success) or not math.isfinite(now):
+            return False
+    except (OverflowError, ValueError, TypeError):
+        return False
+    return (now < last_success
+            or now - last_success > STREAM_CAMERA_STALE_AFTER_SECONDS)
+
+
 def stream_camera_snapshot_due(previous, now, mode):
     """Throttle *only* OBS-preview RGB conversion, never source tracking.
 
@@ -386,7 +405,8 @@ def compose_stream_output(game, camera, *, size, settings, themes,
         ("GAME", game if game_active else None,
          "GAMEPLAY" if game_active else "NO GAME LOADED", True),
         ("CAMERA", camera if camera_active or camera_reference else None,
-         "CAMERA LIVE" if camera_active else
+         "CAMERA LIVE" if camera_active and camera is not None else
+         "CAMERA WAITING" if camera_active else
          "REFERENCE IMAGE" if camera_reference else "CAMERA OFF", False),
     ]
     if options["swap_screens"]:
@@ -439,7 +459,11 @@ def compose_stream_output(game, camera, *, size, settings, themes,
                 img.paste(resized, (x, y))
             else:
                 # A neutral, truthful placeholder until a live source exists.
-                msg = "Load a game to begin" if name == "GAME" else "Start a camera to begin"
+                msg = (
+                    "Load a game to begin" if name == "GAME"
+                    else "Waiting for camera frames" if camera_active
+                    else "Start a camera to begin"
+                )
                 box = painter.textbbox((0, 0), msg, font=label_font)
                 cx = (video[0] + video[2] - (box[2]-box[0])) // 2
                 cy = (video[1] + video[3] - (box[3]-box[1])) // 2
@@ -487,6 +511,7 @@ class StreamMixin:
         self._stream_camera_last_snapshot = None
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
+        self._stream_stale_camera_clears = 0
         self._stream_game_frame = None
         self._stream_game_serial = None
 
@@ -525,6 +550,7 @@ class StreamMixin:
         self._stream_cadence = StreamCadenceTracker()
         self._stream_cadence.reset_for(self._stream_options["frame_rate"])
         self._stream_resize_cache = StreamPanelResizeCache()
+        self._stream_stale_camera_clears = 0
         self._open_stream_controls()
         self._stream_render_tick()
 
@@ -760,6 +786,9 @@ class StreamMixin:
                 **(self._stream_resize_cache.snapshot()
                    if getattr(self, "_stream_resize_cache", None) is not None
                    else {}),
+                "stream_stale_camera_clears": getattr(
+                    self, "_stream_stale_camera_clears", 0
+                ),
             },
         }
 
@@ -854,6 +883,19 @@ class StreamMixin:
             except (cv2.error, OSError, RuntimeError):
                 pass
         camera_ref = bool(self.reference_image and self.frame is not None)
+        if (camera_active and not camera_ref
+                and self._stream_camera_frame is not None
+                and stream_camera_frame_is_stale(
+                    getattr(self, "_stream_camera_last_snapshot", None),
+                    time.monotonic(),
+                )):
+            # Device-open is not equivalent to delivering a new frame.
+            # Clear only the optional OBS picture; game input and camera
+            # recovery remain owned by the existing camera pipeline.
+            self._stream_stale_camera_clears = (
+                getattr(self, "_stream_stale_camera_clears", 0) + 1
+            )
+            self.stream_clear_camera()
         if not camera_active and not camera_ref and self._stream_camera_frame is not None:
             self.stream_clear_camera()
         status = (active_game, camera_active, camera_ref)
@@ -924,6 +966,7 @@ class StreamMixin:
         if cache is not None:
             cache.clear()
         self._stream_resize_cache = None
+        self._stream_stale_camera_clears = 0
         if output is not None:
             try:
                 output.destroy()

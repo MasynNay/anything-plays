@@ -37,6 +37,21 @@ footage, game content, device names, usernames or individual frame traces.
    control release alongside the metrics. Keep hardware/device identifiers
    out of any issue report.
 
+## Stalled camera preview protection
+
+A USB webcam may still report itself open even when it has stopped supplying
+frames. The **optional OBS-facing camera picture** is considered stale after
+more than 3 seconds without a successful snapshot. At that point, Stream Mode
+drops the cached private image and shows **Camera waiting** until a fresh
+annotated source frame arrives. Fresh frames resume automatically without
+restarting the camera or changing native player input. This is not a claim that
+the camera device disconnected, and does not change webcam tracking.
+
+Intentional static reference images do **not** expire; they are not incorrectly
+labeled live footage. The safe report includes only the numeric count
+`stream_stale_camera_clears` for the current stream session, not a timestamp
+history or any captured pixels.
+
 ## What the metrics mean
 
 | Metric | Meaning | Not proof of |
@@ -50,6 +65,8 @@ footage, game content, device names, usernames or individual frame traces.
 | `stream_render_samples`, `stream_render_mean_ms`, `stream_render_max_ms` | Count and aggregate measured time for optional Tk output updates | Camera tracking latency, native emulator frame cost or OBS encoder work |
 | `stream_render_p95_bucket_code` | Nearest-rank P95 render-cost range: codes 0–10 map to 0–5, 5–10, 10–16, 16–25, 25–33, 33–50, 50–67, 67–100, 100–200, 200–500 and >500 ms; -1 means insufficient samples | An exact percentile or physical display frame rate |
 | `stream_render_over_budget_ticks` | Number of optional Tk output updates whose measured composition work exceeded the selected output frame interval | A count of frames dropped by OBS or the game |
+| `stream_resize_cache_hits`, `stream_resize_cache_misses` | Number of unchanged fitted game/camera panels reused versus rescaled, bounded to two cached sources | A guaranteed FPS increase or persistent disk cache |
+| `stream_stale_camera_clears` | Number of stale optional camera pictures removed from a current Stream Mode session | A device-disconnect or tracking-failure count |
 
 The setup UI says *waiting for two timer ticks* or *waiting for two changed
 images* when it has too few observations. A static scene can have a healthy
