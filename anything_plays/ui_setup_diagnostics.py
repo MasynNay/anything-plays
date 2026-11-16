@@ -118,10 +118,23 @@ def _gamecube_performance_summary_lines(performance):
         if m['gamecube_preview_cadence_intervals'] > 0
         else "waiting for two published preview images"
     )
+    # This is a bounded percentile *range*, not a precise per-frame P95.
+    # Older session reports may predate this 3.3 field.
+    p95_labels = (
+        "0–8", "8–16", "16–25", "25–33", "33–50",
+        "50–100", "100–250", "250–500", ">500",
+    )
+    p95_code = m.get("native_run_p95_bucket_code", -1)
+    p95_label = (
+        p95_labels[p95_code] + " ms"
+        if type(p95_code) is int and 0 <= p95_code < len(p95_labels)
+        else "not sampled"
+    )
     return (
         f"Native frames: {m['native_run_calls']} · average "
         f"{m['native_run_mean_ms']} ms · maximum "
-        f"{m['native_run_max_ms']} ms per retro_run",
+        f"{m['native_run_max_ms']} ms per retro_run · P95 " 
+        f"{p95_label}",
         f"GPU readback: {m['gpu_readback_calls']} captures · maximum "
         f"{m['gpu_readback_max_ms']} ms · "
         f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
