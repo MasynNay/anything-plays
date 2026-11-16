@@ -98,6 +98,11 @@ def _gamecube_performance_summary_lines(performance):
     m = performance["metrics"]
     if not m["native_run_calls"]:
         return ("GameCube has not completed a native gameplay frame yet.",)
+    observed_preview = (
+        f"{m['gamecube_preview_observed_capture_fps']} FPS"
+        if m['gamecube_preview_cadence_intervals'] > 0
+        else "waiting for two published preview images"
+    )
     return (
         f"Native frames: {m['native_run_calls']} · average "
         f"{m['native_run_mean_ms']} ms · maximum "
@@ -107,7 +112,7 @@ def _gamecube_performance_summary_lines(performance):
         f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
         "native execution time (included, not additive)",
         f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
-        f"observed {m['gamecube_preview_observed_capture_fps']} FPS over "
+        f"observed {observed_preview} over "
         f"{m['gamecube_preview_cadence_intervals']} intervals · "
         f"maximum gap {m['gamecube_preview_max_interval_ms']} ms",
         f"Late deadlines (>5 ms): {m['scheduler_late_frames']} · "
