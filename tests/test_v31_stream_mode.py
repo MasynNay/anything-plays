@@ -101,6 +101,73 @@ class StreamModeContracts(unittest.TestCase):
         app._render_stream_frame.assert_called_once_with()
         self.assertIsNotNone(app._stream_frame_job)
 
+    def test_stream_diagnostic_stringvar_updates_only_when_state_changes(self):
+        from unittest.mock import Mock, patch
+
+        class Status:
+            def __init__(self):
+                self.current = ""
+                self.updates = []
+
+            def get(self):
+                return self.current
+
+            def set(self, value):
+                self.current = value
+                self.updates.append(value)
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_diagnostic = Status()
+        app._render_stream_frame = Mock(return_value=False)
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(10.0, 10.001, 10.04, 10.041,
+                                10.08, 10.081)):
+            for _ in range(3):
+                app._stream_render_tick()
+        self.assertEqual(len(app._stream_diagnostic.updates), 1)
+        self.assertIn("Output ready", app._stream_diagnostic.current)
+        self.assertEqual(app._render_stream_frame.call_count, 3)
+        app._render_stream_frame.side_effect = OSError(
+            "private USB camera /home/user/driver.log"
+        )
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   return_value=12.0):
+            app._stream_render_tick()
+        self.assertEqual(len(app._stream_diagnostic.updates), 2)
+        self.assertIn("Stream preview retrying (OSError)", app._stream_diagnostic.current)
+        self.assertNotIn("/home/", app._stream_diagnostic.current)
+        self.assertNotIn("USB camera", app._stream_diagnostic.current)
+        app._render_stream_frame.side_effect = None
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(13.0, 13.001)):
+            app._stream_render_tick()
+        self.assertEqual(len(app._stream_diagnostic.updates), 3)
+        self.assertIn("Output ready", app._stream_diagnostic.current)
+
+    def test_stream_diagnostic_can_survive_destroyed_settings_widget(self):
+        from unittest.mock import Mock
+        import tkinter as tk
+
+        class Status:
+            def get(self):
+                raise tk.TclError("settings control was destroyed")
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_diagnostic = Status()
+        app._stream_update_diagnostic("Output ready")
+        app._stream_diagnostic = None
+        app._stream_update_diagnostic("Output ready")
+
     def test_stream_render_failure_redacts_driver_device_and_private_paths(self):
         from unittest.mock import Mock, patch
 
