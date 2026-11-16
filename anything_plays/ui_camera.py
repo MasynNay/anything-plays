@@ -553,8 +553,15 @@ class CameraMixin:
                     f'P1: {", ".join(sorted(buttons[0])) or "idle"} · '
                     f'P2: {", ".join(sorted(buttons[1])) or "idle"}'
                 )
-            if self.action.get() != message:
-                self.action.set(message)
+            try:
+                if self.action.get() != message:
+                    self.action.set(message)
+            except Exception:
+                # The optional action/status variable may have been
+                # destroyed with a panel, or wrapped by a Tk extension.
+                # A label read/write cannot disarm an otherwise healthy
+                # camera-to-native input session or leak private error text.
+                pass
 
         # Gameplay input has ALREADY been dispatched. Cosmetic overlays,
         # calibration, the OBS mirror and primary Tk preview are optional;

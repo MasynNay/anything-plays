@@ -590,6 +590,28 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertFalse(app.emu.held("A", 0))
         self.assertFalse(app.emu.held("B", 1))
 
+    def test_optional_camera_action_label_fault_never_disarms_native_ports(self):
+        from unittest.mock import Mock
+        app = self.app
+        for stage in ("get", "set"):
+            with self.subTest(stage=stage):
+                action = Mock()
+                action.get.return_value = ""
+                getattr(action, stage).side_effect = OSError(
+                    "private device path /Users/person/USB-serial"
+                )
+                app.action = action
+                app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+                app.one_frame()
+                self.assertTrue(app.armed)
+                self.assertTrue(app.emu.held("A", 0))
+                self.assertTrue(app.emu.held("B", 1))
+                app.set_pixels()
+                app.one_frame()
+                self.assertFalse(app.emu.held("A", 0))
+                self.assertFalse(app.emu.held("B", 1))
+                self.assertTrue(app.armed)
+
     def test_post_dispatch_annotation_and_calibration_faults_keep_both_ports(self):
         app = self.app
         self.pad.buttons = {"X"}
