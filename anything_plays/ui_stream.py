@@ -792,6 +792,19 @@ class StreamMixin:
             },
         }
 
+    def _stream_update_diagnostic(self, message):
+        """Avoid changing Tk state every frame when the text is identical."""
+        status = getattr(self, "_stream_diagnostic", None)
+        if status is None:
+            return
+        try:
+            if status.get() != message:
+                status.set(message)
+        except tk.TclError:
+            # The uncaptured settings dialog may close independently of
+            # the actual stream window; never stop streaming on a dead label.
+            pass
+
     def _stream_render_tick(self):
         self._stream_frame_job = None
         if self._stream_output_window is None or getattr(self, "_closing", False):
@@ -815,10 +828,9 @@ class StreamMixin:
                     published=published,
                     render_seconds=finished - started,
                 )
-            if hasattr(self, "_stream_diagnostic"):
-                self._stream_diagnostic.set(
-                    "Output ready · Game and camera are mirrored, not restarted."
-                )
+            self._stream_update_diagnostic(
+                "Output ready · Game and camera are mirrored, not restarted."
+            )
         except tk.TclError:
             self.close_stream_mode()
             return
@@ -835,10 +847,9 @@ class StreamMixin:
             # the original camera or emulator session.
             self._invalidate_stream()
             interval = 1000
-            if hasattr(self, "_stream_diagnostic"):
-                self._stream_diagnostic.set(
-                    "Stream preview retrying (" + type(exc).__name__ + ")."
-                )
+            self._stream_update_diagnostic(
+                "Stream preview retrying (" + type(exc).__name__ + ")."
+            )
         if self._stream_output_window is not None and not self._closing:
             self._stream_frame_job = self.root.after(interval, self._stream_render_tick)
 
