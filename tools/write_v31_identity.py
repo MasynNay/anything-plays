@@ -22,9 +22,10 @@ def choose_channel(env):
     v311_stable_candidate = env.get("AP_V311_STABLE_CANDIDATE") == "1"
     v32_preview = env.get("AP_V32_PREVIEW_BUILD") == "1"
     v32_upgrade = env.get("AP_V32_STABLE_CANDIDATE") == "1"
+    v33_candidate = env.get("AP_V33_CANDIDATE") == "1"
     if sum((preview, candidate, candidate2, final_candidate,
             v311_candidate, v311_stable_candidate, v32_preview,
-            v32_upgrade)) != 1:
+            v32_upgrade, v33_candidate)) != 1:
         raise ValueError("Select exactly one approved private build channel")
     if env.get("AP_V30_MINIMAL_CORE_BUILD") != "1":
         raise ValueError("Only isolated mGBA source-build stage allowed")
@@ -35,7 +36,8 @@ def choose_channel(env):
     ):
         if env.get(forbidden) == "1":
             raise ValueError("3.1 candidate cannot use release/native approval flags")
-    return ("v32_stable_candidate" if v32_upgrade
+    return ("v33_candidate" if v33_candidate
+            else "v32_stable_candidate" if v32_upgrade
             else "v32_preview" if v32_preview
             else "v311_stable_candidate" if v311_stable_candidate
             else "v311_candidate" if v311_candidate
