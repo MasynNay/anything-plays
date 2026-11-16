@@ -59,6 +59,15 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertEqual(snap["native_run_mean_ms"], 0.0)
         self.assertTrue(all(math.isfinite(v) for v in snap.values()))
 
+    def test_gpu_readback_report_rejects_malformed_clock_without_failing(self):
+        timing = GameCubeNativeTiming()
+        timing.record_native_run(0.03)
+        for invalid in (None, "device /home/private", 10**1000):
+            with self.subTest(invalid_type=type(invalid).__name__):
+                metric = timing.snapshot(gpu_readback_seconds=invalid)
+                self.assertEqual(metric["gpu_readback_share_of_native_run"], 0)
+                self.assertEqual(metric["native_run_non_readback_mean_ms"], 30)
+
     def test_gpu_readback_must_not_exceed_native_run_time_in_report(self):
         t = GameCubeNativeTiming()
         t.record_native_run(0.050)
@@ -194,6 +203,75 @@ class NativeLoopTimingTests(unittest.TestCase):
             self.assertGreater(snapshot["scheduler_late_max_ms"], 250)
             self.assertEqual(snapshot["scheduler_wait_calls"], 0)
             fake.close.assert_called_once()
+
+    def test_live_gamecube_aggregate_contains_no_native_session_or_private_names(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        session = object.__new__(GameCubeHardwareSession)
+        timing = GameCubeNativeTiming()
+        timing.record_native_run(0.040)
+        timing.record_native_run(0.060)
+        timing.record_lateness(0.09, resynchronized=False)
+        session.native_run_timing = timing
+        session.gpu_readback_seconds = 0.008
+        session.gpu_readback_max_seconds = 0.005
+        session.gpu_readback_calls = 2
+        session.hardware_frames = 2
+        session.preview_readback_skips = 4
+        session.audio = Mock(
+            delivery_snapshot=Mock(return_value={
+                "audio_output_callback_calls": 15,
+                "audio_output_requested_frames": 1280,
+                "audio_output_underrun_frames": 16,
+                "audio_output_device_underflow_callbacks": 1,
+                "audio_queue_dropped_frames": 64,
+            }),
+            device_name="Private output /home/user/speakers"
+        )
+        session.rom = "/home/user/ROMs/private.game.iso"
+        session.host = Mock(driver_info="NVIDIA id XYZSECRET")
+        performance = session.performance_snapshot()
+        self.assertEqual(performance["format"], "anything-plays-gamecube-performance")
+        self.assertEqual(performance["metrics"]["native_run_calls"], 2)
+        self.assertEqual(performance["metrics"]["gpu_readback_calls"], 2)
+        self.assertEqual(performance["metrics"]["gamecube_hardware_frames"], 2)
+        self.assertEqual(performance["metrics"]["scheduler_late_frames"], 1)
+        self.assertAlmostEqual(
+            performance["metrics"]["gpu_readback_share_of_native_run"], .08
+        )
+        self.assertEqual(
+            performance["metrics"]["audio_output_device_underflow_callbacks"], 1
+        )
+        import json
+        encoded = json.dumps(performance)
+        for private in ("private.game.iso", "/home/", "XYZSECRET", "device_name",
+                        "driver_info", "speaker", "rom", "host"):
+            self.assertNotIn(private, encoded.lower() if private == "rom" else encoded)
+
+    def test_emulator_exposes_live_and_final_gamecube_metrics_without_session_retention(self):
+        from anything_plays.gba_emulator import Emulator
+        emu = Emulator()
+        emu.system = "gamecube"
+        emu.rom = "/home/user/private-game.iso"
+        emu.core_path = "/home/user/private-dolphin.so"
+        expected = {
+            "format": "anything-plays-gamecube-performance",
+            "version": 1,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": {"native_run_calls": 12},
+        }
+        fake = Mock(performance_snapshot=Mock(return_value=expected))
+        def run_game():
+            self.assertIs(emu._gamecube_session, fake)
+            self.assertEqual(emu.gamecube_performance_snapshot(), expected)
+        fake.run.side_effect = run_game
+        with patch("anything_plays.gamecube_gpu.GameCubeHardwareSession",
+                   return_value=fake):
+            emu._run()
+        self.assertIsNone(emu._gamecube_session)
+        self.assertIs(emu.gamecube_performance_snapshot(), expected)
+        fake.performance_snapshot.assert_called()
+        emu.system = "gba"
+        self.assertIsNone(emu.gamecube_performance_snapshot())
 
     def test_research_metrics_are_allowlisted_not_raw_logs(self):
         from tools.v32_extended_native_runtime import safe_evidence
