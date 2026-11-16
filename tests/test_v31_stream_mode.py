@@ -361,6 +361,8 @@ class StreamModeContracts(unittest.TestCase):
         app._stream_camera_frame = Image.new("RGB", (24, 18), "#c134ab")
         app._stream_camera_last_snapshot = 1.0
         app._stream_camera_serial = 5
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.reset_for("24 FPS")
 
         with (
             patch("anything_plays.ui_stream.time.monotonic",
