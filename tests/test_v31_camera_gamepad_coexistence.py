@@ -346,6 +346,57 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertEqual(app._stream_camera_serial, 2)
         self.assertEqual(app._stream_camera_last_snapshot, 10.100)
 
+    def test_broken_stream_clock_never_blocks_both_player_input_releases(self):
+        """P1/P2 native snapshots survive a failed optional OBS clock."""
+        import time
+        from types import MethodType
+        from anything_plays.ui_stream import StreamMixin
+
+        app = self.app
+        app._stream_output_window = object()
+        app._stream_options = {"frame_rate": "24 FPS"}
+        app._stream_camera_last_snapshot = None
+        app._stream_camera_frame = None
+        app._stream_camera_serial = 0
+        app._stream_last_render = None
+        app.stream_camera_snapshot = MethodType(
+            StreamMixin.stream_camera_snapshot, app
+        )
+        app.stream_clear_camera = MethodType(
+            StreamMixin.stream_clear_camera, app
+        )
+        app._invalidate_stream = MethodType(
+            StreamMixin._invalidate_stream, app
+        )
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "monotonic", return_value=10.0):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 1)
+
+        app.set_pixels()  # Both tracked objects disappeared.
+        with patch.object(time, "monotonic", side_effect=OSError(
+            "Native clock /Users/private/usb-camera-serial-007"
+        )):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 2)
+        self.assertEqual(app.emu.inputs.commands.qsize(), 0)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+
+        # The next valid camera frame must rebuild the optional stream image
+        # without reopening the webcam or needing new player permissions.
+        with patch.object(time, "monotonic", return_value=10.1):
+            app.draw_camera()
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 3)
+
     def test_stream_preview_throttle_never_skips_native_camera_button_release(self):
         """OBS-only RGB throttling cannot stall the actual game input path."""
         import time
