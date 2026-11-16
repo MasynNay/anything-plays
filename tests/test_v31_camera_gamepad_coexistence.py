@@ -288,6 +288,61 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertTrue(app.emu.held("B", 0))
         self.assertTrue(app.emu.held("Start", 0))
 
+    def test_broken_optional_stream_rgb_cannot_block_native_button_release(self):
+        """Corrupt OBS image conversion must not affect tracking or P1 holds."""
+        import time
+        from types import MethodType
+        from anything_plays.ui_stream import StreamMixin
+
+        app = self.app
+        app._stream_output_window = object()
+        app._stream_options = {"frame_rate": "24 FPS"}
+        app._stream_camera_last_snapshot = None
+        app._stream_camera_frame = None
+        app._stream_camera_serial = 0
+        app._stream_last_render = ("before error",)
+        app.stream_camera_snapshot = MethodType(
+            StreamMixin.stream_camera_snapshot, app
+        )
+        app.stream_clear_camera = MethodType(
+            StreamMixin.stream_clear_camera, app
+        )
+        app._invalidate_stream = MethodType(
+            StreamMixin._invalidate_stream, app
+        )
+        original = cv2.cvtColor
+        rgb_fails = [False]
+
+        def convert(pixels, mode):
+            if mode == cv2.COLOR_BGR2RGB and rgb_fails[0]:
+                raise cv2.error(
+                    "private webcam /Users/private/usb-serial-123 failed"
+                )
+            return original(pixels, mode)
+
+        app.set_pixels(primary=[(45, 60)])
+        with (
+            patch.object(time, "monotonic", side_effect=(10.0, 10.100)),
+            patch.object(cv2, "cvtColor", side_effect=convert),
+        ):
+            app.draw_camera()
+            app.emu.frame()
+            self.assertTrue(app.emu.held("A", 0))
+            self.assertIsNotNone(app._stream_camera_frame)
+            self.assertEqual(app._stream_camera_serial, 1)
+
+            rgb_fails[0] = True
+            app.set_pixels()
+            app.draw_camera()
+            app.emu.frame()
+        self.assertFalse(app.emu.held("A", 0),
+                         "native P1 button must release on the next frame")
+        self.assertIsNone(app._stream_camera_frame,
+                          "OBS may never retain a stale private camera image")
+        self.assertIsNone(app._stream_last_render)
+        self.assertEqual(app._stream_camera_serial, 2)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.100)
+
     def test_stream_preview_throttle_never_skips_native_camera_button_release(self):
         """OBS-only RGB throttling cannot stall the actual game input path."""
         import time
