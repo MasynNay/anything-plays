@@ -262,36 +262,83 @@ class CameraMixin:
         """Release camera, stale frames, and pending reconnect when requested."""
         camera_changed = getattr(self, "calibration_camera_changed", None)
         if callable(camera_changed):
-            camera_changed()
+            try:
+                camera_changed()
+            except Exception:
+                # An optional calibration panel may already be gone. Stop
+                # must not leave camera-driven native controls armed.
+                pass
         if not keep_reconnect:
-            self.cancel_camera_reconnect()
-        self.stop_controls()
+            try:
+                self.cancel_camera_reconnect()
+            except Exception:
+                # Cancel callbacks can fail after Tk shutdown. Retire the
+                # generation and pending job even if after_cancel failed.
+                self._camera_retry_generation = (
+                    getattr(self, "_camera_retry_generation", 0) + 1
+                )
+                self._camera_reconnect_job = None
+                self._camera_reconnect_name = None
+                self._camera_reconnect_attempts = 0
+        try:
+            self.stop_controls()
+        except Exception:
+            # GameplayMixin disarms native inputs before updating labels.
+            # If *any* earlier step failed, enforce Stop independently.
+            self.armed = False
+            self._pending_object_controls = False
+            emu = getattr(self, "emu", None)
+            if emu is not None:
+                try:
+                    emu.disarm()
+                except Exception:
+                    pass
+            bridge = getattr(self, "external_input", None)
+            if bridge is not None:
+                try:
+                    bridge.release_camera()
+                except Exception:
+                    pass
         # Clear the active identity before releasing a native device. The
         # polling loop remembers the original name before stopping it.
         self._active_camera_name = None
-        # Some drivers raise while closing a just-unplugged device; those
-        # errors must not strand Tk preview, bezel or Stream Mode on screen.
+        # Native extension-defined release errors must not strand a privacy
+        # preview, bezel, or Stream Mode after a USB hot-unplug.
         cap, self.cap = self.cap, None
         if cap is not None:
             try:
                 cap.release()
-            except (cv2.error, OSError, RuntimeError):
+            except Exception:
                 pass
         if not self.reference_image:
             self.frame = None
             self.camera_photo = None
-            if hasattr(self, "canvas"):
-                self.canvas.delete("all")
             self._camera_canvas_item = None
-        # Legacy camera harnesses and nonstream clients do not mix in StreamMixin.
-        # A real Stream Mode session always clears its stale preview on Stop.
+            canvas = getattr(self, "canvas", None)
+            if canvas is not None:
+                try:
+                    canvas.delete("all")
+                except Exception:
+                    # Already destroyed widget; continue revoking OBS pixels.
+                    pass
+        # These are independent cleanup paths; one failing must not prevent
+        # the other from running or leave a stale OBS-facing camera image.
         clear_stream = getattr(self, "stream_clear_camera", None)
         if callable(clear_stream):
-            clear_stream()
+            try:
+                clear_stream()
+            except Exception:
+                pass
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
-            bezel.set_active(False)
-        self.status.set('Camera stopped')
+            try:
+                bezel.set_active(False)
+            except Exception:
+                pass
+        try:
+            self.status.set('Camera stopped')
+        except Exception:
+            pass
 
     def pick_color(self):
         if self.frame is None:

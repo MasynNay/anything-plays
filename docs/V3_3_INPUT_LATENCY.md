@@ -82,6 +82,21 @@ existing fail-closed Stop/disarm logic in the application camera tick.
 These guarantees are covered by synthetic tests; they do not establish
 physical USB camera recovery or end-to-end sensor latency.
 
+## Stop and USB unplug shutdown isolation
+
+A Stop or unplug keeps the same fail-closed **native camera input disarm**
+policy even when a native capture extension throws during `release()`, a
+destroyed Tk camera canvas refuses to delete old pixels, or an optional
+calibration/bezel/status widget raises during teardown. Each cleanup stage
+continues independently: clear the current camera frame, detach the native
+capture handle, revoke the OBS-facing cached camera frame, and retire the
+reconnect timer on explicit Stop. A failed optional Stream Mode cleanup
+cannot prevent the local camera and native input from stopping.
+
+This behavior has synthetic fault-injection coverage. The real camera
+driver's permissions, USB reconnect timing and native-controller release
+still require physical-device QA.
+
 ## Manual 3.3 acceptance
 
 Capture separate baselines per host/OS, camera resolution, single vs two
