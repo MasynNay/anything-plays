@@ -17,6 +17,14 @@ from anything_plays.setup_health import build_setup_report
 from anything_plays.ui_setup_theme import bind_theme_canvas
 
 
+def _safe_refresh_failure_message(_error):
+    """Never display or copy raw driver, Tcl or local filesystem errors."""
+    return (
+        "Unable to check current setup. Check device connection "
+        "and choose Refresh again."
+    )
+
+
 def _snapshot(app):
     selected = app.camera_name.get() in app.camera_options
     active = False
@@ -224,14 +232,10 @@ def show_setup_diagnostics(app):
     def refresh():
         try:
             report = _snapshot(app)
-        except (ValueError, tk.TclError):
-            # Tk/driver error messages may contain device labels, ROM paths,
-            # or the user's home directory. Never echo them into diagnostics
-            # that can be copied or shown during a stream.
-            status.set(
-                "Unable to check current setup. Check device connection "
-                "and choose Refresh again."
-            )
+        except (ValueError, tk.TclError) as exc:
+            # Driver and Tcl exception text may contain local device/path
+            # details; the displayed failure is intentionally fixed.
+            status.set(_safe_refresh_failure_message(exc))
             return
         snapshot["value"] = report
         for child in cards.winfo_children():
