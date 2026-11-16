@@ -42,6 +42,21 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertTrue(should_capture(0.0, 0.040, "Quality (60 FPS)"))
         self.assertTrue(should_capture(100.0, 0.0, DEFAULT_PREVIEW_MODE))
 
+    def test_preview_clock_corruption_never_raises_during_native_gpu_callback(self):
+        """Only the optional GL-to-Tk snapshot is budgeted, not retro_run."""
+        for mode in PREVIEW_FPS:
+            for invalid in (
+                float("nan"), float("inf"), float("-inf"), -1, True,
+                10**1000, "private /Users/owner/device", [], {},
+            ):
+                with self.subTest(mode=mode, value_type=type(invalid).__name__):
+                    self.assertFalse(should_capture(1.0, invalid, mode))
+                    self.assertTrue(should_capture(invalid, 1.0, mode))
+            self.assertTrue(should_capture(None, 1.0, mode))
+            self.assertTrue(should_capture(1.0, 0.5, mode))
+            self.assertFalse(should_capture(1.0, 1.005, mode))
+            self.assertTrue(should_capture(1.0, 1.2, mode))
+
     def test_preview_cadence_measures_only_published_intervals_per_mode(self):
         tracker = PreviewCadenceTracker()
         self.assertEqual(tracker.snapshot()["gamecube_preview_target_fps"], 0)
