@@ -14,6 +14,11 @@ DEFAULT_PREVIEW_MODE = "Balanced (30 FPS)"
 
 def preview_fps(mode):
     """Normalize malformed/legacy preferences to an explicit safe default."""
+    # User preference files may be damaged or supplied by extensions.
+    # An unhashable list/dict must never raise across a ctypes video
+    # callback while Dolphin is executing a native frame.
+    if not isinstance(mode, str):
+        return PREVIEW_FPS[DEFAULT_PREVIEW_MODE]
     return PREVIEW_FPS.get(mode, PREVIEW_FPS[DEFAULT_PREVIEW_MODE])
 
 
