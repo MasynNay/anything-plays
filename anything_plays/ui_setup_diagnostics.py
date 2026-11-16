@@ -66,6 +66,24 @@ def _snapshot(app):
     return report
 
 
+def _input_timing_summary_lines(timing):
+    """Render known aggregate-only stages, never arbitrary diagnostic text."""
+    if not timing["samples"]:
+        return ("No software input samples yet (enable held camera controls).",)
+    lines = []
+    for stage, label in (
+        ("tracking_to_dispatch", "Tracking → input buffer"),
+        ("dispatch_to_native", "Input buffer → native frame"),
+        ("tracking_to_native", "Combined software input"),
+    ):
+        bucket = timing["stages"][stage]
+        lines.append(
+            f"{label}: P50 {bucket['p50_bucket_ms']} ms · "
+            f"P95 {bucket['p95_bucket_ms']} ms"
+        )
+    return tuple(lines)
+
+
 def show_setup_diagnostics(app):
     existing = getattr(app, "_setup_diagnostics_window", None)
     if existing is not None:
@@ -86,6 +104,7 @@ def show_setup_diagnostics(app):
 
     def close():
         app._setup_diagnostics_window = None
+        app._input_timing_button = None
         try:
             window.destroy()
         except tk.TclError:
@@ -161,22 +180,24 @@ def show_setup_diagnostics(app):
                 cards, text="OPTIONAL CAMERA INPUT TIMING", padding=10,
             )
             frame.pack(fill="x", pady=(0, 9), padx=(0, 3))
-            native = timing["stages"]["tracking_to_native"]
-            p95 = native["p95_bucket_ms"] or "no samples"
             state = "Measuring" if timing["enabled"] else "Stopped"
             ttk.Label(
                 frame,
-                text=f"{state} · {timing['samples']} held-input samples "
-                     f"· P95 software path {p95} ms",
+                text=f"{state} · {timing['samples']} native-input samples "
+                     f"· {timing['superseded']} superseded "
+                     f"· {timing['discarded_pending']} discarded",
                 style="Value.TLabel",
             ).pack(anchor="w")
+            for line in _input_timing_summary_lines(timing):
+                ttk.Label(frame, text=line, wraplength=545,
+                          justify="left").pack(anchor="w", pady=(3, 0))
             ttk.Label(
                 frame,
-                text="Measures camera-frame processing start to the next "
-                     "native input snapshot. Not sensor, screen, pulse-mode "
-                     "or physical response latency; no footage is recorded.",
+                text="Already captured camera frame → next native input "
+                     "snapshot only. These are bucket ranges, not physical "
+                     "camera or screen response latency; no footage is recorded.",
                 wraplength=545, justify="left",
-            ).pack(anchor="w", pady=(3, 0))
+            ).pack(anchor="w", pady=(5, 0))
         timing_control = getattr(app, "_input_timing_button", None)
         if timing_control is not None:
             buffer = getattr(app.emu, "inputs", None)
