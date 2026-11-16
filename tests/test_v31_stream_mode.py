@@ -264,6 +264,91 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(compose.call_args.args[1])
         self.assertTrue(app.cap.isOpened())
 
+    def test_session_fault_and_recovery_survive_fps_mode_changes(self):
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._closing = False
+        app._stream_output_window = object()
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_canvas = Mock()
+        app._stream_photo = object()
+        app._stream_canvas_item = 5
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_resize_cache = StreamPanelResizeCache()
+        app._stream_stale_camera_clears = 0
+        app._render_stream_frame = Mock(side_effect=RuntimeError(
+            "device serial 9381 /Users/private"
+        ))
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(10.0, 10.02)):
+            app._stream_render_tick()
+        first = app.stream_performance_snapshot()["metrics"]
+        self.assertEqual(first["stream_session_faults"], 1)
+        self.assertEqual(first["stream_session_recoveries"], 0)
+        self.assertTrue(first["stream_recovery_pending"])
+        self.assertEqual(first["stream_failed_ticks"], 1)
+
+        app._render_stream_frame = Mock(return_value=False)
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(11.0, 11.01)):
+            app._stream_render_tick()
+        self.assertTrue(app.stream_performance_snapshot()["metrics"][
+            "stream_recovery_pending"
+        ])
+
+        app._stream_options["frame_rate"] = "15 FPS"
+        app._stream_cadence.reset_for("15 FPS")
+        self.assertEqual(
+            app.stream_performance_snapshot()["metrics"]["stream_failed_ticks"],
+            0,
+        )
+        self.assertEqual(
+            app.stream_performance_snapshot()["metrics"]["stream_session_faults"],
+            1,
+        )
+        app._render_stream_frame = Mock(return_value=True)
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(12.0, 12.01)):
+            app._stream_render_tick()
+        recovery = app.stream_performance_snapshot()["metrics"]
+        self.assertEqual(recovery["stream_session_faults"], 1)
+        self.assertEqual(recovery["stream_session_recoveries"], 1)
+        self.assertFalse(recovery["stream_recovery_pending"])
+        self.assertEqual(recovery["stream_target_refresh_fps"], 15)
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(13.0, 13.01)):
+            app._stream_render_tick()
+        self.assertEqual(app.stream_performance_snapshot()["metrics"][
+            "stream_session_recoveries"
+        ], 1)
+
+    def test_invalid_runtime_output_rate_uses_safe_default(self):
+        from unittest.mock import Mock, patch
+        class Harness(StreamMixin):
+            pass
+        app = Harness()
+        app._closing = False
+        app._stream_output_window = object()
+        app._stream_options = {"frame_rate": []}
+        app._render_stream_frame = Mock(return_value=True)
+        app.root = Mock()
+        app._stream_cadence = StreamCadenceTracker()
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(5.0, 5.01)):
+            app._stream_render_tick()
+        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        self.assertEqual(app.stream_performance_snapshot()["metrics"][
+            "stream_target_refresh_fps"
+        ], 24)
+        self.assertEqual(app.stream_performance_snapshot()["metrics"][
+            "stream_session_faults"
+        ], 0)
+
     def test_render_tick_accounts_for_composition_time(self):
         from types import SimpleNamespace
         from unittest.mock import Mock, patch

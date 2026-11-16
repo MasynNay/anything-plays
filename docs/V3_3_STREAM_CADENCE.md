@@ -67,6 +67,17 @@ readings without interrupting tracking or native control updates. If the
 clock itself fails while a prior webcam image is displayed, the old private
 image is revoked until a fresh valid snapshot can be captured.
 
+## Session-wide compositor fault/recovery metrics
+
+The safe local report now includes `stream_session_faults`,
+`stream_session_recoveries` and `stream_recovery_pending`. These are
+session-only aggregate counts that **do not reset** when switching the
+15/24/30 FPS output cap, unlike intentionally reset per-rate cadence
+measurements. A recovery is acknowledged only when a new image is actually
+published after a fault; an unchanged tick cannot claim one. Closing and
+reopening the output resets all three counters. No frame, clock history,
+camera identity or filesystem path is retained.
+
 ## Stream compositor failure and privacy recovery
 
 If a PIL image conversion, Tk photo update or native preview wrapper fails,

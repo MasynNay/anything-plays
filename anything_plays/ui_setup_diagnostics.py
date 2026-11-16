@@ -210,6 +210,14 @@ def _stream_cadence_summary_lines(stream):
         f"{m['stream_resize_cache_misses']} resized"
         if cache_counts_known else "Source resize cache: not measured"
     )
+    recovery_info = (
+        (
+            f"Session compositor recovery: {m['stream_session_faults']} "
+            f"faults · {m['stream_session_recoveries']} recoveries · "
+            f"{'retry pending' if m.get('stream_recovery_pending') else 'ready'}",
+        ) if ("stream_session_faults" in m
+               and "stream_session_recoveries" in m) else ()
+    )
     return (
         f"Requested Stream Mode refresh: {m['stream_target_refresh_fps']} FPS · "
         f"observed Tk tick {ticks}",
@@ -224,7 +232,7 @@ def _stream_cadence_summary_lines(stream):
         f"{m.get('stream_render_over_budget_ticks', 0)} over-budget "
         f"of {m.get('stream_render_samples', 0)} measured ticks",
         fit_summary,
-    )
+    ) + recovery_info
 
 
 def show_setup_diagnostics(app):

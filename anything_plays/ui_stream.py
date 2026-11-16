@@ -569,6 +569,9 @@ class StreamMixin:
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
         self._stream_stale_camera_clears = 0
+        self._stream_session_faults = 0
+        self._stream_session_recoveries = 0
+        self._stream_recovery_pending = False
         self._stream_game_frame = None
         self._stream_game_serial = None
 
@@ -608,6 +611,9 @@ class StreamMixin:
         self._stream_cadence.reset_for(self._stream_options["frame_rate"])
         self._stream_resize_cache = StreamPanelResizeCache()
         self._stream_stale_camera_clears = 0
+        self._stream_session_faults = 0
+        self._stream_session_recoveries = 0
+        self._stream_recovery_pending = False
         self._open_stream_controls()
         self._stream_render_tick()
 
@@ -859,6 +865,15 @@ class StreamMixin:
                 "stream_stale_camera_clears": getattr(
                     self, "_stream_stale_camera_clears", 0
                 ),
+                "stream_session_faults": getattr(
+                    self, "_stream_session_faults", 0
+                ),
+                "stream_session_recoveries": getattr(
+                    self, "_stream_session_recoveries", 0
+                ),
+                "stream_recovery_pending": bool(getattr(
+                    self, "_stream_recovery_pending", False
+                )),
             },
         }
 
@@ -901,7 +916,11 @@ class StreamMixin:
             return
         # Stream Mode clocks and canvas composition are optional. Neither
         # may stall the native emulator's independent video/audio/input loop.
-        mode = self._stream_options["frame_rate"]
+        raw_mode = self._stream_options.get("frame_rate")
+        mode = (
+            raw_mode if isinstance(raw_mode, str) and raw_mode in FRAME_RATES
+            else DEFAULT_STREAM["frame_rate"]
+        )
         interval = round(1000 / int(mode.split()[0]))
         started = stream_optional_perf_clock()
         try:
@@ -919,6 +938,11 @@ class StreamMixin:
                     finished, mode, published=published,
                     render_seconds=elapsed,
                 )
+            if published and getattr(self, "_stream_recovery_pending", False):
+                self._stream_session_recoveries = (
+                    getattr(self, "_stream_session_recoveries", 0) + 1
+                )
+                self._stream_recovery_pending = False
             self._stream_update_diagnostic(
                 "Output ready · Game and camera are mirrored, not restarted."
             )
@@ -939,6 +963,11 @@ class StreamMixin:
                     cadence.record_tick(
                         finished, mode, failed=True, render_seconds=measured,
                     )
+            # Session-wide fault evidence survives output-rate switches.
+            self._stream_session_faults = (
+                getattr(self, "_stream_session_faults", 0) + 1
+            )
+            self._stream_recovery_pending = True
             # A corrupt PIL/driver frame must never remain visible in OBS
             # while the optional compositor retries. Do not stop the
             # underlying camera or emulator; back off to one attempt/sec.
@@ -1091,6 +1120,9 @@ class StreamMixin:
             cache.clear()
         self._stream_resize_cache = None
         self._stream_stale_camera_clears = 0
+        self._stream_session_faults = 0
+        self._stream_session_recoveries = 0
+        self._stream_recovery_pending = False
         if output is not None:
             try:
                 output.destroy()

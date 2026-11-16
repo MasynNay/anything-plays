@@ -244,8 +244,11 @@ class SnapshotPrivacyTests(unittest.TestCase):
         report = _snapshot(app)
         self.assertIn("stream_cadence", report)
         lines = _stream_cadence_summary_lines(report["stream_cadence"])
-        self.assertEqual(len(lines), 5)
+        self.assertEqual(len(lines), 6)
         self.assertIn("Source resize cache: not measured", lines[4])
+        self.assertIn("Session compositor recovery: 0 faults", lines[5])
+        self.assertIn("0 recoveries", lines[5])
+        self.assertIn("ready", lines[5])
         self.assertIn("Requested Stream Mode refresh: 24 FPS", lines[0])
         self.assertIn("observed Tk tick 25.0 FPS", lines[0])
         self.assertIn("waiting for two changed images", lines[1])
@@ -281,6 +284,10 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertIn(
             "P95 not sampled", _stream_cadence_summary_lines(old)[3]
         )
+        old["metrics"].pop("stream_session_faults", None)
+        old["metrics"].pop("stream_session_recoveries", None)
+        old["metrics"].pop("stream_recovery_pending", None)
+        self.assertEqual(len(_stream_cadence_summary_lines(old)), 5)
         app._stream_output_window = None
         self.assertNotIn("stream_cadence", _snapshot(app))
 
