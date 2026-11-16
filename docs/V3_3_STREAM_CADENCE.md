@@ -97,12 +97,14 @@ and remains unchanged. The shorter workflow additionally verifies that the
 new source resize cache never holds more than **two fitted panels**, regardless
 of game or camera frame count.
 
-A separate [manual 30-minute Stream Mode endurance workflow](../.github/workflows/v33-extended-stream-mode-soak.yml)
+A separate [opt-in 30-minute Stream Mode endurance workflow](../.github/workflows/v33-extended-stream-mode-soak.yml)
 is now available on the development branch. It uses the same real Tk window
-and moving **synthetic** camera/game pixels for 1,800 seconds, requiring
-continuous publications, bounded canvas items/Tk jobs, at most two cached
-resized sources, zero callback errors and at most 96 MiB RSS growth after
-warm-up. It does **not** run on every push, open a physical camera or load
+and moving **synthetic** camera/game pixels for 1,800 seconds. During the run,
+it also cycles 15/24/30 FPS, both screen layouts, window sizes and screen
+swapping, while repeatedly clearing/reacquiring the optional camera preview.
+It requires successful recurring transitions, bounded canvas items/Tk jobs,
+at most two cached resized sources, zero callback errors and at most 96 MiB
+RSS growth after warm-up. It does **not** run on every push, open a physical camera or load
 a commercial ROM. While 3.3 remains in draft PR #246, explicitly opt in by
 adding the `v33-long-soak` PR label (create the label once in the repository
 if necessary); the workflow reacts to that `labeled` event, not to routine

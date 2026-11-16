@@ -70,9 +70,11 @@ class SyntheticCamera:
 
 
 def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
-         enable_stream=False):
+         enable_stream=False, stress_stream=False):
     if seconds < 8:
         raise ValueError("Soak must run at least 8 seconds")
+    if stress_stream and not enable_stream:
+        raise ValueError("Stream transition stress requires --enable-stream")
     tracemalloc.start()
     report = {"seconds_requested": seconds,
               "test_type": "synthetic Tk + OpenCV UI, not native emulator",
@@ -80,6 +82,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
               "real_controller_hardware_tested": False,
               "physical_camera_tested": False,
               "stream_mode_requested": bool(enable_stream),
+              "stream_transition_stress_requested": bool(stress_stream),
               "real_stream_hardware_tested": False,
               "gamepad_sdl_polling_requested": bool(enable_gamepad)}
     started = time.monotonic()
@@ -126,6 +129,43 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             if enable_stream:
                 app.open_stream_mode()
             frame_number = 0
+            stream_stress_cycles = 0
+            stream_camera_clears = 0
+            visited_rates = set()
+            visited_layouts = set()
+
+            def stress_stream_transitions():
+                """Exercise actual Tk resize, mode switches and camera resets.
+
+                This never restarts the capture backend or native game input.
+                Only the optional output configuration and preview are
+                manipulated, as users do during long OBS sessions.
+                """
+                nonlocal stream_stress_cycles, stream_camera_clears
+                if app._closing or not enable_stream:
+                    return
+                index = stream_stress_cycles
+                rate = ("15 FPS", "24 FPS", "30 FPS")[index % 3]
+                layout = ("DS stacked", "Side by side")[index % 2]
+                visited_rates.add(rate)
+                visited_layouts.add(layout)
+                app._stream_options["frame_rate"] = rate
+                app._stream_options["layout"] = layout
+                app._stream_options["swap_screens"] = bool(index % 2)
+                app._stream_options_updated()
+                window = app._stream_output_window
+                if window is not None:
+                    window.geometry(
+                        "760x840" if layout == "DS stacked"
+                        else "1120x660"
+                    )
+                if index % 4 == 0:
+                    # Simulate a preview reset, not an actual webcam unplug.
+                    # The very next source frame should publish a fresh image.
+                    app.stream_clear_camera()
+                    stream_camera_clears += 1
+                stream_stress_cycles += 1
+                root.after(8000, stress_stream_transitions)
 
             def emit_frame():
                 nonlocal frame_number
@@ -216,6 +256,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     app.close()
 
             root.after(20, emit_frame)
+            if stress_stream:
+                root.after(2000, stress_stream_transitions)
             root.after(1000, sample)
             root.after(int(seconds * 1000), shutdown)
             try:
@@ -225,6 +267,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     app.close()
             report["frames_emitted"] = frame_number
             report["camera_frames"] = camera.frame_number
+            report["stream_stress_cycles"] = stream_stress_cycles
+            report["stream_forced_preview_clears"] = stream_camera_clears
+            report["stream_rates_visited"] = sorted(visited_rates)
+            report["stream_layouts_visited"] = sorted(visited_layouts)
 
     elapsed_real_seconds = time.monotonic() - started
     report["elapsed_real_seconds"] = round(elapsed_real_seconds, 2)
@@ -252,6 +298,22 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
         if any(s["stream_items"] != 1 for s in samples
                if s["seconds"] >= warmup):
             failures.append("Stream output canvas did not stay at one item")
+        if stress_stream:
+            # Stress must actually exercise transitions; a green idle soak
+            # with a broken timer is not representative of long streaming.
+            expected = max(1, (seconds - 10) // 8)
+            if report.get("stream_stress_cycles", 0) < expected:
+                failures.append("Stream transition stress timer did not progress")
+            if set(report.get("stream_rates_visited", [])) != {
+                "15 FPS", "24 FPS", "30 FPS"
+            }:
+                failures.append("Stream stress did not exercise all rates")
+            if set(report.get("stream_layouts_visited", [])) != {
+                "DS stacked", "Side by side"
+            }:
+                failures.append("Stream stress did not exercise both layouts")
+            if report.get("stream_forced_preview_clears", 0) < 2:
+                failures.append("Stream camera preview reset was not exercised")
     baseline = next((s for s in samples if s["seconds"] >= warmup), None)
     if baseline is None and samples:
         baseline = samples[0]
@@ -290,8 +352,11 @@ if __name__ == "__main__":
                         help="Exercise SDL polling without physical HID hardware")
     parser.add_argument("--enable-stream", action="store_true",
                         help="Exercise actual Stream Mode Tk output without OBS or hardware")
+    parser.add_argument("--stress-stream", action="store_true",
+                        help="For a long stream soak, rotate output size, 15/24/30 FPS, layout and preview resets")
     parser.add_argument("--report", default="soak-report.json")
     args = parser.parse_args()
     sys.exit(0 if soak(args.seconds, args.max_growth_mb, args.report,
                        enable_gamepad=args.enable_gamepad,
-                       enable_stream=args.enable_stream) else 1)
+                       enable_stream=args.enable_stream,
+                       stress_stream=args.stress_stream) else 1)

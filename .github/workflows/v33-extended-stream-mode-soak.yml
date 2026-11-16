@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           mkdir -p test-evidence
           PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
-            python tests/soak_gui.py --seconds 1800 --enable-stream \
+            python tests/soak_gui.py --seconds 1800 --enable-stream --stress-stream \
               --max-growth-mb 96 \
               --report test-evidence/v33-stream-mode-1800s.json
           python - <<'PY'
@@ -69,6 +69,11 @@ jobs:
           assert report["seconds_requested"] == 1800
           assert report["elapsed_real_seconds"] >= 1800
           assert report["stream_mode_requested"] is True
+          assert report["stream_transition_stress_requested"] is True
+          assert report["stream_stress_cycles"] >= 200
+          assert report["stream_forced_preview_clears"] >= 40
+          assert set(report["stream_rates_visited"]) == {"15 FPS", "24 FPS", "30 FPS"}
+          assert set(report["stream_layouts_visited"]) == {"DS stacked", "Side by side"}
           assert report["real_stream_hardware_tested"] is False
           assert report["physical_camera_tested"] is False
           assert report["real_controller_hardware_tested"] is False
@@ -80,7 +85,7 @@ jobs:
           assert all(s["stream_resize_cache_items"] <= 2 for s in samples)
           assert all(s["pending_tk_jobs"] <= 32 for s in samples)
           m = report["stream_final"]["metrics"]
-          assert m["stream_target_refresh_fps"] == 24
+          assert m["stream_target_refresh_fps"] in (15, 24, 30)
           assert m["stream_refresh_intervals"] >= 2
           assert m["stream_published_images"] >= 2
           assert m["stream_failed_ticks"] == 0
