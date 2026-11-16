@@ -223,6 +223,28 @@ class SnapshotPrivacyTests(unittest.TestCase):
         ):
             self.assertNotIn(private, encoded)
 
+    def test_input_timing_display_has_three_stage_ranges_or_no_samples(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _input_timing_summary_lines
+
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=iter((10.013, 10.040)).__next__)
+        empty = _input_timing_summary_lines(inputs.latency_snapshot())
+        self.assertEqual(len(empty), 1)
+        self.assertIn("No software input samples", empty[0])
+        self.assertNotIn("None ms", empty[0])
+
+        inputs.set_camera_buttons(["A"], sample_started_at=10.0)
+        inputs.before_frame(armed=True)
+        lines = _input_timing_summary_lines(inputs.latency_snapshot())
+        self.assertEqual(len(lines), 3)
+        self.assertIn("Tracking", lines[0])
+        self.assertIn("input buffer", lines[0])
+        self.assertIn("native frame", lines[1])
+        self.assertIn("Combined software", lines[2])
+        self.assertIn("P50 33-50 ms", lines[2])
+        self.assertIn("P95 33-50 ms", lines[2])
+
     def test_opt_in_timing_report_contains_only_bounded_aggregate_buckets(self):
         from anything_plays.libretro_input import InputBuffer
         from anything_plays.ui_setup_diagnostics import _snapshot
