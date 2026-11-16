@@ -1,0 +1,58 @@
+# 3.3 — camera-to-native input timing (opt-in, source development)
+
+This procedure measures **software handoff stages**, not end-to-end physical
+camera-to-display latency. It is intended for the experimental 3.3 source
+branch and does not describe a feature in the public 3.2.0 installers.
+
+## Local use
+
+1. Run the development app normally. In **Check my setup**, click **Start
+   input timing**. Timing is off by default, and this action does not open
+   cameras, start games or enable object controls.
+2. Load a supported embedded game using authorized content, select a camera,
+   and enable object controls in **Held while visible** mode.
+3. Move one or two tracked objects between active input zones for at least
+   30 seconds. Use normal gameplay; keep sensitive material out of frame.
+4. Open **Check my setup** again, click **Refresh checks**, then **Copy safe
+   report** if you want a local aggregate report. Click **Stop input timing**
+   to stop collection. Starting again creates a fresh measurement session.
+
+No video frames, pixel locations, button names, ROM paths, usernames, serials,
+device names, sample-by-sample timestamps or raw timing traces are retained in
+the report. A new observation can supersede an older one that never reached a
+native frame, and STOP discards pending observations. Counters and histogram
+arrays have constant size over long sessions.
+
+## What the three time ranges mean
+
+| Stage | Start | End |
+| --- | --- | --- |
+| `tracking_to_dispatch` | Start of analysis of an already captured camera frame | The latest held-input snapshot is atomically copied to the native input buffer |
+| `dispatch_to_native` | Input buffer handoff | The next armed `before_frame` native input snapshot |
+| `tracking_to_native` | Start of that camera frame's analysis | The next native input snapshot |
+
+Results are coarse *percentile buckets*, such as `20-33` milliseconds or
+`>500` milliseconds, not exact sensor-response measurements. P50/P95 use
+the nearest-rank estimate from a fixed-size histogram. `samples` counts
+camera observations actually consumed by native snapshots, not all camera
+frames; `superseded` counts observations overwritten before consumption;
+`discarded_pending` counts pending observations cleared by Stop or explicit
+timing disable. Samples include empty held-button snapshots so button releases
+are observable. No old timestamps cross a Stop/ROM boundary.
+
+**Not measured:** sensor exposure, webcam `read()` blocking time, display
+latency, rendered response, physical audio, native game reaction, pulse-mode
+inputs, or external emulator bridges. These cases require independent physical
+measurement, not just the software probe. Do not compare bucket bounds as
+precise measurements or report them as a verified FPS improvement.
+
+## Manual 3.3 acceptance
+
+Capture separate baselines per host/OS, camera resolution, single vs two
+colors, normal view vs Stream Mode, active game console, and control mode.
+Document software P50/P95, sample count and any superseded/discarded samples.
+Repeat a 30-minute run with disconnect/reconnect and Stop; verify no stuck
+buttons, memory growth, game crashes or timestamp leak. For a true
+camera-to-screen latency result, use an external high-speed camera or another
+independent instrument synchronizing the physical object movement and display;
+do not label these software timings as a physical latency result.
