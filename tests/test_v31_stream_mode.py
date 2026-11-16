@@ -198,7 +198,12 @@ class StreamModeContracts(unittest.TestCase):
 
             # Camera-off must erase the last image even within the
             # throttling interval, and permit an immediate reconnect.
+            cache = StreamPanelResizeCache()
+            cache.contained("CAMERA", app._stream_camera_frame, (0, 0, 160, 120))
+            self.assertIn("CAMERA", cache._entries)
+            app._stream_resize_cache = cache
             app.stream_clear_camera()
+            self.assertNotIn("CAMERA", cache._entries)
             self.assertIsNone(app._stream_camera_frame)
             self.assertIsNone(app._stream_camera_last_snapshot)
             self.assertEqual(app._stream_camera_serial, 4)
@@ -206,7 +211,11 @@ class StreamModeContracts(unittest.TestCase):
             self.assertEqual(app._stream_camera_serial, 5)
         self.assertEqual(convert.call_count, 4)
         self.assertEqual(app._stream_camera_frame.size, (25, 20))
+        cache.contained("CAMERA", app._stream_camera_frame, (0, 0, 160, 120))
+        self.assertEqual(len(cache._entries), 1)
         app.close_stream_mode()
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertEqual(len(cache._entries), 0)
         self.assertIsNone(app._stream_camera_frame)
         self.assertIsNone(app._stream_camera_last_snapshot)
 
@@ -839,6 +848,7 @@ class StreamModeContracts(unittest.TestCase):
         app.emu = SimpleNamespace(
             running=True, lock=lock, frame_serial=3, frame=LockedFrame(),
         )
+        app._stream_resize_cache = StreamPanelResizeCache()
         app._stream_output_window = object()
         app._stream_canvas = MagicMock()
         app._stream_canvas.winfo_exists.return_value = True
@@ -862,9 +872,13 @@ class StreamModeContracts(unittest.TestCase):
                   side_effect=convert_without_native_lock),
             patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
             patch("anything_plays.ui_stream.compose_stream_output",
-                  return_value=Image.new("RGB", (760, 980))),
+                  return_value=Image.new("RGB", (760, 980))) as compose,
         ):
             app._render_stream_frame()
+            self.assertIs(
+                compose.call_args.kwargs["resize_cache"],
+                app._stream_resize_cache,
+            )
             self.assertEqual(len(conversions), 1)
             self.assertEqual(app._stream_game_serial, 3)
             self.assertFalse(lock.held)
