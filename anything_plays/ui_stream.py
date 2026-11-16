@@ -27,6 +27,30 @@ STREAM_CAMERA_STALE_AFTER_SECONDS = 3.0
 # Only an integer code is exported, never a sequence of frame timings.
 _STREAM_RENDER_BIN_UPPER_MS = (5, 10, 16, 25, 33, 50, 67, 100, 200, 500)
 _HEX = re.compile(r"#[0-9a-fA-F]{6}\Z")
+def stream_optional_perf_clock():
+    """Best-effort monotonic perf clock for optional OBS composition.
+
+    A broken platform clock must not unwind a Tk callback, generate false
+    frame-cost samples, or interrupt the actual native emulator worker.
+    """
+    try:
+        now = time.perf_counter()
+        if type(now) in (float, int) and math.isfinite(now) and now >= 0:
+            return now
+    except Exception:
+        pass
+    return None
+
+
+def stream_safe_failure_class(exc):
+    """Return only fixed status categories, never driver or custom names."""
+    category = type(exc).__name__
+    return category if category in (
+        "RuntimeError", "OSError", "ValueError", "TypeError", "IndexError",
+        "AttributeError", "MemoryError", "OverflowError", "KeyError",
+    ) else "UnexpectedError"
+
+
 DEFAULT_STREAM = {
     "layout": "DS stacked",
     "frame_rate": "24 FPS",
@@ -249,6 +273,11 @@ class StreamCadenceTracker:
         if mode != self.mode:
             self.__init__()
             self.mode = mode
+
+    def record_failed_without_clock(self, mode):
+        """Count a failed UI update without inventing a timer observation."""
+        self.reset_for(mode)
+        self.failures += 1
 
     def record_tick(self, now, mode, *, published=False, failed=False,
                     render_seconds=None):
@@ -846,28 +875,49 @@ class StreamMixin:
             # the actual stream window; never stop streaming on a dead label.
             pass
 
+    def _stream_blank_output(self):
+        """Remove the OBS-facing image after a failed composition.
+
+        A Tk PhotoImage may already be partly updated when paste() fails.
+        Clear the canvas item *and* native image reference so the next OBS
+        capture cannot keep showing stale webcam/game pixels. Camera capture,
+        tracking and native emulator input remain entirely untouched.
+        """
+        canvas = getattr(self, "_stream_canvas", None)
+        self._stream_photo = None
+        self._stream_canvas_item = None
+        self._invalidate_stream()
+        if canvas is not None:
+            try:
+                canvas.delete("all")
+            except Exception:
+                # A window may already be destroyed; never send a native
+                # widget/driver exception into the original game loop.
+                pass
+
     def _stream_render_tick(self):
         self._stream_frame_job = None
         if self._stream_output_window is None or getattr(self, "_closing", False):
             return
-        # Streamers can pick smooth motion or lower CPU usage without
-        # changing the underlying emulator/camera sampling rates.
-        interval = round(1000 / int(self._stream_options["frame_rate"].split()[0]))
-        started = time.perf_counter()
+        # Stream Mode clocks and canvas composition are optional. Neither
+        # may stall the native emulator's independent video/audio/input loop.
+        mode = self._stream_options["frame_rate"]
+        interval = round(1000 / int(mode.split()[0]))
+        started = stream_optional_perf_clock()
         try:
+            if started is None:
+                raise RuntimeError("Stream composition timer unavailable")
             published = self._render_stream_frame() is True
-            finished = time.perf_counter()
-            # Rendering a frame already spent part of our output period.
-            # Compensate that cost instead of accumulating timer drift.
-            interval = stream_render_delay_ms(
-                interval, finished - started
-            )
+            finished = stream_optional_perf_clock()
+            if finished is None or finished < started:
+                raise RuntimeError("Stream composition timer unavailable")
+            elapsed = finished - started
+            interval = stream_render_delay_ms(interval, elapsed)
             cadence = getattr(self, "_stream_cadence", None)
             if cadence is not None:
                 cadence.record_tick(
-                    finished, self._stream_options["frame_rate"],
-                    published=published,
-                    render_seconds=finished - started,
+                    finished, mode, published=published,
+                    render_seconds=elapsed,
                 )
             self._stream_update_diagnostic(
                 "Output ready · Game and camera are mirrored, not restarted."
@@ -878,21 +928,33 @@ class StreamMixin:
         except Exception as exc:
             cadence = getattr(self, "_stream_cadence", None)
             if cadence is not None:
-                finished = time.perf_counter()
-                cadence.record_tick(
-                    finished, self._stream_options["frame_rate"],
-                    failed=True, render_seconds=finished - started,
-                )
-            # A corrupt driver frame must not spin at the selected output FPS.
-            # Back off, show a useful diagnostic, and retry without stopping
-            # the original camera or emulator session.
-            self._invalidate_stream()
+                finished = stream_optional_perf_clock()
+                if finished is None:
+                    cadence.record_failed_without_clock(mode)
+                else:
+                    measured = (
+                        finished - started
+                        if started is not None and finished >= started else None
+                    )
+                    cadence.record_tick(
+                        finished, mode, failed=True, render_seconds=measured,
+                    )
+            # A corrupt PIL/driver frame must never remain visible in OBS
+            # while the optional compositor retries. Do not stop the
+            # underlying camera or emulator; back off to one attempt/sec.
+            self._stream_blank_output()
             interval = 1000
             self._stream_update_diagnostic(
-                "Stream preview retrying (" + type(exc).__name__ + ")."
+                "Stream preview retrying ("
+                + stream_safe_failure_class(exc) + ")."
             )
         if self._stream_output_window is not None and not self._closing:
-            self._stream_frame_job = self.root.after(interval, self._stream_render_tick)
+            try:
+                self._stream_frame_job = self.root.after(
+                    interval, self._stream_render_tick
+                )
+            except (tk.TclError, RuntimeError):
+                self.close_stream_mode()
 
     def _render_stream_frame(self):
         canvas = self._stream_canvas
@@ -932,22 +994,32 @@ class StreamMixin:
         if self.cap is not None:
             try:
                 camera_active = bool(self.cap.isOpened())
-            except (cv2.error, OSError, RuntimeError):
+            except Exception:
+                # isOpened() may raise arbitrary third-party wrapper errors.
+                # Only the optional OBS preview is affected.
                 pass
         camera_ref = bool(self.reference_image and self.frame is not None)
         if (camera_active and not camera_ref
-                and self._stream_camera_frame is not None
-                and stream_camera_frame_is_stale(
+                and self._stream_camera_frame is not None):
+            try:
+                observed_at = time.monotonic()
+                clock_valid = (
+                    type(observed_at) in (float, int)
+                    and math.isfinite(observed_at) and observed_at >= 0
+                )
+            except Exception:
+                clock_valid = False
+            if (not clock_valid or stream_camera_frame_is_stale(
                     getattr(self, "_stream_camera_last_snapshot", None),
-                    time.monotonic(),
-                )):
-            # Device-open is not equivalent to delivering a new frame.
-            # Clear only the optional OBS picture; game input and camera
-            # recovery remain owned by the existing camera pipeline.
-            self._stream_stale_camera_clears = (
-                getattr(self, "_stream_stale_camera_clears", 0) + 1
-            )
-            self.stream_clear_camera()
+                    observed_at,
+            )):
+                # A device-open flag is not proof of fresh video. If even
+                # the optional clock breaks, erase old private camera pixels
+                # without disrupting native input or static reference art.
+                self._stream_stale_camera_clears = (
+                    getattr(self, "_stream_stale_camera_clears", 0) + 1
+                )
+                self.stream_clear_camera()
         if not camera_active and not camera_ref and self._stream_camera_frame is not None:
             self.stream_clear_camera()
         status = (active_game, camera_active, camera_ref)

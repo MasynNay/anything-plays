@@ -67,6 +67,27 @@ readings without interrupting tracking or native control updates. If the
 clock itself fails while a prior webcam image is displayed, the old private
 image is revoked until a fresh valid snapshot can be captured.
 
+## Stream compositor failure and privacy recovery
+
+If a PIL image conversion, Tk photo update or native preview wrapper fails,
+the **optional OBS-facing canvas is blanked immediately** instead of leaving
+the previously captured private webcam/game pixels frozen on screen. A
+fixed-category status is shown in the separate uncaptured Stream Settings
+window and the compositor retries at most once per second. This recovery
+never stops the original webcam tracking or native emulator/input/audio
+sessions. After the error clears, the next valid image recreates the one
+canvas image item.
+
+An invalid, missing or exceptional performance clock is also treated as a
+failed optional update; it does not fabricate a zero-duration frame or let
+the failed timer escape a Tk callback. The bounded failure count can advance
+even when no clock sample exists. An invalid camera freshness clock clears
+only the optional camera preview; static reference images are preserved.
+
+These safeguards prevent **application-retained** stale Stream Mode imagery,
+but OBS itself can retain the last captured frame depending on its capture
+configuration; physical OBS tests remain mandatory.
+
 ## What the metrics mean
 
 | Metric | Meaning | Not proof of |

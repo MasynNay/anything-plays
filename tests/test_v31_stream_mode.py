@@ -11,6 +11,7 @@ from anything_plays.ui_stream import (
     stream_panel_boxes, stream_render_delay_ms, StreamCadenceTracker,
     StreamPanelResizeCache, _contained,
     stream_camera_snapshot_due, stream_camera_frame_is_stale,
+    stream_optional_perf_clock, stream_safe_failure_class,
     validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
@@ -78,6 +79,190 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(stream_render_delay_ms(42, -1), 42)
         self.assertEqual(stream_render_delay_ms(42, float("nan")), 42)
         self.assertEqual(stream_render_delay_ms(42, None), 42)
+
+    def test_optional_stream_perf_clock_handles_invalid_native_values(self):
+        from unittest.mock import patch
+        for bad in (
+            OSError("private /Users/someone/camera"),
+            RuntimeError("GPU driver serial-123"),
+        ):
+            with patch("anything_plays.ui_stream.time.perf_counter",
+                       side_effect=bad):
+                self.assertIsNone(stream_optional_perf_clock())
+        for bad in (float("nan"), float("inf"), -1.0, 10**1000,
+                    True, "private path", None, {}, []):
+            with patch("anything_plays.ui_stream.time.perf_counter",
+                       return_value=bad):
+                self.assertIsNone(stream_optional_perf_clock())
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   return_value=3.5):
+            self.assertEqual(stream_optional_perf_clock(), 3.5)
+        class DeviceSerialXYZ(Exception):
+            pass
+        self.assertEqual(
+            stream_safe_failure_class(DeviceSerialXYZ("/home/private")),
+            "UnexpectedError",
+        )
+        self.assertEqual(stream_safe_failure_class(OSError("secret")), "OSError")
+
+    def test_failed_stream_canvas_blanks_previous_pixels_then_recovers(self):
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._closing = False
+        app._stream_output_window = object()
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_canvas = Mock()
+        app._stream_photo = object()
+        app._stream_canvas_item = 7
+        app._stream_last_render = ("prior",)
+        app._stream_cadence = StreamCadenceTracker()
+        app._render_stream_frame = Mock(side_effect=OSError(
+            "/home/owner/private-webcam-serial-22"
+        ))
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(10.0, 10.02)):
+            app._stream_render_tick()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        self.assertIsNone(app._stream_last_render)
+        app._stream_canvas.delete.assert_called_once_with("all")
+        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_failed_ticks"], 1
+        )
+        app.root.after.reset_mock()
+
+        def publish_again():
+            app._stream_photo = object()
+            app._stream_canvas_item = 19
+            return True
+
+        app._render_stream_frame.side_effect = publish_again
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(11.0, 11.01)):
+            app._stream_render_tick()
+        self.assertIsNotNone(app._stream_photo)
+        self.assertEqual(app._stream_canvas_item, 19)
+        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_published_images"], 1
+        )
+
+    def test_stream_faulty_perf_clock_keeps_backoff_and_cadence_honest(self):
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._closing = False
+        app._stream_output_window = object()
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_canvas = Mock()
+        app._stream_photo = object()
+        app._stream_canvas_item = 3
+        app._render_stream_frame = Mock(return_value=True)
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=RuntimeError("secret driver /Users/private")):
+            app._stream_render_tick()
+        app._render_stream_frame.assert_not_called()
+        app._stream_canvas.delete.assert_called_once_with("all")
+        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_failed_ticks"], 1
+        )
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_render_samples"], 0
+        )
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_published_images"], 0
+        )
+        app.root.after.reset_mock()
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(20.0, 20.01)):
+            app._stream_render_tick()
+        app._render_stream_frame.assert_called_once()
+        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        self.assertEqual(
+            app._stream_cadence.snapshot()["stream_published_images"], 1
+        )
+
+    def test_stream_driver_subclass_name_never_appears_in_status(self):
+        from unittest.mock import Mock, patch
+
+        class WebcamSerialPrivate(Exception):
+            pass
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._closing = False
+        app._stream_output_window = object()
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_canvas = Mock()
+        app._stream_diagnostic = Mock()
+        app._render_stream_frame = Mock(side_effect=WebcamSerialPrivate(
+            "USB serial /Users/owner/secret-driver"
+        ))
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   return_value=10.0):
+            app._stream_render_tick()
+        status = app._stream_diagnostic.set.call_args.args[0]
+        self.assertIn("UnexpectedError", status)
+        for private in ("WebcamSerialPrivate", "/Users/", "secret-driver"):
+            self.assertNotIn(private, status)
+        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+
+    def test_stream_camera_stale_guard_fails_closed_on_invalid_clock(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.emu = SimpleNamespace(running=False)
+        app.cap = MagicMock()
+        app.cap.isOpened.return_value = True
+        app.frame = None
+        app.reference_image = False
+        app._stream_camera_frame = Image.new("RGB", (24, 18), "#c134ab")
+        app._stream_camera_last_snapshot = 20.0
+        app._stream_camera_serial = 5
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=RuntimeError("private USB /home/owner")),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+        self.assertEqual(app._stream_camera_serial, 6)
+        self.assertTrue(compose.call_args.kwargs["camera_active"])
+        self.assertIsNone(compose.call_args.args[1])
+        self.assertTrue(app.cap.isOpened())
 
     def test_render_tick_accounts_for_composition_time(self):
         from types import SimpleNamespace
