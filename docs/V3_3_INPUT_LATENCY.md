@@ -36,6 +36,19 @@ without a new pending sample; the next valid clock automatically resumes
 measurements without restarting a camera or emulator. These are software
 safety guarantees under synthetic tests, not physical response measurements.
 
+## Sleep/resume and clock discontinuities
+
+A host that sleeps or pauses for more than one hour between processing an
+already captured frame and handing off buttons, or before the next native
+snapshot, cannot yield a meaningful active-play latency measurement. The
+optional 3.3 probe now **rejects that sample** and increments the aggregate
+`clock_discontinuities` counter, while the next valid camera frame can be
+measured normally. It does not insert a false `>500` ms percentile outlier,
+retain raw timestamps, or stop P1/P2 held-button delivery and release.
+The one-hour cap is a diagnostic sanity boundary, **not** a latency target
+or a promise about real webcam/USB timing. Physical suspend/resume and
+controller responsiveness still need owner hardware verification.
+
 ## What the three time ranges mean
 
 | Stage | Start | End |

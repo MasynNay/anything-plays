@@ -208,6 +208,48 @@ class BoundedProbeTests(unittest.TestCase):
         inputs.before_frame(armed=True)
         self.assertEqual(inputs.latency_snapshot()["samples"], 1)
 
+    def test_sleep_resume_clock_jumps_are_not_reported_as_active_input_lag(self):
+        # Large idle gaps used to land in the >500 ms latency bucket and
+        # corrupt an active-session percentile. Actual button updates must
+        # not depend on whether this optional timer can be sampled.
+        probe = InputLatencyProbe(clock=SteppedClock(
+            4005.0, 4005.020, 7606.020, 7606.040, 7606.070,
+        ))
+        probe.published(1.0)  # suspended during camera processing
+        self.assertIsNone(probe._pending)
+        probe.published(4005.0)  # fresh frame after resume
+        probe.consumed()  # suspended again before native snapshot
+        self.assertEqual(probe.snapshot()["samples"], 0)
+        probe.published(7606.030)  # healthy observation after resume
+        probe.consumed()
+        report = probe.snapshot()
+        self.assertEqual(report["samples"], 1)
+        self.assertEqual(report["clock_discontinuities"], 2)
+        self.assertEqual(
+            report["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "33-50",
+        )
+        self.assertEqual(sum(probe._histograms["tracking_to_native"]), 1)
+        self.assertIsNone(probe._pending)
+
+    def test_expired_timing_still_delivers_and_releases_both_native_ports(self):
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=SteppedClock(
+            4005.0, 4006.010, 4006.025,
+        ))
+        inputs.set_camera_buttons(["A"], ["B"], sample_started_at=1.0)
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 1)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 0)
+        self.assertEqual(inputs.latency_snapshot()["clock_discontinuities"], 1)
+        inputs.after_frame()
+        inputs.set_camera_buttons([], [], sample_started_at=4006.0)
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 0)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 0)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 1)
+
     def test_constant_memory_after_thousands_of_samples(self):
         clock = [1.0]
         def current():

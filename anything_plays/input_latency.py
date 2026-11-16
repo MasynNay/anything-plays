@@ -14,6 +14,9 @@ import time
 # Explicit boundaries make percentiles *buckets*, not fabricated precision.
 _BUCKET_UPPER_MS = (2, 5, 10, 20, 33, 50, 75, 100, 150, 250, 500)
 _STAGES = ("tracking_to_dispatch", "dispatch_to_native", "tracking_to_native")
+# Ignore optional timing samples across a suspended host or huge clock jump.
+# Normal game input is delivered regardless of this diagnostics-only cap.
+_MAX_TIMING_SPAN_SECONDS = 3600.0
 
 
 def _percentile_bucket(histogram, count, percentile):
@@ -46,6 +49,7 @@ class InputLatencyProbe:
         self.samples = 0
         self.superseded = 0
         self.discarded_pending = 0
+        self.clock_discontinuities = 0
         self._histograms = {
             stage: [0] * (len(_BUCKET_UPPER_MS) + 1)
             for stage in _STAGES
@@ -82,6 +86,12 @@ class InputLatencyProbe:
             # it would falsely attribute a later native frame to old pixels.
             self.discard()
             return
+        if published_at - started_at > _MAX_TIMING_SPAN_SECONDS:
+            # A suspended host must not masquerade as hours of camera
+            # processing delay. Only the optional measurement is discarded.
+            self.clock_discontinuities += 1
+            self.discard()
+            return
         if self._pending is not None:
             self.superseded += 1
         self._pending = (started_at, published_at)
@@ -94,6 +104,11 @@ class InputLatencyProbe:
         self._pending = None
         consumed_at = self._read_clock()
         if not self._valid(consumed_at) or consumed_at < published_at:
+            return
+        if consumed_at - started_at > _MAX_TIMING_SPAN_SECONDS:
+            # A long suspend between camera handoff and native consumption
+            # is not meaningful active-play latency; drop this one sample.
+            self.clock_discontinuities += 1
             return
         self.samples += 1
         elapsed = {
@@ -121,6 +136,7 @@ class InputLatencyProbe:
             "samples": self.samples,
             "superseded": self.superseded,
             "discarded_pending": self.discarded_pending,
+            "clock_discontinuities": self.clock_discontinuities,
             "stages": {
                 stage: {
                     "p50_bucket_ms": _percentile_bucket(
