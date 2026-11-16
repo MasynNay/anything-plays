@@ -67,6 +67,19 @@ readings without interrupting tracking or native control updates. If the
 clock itself fails while a prior webcam image is displayed, the old private
 image is revoked until a fresh valid snapshot can be captured.
 
+## Instant settings refresh without discarding fresh webcam pixels
+
+Changing output FPS, layout, border, colors or panel sizing marks only
+the *next optional camera conversion* as immediately due. The previous
+successful webcam timestamp remains intact while the current OBS preview
+is still within its privacy window. A settings change therefore cannot
+accidentally make an otherwise fresh camera image appear to have an
+unknown timestamp and blank the output before the next source frame.
+The next annotated tracking image publishes immediately at the selected
+rate, then regular 15/24/30 FPS throttling resumes. The existing
+three-second live-camera stale-image revocation still applies when no
+new image arrives. No tracking, native input or audio loop is restarted.
+
 ## Session-wide compositor fault/recovery metrics
 
 The safe local report now includes `stream_session_faults`,

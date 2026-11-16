@@ -566,6 +566,7 @@ class StreamMixin:
         self._stream_cadence = None
         self._stream_resize_cache = None
         self._stream_camera_last_snapshot = None
+        self._stream_camera_force_next_snapshot = False
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
         self._stream_stale_camera_clears = 0
@@ -607,6 +608,7 @@ class StreamMixin:
         self._stream_photo = None
         self._stream_last_render = None
         self._stream_camera_last_snapshot = None
+        self._stream_camera_force_next_snapshot = True
         self._stream_cadence = StreamCadenceTracker()
         self._stream_cadence.reset_for(self._stream_options["frame_rate"])
         self._stream_resize_cache = StreamPanelResizeCache()
@@ -756,9 +758,11 @@ class StreamMixin:
         self._stream_options_updated()
 
     def _stream_options_updated(self):
-        # A changed refresh rate/size needs the next available annotated
-        # camera frame, not a delayed snapshot from the prior stream setup.
-        self._stream_camera_last_snapshot = None
+        # Request an immediate *next* annotated frame, but do not erase
+        # the last successful camera freshness timestamp. That would
+        # wrongly turn a still-live OBS image into an invalid/stale image
+        # and cause avoidable blanking on every slider/FPS/layout change.
+        self._stream_camera_force_next_snapshot = True
         cadence = getattr(self, "_stream_cadence", None)
         if cadence is not None:
             cadence.reset_for(self._stream_options["frame_rate"])
@@ -800,7 +804,9 @@ class StreamMixin:
             return
         last = getattr(self, "_stream_camera_last_snapshot", None)
         if not stream_camera_snapshot_due(
-            last, now, self._stream_options["frame_rate"]
+            None if getattr(self, "_stream_camera_force_next_snapshot", False)
+            else last,
+            now, self._stream_options["frame_rate"]
         ):
             # Never skip the original camera tracking/control pipeline,
             # only the extra conversion for the optional OBS output window.
@@ -832,15 +838,18 @@ class StreamMixin:
             # Retry at the selected Stream FPS, not on every high-rate
             # tracking frame, to avoid a conversion-error hot loop.
             self._stream_camera_last_snapshot = now
+            self._stream_camera_force_next_snapshot = False
             return
         self._stream_camera_frame = preview
         self._stream_camera_serial += 1
         self._stream_camera_last_snapshot = now
+        self._stream_camera_force_next_snapshot = False
 
     def stream_clear_camera(self):
         # Even if the last frame was only milliseconds ago, disconnect or
         # Stop must immediately clear it and accept the next reconnect.
         self._stream_camera_last_snapshot = None
+        self._stream_camera_force_next_snapshot = False
         self._stream_camera_frame = None
         cache = getattr(self, "_stream_resize_cache", None)
         if cache is not None:
@@ -1121,6 +1130,7 @@ class StreamMixin:
         self._stream_canvas_item = None
         self._stream_camera_frame = None
         self._stream_camera_last_snapshot = None
+        self._stream_camera_force_next_snapshot = False
         self._stream_game_frame = None
         self._stream_game_serial = None
         self._stream_last_render = None

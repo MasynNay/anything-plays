@@ -556,6 +556,93 @@ class StreamModeContracts(unittest.TestCase):
         app.root.after.assert_called_once_with(1000, app._stream_render_tick)
         self.assertEqual(app._stream_last_render, None)
 
+    def test_stream_option_change_keeps_fresh_webcam_until_next_snapshot(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, Mock, patch
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+            def uses_embedded_emulator(self):
+                return False
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.root = Mock()
+        app.save_preferences = Mock()
+        app.emu = SimpleNamespace(running=False)
+        app.cap = MagicMock()
+        app.cap.isOpened.return_value = True
+        app.frame = None
+        app.reference_image = False
+        frame = np.zeros((24, 32, 3), dtype=np.uint8)
+        frame[:, :, :] = (45, 110, 210)
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.0):
+            app.stream_camera_snapshot(frame)
+        before = app._stream_camera_frame
+        before_serial = app._stream_camera_serial
+        self.assertIsNotNone(before)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.0)
+
+        app._stream_options["frame_rate"] = "30 FPS"
+        app._stream_options_updated()
+        self.assertTrue(app._stream_camera_force_next_snapshot)
+        self.assertIs(app._stream_camera_frame, before)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.0)
+
+        # The OBS canvas may update immediately after a settings change,
+        # before the next tracking frame. This MUST retain recent pixels.
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=10.001),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIs(compose.call_args.args[1], before)
+        self.assertEqual(app._stream_camera_serial, before_serial)
+        self.assertEqual(app._stream_stale_camera_clears, 0)
+
+        # The next annotated camera frame bypasses the previous 24 FPS
+        # throttle even when it arrives only 2 ms later.
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.002):
+            app.stream_camera_snapshot(frame)
+        self.assertEqual(app._stream_camera_serial, before_serial + 1)
+        self.assertIsNot(app._stream_camera_frame, before)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.002)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+
+        # Subsequent high-rate frames are throttled normally at 30 FPS.
+        new = app._stream_camera_frame
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.003):
+            app.stream_camera_snapshot(frame)
+        self.assertIs(app._stream_camera_frame, new)
+
+        # Privacy still expires real camera pixels when no new frame
+        # arrives for the three-second freshness window.
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=13.1),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(compose.call_args.args[1])
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+
     def test_stream_camera_preview_conversion_is_rate_bounded(self):
         import cv2
         import numpy as np
