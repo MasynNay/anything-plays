@@ -53,8 +53,14 @@ class InputLatencyProbe:
 
     @staticmethod
     def _valid(value):
-        return (type(value) in (int, float) and math.isfinite(value)
-                and value >= 0)
+        if type(value) not in (int, float) or value < 0:
+            return False
+        try:
+            return math.isfinite(value)
+        except (OverflowError, ValueError, TypeError):
+            # An arbitrarily large integer supplied through an extension
+            # cannot crash the native input snapshot or local diagnostics.
+            return False
 
     def published(self, started_at):
         """A new held-button snapshot reached the native input buffer."""
