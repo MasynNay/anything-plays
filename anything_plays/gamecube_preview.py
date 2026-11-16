@@ -78,9 +78,12 @@ class PreviewCadenceTracker:
             return
         if not valid or now < 0:
             return
-        if self.last_publication is not None and now < self.last_publication:
-            # A monotonic clock discontinuity must not create a bogus
-            # capture-frequency estimate or retain unrelated old intervals.
+        if (self.last_publication is not None
+                and (now < self.last_publication
+                     or now - self.last_publication > 3600)):
+            # A clock reversal or hours-long suspended window starts a new
+            # observation segment. Do not turn a sleep/resume gap into a
+            # fictitious low preview FPS. Match Stream Mode's suspend policy.
             self.last_publication = None
             self.published = 0
             self.intervals = 0
