@@ -84,6 +84,14 @@ a *lower bound* and the report says **partial timing**. The counter
 it does not represent a native Dolphin `retro_run` failure. Failed timing
 reads are never counted as deliberately throttled readback skips.
 
+A native GL readback that raises an unexpected extension-defined exception
+causes a **controlled stop** of the broken GameCube hardware session; it
+cannot cross the ctypes callback and leave the core with a permanently
+stale display. The application reports only an allowlisted category or
+`UnexpectedError`, never the exception message, custom class name, device
+serial or private driver path. A failed GPU driver is **not** silently
+restarted or substituted with a software framebuffer.
+
 A high readback **share** suggests the synchronous GL pixel copy is an area
 to investigate, but no frame-rate increase is proven unless a controlled
 before/after physical-device benchmark actually measures one. If native
