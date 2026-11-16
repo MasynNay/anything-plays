@@ -53,7 +53,8 @@ class InputLatencyProbe:
 
     @staticmethod
     def _valid(value):
-        return type(value) in (int, float) and math.isfinite(value)
+        return (type(value) in (int, float) and math.isfinite(value)
+                and value >= 0)
 
     def published(self, started_at):
         """A new held-button snapshot reached the native input buffer."""
