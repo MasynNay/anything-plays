@@ -138,15 +138,29 @@ def _gamecube_performance_summary_lines(performance):
             and "gamecube_preview_clock_failures" in m)
         else ""
     )
+    timed = m.get("gpu_readback_timing_samples")
+    captures = m["gpu_readback_calls"]
+    if type(timed) is int and captures > 0 and timed == 0:
+        # A perf_counter() failure is not evidence that glReadPixels is free.
+        readback_cost = "maximum unmeasured · share unavailable"
+    elif type(timed) is int and 0 < timed < captures:
+        readback_cost = (
+            f"maximum {m['gpu_readback_max_ms']} ms · "
+            f"at least {m['gpu_readback_share_of_native_run'] * 100:.1f}% "
+            "of native execution time (partial timing)"
+        )
+    else:
+        readback_cost = (
+            f"maximum {m['gpu_readback_max_ms']} ms · "
+            f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% "
+            "of native execution time (included, not additive)"
+        )
     return (
         f"Native frames: {m['native_run_calls']} · average "
         f"{m['native_run_mean_ms']} ms · maximum "
         f"{m['native_run_max_ms']} ms per retro_run · P95 " 
         f"{p95_label}",
-        f"GPU readback: {m['gpu_readback_calls']} captures · maximum "
-        f"{m['gpu_readback_max_ms']} ms · "
-        f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
-        "native execution time (included, not additive)"
+        f"GPU readback: {captures} captures · {readback_cost}"
         f"{readback_timing}",
         f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
         f"observed {observed_preview} over "
