@@ -134,6 +134,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 app.open_stream_mode()
             frame_number = 0
             stream_stress_cycles = 0
+            stream_controls_updates = 0
             stream_camera_clears = 0
             stream_fault_injected = False
             stream_fault_blanked = False
@@ -151,6 +152,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 manipulated, as users do during long OBS sessions.
                 """
                 nonlocal stream_stress_cycles, stream_camera_clears
+                nonlocal stream_controls_updates
                 if app._closing or not enable_stream:
                     return
                 index = stream_stress_cycles
@@ -158,10 +160,29 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 layout = ("DS stacked", "Side by side")[index % 2]
                 visited_rates.add(rate)
                 visited_layouts.add(layout)
-                app._stream_options["frame_rate"] = rate
-                app._stream_options["layout"] = layout
-                app._stream_options["swap_screens"] = bool(index % 2)
-                app._stream_options_updated()
+                # Drive the *actual* traced Tk StringVar/DoubleVar/BooleanVar
+                # controls, not internal _stream_options dict mutations.
+                # This exercises scheduling, validation, layout geometry,
+                # visual-only camera-pixel reuse and deferred preference save
+                # while the real Tk webcam/game timers remain active.
+                options = (
+                    ("frame_rate", rate),
+                    ("layout", layout),
+                    ("swap_screens", bool(index % 2)),
+                    ("theme", "Ocean Dark" if index % 2 else "Dark"),
+                    ("border_width", 2 + (index * 3) % 15),
+                    ("game_size", 35 + (index * 7) % 31),
+                )
+                for key, value in options:
+                    control = app._stream_vars[key]
+                    control.set(value)
+                    stream_controls_updates += 1
+                    if app._stream_options[key] != value:
+                        failures.append(
+                            "Stream control trace failed to apply " + key
+                        )
+                        app.close()
+                        return
                 window = app._stream_output_window
                 if window is not None:
                     window.geometry(
@@ -339,6 +360,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             report["frames_emitted"] = frame_number
             report["camera_frames"] = camera.frame_number
             report["stream_stress_cycles"] = stream_stress_cycles
+            report["stream_controls_updates"] = stream_controls_updates
             report["stream_forced_preview_clears"] = stream_camera_clears
             report["stream_fault_injected"] = stream_fault_injected
             report["stream_fault_blanked"] = stream_fault_blanked
@@ -382,6 +404,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             expected = max(1, (seconds - 10) // 8)
             if report.get("stream_stress_cycles", 0) < expected:
                 failures.append("Stream transition stress timer did not progress")
+            if report.get("stream_controls_updates", 0) < 6 * expected:
+                failures.append("Traced Tk Stream Settings were not exercised")
             if set(report.get("stream_rates_visited", [])) != {
                 "15 FPS", "24 FPS", "30 FPS"
             }:

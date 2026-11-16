@@ -72,6 +72,9 @@ jobs:
           assert report["stream_transition_stress_requested"] is True
           assert report["stream_stress_cycles"] >= 200
           assert report["stream_forced_preview_clears"] >= 40
+          assert report["stream_controls_updates"] >= 6 * max(
+              1, (report["seconds_requested"] - 10) // 8
+          )
           assert report["stream_fault_injected"] is True
           assert report["stream_fault_blanked"] is True
           assert report["stream_fault_counted"] is True

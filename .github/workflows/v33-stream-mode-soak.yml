@@ -96,6 +96,7 @@ jobs:
           assert report["passed"] is True
           assert report["seconds_requested"] == 45
           assert report["stream_transition_stress_requested"] is True
+          assert report["stream_controls_updates"] >= 24
           assert report["stream_fault_injected"] is True
           assert report["stream_fault_blanked"] is True
           assert report["stream_fault_counted"] is True

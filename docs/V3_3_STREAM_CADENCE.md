@@ -179,10 +179,12 @@ PYTHONPATH=. python tests/soak_gui.py --seconds 180 --enable-stream \
 ```
 
 The automated workflow also runs a separate **45-second actual Tk**
-transition/fault-recovery check. It exercises all three output refresh
-options, both layouts and one deliberately injected synthetic compositor
-exception, proving the canvas blanks and resumes without an unhandled Tk
-callback. It is separate from the unchanged-image/zero-fault 180-second
+transition/fault-recovery check. It drives the **real traced Stream Settings
+controls**, not direct internal option writes: 15/24/30 FPS, both layouts,
+screen swapping, themes, border thickness and game size are exercised while
+synthetic frames continue to be processed. It also injects one deliberate
+compositor exception and proves the canvas blanks and resumes without an
+unhandled Tk callback. It is separate from the unchanged-image/zero-fault 180-second
 baseline. The final stream rate is allowed to be **15, 24 or 30 FPS** in
 a rotating-rate stress run; the normal 180-second baseline still requires
 exactly **24 FPS**. Neither uses physical hardware.
