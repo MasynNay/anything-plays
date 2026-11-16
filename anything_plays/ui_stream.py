@@ -108,6 +108,66 @@ def _contained(image, bounds, *, nearest=False):
     )
 
 
+class StreamPanelResizeCache:
+    """At most one fitted PIL image per source; never retain frame history.
+
+    When a game animates against an unchanged camera (or vice versa),
+    repeatedly scaling both sources wastes UI-thread time. Cached fits are
+    keyed by the *actual source image object*, panel dimensions and sampling
+    method; a new camera/game image invalidates only its own slot. Offsets
+    are recomputed for each panel, so swapping screens is safe.
+
+    Entries are owned by a single Stream Mode window and released on Stop,
+    camera disconnect, or window close. Cache never changes source pixels.
+    """
+
+    def __init__(self):
+        self._entries = {}
+        self.hits = 0
+        self.misses = 0
+
+    def clear(self, channel=None):
+        if channel is None:
+            self._entries.clear()
+        else:
+            self._entries.pop(channel, None)
+
+    def contained(self, channel, image, bounds, *, nearest=False):
+        if channel not in ("GAME", "CAMERA"):
+            # Only the two local capture sources may retain a fitted image.
+            return _contained(image, bounds, nearest=nearest)
+        if image is None:
+            self.clear(channel)
+            return None
+        x0, y0, x1, y1 = bounds
+        width, height = max(1, x1 - x0), max(1, y1 - y0)
+        prior = self._entries.get(channel)
+        if (prior is not None and prior[0] is image
+                and prior[1] == width and prior[2] == height
+                and prior[3] == nearest):
+            fitted = prior[4]
+            self.hits += 1
+        else:
+            fitted = _contained(
+                image, (0, 0, width, height), nearest=nearest,
+            )
+            # Replace, never append: even hours of streaming keep at most
+            # the two most recently needed resized sources in memory.
+            self._entries[channel] = (image, width, height, nearest, fitted)
+            self.misses += 1
+        if fitted is None:
+            return None
+        scaled, offset_x, offset_y = fitted
+        return scaled, x0 + offset_x, y0 + offset_y
+
+    def snapshot(self):
+        # Allowlisted scalar metrics; never include images or source names.
+        return {
+            "stream_resize_cache_hits": self.hits,
+            "stream_resize_cache_misses": self.misses,
+        }
+
+
 def stream_panel_boxes(size, layout="DS stacked", game_size=53):
     """Pure panel geometry shared by rendering and deterministic tests."""
     width, height = (max(320, int(size[0])), max(400, int(size[1])))
@@ -298,7 +358,7 @@ def stream_camera_snapshot_due(previous, now, mode):
 
 def compose_stream_output(game, camera, *, size, settings, themes,
                           game_active=False, camera_active=False,
-                          camera_reference=False):
+                          camera_reference=False, resize_cache=None):
     """Render one complete OBS-capturable DS-style frame as a PIL RGB image.
 
     Includes custom borders and both sources, but no settings widgets or
@@ -369,7 +429,11 @@ def compose_stream_output(game, camera, *, size, settings, themes,
             inner[2] - 4, inner[3] - 4,
         )
         if video[2] > video[0] and video[3] > video[1]:
-            sized = _contained(source, video, nearest=nearest)
+            sized = (
+                resize_cache.contained(name, source, video, nearest=nearest)
+                if resize_cache is not None
+                else _contained(source, video, nearest=nearest)
+            )
             if sized is not None:
                 resized, x, y = sized
                 img.paste(resized, (x, y))
@@ -419,6 +483,7 @@ class StreamMixin:
         self._stream_save_job = None
         self._stream_last_render = None
         self._stream_cadence = None
+        self._stream_resize_cache = None
         self._stream_camera_last_snapshot = None
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
@@ -459,6 +524,7 @@ class StreamMixin:
         self._stream_camera_last_snapshot = None
         self._stream_cadence = StreamCadenceTracker()
         self._stream_cadence.reset_for(self._stream_options["frame_rate"])
+        self._stream_resize_cache = StreamPanelResizeCache()
         self._open_stream_controls()
         self._stream_render_tick()
 
@@ -674,6 +740,9 @@ class StreamMixin:
         # Stop must immediately clear it and accept the next reconnect.
         self._stream_camera_last_snapshot = None
         self._stream_camera_frame = None
+        cache = getattr(self, "_stream_resize_cache", None)
+        if cache is not None:
+            cache.clear("CAMERA")
         self._stream_camera_serial += 1
         self._invalidate_stream()
 
@@ -686,7 +755,12 @@ class StreamMixin:
             "format": "anything-plays-stream-cadence",
             "version": 1,
             "scope": "tk_refresh_and_changed_image_publications_not_obs_fps",
-            "metrics": cadence.snapshot(),
+            "metrics": {
+                **cadence.snapshot(),
+                **(self._stream_resize_cache.snapshot()
+                   if getattr(self, "_stream_resize_cache", None) is not None
+                   else {}),
+            },
         }
 
     def _stream_render_tick(self):
@@ -795,6 +869,7 @@ class StreamMixin:
             size=(w, h), settings=self._stream_options, themes=self.THEMES,
             game_active=active_game,
             camera_active=camera_active, camera_reference=camera_ref,
+            resize_cache=getattr(self, "_stream_resize_cache", None),
         )
         photo = self._stream_photo
         if photo is None or photo.width() != w or photo.height() != h:
@@ -845,6 +920,10 @@ class StreamMixin:
         self._stream_game_serial = None
         self._stream_last_render = None
         self._stream_cadence = None
+        cache = getattr(self, "_stream_resize_cache", None)
+        if cache is not None:
+            cache.clear()
+        self._stream_resize_cache = None
         if output is not None:
             try:
                 output.destroy()
