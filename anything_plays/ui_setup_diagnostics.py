@@ -178,6 +178,15 @@ def _stream_cadence_summary_lines(stream):
         if type(code) is int and 0 <= code < len(cost_bins)
         else "not sampled"
     )
+    cache_counts_known = (
+        "stream_resize_cache_hits" in m
+        and "stream_resize_cache_misses" in m
+    )
+    fit_summary = (
+        f"Source resize cache: {m['stream_resize_cache_hits']} reused · "
+        f"{m['stream_resize_cache_misses']} resized"
+        if cache_counts_known else "Source resize cache: not measured"
+    )
     return (
         f"Requested Stream Mode refresh: {m['stream_target_refresh_fps']} FPS · "
         f"observed Tk tick {ticks}",
@@ -191,6 +200,7 @@ def _stream_cadence_summary_lines(stream):
         f"max {m.get('stream_render_max_ms', 0)} ms · "
         f"{m.get('stream_render_over_budget_ticks', 0)} over-budget "
         f"of {m.get('stream_render_samples', 0)} measured ticks",
+        fit_summary,
     )
 
 
