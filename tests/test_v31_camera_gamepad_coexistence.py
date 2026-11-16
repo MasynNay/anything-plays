@@ -670,7 +670,7 @@ class CameraScanErrorPrivacyTests(TestCase):
         app.finish_scan([(3, "Previously selected")])
         self.assertEqual(app.camera_name.get(), "Previously selected (device 3)")
         self.assertEqual(app.camera_options, {
-            "Previously selected (device 3)": "Previously selected"
+            "Previously selected (device 3)": 3
         })
 
 
