@@ -19,9 +19,15 @@ frames or audio, benchmark an external emulator, or verify a real speaker.
 3. Play for at least 2 minutes. Refresh the window and inspect native
    `retro_run` calls/mean/max cost, GPU readback captures/max/share,
    >5 ms scheduler deadline misses/resyncs, and audio delivery counters.
-4. Repeat the same segment with the preview rate set to 15, 24 and 30 FPS.
-   Keep the game, camera setup and resolution stable. Note that preview
-   capture rate is **not** the number of game frames emulated per second.
+4. Repeat the same segment with the embedded GameCube preview rate set to
+   **20, 30 and 60 FPS** (Performance, Balanced, Quality). The separately
+   configured **Stream Mode** supports 15, 24 and 30 FPS; those numbers
+   control OBS capture composition, not GameCube's GL readback policy.
+   Keep the game, camera setup and resolution stable. After switching rates,
+   wait for at least two successful preview publications before interpreting
+   the new observed capture cadence. Mode changes reset the cadence interval
+   counter to avoid blending different requested rates. Note that neither
+   capture rate is the number of game frames emulated per second.
 5. Run a 30-minute session with normal controls and audio. Stop the game,
    reopen/refresh **Check my setup** and inspect the last session's counters.
    Start another ROM only after preserving the first session's report:
@@ -46,6 +52,8 @@ alongside it unless you have reviewed them for personal data.
 | `audio_output_device_underflow_callbacks` | PortAudio reported output-device underrun callbacks | A nonzero value signals a scheduling symptom, not its root cause |
 | `audio_output_underrun_frames`, `audio_queue_dropped_frames` | PCM output frames filled with silence or dropped from the bounded queue | No recorded waveform or audible-speaker confirmation |
 | `gamecube_hardware_frames`, `gamecube_preview_readback_skips` | Game frames published to the embedded UI vs deliberately skipped preview readbacks | Does not mean the emulator skipped `retro_run` or game input |
+| `gamecube_preview_target_fps`, `gamecube_preview_observed_capture_fps` | Selected 20/30/60 FPS preview cap versus aggregate **successful frame publication cadence** since the most recent preview mode switch | Observed publication frequency is not native Dolphin emulation FPS or physical monitor FPS |
+| `gamecube_preview_cadence_intervals`, `gamecube_preview_max_interval_ms` | Number of measured gaps between published preview images and longest such gap | With fewer than two published frames, observed cadence is zero meaning **insufficient samples**, not a 0 FPS performance result |
 
 A high readback **share** suggests the synchronous GL pixel copy is an area
 to investigate, but no frame-rate increase is proven unless a controlled
