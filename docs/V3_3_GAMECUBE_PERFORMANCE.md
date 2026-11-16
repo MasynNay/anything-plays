@@ -43,6 +43,20 @@ retains no closed Dolphin session, GL context, ROM handle or audio samples
 for diagnostics. Do not share external system-information screenshots
 alongside it unless you have reviewed them for personal data.
 
+## Clock integrity and native gameplay
+
+3.3 discards invalid, nonfinite, negative or hours-long timing samples
+(above 3,600 seconds) from the optional native-run, scheduler-wait and
+deadline-lateness counters. An invalid or oversized reported core-FPS value
+is displayed as unavailable rather than crashing the report. The 20/30/60
+FPS readback policy also rejects invalid clock values safely. These
+safeguards operate on local *measurement data*: they do not skip a native
+Dolphin `retro_run` or modify its audio/input loop.
+
+An ignored timing sample is not evidence of successful gameplay. A
+suspend/resume or native graphics fault still requires observation on the
+user's actual GPU and speakers.
+
 ## Interpretation
 
 | Observed field | Meaning | Important limit |
