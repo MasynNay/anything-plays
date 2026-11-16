@@ -399,6 +399,19 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertIn("GPU readback", lines[1])
         self.assertIn("timed 0 of 1 captures", lines[1])
         self.assertIn("0 invalid clock reads", lines[1])
+        self.assertIn("share unavailable", lines[1])
+        self.assertIn("maximum unmeasured", lines[1])
+        # Coverage can be incomplete even when both GL readbacks publish.
+        performance["metrics"]["gpu_readback_timing_samples"] = 1
+        performance["metrics"]["gpu_readback_calls"] = 2
+        partial = _gamecube_performance_summary_lines(performance)
+        self.assertIn("partial timing", partial[1])
+        self.assertIn("at least", partial[1])
+        performance["metrics"]["gpu_readback_calls"] = 1
+        complete = _gamecube_performance_summary_lines(performance)
+        self.assertIn("included, not additive", complete[1])
+        self.assertNotIn("share unavailable", complete[1])
+        performance["metrics"]["gpu_readback_timing_samples"] = 0
         self.assertIn("Preview captures", lines[2])
         self.assertIn("waiting for two published preview images", lines[2])
         self.assertNotIn("observed 0.0 FPS", lines[2])
