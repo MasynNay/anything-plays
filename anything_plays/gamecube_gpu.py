@@ -158,6 +158,32 @@ class GameCubeHardwareSession(CoreSession):
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
 
+    def performance_snapshot(self):
+        """Bounded, allowlisted counters only; no game frames/device strings.
+
+        A manual setup check can read these counters on the Tk thread while
+        Dolphin continues running. Values are best-effort live aggregates,
+        not a hardware GPU or physical-speaker pass/fail certificate.
+        """
+        metrics = self.native_run_timing.snapshot(
+            gpu_readback_seconds=self.gpu_readback_seconds
+        )
+        metrics.update({
+            "gpu_readback_calls": self.gpu_readback_calls,
+            "gpu_readback_max_ms": round(
+                self.gpu_readback_max_seconds * 1000, 3
+            ),
+            "gamecube_hardware_frames": self.hardware_frames,
+            "gamecube_preview_readback_skips": self.preview_readback_skips,
+        })
+        metrics.update(self.audio.delivery_snapshot())
+        return {
+            "format": "anything-plays-gamecube-performance",
+            "version": 1,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": metrics,
+        }
+
     def run(self):
         with self._host_factory(width=640, height=576) as host:
             self.host = host
