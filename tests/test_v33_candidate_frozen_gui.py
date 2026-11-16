@@ -116,10 +116,25 @@ class FrozenV33CandidateAcceptanceTests(unittest.TestCase):
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, source)
-        self.assertGreaterEqual(source.count("--ap-v30-ui-smoke"), 3)
+        self.assertGreaterEqual(source.count("--ap-v30-ui-smoke"), 6)
         self.assertEqual(
             source.count("python -m tools.v33_candidate_frozen_gui verify"),
-            3,
+            6,
+        )
+        for required in (
+            "Launch final 11-core Linux QA frozen application",
+            "Launch full 11-core Windows Inno candidate",
+            "Mount final full-native macOS DMG",
+            "dpkg-deb -x 'private-full-v33/",
+            "private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe",
+            "private-full-v33-macos/AnythingPlays-3.3.0-fullqa1-macos-",
+            "V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json",
+            "AP_V33_GUI_SMOKE_CHECK=1",
+        ):
+            with self.subTest(full_native=required):
+                self.assertIn(required, source)
+        self.assertEqual(
+            source.count("V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json"), 6,
         )
 
     def test_historical_changes_or_links_fail_closed(self):

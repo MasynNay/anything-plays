@@ -188,3 +188,29 @@ exact-head job completes and its full-native artifact exists. The
 eventual public 3.3 stable-upgrade installer still requires distinct
 release identity, source and license review, and real-host acceptance.
 
+
+## Full-core frozen-app desktop startup checks
+
+The full-native owner-QA workflow also launches the **repacked** full 11-core
+application on each hosted target, independently of the earlier mGBA-only
+installer startup. Linux extracts the actual `3.3.0~fullqa1` Debian package
+and executes the frozen binary under Xvfb. Windows runs Inno to install the
+real `3.3.0-fullqa1` setup into an isolated runner directory before launching
+the frozen EXE. Each macOS job, when available, must mount the **repacked
+full-native DMG**, recheck its ad-hoc code signature and launch the actual
+app executable from the mounted bundle.
+
+Every full-native test seeds dummy 3.1/3.2 settings canaries in a disposable
+home, requires the frozen 3.3 QA identity and disarmed inputs, opens and
+closes a real Tk Stream Output window with synthetic reference pixels,
+and fails if historical settings change. Each full-native artifact must
+contain both the original-byte provenance receipt and the independent
+`V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json` that proves its startup path
+actually executed. A successful package hash or native-core inventory
+**alone** is insufficient for the full-native artifact.
+
+These are hosted CI desktop startup checks, **not real hardware, games,
+OBS recording, native audio, player/controller latency, Apple notarization,
+or a public 3.3 stable-upgrade validation**. The real 30-minute camera,
+GameCube and OBS acceptance requirements remain open.
+
