@@ -235,6 +235,20 @@ class StreamCadenceTracker:
         }
 
 
+def stream_camera_snapshot_due(previous, now, mode):
+    """Throttle *only* OBS-preview RGB conversion, never source tracking.
+
+    Camera controls/zone detection and the primary camera preview still run
+    for every source frame. Only Stream Mode's extra PIL snapshot is skipped
+    if its previous snapshot is fresh enough for the requested output rate.
+    """
+    selected = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
+    period = 1 / int(selected.split()[0])
+    if previous is None or now < previous:
+        return True
+    return now - previous >= period - 0.001
+
+
 def compose_stream_output(game, camera, *, size, settings, themes,
                           game_active=False, camera_active=False,
                           camera_reference=False):
@@ -358,6 +372,7 @@ class StreamMixin:
         self._stream_save_job = None
         self._stream_last_render = None
         self._stream_cadence = None
+        self._stream_camera_last_snapshot = None
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
         self._stream_game_frame = None
@@ -394,6 +409,7 @@ class StreamMixin:
         self._stream_canvas = canvas
         self._stream_photo = None
         self._stream_last_render = None
+        self._stream_camera_last_snapshot = None
         self._stream_cadence = StreamCadenceTracker()
         self._stream_cadence.reset_for(self._stream_options["frame_rate"])
         self._open_stream_controls()
@@ -538,6 +554,9 @@ class StreamMixin:
         self._stream_options_updated()
 
     def _stream_options_updated(self):
+        # A changed refresh rate/size needs the next available annotated
+        # camera frame, not a delayed snapshot from the prior stream setup.
+        self._stream_camera_last_snapshot = None
         cadence = getattr(self, "_stream_cadence", None)
         if cadence is not None:
             cadence.reset_for(self._stream_options["frame_rate"])
@@ -563,6 +582,14 @@ class StreamMixin:
         if frame is None:
             self.stream_clear_camera()
             return
+        now = time.monotonic()
+        last = getattr(self, "_stream_camera_last_snapshot", None)
+        if not stream_camera_snapshot_due(
+            last, now, self._stream_options["frame_rate"]
+        ):
+            # Never skip the original camera tracking/control pipeline,
+            # only the extra conversion for the optional OBS output window.
+            return
         # Bound temporary RGB memory independent of high-resolution webcams.
         height, width = frame.shape[:2]
         if max(height, width) > 1280:
@@ -574,8 +601,12 @@ class StreamMixin:
             cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         )
         self._stream_camera_serial += 1
+        self._stream_camera_last_snapshot = now
 
     def stream_clear_camera(self):
+        # Even if the last frame was only milliseconds ago, disconnect or
+        # Stop must immediately clear it and accept the next reconnect.
+        self._stream_camera_last_snapshot = None
         self._stream_camera_frame = None
         self._stream_camera_serial += 1
         self._invalidate_stream()
@@ -741,6 +772,7 @@ class StreamMixin:
         self._stream_photo = None
         self._stream_canvas_item = None
         self._stream_camera_frame = None
+        self._stream_camera_last_snapshot = None
         self._stream_game_frame = None
         self._stream_game_serial = None
         self._stream_last_render = None
