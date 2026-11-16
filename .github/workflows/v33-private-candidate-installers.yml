@@ -15,7 +15,9 @@ on:
       - 'tools/write_v31_identity.py'
       - 'tools/v33_candidate_verify.py'
       - 'tools/v33_candidate_frozen_gui.py'
+      - 'tools/stage_v33_full_linux.py'
       - 'tests/test_v33_candidate_*.py'
+      - 'tests/test_v33_full_linux_staging.py'
   workflow_dispatch:
 
 permissions:
@@ -87,6 +89,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_candidate_isolation.py' -v
           python -m unittest discover -s tests -p 'test_v33_candidate_verify.py' -v
           python -m unittest discover -s tests -p 'test_v33_candidate_frozen_gui.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_linux_staging.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
@@ -290,6 +293,53 @@ jobs:
             --report "$QA/frozen.json" \
             --output release/V33_FROZEN_GUI_RECEIPT.json
 
+
+      - name: Stage 11 original 3.2 native cores into independent full 3.3 Linux QA
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'anything-plays-31_3.2.0_amd64.deb' --dir baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          python -m tools.stage_v33_full_linux \
+            --stable baseline-v32/anything-plays-31_3.2.0_amd64.deb \
+            --candidate 'release/anything-plays-33-candidate_3.3.0~qa1_amd64.deb' \
+            --checksums baseline-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_CANDIDATE_QA_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output private-full-v33
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path("private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json")
+          r=json.loads(path.read_text(encoding="utf-8"))
+          assert r["native_core_count"] == 11
+          assert r["console_profiles"] == 18
+          assert r["source_revision"] == __import__("os").environ["QA_SOURCE_SHA"]
+          assert r["source_native_core_bytes_preserved"] is True
+          assert r["settings_namespace"] == "anything-plays-33-candidate"
+          assert r["public_release_approved"] is False
+          assert r["real_gamecube_gameplay_tested"] is False
+          assert r["redistribution_audit_complete"] is False
+          print("Full native 3.3 Linux *private* installer staged. No hardware QA/public release.")
+          PY
+      - name: Retain full 11-core Linux owner-QA installer without publishing
+        if: matrix.target == 'linux-x64' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-linux-x64-UNRELEASED
+          path: |
+            private-full-v33/anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb
+            private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json
+            private-full-v33/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
       - name: Retain only unreleased installer and aggregate proof
         if: success()
         uses: actions/upload-artifact@v4

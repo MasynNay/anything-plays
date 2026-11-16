@@ -110,3 +110,33 @@ Before publishing 3.3, require exact-head Python tests/native checks,
 four-platform builds and SHA-256 checksums, hardware acceptance of GameCube
 GPU/audio/input/save flows, and repeatable latency/performance measurements.
 A source-only PR or passing synthetic soak does not satisfy those criteria.
+
+## Private full-native 3.3 Linux packaging bridge (unreleased)
+
+The 3.3 owner QA workflow now has a **separate full-native Linux QA
+staging step** after the normal mGBA-only install/startup checks. It
+downloads the already published `v3.2.0` Linux installer and
+`SHA256SUMS.txt` from the GitHub release and refuses to proceed unless
+the published package bytes match that immutable manifest. It separately
+validates the exact-HEAD 3.3 mGBA-only candidate receipt and its frozen
+private `v33_candidate` identity, then copies **only the previously
+published native core and original source-notice bytes** into the new
+app without modifying the Python runtime notices.
+
+The output is a different, nonpublic
+`anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb`. It keeps its
+own Linux install identity, launch path, settings namespace and
+native-system/save directories, never the public `anything-plays-31`
+identity. The verifier requires all 11 original native core families
+and 18 console profiles, checks source-byte provenance again after
+repacking, and retains a 14-day QA artifact with a separate SHA256 and
+`V33_FULL_NATIVE_LINUX_QA_RECEIPT.json` with
+`public_release_approved=false`.
+
+This addresses a significant packaging gap: prior 3.3 installer jobs
+could only run GB/GBC/GBA through bundled mGBA. **It does not prove real
+GameCube gameplay or audio, hardware FPS, other-host native core
+compatibility, asset distribution rights, or an approved public 3.3
+release.** The macOS and Windows full-native staged upgrades still
+require their own verified workflows and physical-owner acceptance.
+
