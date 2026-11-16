@@ -459,6 +459,10 @@ class Emulator:
         self.resume_info = None
         self.volume = 0.35
         self.audio_sink = None
+        # Retain only a small, path-free aggregate after Dolphin exits;
+        # never retain its native CoreSession/GL host or ROM by reference.
+        self._gamecube_session = None
+        self._gamecube_last_performance = None
         self.frame = None
         self.frame_serial = 0  # Monotonic per-session video revision for Tk.
         self.lock = threading.Lock()
@@ -489,12 +493,22 @@ class Emulator:
         self.save_warning = None
         self.audio_warning = None
         self.resume_info = None
+        self._gamecube_last_performance = None
         self.stop_event.clear()
         with self.lock:
             self.frame = None
             self.frame_serial += 1
         self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
+
+    def gamecube_performance_snapshot(self):
+        """Return local GameCube metrics, never native session or device data."""
+        if self.system != "gamecube":
+            return None
+        session = self._gamecube_session
+        if session is not None:
+            return session.performance_snapshot()
+        return self._gamecube_last_performance
 
     def set_volume(self, level):
         """Adjust only this application's audio, including active games."""
@@ -567,7 +581,22 @@ class Emulator:
                 # Offscreen accelerated rendering, not Dolphin's slow/crashing
                 # CPU-only software renderer, owns game frames.
                 from anything_plays.gamecube_gpu import GameCubeHardwareSession
-                GameCubeHardwareSession(self, self.rom, self.core_path).run()
+                session = GameCubeHardwareSession(
+                    self, self.rom, self.core_path
+                )
+                self._gamecube_session = session
+                try:
+                    session.run()
+                finally:
+                    # Snapshot after native teardown, then drop the entire
+                    # session: no GL contexts, ROM references, audio frames or
+                    # ctypes callbacks remain reachable through diagnostics.
+                    try:
+                        self._gamecube_last_performance = (
+                            session.performance_snapshot()
+                        )
+                    finally:
+                        self._gamecube_session = None
             elif self.system == "n64" and sys.platform == "darwin":
                 # A second native N64 init freezes the same-process core on
                 # macOS; direct dlclose even segfaults inside dyld. Spawn a
