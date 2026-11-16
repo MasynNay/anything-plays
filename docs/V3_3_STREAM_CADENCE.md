@@ -52,6 +52,21 @@ labeled live footage. The safe report includes only the numeric count
 `stream_stale_camera_clears` for the current stream session, not a timestamp
 history or any captured pixels.
 
+## RGB resize and clock-failure safeguards
+
+In 3.3, a freshly animated game/camera frame that already uses PIL RGB is
+resized directly instead of first allocating a second full-sized RGB copy.
+If that source already fits its output panel, neither a color conversion nor
+a resize runs. Unchanged image fits are cached for only the two active
+sources. All original nearest/bilinear scaling decisions and pixel output
+remain unchanged. This avoids avoidable work but is **not** a verified FPS
+increase until measured on real hardware.
+
+The optional OBS-facing camera frame also rejects invalid monotonic clock
+readings without interrupting tracking or native control updates. If the
+clock itself fails while a prior webcam image is displayed, the old private
+image is revoked until a fresh valid snapshot can be captured.
+
 ## What the metrics mean
 
 | Metric | Meaning | Not proof of |
