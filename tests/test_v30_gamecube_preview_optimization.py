@@ -215,6 +215,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         session.gpu_readback_seconds = 0.0
         session.gpu_readback_max_seconds = 0.0
         session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
         session.preview_readback_skips = 0
         session._last_preview_capture = None
         session.raw_video_callbacks = 0
