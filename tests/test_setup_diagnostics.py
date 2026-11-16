@@ -320,11 +320,12 @@ class SnapshotPrivacyTests(unittest.TestCase):
         report = _snapshot(app)
         performance = report["gamecube_performance"]
         lines = _gamecube_performance_summary_lines(performance)
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 5)
         self.assertIn("Native frames: 1", lines[0])
         self.assertIn("GPU readback", lines[1])
-        self.assertIn("Late deadlines", lines[2])
-        self.assertIn("Audio", lines[3])
+        self.assertIn("Preview captures", lines[2])
+        self.assertIn("Late deadlines", lines[3])
+        self.assertIn("Audio", lines[4])
         text = json.dumps(report)
         for private in ("secret-disc.iso", "secret-core.so", "private-GPU",
                         "/home/", "serial_number", "rom_path"):
