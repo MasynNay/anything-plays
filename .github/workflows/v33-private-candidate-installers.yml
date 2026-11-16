@@ -1,0 +1,171 @@
+name: 3.3 | Four-platform isolated owner QA installers (unreleased)
+
+# Private acceptance candidates for the exact PR head. These only contain
+# independently staged mGBA and are NOT public 3.3 or full-console releases.
+# No tags, Releases API writes, deployment credentials or automatic install.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v33-private-candidate-installers.yml'
+      - 'packaging/**'
+      - 'requirements-build.txt'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/v33_candidate_verify.py'
+      - 'tests/test_v33_candidate_*.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v33-candidate-build-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  v33-private-mgba-candidate:
+    # Never build installers for an arbitrary PR, fork or release tag.
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.3-stream-render-latency') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.3-stream-render-latency') }}
+    name: Unreleased 3.3 isolated QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 115
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            installer: release/anything-plays-33-candidate_3.3.0~qa1_amd64.deb
+            bundle: dist/AnythingPlays
+          - target: windows-x64
+            runner: windows-latest
+            installer: release/AnythingPlaysSetup-3.3.0-qa1.exe
+            bundle: dist/AnythingPlays
+          - target: macos-arm64
+            runner: macos-15
+            installer: release/AnythingPlays-3.3.0-qa1-macos-arm64.dmg
+            bundle: dist/AnythingPlays33Candidate.app
+          - target: macos-x64
+            runner: macos-15-intel
+            installer: release/AnythingPlays-3.3.0-qa1-macos-x64.dmg
+            bundle: dist/AnythingPlays33Candidate.app
+    env:
+      AP_V33_CANDIDATE: "1"
+      AP_V30_MINIMAL_CORE_BUILD: "1"
+      AP_RELEASE_BUILD: "0"
+      AP_V30_APPROVED_RELEASE: "0"
+      AP_V30_STABLE_CANDIDATE: "0"
+      AP_V30_TEST_CORES: "0"
+      AP_V30_GPL_TRIAL: "0"
+      AP_V30_TIA_TRIAL: "0"
+      AP_V31_PREVIEW: "0"
+      AP_V31_RC: "0"
+      AP_V31_RC2: "0"
+      AP_V31_FINAL_CANDIDATE: "0"
+      AP_V311_CANDIDATE: "0"
+      AP_V311_STABLE_CANDIDATE: "0"
+      AP_V32_PREVIEW_BUILD: "0"
+      AP_V32_STABLE_CANDIDATE: "0"
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact reviewed source, without write credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Confirm exact SHA, exclusive identity and isolated storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v33_candidate_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_v33_candidate_verify.py' -v
+          python - <<'PY'
+          import os
+          from anything_plays.build_identity import make_identity
+          from tools.write_v31_identity import choose_channel
+          assert choose_channel(os.environ) == "v33_candidate"
+          identity = make_identity("v33_candidate")
+          assert identity["settings_namespace"] == "anything-plays-33-candidate"
+          assert identity["public_release_approved"] is False
+          assert os.environ["AP_RELEASE_BUILD"] == "0"
+          assert os.environ["AP_V30_MINIMAL_CORE_BUILD"] == "1"
+          print("Correct isolated 3.3 owner QA identity; stable release disabled")
+          PY
+      - name: Install Linux packaging and native runtime tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup missing" }
+      - name: Create private Linux .deb
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Create private Windows .exe
+        if: matrix.target == 'windows-x64'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Create private Mac .dmg
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify exact frozen identity, exclusive mGBA core and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.v33_candidate_verify --target "${{ matrix.target }}" --bundle "${{ matrix.bundle }}" --installer "${{ matrix.installer }}" --source-sha "$QA_SOURCE_SHA" --output release/V33_CANDIDATE_QA_RECEIPT.json
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          receipt=json.loads(Path("release/V33_CANDIDATE_QA_RECEIPT.json").read_text())
+          assert receipt["public_release_approved"] is False
+          assert receipt["channel"] == "v33_candidate"
+          assert receipt["bundled_core_count"] == 1
+          assert receipt["settings_namespace"] == "anything-plays-33-candidate"
+          path=Path("release")/receipt["installer_filename"]
+          assert hashlib.sha256(path.read_bytes()).hexdigest() == receipt["installer_sha256"]
+          Path("release/SHA256SUMS.txt").write_text(receipt["installer_sha256"]+"  "+path.name+"\n")
+          PY
+      - name: Verify Linux install payload without touching the host
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG='${{ matrix.installer }}'
+          test "$(dpkg-deb -f "$PKG" Package)" = "anything-plays-33-candidate"
+          test "$(dpkg-deb -f "$PKG" Version)" = "3.3.0~qa1"
+          test "$(dpkg-deb -f "$PKG" Architecture)" = "amd64"
+          QA_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$QA_ROOT"' EXIT
+          dpkg-deb -x "$PKG" "$QA_ROOT"
+          test -x "$QA_ROOT/opt/anything-plays-33-candidate/AnythingPlays"
+          test -x "$QA_ROOT/usr/bin/anything-plays-33-candidate"
+          test -f "$QA_ROOT/usr/share/applications/anything-plays-33-candidate.desktop"
+          test ! -e "$QA_ROOT/opt/anything-plays-31"
+          test ! -e "$QA_ROOT/opt/anything-plays-32-preview"
+      - name: Retain only unreleased installer and aggregate proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-QA-${{ matrix.target }}-UNRELEASED
+          path: |
+            ${{ matrix.installer }}
+            release/V33_CANDIDATE_QA_RECEIPT.json
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
