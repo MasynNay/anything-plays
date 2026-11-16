@@ -62,12 +62,25 @@ class InputLatencyProbe:
             # cannot crash the native input snapshot or local diagnostics.
             return False
 
+    def _read_clock(self):
+        """A failed optional probe must never interrupt real game input."""
+        try:
+            return self._clock()
+        except Exception:
+            # Do not forward driver/plugin exception text into a UI report
+            # or across the Libretro callback boundary.
+            return None
+
     def published(self, started_at):
         """A new held-button snapshot reached the native input buffer."""
         if not self._valid(started_at):
+            self.discard()
             return
-        published_at = self._clock()
+        published_at = self._read_clock()
         if not self._valid(published_at) or published_at < started_at:
+            # An invalid newer observation supersedes the old one. Keeping
+            # it would falsely attribute a later native frame to old pixels.
+            self.discard()
             return
         if self._pending is not None:
             self.superseded += 1
@@ -79,7 +92,7 @@ class InputLatencyProbe:
             return
         started_at, published_at = self._pending
         self._pending = None
-        consumed_at = self._clock()
+        consumed_at = self._read_clock()
         if not self._valid(consumed_at) or consumed_at < published_at:
             return
         self.samples += 1
