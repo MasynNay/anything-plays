@@ -290,6 +290,7 @@ class PixelAndControllerCoexistenceTests(TestCase):
 
     def test_stream_preview_throttle_never_skips_native_camera_button_release(self):
         """OBS-only RGB throttling cannot stall the actual game input path."""
+        import time
         from types import MethodType
         from anything_plays.ui_stream import StreamMixin
 
@@ -308,8 +309,8 @@ class PixelAndControllerCoexistenceTests(TestCase):
         convert_original = cv2.cvtColor
         app.set_pixels(primary=[(45, 60)])
         with (
-            patch("anything_plays.ui_stream.time.monotonic",
-                  side_effect=(20.0, 20.010)),
+            patch.object(time, "monotonic",
+                         side_effect=(20.0, 20.010)),
             patch.object(cv2, "cvtColor", wraps=convert_original) as convert,
         ):
             app.draw_camera()
