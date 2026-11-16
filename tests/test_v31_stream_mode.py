@@ -208,6 +208,56 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(app._stream_camera_frame)
         self.assertIsNone(app._stream_camera_last_snapshot)
 
+    def test_stream_camera_conversion_failure_clears_old_image_and_recovers(self):
+        """Optional PIL/OpenCV preview failures must be bounded and private."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        import cv2
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_last_render = ("old camera",)
+        old = Image.new("RGB", (24, 18), "#ff00aa")
+        app._stream_camera_frame = old
+        app._stream_camera_serial = 7
+        image = np.zeros((18, 24, 3), dtype=np.uint8)
+        original_convert = cv2.cvtColor
+        broken = [True]
+
+        def occasionally_broken(pixels, conversion):
+            if broken[0]:
+                raise cv2.error(
+                    "OpenCV failed on private /home/user/secret-camera-id"
+                )
+            return original_convert(pixels, conversion)
+
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=(1.0, 1.010, 1.050)),
+            patch.object(cv2, "cvtColor",
+                         side_effect=occasionally_broken) as convert,
+        ):
+            app.stream_camera_snapshot(image)
+            self.assertIsNone(app._stream_camera_frame)
+            self.assertIsNone(app._stream_last_render)
+            self.assertEqual(app._stream_camera_serial, 8)
+            self.assertEqual(app._stream_camera_last_snapshot, 1.0)
+            app.stream_camera_snapshot(image)
+            self.assertEqual(convert.call_count, 1,
+                             "failed optional preview must obey FPS backoff")
+            broken[0] = False
+            app.stream_camera_snapshot(image)
+        self.assertEqual(convert.call_count, 2)
+        self.assertEqual(app._stream_camera_serial, 9)
+        self.assertEqual(app._stream_camera_frame.size, (24, 18))
+        self.assertEqual(app._stream_camera_last_snapshot, 1.050)
+
     def test_stream_camera_snapshot_rate_policy_handles_all_three_targets(self):
         for rate in FRAME_RATES:
             target = int(rate.split()[0])
