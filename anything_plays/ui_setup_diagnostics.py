@@ -12,6 +12,7 @@ from tkinter import messagebox, ttk
 from anything_plays.build_identity import current_identity
 from anything_plays.libretro_input import InputBuffer
 from anything_plays.gba_emulator import Emulator
+from anything_plays.ui_stream import StreamMixin
 from anything_plays.setup_health import build_setup_report
 from anything_plays.ui_setup_theme import bind_theme_canvas
 
@@ -72,6 +73,12 @@ def _snapshot(app):
         performance = app.emu.gamecube_performance_snapshot()
         if performance is not None:
             report["gamecube_performance"] = performance
+    # Stream Mode owns a single Tk output; only its first-party mixin can
+    # provide an allowlisted, in-memory count for the current window.
+    if isinstance(app, StreamMixin):
+        stream = app.stream_performance_snapshot()
+        if stream is not None:
+            report["stream_cadence"] = stream
     return report
 
 
@@ -122,6 +129,30 @@ def _gamecube_performance_summary_lines(performance):
         f"underflow callbacks · {m['audio_output_underrun_frames']} "
         f"application underrun frames · "
         f"{m['audio_queue_dropped_frames']} queue-dropped frames",
+    )
+
+
+def _stream_cadence_summary_lines(stream):
+    """Distinguish healthy timer refresh from changed-image publication."""
+    m = stream["metrics"]
+    ticks = (
+        f"{m['stream_observed_refresh_fps']} FPS"
+        if m["stream_refresh_intervals"] > 0
+        else "waiting for two timer ticks"
+    )
+    published = (
+        f"{m['stream_observed_publication_fps']} FPS"
+        if m["stream_publication_intervals"] > 0
+        else "waiting for two changed images"
+    )
+    return (
+        f"Requested Stream Mode refresh: {m['stream_target_refresh_fps']} FPS · "
+        f"observed Tk tick {ticks}",
+        f"Changed-image publication: {published} · "
+        f"{m['stream_published_images']} compositions · "
+        f"{m['stream_unchanged_ticks']} unchanged ticks",
+        f"Longest refresh gap: {m['stream_max_refresh_gap_ms']} ms · "
+        f"{m['stream_failed_ticks']} failed ticks",
     )
 
 
@@ -215,6 +246,24 @@ def show_setup_diagnostics(app):
             ttk.Label(
                 frame, text=item["next"], wraplength=545, justify="left",
             ).pack(anchor="w", pady=(3, 0))
+        stream = report.get("stream_cadence")
+        if stream is not None:
+            frame = ttk.LabelFrame(
+                cards, text="STREAM MODE CAPTURE CADENCE", padding=10,
+            )
+            frame.pack(fill="x", pady=(0, 9), padx=(0, 3))
+            for line in _stream_cadence_summary_lines(stream):
+                ttk.Label(
+                    frame, text=line, wraplength=545, justify="left",
+                ).pack(anchor="w", pady=(3, 0))
+            ttk.Label(
+                frame,
+                text="Tk timer refresh is not a changed image. A static scene "
+                     "can have full timer cadence and very few compositions. "
+                     "Neither number measures OBS recording FPS, camera "
+                     "sensor FPS or native emulation speed.",
+                wraplength=545, justify="left",
+            ).pack(anchor="w", pady=(4, 0))
         timing = report.get("input_latency")
         if timing is not None:
             frame = ttk.LabelFrame(
