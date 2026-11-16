@@ -376,9 +376,29 @@ def stream_camera_snapshot_due(previous, now, mode):
     for every source frame. Only Stream Mode's extra PIL snapshot is skipped
     if its previous snapshot is fresh enough for the requested output rate.
     """
-    selected = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
+    selected = (
+        mode if isinstance(mode, str) and mode in FRAME_RATES
+        else DEFAULT_STREAM["frame_rate"]
+    )
     period = 1 / int(selected.split()[0])
-    if previous is None or now < previous:
+    # This is the optional OBS conversion policy, called from the *real*
+    # camera tracking tick. A malformed clock or legacy value must never
+    # raise and disarm/release the user's native game controls.
+    if type(now) not in (int, float):
+        return False
+    try:
+        if not math.isfinite(now) or now < 0:
+            return False
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if previous is None or type(previous) not in (int, float):
+        return True
+    try:
+        if not math.isfinite(previous) or previous < 0:
+            return True
+    except (TypeError, ValueError, OverflowError):
+        return True
+    if now < previous:
         return True
     return now - previous >= period - 0.001
 
@@ -729,7 +749,12 @@ class StreamMixin:
         if frame is None:
             self.stream_clear_camera()
             return
-        now = time.monotonic()
+        try:
+            now = time.monotonic()
+        except Exception:
+            # Optional capture diagnostics/clock should not interrupt
+            # already-computed camera controls or the in-app preview.
+            return
         last = getattr(self, "_stream_camera_last_snapshot", None)
         if not stream_camera_snapshot_due(
             last, now, self._stream_options["frame_rate"]
