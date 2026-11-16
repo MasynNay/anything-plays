@@ -559,8 +559,23 @@ class StreamModeContracts(unittest.TestCase):
         with patch("anything_plays.ui_stream.time.monotonic",
                    return_value=float("nan")):
             app.stream_camera_snapshot(frame)
-        self.assertIs(app._stream_camera_frame, before)
-        self.assertEqual(app._stream_camera_serial, 1)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertEqual(app._stream_camera_serial, 2)
+        # Fresh source frames can recover immediately after the bad clock.
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=2.05):
+            app.stream_camera_snapshot(frame)
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 3)
+
+        # A valid old frame must also be revoked when the optional clock
+        # raises an exception rather than returning a bad numeric value.
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   side_effect=RuntimeError("private webcam ID /home/user")):
+            app.stream_camera_snapshot(frame)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 4)
 
     def test_stream_snapshot_rate_policy_rejects_bad_clocks_without_throwing(self):
         for bad in (float("nan"), float("inf"), float("-inf"),
