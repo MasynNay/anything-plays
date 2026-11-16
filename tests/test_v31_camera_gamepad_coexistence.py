@@ -288,6 +288,49 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertTrue(app.emu.held("B", 0))
         self.assertTrue(app.emu.held("Start", 0))
 
+    def test_stream_preview_throttle_never_skips_native_camera_button_release(self):
+        """OBS-only RGB throttling cannot stall the actual game input path."""
+        from types import MethodType
+        from anything_plays.ui_stream import StreamMixin
+
+        app = self.app
+        app._stream_output_window = object()
+        app._stream_options = {"frame_rate": "15 FPS"}
+        app._stream_camera_last_snapshot = None
+        app._stream_camera_frame = None
+        app._stream_camera_serial = 0
+        app.stream_camera_snapshot = MethodType(
+            StreamMixin.stream_camera_snapshot, app
+        )
+        app.stream_clear_camera = MethodType(
+            StreamMixin.stream_clear_camera, app
+        )
+        convert_original = cv2.cvtColor
+        app.set_pixels(primary=[(45, 60)])
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=(20.0, 20.010)),
+            patch.object(cv2, "cvtColor", wraps=convert_original) as convert,
+        ):
+            app.draw_camera()
+            app.emu.frame()
+            self.assertTrue(app.emu.held("A", 0))
+            first_preview = app._stream_camera_frame
+            self.assertIsNotNone(first_preview)
+            app.set_pixels()  # Object disappears 10 ms after the first frame.
+            app.draw_camera()
+            app.emu.frame()
+            self.assertFalse(app.emu.held("A", 0))
+
+        rgb = [call for call in convert.call_args_list
+               if call.args[1] == cv2.COLOR_BGR2RGB]
+        hsv = [call for call in convert.call_args_list
+               if call.args[1] == cv2.COLOR_BGR2HSV]
+        self.assertEqual(len(rgb), 1, "OBS conversion skipped only")
+        self.assertEqual(len(hsv), 2, "native tracking still runs every frame")
+        self.assertEqual(app._stream_camera_serial, 1)
+        self.assertIs(app._stream_camera_frame, first_preview)
+
     def test_opt_in_tracking_is_consumed_on_next_real_input_snapshot(self):
         # Exercise actual OpenCV contours -> CameraMixin -> native InputBuffer
         # with a deterministic clock. This is software only: no webcam glass,
