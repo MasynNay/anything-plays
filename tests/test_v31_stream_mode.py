@@ -258,6 +258,53 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(app._stream_camera_frame.size, (24, 18))
         self.assertEqual(app._stream_camera_last_snapshot, 1.050)
 
+    def test_native_preview_failures_do_not_escape_or_freeze_old_camera(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import cv2
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        source = np.zeros((18, 24, 3), dtype=np.uint8)
+        native_convert = cv2.cvtColor
+        for problem in (RuntimeError("private device /home/rom"),
+                        AttributeError("bad frame wrapper"),
+                        MemoryError("allocation failed"),
+                        OverflowError("native dimensions overflow")):
+            with self.subTest(problem=type(problem).__name__):
+                app = Harness()
+                app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+                app.initialize_stream_mode({})
+                app._stream_output_window = object()
+                app._stream_camera_frame = Image.new("RGB", (24, 18))
+                app._stream_camera_serial = 4
+                app._stream_last_render = ("stale",)
+                calls = [0]
+
+                def convert(*args):
+                    calls[0] += 1
+                    if calls[0] == 1:
+                        raise problem
+                    return native_convert(*args)
+
+                with (
+                    patch("anything_plays.ui_stream.time.monotonic",
+                          side_effect=(1.0, 1.01, 1.05)),
+                    patch.object(cv2, "cvtColor", side_effect=convert),
+                ):
+                    app.stream_camera_snapshot(source)
+                    self.assertIsNone(app._stream_camera_frame)
+                    self.assertIsNone(app._stream_last_render)
+                    self.assertEqual(app._stream_camera_serial, 5)
+                    app.stream_camera_snapshot(source)
+                    self.assertEqual(calls[0], 1)
+                    app.stream_camera_snapshot(source)
+                self.assertEqual(calls[0], 2)
+                self.assertEqual(app._stream_camera_serial, 6)
+                self.assertEqual(app._stream_camera_frame.size, (24, 18))
+
     def test_stream_camera_snapshot_rate_policy_handles_all_three_targets(self):
         for rate in FRAME_RATES:
             target = int(rate.split()[0])
