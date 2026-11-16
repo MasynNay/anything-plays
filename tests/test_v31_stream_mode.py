@@ -170,9 +170,10 @@ class StreamModeContracts(unittest.TestCase):
 
         # 24 FPS Stream Mode needs at most one optional RGB/PIL snapshot
         # per ~42ms, even if tracking sends camera frames at 100 FPS.
-        with patch("anything_plays.ui_stream.time.monotonic",
-                   side_effect=(0.0, 0.010, 0.035, 0.042, 0.045, 0.047)), (
-            patch.object(cv2, "cvtColor", wraps=original_convert) as convert
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=(0.0, 0.010, 0.035, 0.042, 0.045, 0.047)),
+            patch.object(cv2, "cvtColor", wraps=original_convert) as convert,
         ):
             app.stream_camera_snapshot(frame)
             self.assertEqual(app._stream_camera_serial, 1)
