@@ -324,7 +324,49 @@ class StreamModeContracts(unittest.TestCase):
         for i in range(10000):
             tracker.record_tick(10.0 + i / 30, "30 FPS", published=i % 2 == 0)
         self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 9999)
-        self.assertLessEqual(len(vars(tracker)), 12)
+        self.assertLessEqual(len(vars(tracker)), 17)
+
+    def test_stream_composition_p95_detects_stutter_without_trace_history(self):
+        tracker = StreamCadenceTracker()
+        self.assertEqual(tracker.snapshot()["stream_render_p95_bucket_code"], -1)
+        for i in range(20):
+            tracker.record_tick(1.0 + i / 30, "30 FPS",
+                                published=i % 2 == 0, render_seconds=0.008)
+        tracker.record_tick(2.0, "30 FPS", published=True,
+                            render_seconds=0.600)
+        m = tracker.snapshot()
+        self.assertEqual(m["stream_render_samples"], 21)
+        self.assertEqual(m["stream_render_p95_bucket_code"], 1)  # 5–10ms
+        self.assertEqual(m["stream_render_over_budget_ticks"], 1)
+        self.assertEqual(m["stream_render_max_ms"], 600)
+        self.assertEqual(sum(tracker.render_histogram), 21)
+        self.assertNotIn("render_histogram", m)
+        tracker.record_tick(2.05, "30 FPS", published=True,
+                            render_seconds=0.600)
+        m = tracker.snapshot()
+        self.assertEqual(m["stream_render_p95_bucket_code"], 10)  # >500ms
+        self.assertEqual(m["stream_render_over_budget_ticks"], 2)
+        self.assertEqual(len(tracker.render_histogram), 11)
+
+    def test_stream_render_cost_resets_on_mode_change_and_rejects_bad_data(self):
+        tracker = StreamCadenceTracker()
+        tracker.record_tick(1.0, "24 FPS", render_seconds=0.050, failed=True)
+        snap = tracker.snapshot()
+        self.assertEqual(snap["stream_render_samples"], 1)
+        self.assertEqual(snap["stream_render_over_budget_ticks"], 1)
+        self.assertEqual(snap["stream_failed_ticks"], 1)
+        tracker.reset_for("15 FPS")
+        self.assertEqual(tracker.snapshot()["stream_render_samples"], 0)
+        self.assertEqual(tracker.snapshot()["stream_render_p95_bucket_code"], -1)
+        for i, bad in enumerate((
+            None, -1, float("nan"), float("inf"), 10**1000, True, "secret"
+        )):
+            tracker.record_tick(2.0 + i / 15, "15 FPS", render_seconds=bad)
+        self.assertEqual(tracker.snapshot()["stream_render_samples"], 0)
+        tracker.record_tick(3.0, "15 FPS", render_seconds=0.050)
+        self.assertEqual(tracker.snapshot()["stream_render_over_budget_ticks"], 0)
+        self.assertEqual(tracker.snapshot()["stream_render_samples"], 1)
+        self.assertEqual(tracker.snapshot()["stream_render_p95_bucket_code"], 5)
 
     def test_stream_tick_measures_actual_changed_image_publication(self):
         from unittest.mock import Mock, patch, call
@@ -351,6 +393,10 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(m["stream_unchanged_ticks"], 1)
         self.assertEqual(m["stream_publication_intervals"], 1)
         self.assertAlmostEqual(m["stream_observed_publication_fps"], 12.5)
+        self.assertEqual(m["stream_render_samples"], 3)
+        self.assertEqual(m["stream_render_over_budget_ticks"], 0)
+        self.assertEqual(m["stream_render_max_ms"], 12.0)
+        self.assertEqual(m["stream_render_p95_bucket_code"], 2)
         app.root.after.assert_has_calls([
             call(32, app._stream_render_tick),
             call(30, app._stream_render_tick),
