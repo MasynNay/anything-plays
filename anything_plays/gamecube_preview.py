@@ -26,3 +26,70 @@ def should_capture(last_capture, now, mode):
         return True  # clock discontinuity
     # Small tolerance compensates for timer jitter; avoids 29.9 FPS output.
     return elapsed >= (1 / preview_fps(mode)) - 0.001
+
+class PreviewCadenceTracker:
+    """Constant-memory capture *publication* cadence for one preview mode.
+
+    Native Dolphin retro_run is not counted here. No frames, filenames, raw
+    trace history or per-frame timings appear in the aggregate snapshot.
+    Only one in-memory monotonic observation is retained until teardown.
+    """
+
+    def __init__(self):
+        self.mode = None
+        self.last_publication = None
+        self.published = 0
+        self.intervals = 0
+        self.total_seconds = 0.0
+        self.max_interval_seconds = 0.0
+
+    def record_published(self, now, mode):
+        import math
+
+        selected = mode if mode in PREVIEW_FPS else DEFAULT_PREVIEW_MODE
+        if not isinstance(now, (int, float)):
+            return
+        try:
+            valid = math.isfinite(now)
+        except (TypeError, OverflowError, ValueError):
+            return
+        if not valid or now < 0:
+            return
+        if selected != self.mode or (
+            self.last_publication is not None and now < self.last_publication
+        ):
+            # A rate change or clock discontinuity starts a new segment.
+            # Never blend 20/30/60 FPS observations into one number.
+            self.mode = selected
+            self.last_publication = None
+            self.published = 0
+            self.intervals = 0
+            self.total_seconds = 0.0
+            self.max_interval_seconds = 0.0
+
+        if self.last_publication is not None:
+            elapsed = now - self.last_publication
+            if elapsed > 0:
+                self.intervals += 1
+                self.total_seconds += elapsed
+                self.max_interval_seconds = max(
+                    self.max_interval_seconds, elapsed
+                )
+        self.last_publication = now
+        self.published += 1
+
+    def snapshot(self):
+        """Allowlisted numeric facts, not rendered FPS or speaker metrics."""
+        target = preview_fps(self.mode) if self.mode is not None else 0
+        cadence = (
+            self.intervals / self.total_seconds
+            if self.intervals > 0 and self.total_seconds > 0 else 0.0
+        )
+        return {
+            "gamecube_preview_target_fps": target,
+            "gamecube_preview_observed_capture_fps": round(cadence, 2),
+            "gamecube_preview_cadence_intervals": self.intervals,
+            "gamecube_preview_max_interval_ms": round(
+                self.max_interval_seconds * 1000, 2
+            ),
+        }
