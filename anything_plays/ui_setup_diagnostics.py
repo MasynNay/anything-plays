@@ -11,6 +11,7 @@ from tkinter import messagebox, ttk
 
 from anything_plays.build_identity import current_identity
 from anything_plays.libretro_input import InputBuffer
+from anything_plays.gba_emulator import Emulator
 from anything_plays.setup_health import build_setup_report
 from anything_plays.ui_setup_theme import bind_theme_canvas
 
@@ -63,6 +64,14 @@ def _snapshot(app):
         timing = inputs.latency_snapshot()
         if timing is not None:
             report["input_latency"] = timing
+    # Accept only our built-in emulator class; a third-party integration
+    # cannot inject arbitrary paths, devices, or private driver strings.
+    if (isinstance(app.emu, Emulator)
+            and app.system_key.get() == "gamecube"
+            and bool(app.uses_embedded_emulator())):
+        performance = app.emu.gamecube_performance_snapshot()
+        if performance is not None:
+            report["gamecube_performance"] = performance
     return report
 
 
@@ -82,6 +91,29 @@ def _input_timing_summary_lines(timing):
             f"P95 {bucket['p95_bucket_ms']} ms"
         )
     return tuple(lines)
+
+
+def _gamecube_performance_summary_lines(performance):
+    """Explain native costs without inventing rendered or audible FPS."""
+    m = performance["metrics"]
+    if not m["native_run_calls"]:
+        return ("GameCube has not completed a native gameplay frame yet.",)
+    return (
+        f"Native frames: {m['native_run_calls']} · average "
+        f"{m['native_run_mean_ms']} ms · maximum "
+        f"{m['native_run_max_ms']} ms per retro_run",
+        f"GPU readback: {m['gpu_readback_calls']} captures · maximum "
+        f"{m['gpu_readback_max_ms']} ms · "
+        f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
+        "native execution time (included, not additive)",
+        f"Late deadlines (>5 ms): {m['scheduler_late_frames']} · "
+        f"resynchronizations: {m['scheduler_resyncs']} · "
+        f"maximum lateness {m['scheduler_late_max_ms']} ms",
+        f"Audio: {m['audio_output_device_underflow_callbacks']} device "
+        f"underflow callbacks · {m['audio_output_underrun_frames']} "
+        f"application underrun frames · "
+        f"{m['audio_queue_dropped_frames']} queue-dropped frames",
+    )
 
 
 def show_setup_diagnostics(app):
@@ -196,6 +228,23 @@ def show_setup_diagnostics(app):
                 text="Already captured camera frame → next native input "
                      "snapshot only. These are bucket ranges, not physical "
                      "camera or screen response latency; no footage is recorded.",
+                wraplength=545, justify="left",
+            ).pack(anchor="w", pady=(5, 0))
+        performance = report.get("gamecube_performance")
+        if performance is not None:
+            frame = ttk.LabelFrame(
+                cards, text="GAMECUBE NATIVE A/V (DIAGNOSTIC)", padding=10,
+            )
+            frame.pack(fill="x", pady=(0, 9), padx=(0, 3))
+            for line in _gamecube_performance_summary_lines(performance):
+                ttk.Label(
+                    frame, text=line, wraplength=545, justify="left",
+                ).pack(anchor="w", pady=(3, 0))
+            ttk.Label(
+                frame,
+                text="Observed native frame work includes synchronous GPU "
+                     "readback. These counts do not prove achieved rendered "
+                     "FPS, physical audio, game compatibility or sensor latency.",
                 wraplength=545, justify="left",
             ).pack(anchor="w", pady=(5, 0))
         timing_control = getattr(app, "_input_timing_button", None)
