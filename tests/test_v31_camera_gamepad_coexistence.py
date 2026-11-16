@@ -666,7 +666,12 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertIsNone(app._camera_canvas_item)
         app.canvas.delete.assert_called_once_with("all")
         app.set_pixels()
-        with patch("anything_plays.ui_camera.ImageTk.PhotoImage") as photo:
+        # GamepadReader's virtual SDL import hook replaces
+        # importlib.import_module. Mocking by a dotted path would resolve
+        # the test's VirtualSDL object rather than this Pillow class.
+        # Patch the already imported module directly instead.
+        from PIL import ImageTk
+        with patch.object(ImageTk, "PhotoImage") as photo:
             photo.return_value.width.return_value = 192
             photo.return_value.height.return_value = 128
             app.one_frame()
