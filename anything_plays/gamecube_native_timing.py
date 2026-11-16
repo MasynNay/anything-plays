@@ -10,11 +10,17 @@ from __future__ import annotations
 import math
 
 
+# Integer bin codes are exported instead of per-frame samples or falsely
+# precise percentile values. Code 8 means >500ms; -1 means no samples.
+_NATIVE_RUN_P95_BIN_UPPER_MS = (8, 16, 25, 33, 50, 100, 250, 500)
+
+
 class GameCubeNativeTiming:
     def __init__(self):
         self.native_run_calls = 0
         self.native_run_total_seconds = 0.0
         self.native_run_max_seconds = 0.0
+        self.native_run_histogram = [0] * (len(_NATIVE_RUN_P95_BIN_UPPER_MS) + 1)
         self.native_run_over_16ms = 0
         self.native_run_over_50ms = 0
         self.native_run_over_100ms = 0
@@ -30,11 +36,24 @@ class GameCubeNativeTiming:
         self.reported_core_fps = None
 
     def record_native_run(self, duration):
-        if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+        if type(duration) not in (int, float):
+            return
+        try:
+            if not math.isfinite(duration) or duration < 0:
+                return
+        except (OverflowError, ValueError, TypeError):
+            # Optional telemetry must not crash native emulation.
             return
         self.native_run_calls += 1
         self.native_run_total_seconds += duration
         self.native_run_max_seconds = max(self.native_run_max_seconds, duration)
+        elapsed_ms = duration * 1000
+        bucket = next(
+            (i for i, upper in enumerate(_NATIVE_RUN_P95_BIN_UPPER_MS)
+             if elapsed_ms <= upper),
+            len(_NATIVE_RUN_P95_BIN_UPPER_MS),
+        )
+        self.native_run_histogram[bucket] += 1
         self.native_run_over_16ms += int(duration > 1 / 60)
         self.native_run_over_50ms += int(duration > 0.050)
         self.native_run_over_100ms += int(duration > 0.100)
@@ -62,6 +81,17 @@ class GameCubeNativeTiming:
         if resynchronized:
             self.scheduler_resyncs += 1
 
+    def _p95_bucket_code(self):
+        if not self.native_run_calls:
+            return -1
+        target = math.ceil(self.native_run_calls * 0.95)
+        subtotal = 0
+        for index, samples in enumerate(self.native_run_histogram):
+            subtotal += samples
+            if subtotal >= target:
+                return index
+        return -1
+
     def snapshot(self, *, gpu_readback_seconds=0.0):
         reported = self.reported_core_fps
         if (type(reported) not in (int, float)
@@ -84,6 +114,7 @@ class GameCubeNativeTiming:
             "native_reported_core_fps": round(reported, 3),
             "native_run_mean_ms": round(1000 * native / count, 3) if count else 0.0,
             "native_run_max_ms": round(self.native_run_max_seconds * 1000, 3),
+            "native_run_p95_bucket_code": self._p95_bucket_code(),
             "native_run_total_seconds": round(native, 4),
             "native_run_over_16ms": self.native_run_over_16ms,
             "native_run_over_50ms": self.native_run_over_50ms,
