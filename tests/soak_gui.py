@@ -69,7 +69,8 @@ class SyntheticCamera:
         self.opened = False
 
 
-def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
+def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
+         enable_stream=False):
     if seconds < 8:
         raise ValueError("Soak must run at least 8 seconds")
     tracemalloc.start()
@@ -78,6 +79,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
               "samples": [], "passed": False,
               "real_controller_hardware_tested": False,
               "physical_camera_tested": False,
+              "stream_mode_requested": bool(enable_stream),
+              "real_stream_hardware_tested": False,
               "gamepad_sdl_polling_requested": bool(enable_gamepad)}
     started = time.monotonic()
     warmup = min(15, max(3, seconds // 5))
@@ -113,6 +116,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
             app.reference_image = False
             app.emu.running = True
             app.current_rom = "synthetic-frame.gba"
+            # Optional 3.3 QA runs the REAL Tk Stream Mode output window
+            # alongside game/camera/SDL, without any native ROM or webcam.
+            if enable_stream:
+                app.open_stream_mode()
             frame_number = 0
 
             def emit_frame():
@@ -136,6 +143,18 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
                 items_game = len(app.game_canvas.find_all())
                 after_jobs = len(root.tk.call("after", "info"))
                 cache = len(app._zone_thumbnail_cache)
+                stream_canvas = getattr(app, "_stream_canvas", None)
+                stream_items = (
+                    len(stream_canvas.find_all())
+                    if stream_canvas is not None else 0
+                )
+                stream_report = (
+                    app.stream_performance_snapshot()
+                    if enable_stream else None
+                )
+                stream_metrics = (
+                    stream_report["metrics"] if stream_report else {}
+                )
                 sample_data = {
                     "seconds": round(time.monotonic() - started, 2),
                     "rss_mb": rss_megabytes(),
@@ -143,6 +162,16 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
                     "python_peak_mb": round(peak / (1024 * 1024), 2),
                     "camera_items": items_camera,
                     "game_items": items_game,
+                    "stream_items": stream_items,
+                    "stream_refresh_intervals": stream_metrics.get(
+                        "stream_refresh_intervals", 0
+                    ),
+                    "stream_published_images": stream_metrics.get(
+                        "stream_published_images", 0
+                    ),
+                    "stream_failed_ticks": stream_metrics.get(
+                        "stream_failed_ticks", 0
+                    ),
                     "pending_tk_jobs": after_jobs,
                     "cached_zone_art": cache,
                     "gamepad_enabled": bool(app.gamepad_enabled.get()),
@@ -156,7 +185,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
                     failures.append("SDL controller polling stopped unexpectedly")
                     app.close()
                     return
-                if (items_camera > 1 or items_game > 1 or
+                if (items_camera > 1 or items_game > 1
+                        or stream_items > 1 or
                         after_jobs > 32 or cache > 12 or
                         len(app.library_images) > 300):
                     failures.append("UI resource counts exceeded fixed bounds")
@@ -166,6 +196,13 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
 
             def shutdown():
                 if not app._closing:
+                    if enable_stream:
+                        # Stream close intentionally clears all live
+                        # counters. Preserve only numeric aggregate evidence
+                        # before shutdown, never images or Tk objects.
+                        report["stream_final"] = (
+                            app.stream_performance_snapshot()
+                        )
                     app.close()
 
             root.after(20, emit_frame)
@@ -190,6 +227,21 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False):
         1 for sample in samples if sample["sdl_backend_initialized"])
     if enable_gamepad and report["sdl_initialized_samples"] < 2:
         failures.append("SDL controller backend did not sustain polling")
+    if enable_stream:
+        final = report.get("stream_final")
+        summary = final["metrics"] if isinstance(final, dict) else {}
+        if (not summary
+                or summary.get("stream_target_refresh_fps") != 24
+                or summary.get("stream_refresh_intervals", 0) < 2
+                or summary.get("stream_published_images", 0) < 2):
+            failures.append(
+                "Stream Mode did not sustain Tk refresh and output images"
+            )
+        if summary.get("stream_failed_ticks", 0):
+            failures.append("Stream Mode output encountered failed Tk ticks")
+        if any(s["stream_items"] != 1 for s in samples
+               if s["seconds"] >= warmup):
+            failures.append("Stream output canvas did not stay at one item")
     baseline = next((s for s in samples if s["seconds"] >= warmup), None)
     if baseline is None and samples:
         baseline = samples[0]
@@ -226,7 +278,10 @@ if __name__ == "__main__":
     parser.add_argument("--max-growth-mb", type=float, default=96.0)
     parser.add_argument("--enable-gamepad", action="store_true",
                         help="Exercise SDL polling without physical HID hardware")
+    parser.add_argument("--enable-stream", action="store_true",
+                        help="Exercise actual Stream Mode Tk output without OBS or hardware")
     parser.add_argument("--report", default="soak-report.json")
     args = parser.parse_args()
     sys.exit(0 if soak(args.seconds, args.max_growth_mb, args.report,
-                       enable_gamepad=args.enable_gamepad) else 1)
+                       enable_gamepad=args.enable_gamepad,
+                       enable_stream=args.enable_stream) else 1)
