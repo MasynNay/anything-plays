@@ -248,7 +248,12 @@ class SnapshotPrivacyTests(unittest.TestCase):
             "Bluetooth Serial", "camera_frame", "ROM",
         ):
             self.assertNotIn(private, encoded)
-        self.assertNotIn("_pending", encoded)
+        # A public aggregate count named discarded_pending is expected;
+        # only the internal raw pending timestamp must be absent.
+        self.assertNotIn("_pending", timing)
+        self.assertEqual(timing["discarded_pending"], 0)
+        self.assertNotIn("10.013", encoded)
+        self.assertNotIn("10.040", encoded)
         inputs.disable_latency_probe()
         stopped = _snapshot(app)["input_latency"]
         self.assertFalse(stopped["enabled"])
