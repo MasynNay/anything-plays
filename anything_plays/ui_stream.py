@@ -145,6 +145,91 @@ def stream_render_delay_ms(interval_ms, render_seconds):
     return max(8, round(interval_ms - elapsed_ms))
 
 
+class StreamCadenceTracker:
+    """Bounded Stream Mode timer and changed-image publication cadence.
+
+    A static scene may keep the Tk refresh timer on time without publishing
+    a new photo. Report both rates separately; neither is native game FPS,
+    camera sensor FPS or the frame rate recorded by OBS.
+    """
+
+    def __init__(self):
+        self.mode = None
+        self.last_tick = None
+        self.last_published = None
+        self.tick_intervals = 0
+        self.tick_elapsed = 0.0
+        self.max_tick_gap = 0.0
+        self.publication_intervals = 0
+        self.publication_elapsed = 0.0
+        self.max_publication_gap = 0.0
+        self.publications = 0
+        self.unchanged = 0
+        self.failures = 0
+
+    def reset_for(self, mode):
+        mode = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
+        if mode != self.mode:
+            self.__init__()
+            self.mode = mode
+
+    def record_tick(self, now, mode, *, published=False, failed=False):
+        self.reset_for(mode)
+        if type(now) not in (float, int):
+            return
+        try:
+            if not math.isfinite(now) or now < 0:
+                return
+        except (OverflowError, TypeError, ValueError):
+            return
+        if self.last_tick is not None:
+            delta = now - self.last_tick
+            if delta < 0:
+                # A clock reset should not produce an invented high FPS.
+                self.__init__()
+                self.mode = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
+            elif delta > 0:
+                self.tick_intervals += 1
+                self.tick_elapsed += delta
+                self.max_tick_gap = max(self.max_tick_gap, delta)
+        self.last_tick = now
+        if failed:
+            self.failures += 1
+        elif published:
+            if self.last_published is not None:
+                delta = now - self.last_published
+                if delta > 0:
+                    self.publication_intervals += 1
+                    self.publication_elapsed += delta
+                    self.max_publication_gap = max(self.max_publication_gap, delta)
+            self.last_published = now
+            self.publications += 1
+        else:
+            self.unchanged += 1
+
+    def snapshot(self):
+        target = int(self.mode.split()[0]) if self.mode is not None else 0
+        tick_rate = (
+            self.tick_intervals / self.tick_elapsed
+            if self.tick_intervals and self.tick_elapsed > 0 else 0.0
+        )
+        publication_rate = (
+            self.publication_intervals / self.publication_elapsed
+            if self.publication_intervals and self.publication_elapsed > 0 else 0.0
+        )
+        return {
+            "stream_target_refresh_fps": target,
+            "stream_observed_refresh_fps": round(tick_rate, 2),
+            "stream_refresh_intervals": self.tick_intervals,
+            "stream_max_refresh_gap_ms": round(self.max_tick_gap * 1000, 2),
+            "stream_observed_publication_fps": round(publication_rate, 2),
+            "stream_publication_intervals": self.publication_intervals,
+            "stream_published_images": self.publications,
+            "stream_unchanged_ticks": self.unchanged,
+            "stream_failed_ticks": self.failures,
+        }
+
+
 def compose_stream_output(game, camera, *, size, settings, themes,
                           game_active=False, camera_active=False,
                           camera_reference=False):
@@ -267,6 +352,7 @@ class StreamMixin:
         self._stream_frame_job = None
         self._stream_save_job = None
         self._stream_last_render = None
+        self._stream_cadence = None
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
         self._stream_game_frame = None
@@ -303,6 +389,8 @@ class StreamMixin:
         self._stream_canvas = canvas
         self._stream_photo = None
         self._stream_last_render = None
+        self._stream_cadence = StreamCadenceTracker()
+        self._stream_cadence.reset_for(self._stream_options["frame_rate"])
         self._open_stream_controls()
         self._stream_render_tick()
 
@@ -445,6 +533,9 @@ class StreamMixin:
         self._stream_options_updated()
 
     def _stream_options_updated(self):
+        cadence = getattr(self, "_stream_cadence", None)
+        if cadence is not None:
+            cadence.reset_for(self._stream_options["frame_rate"])
         self._invalidate_stream()
         if self._stream_save_job is None:
             self._stream_save_job = self.root.after(600, self._save_stream_options)
@@ -484,6 +575,18 @@ class StreamMixin:
         self._stream_camera_serial += 1
         self._invalidate_stream()
 
+    def stream_performance_snapshot(self):
+        """Only current active Stream Mode, no camera frames or Tk details."""
+        cadence = getattr(self, "_stream_cadence", None)
+        if self._stream_output_window is None or cadence is None:
+            return None
+        return {
+            "format": "anything-plays-stream-cadence",
+            "version": 1,
+            "scope": "tk_refresh_and_changed_image_publications_not_obs_fps",
+            "metrics": cadence.snapshot(),
+        }
+
     def _stream_render_tick(self):
         self._stream_frame_job = None
         if self._stream_output_window is None or getattr(self, "_closing", False):
@@ -493,12 +596,19 @@ class StreamMixin:
         interval = round(1000 / int(self._stream_options["frame_rate"].split()[0]))
         started = time.perf_counter()
         try:
-            self._render_stream_frame()
+            published = self._render_stream_frame() is True
+            finished = time.perf_counter()
             # Rendering a frame already spent part of our output period.
             # Compensate that cost instead of accumulating timer drift.
             interval = stream_render_delay_ms(
-                interval, time.perf_counter() - started
+                interval, finished - started
             )
+            cadence = getattr(self, "_stream_cadence", None)
+            if cadence is not None:
+                cadence.record_tick(
+                    finished, self._stream_options["frame_rate"],
+                    published=published,
+                )
             if hasattr(self, "_stream_diagnostic"):
                 self._stream_diagnostic.set(
                     "Output ready · Game and camera are mirrored, not restarted."
@@ -507,6 +617,12 @@ class StreamMixin:
             self.close_stream_mode()
             return
         except Exception as exc:
+            cadence = getattr(self, "_stream_cadence", None)
+            if cadence is not None:
+                cadence.record_tick(
+                    time.perf_counter(), self._stream_options["frame_rate"],
+                    failed=True,
+                )
             # A corrupt driver frame must not spin at the selected output FPS.
             # Back off, show a useful diagnostic, and retry without stopping
             # the original camera or emulator session.
@@ -523,7 +639,7 @@ class StreamMixin:
         canvas = self._stream_canvas
         if canvas is None or not canvas.winfo_exists():
             self.close_stream_mode()
-            return
+            return False
         w = max(320, min(1920, canvas.winfo_width()))
         h = max(400, min(1600, canvas.winfo_height()))
         active_game = bool(self.emu.running and self.uses_embedded_emulator())
@@ -568,7 +684,7 @@ class StreamMixin:
             tuple(self._stream_options.items()),
         )
         if state == self._stream_last_render:
-            return
+            return False
         frame = compose_stream_output(
             self._stream_game_frame if active_game else None,
             self._stream_camera_frame if camera_active or camera_ref else None,
@@ -590,6 +706,7 @@ class StreamMixin:
         else:
             canvas.itemconfigure(item, image=photo)
         self._stream_last_render = state
+        return True
 
     def close_stream_mode(self):
         job = getattr(self, "_stream_frame_job", None)
@@ -622,6 +739,7 @@ class StreamMixin:
         self._stream_game_frame = None
         self._stream_game_serial = None
         self._stream_last_render = None
+        self._stream_cadence = None
         if output is not None:
             try:
                 output.destroy()
