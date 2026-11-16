@@ -610,6 +610,7 @@ class StreamModeContracts(unittest.TestCase):
     def test_visual_stream_settings_reuse_camera_snapshot_until_fps_changes(self):
         from types import SimpleNamespace
         from unittest.mock import Mock, patch
+        import cv2
         import numpy as np
 
         class Harness(StreamMixin):
