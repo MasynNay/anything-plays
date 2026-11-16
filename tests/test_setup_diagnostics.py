@@ -223,6 +223,37 @@ class SnapshotPrivacyTests(unittest.TestCase):
         ):
             self.assertNotIn(private, encoded)
 
+    def test_opt_in_timing_report_contains_only_bounded_aggregate_buckets(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp("/home/alex/secret/core.so")
+        inputs = InputBuffer()
+        app.emu.inputs = inputs
+        self.assertNotIn("input_latency", _snapshot(app))
+        inputs.enable_latency_probe(clock=iter((10.013, 10.040)).__next__)
+        inputs.set_camera_buttons(["A"], ["B"], sample_started_at=10.0)
+        inputs.before_frame(armed=True)
+        report = _snapshot(app)
+        timing = report["input_latency"]
+        self.assertTrue(timing["enabled"])
+        self.assertEqual(timing["samples"], 1)
+        self.assertEqual(
+            timing["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "33-50",
+        )
+        encoded = json.dumps(report)
+        for private in (
+            "/home/alex", "secret", "Office Webcam",
+            "Bluetooth Serial", "camera_frame", "ROM",
+        ):
+            self.assertNotIn(private, encoded)
+        self.assertNotIn("_pending", encoded)
+        inputs.disable_latency_probe()
+        stopped = _snapshot(app)["input_latency"]
+        self.assertFalse(stopped["enabled"])
+        self.assertEqual(stopped["samples"], 1)
+
     def test_bad_camera_driver_does_not_break_report(self):
         from anything_plays.ui_setup_diagnostics import _snapshot
 
