@@ -99,6 +99,16 @@ is already tearing down and cannot schedule a save callback, the exception
 does not escape the settings handler or change the emulator/camera state.
 Normal valid settings saves and window-close flush remain unchanged.
 
+## Border-color dialog reuses the existing camera preview
+
+Picking a new border color or resetting it to the theme accent now
+changes only the composition of the output canvas. Neither action
+forces another BGR-to-RGB webcam conversion or discards the previous
+successful frame timestamp. Re-choosing the same color (including
+different letter case), resetting an already-default border, canceling
+the picker, or closing its parent during selection causes no redundant
+output work. The camera, controller and native emulator keep running.
+
 ## Redundant controls and destroyed-window recovery
 
 Stream Settings ignores callbacks that do not change a validated setting,

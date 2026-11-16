@@ -687,6 +687,84 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(app._stream_options["frame_rate"], "24 FPS")
         app.root.after.assert_not_called()
 
+    def test_border_color_picker_reuses_live_camera_and_noops_on_same_color(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        app._stream_camera_frame = Image.new(
+            "RGB", (20, 16), "#ab1234"
+        )
+        original = app._stream_camera_frame
+        app._stream_camera_last_snapshot = 10.0
+        app._stream_last_render = ("previous",)
+        with patch("anything_plays.ui_stream.colorchooser.askcolor",
+                   return_value=((12, 170, 34), "#0cAa22")):
+            app._choose_stream_border_color()
+        self.assertEqual(app._stream_options["border_color"], "#0caa22")
+        self.assertIs(app._stream_camera_frame, original)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.0)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        self.assertIsNone(app._stream_last_render)
+        app.root.after.assert_called_once_with(
+            600, app._save_stream_options
+        )
+
+        app.root.after.reset_mock()
+        app._stream_last_render = ("new",)
+        with patch("anything_plays.ui_stream.colorchooser.askcolor",
+                   return_value=((12, 170, 34), "#0CAA22")):
+            app._choose_stream_border_color()
+        self.assertEqual(app._stream_options["border_color"], "#0caa22")
+        self.assertEqual(app._stream_last_render, ("new",))
+        app.root.after.assert_not_called()
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+
+        app._reset_stream_border_color()
+        self.assertEqual(app._stream_options["border_color"], "")
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        app._stream_last_render = ("after reset",)
+        app._reset_stream_border_color()
+        self.assertEqual(app._stream_last_render, ("after reset",))
+        self.assertEqual(app._stream_camera_last_snapshot, 10.0)
+
+    def test_border_color_picker_cancel_and_destroyed_dialog_are_safe(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        import tkinter as tk
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        app._stream_last_render = ("healthy output",)
+        for result in (None, (None, None), (None, "not-a-color"),
+                       (None, ""), (None, 123)):
+            with self.subTest(result=str(result)):
+                with patch("anything_plays.ui_stream.colorchooser.askcolor",
+                           return_value=result):
+                    app._choose_stream_border_color()
+                self.assertEqual(app._stream_last_render, ("healthy output",))
+                self.assertEqual(app._stream_options["border_color"], "")
+        for error in (tk.TclError("parent gone"),
+                      RuntimeError("mainloop exited"),
+                      OSError("desktop color picker closed")):
+            with self.subTest(error=type(error).__name__):
+                with patch("anything_plays.ui_stream.colorchooser.askcolor",
+                           side_effect=error):
+                    app._choose_stream_border_color()
+                self.assertEqual(app._stream_last_render, ("healthy output",))
+        app.root.after.assert_not_called()
+
     def test_visual_stream_settings_reuse_camera_snapshot_until_fps_changes(self):
         from types import SimpleNamespace
         from unittest.mock import Mock, patch

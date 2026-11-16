@@ -720,17 +720,29 @@ class StreamMixin:
     def _choose_stream_border_color(self):
         theme = self._stream_options["theme"]
         default = self._stream_options["border_color"] or self.THEMES[theme][3]
-        result = colorchooser.askcolor(
-            color=default, parent=self._stream_controls_window,
-            title="Stream border color",
-        )
-        if result[1] and _HEX.fullmatch(result[1]):
-            self._stream_options["border_color"] = result[1].lower()
-            self._stream_options_updated()
+        try:
+            result = colorchooser.askcolor(
+                color=default, parent=self._stream_controls_window,
+                title="Stream border color",
+            )
+        except (tk.TclError, RuntimeError, OSError):
+            # The dialog or its parent can be destroyed while Stream Mode
+            # keeps running. Treat it as a canceled *optional* style edit.
+            return
+        chosen = result[1] if result and len(result) > 1 else None
+        if not isinstance(chosen, str) or not _HEX.fullmatch(chosen):
+            return
+        color = chosen.lower()
+        if color != self._stream_options["border_color"]:
+            self._stream_options["border_color"] = color
+            # A border-only repaint must reuse existing annotated camera
+            # pixels, not bypass the preview conversion FPS throttle.
+            self._stream_options_updated(force_camera_snapshot=False)
 
     def _reset_stream_border_color(self):
-        self._stream_options["border_color"] = ""
-        self._stream_options_updated()
+        if self._stream_options["border_color"]:
+            self._stream_options["border_color"] = ""
+            self._stream_options_updated(force_camera_snapshot=False)
 
     def _stream_controls_changed(self):
         if not getattr(self, "_stream_vars", None):
