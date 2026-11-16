@@ -50,6 +50,28 @@ counters and two in-memory monotonic timestamps; it exports only aggregate
 numeric values. A user must explicitly press **Copy safe report** to copy
 setup measurements to their own clipboard.
 
+## Real Tk synthetic Stream Mode endurance gate
+
+The experimental [3.3 Stream Mode CI workflow](../.github/workflows/v33-stream-mode-soak.yml)
+runs the **actual desktop Tk window** under a Linux virtual display for
+180 seconds using changing synthetic camera and game frames. It requires
+successful compositions, continued Stream Mode timer activity, no callback
+exceptions, at most one image item per canvas, bounded pending Tk callbacks,
+and no more than 96 MiB of resident growth after warm-up. The evidence report
+holds only counters, memory usage and diagnostic status, never screenshots.
+
+For a local equivalent on a machine with a display:
+
+```bash
+PYTHONPATH=. python tests/soak_gui.py --seconds 180 --enable-stream \
+  --max-growth-mb 96 --report stream-soak.json
+```
+
+The existing standard desktop soak still runs **without** `--enable-stream`
+and remains unchanged. Neither synthetic test certifies physical devices,
+GameCube Dolphin hardware rendering, actual OBS encoding, or 30-minute stream
+stability. Real-device acceptance is still required.
+
 ## Before claiming a 3.3 speedup
 
 Compare the same host, window size, theme, camera resolution, game state and
