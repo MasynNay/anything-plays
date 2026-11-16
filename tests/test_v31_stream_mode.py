@@ -7,9 +7,9 @@ import unittest
 from PIL import Image
 
 from anything_plays.ui_stream import (
-    DEFAULT_STREAM, LAYOUTS, StreamMixin, compose_stream_output,
+    DEFAULT_STREAM, FRAME_RATES, LAYOUTS, StreamMixin, compose_stream_output,
     stream_panel_boxes, stream_render_delay_ms, StreamCadenceTracker,
-    validate_stream_settings,
+    stream_camera_snapshot_due, validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
 
@@ -149,6 +149,79 @@ class StreamModeContracts(unittest.TestCase):
             app._stream_render_tick()
         app.root.after.assert_called_once_with(1000, app._stream_render_tick)
         self.assertEqual(app._stream_last_render, None)
+
+    def test_stream_camera_preview_conversion_is_rate_bounded(self):
+        import cv2
+        import numpy as np
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = Mock()
+        app.root = Mock()
+        app.save_preferences = Mock()
+        frame = np.zeros((20, 25, 3), dtype=np.uint8)
+        original_convert = cv2.cvtColor
+
+        # 24 FPS Stream Mode needs at most one optional RGB/PIL snapshot
+        # per ~42ms, even if tracking sends camera frames at 100 FPS.
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   side_effect=(0.0, 0.010, 0.035, 0.042, 0.045, 0.047)), (
+            patch.object(cv2, "cvtColor", wraps=original_convert) as convert
+        ):
+            app.stream_camera_snapshot(frame)
+            self.assertEqual(app._stream_camera_serial, 1)
+            first_image = app._stream_camera_frame
+            app.stream_camera_snapshot(frame)
+            app.stream_camera_snapshot(frame)
+            self.assertEqual(app._stream_camera_serial, 1)
+            self.assertIs(app._stream_camera_frame, first_image)
+
+            app.stream_camera_snapshot(frame)
+            self.assertEqual(app._stream_camera_serial, 2)
+            self.assertIsNot(app._stream_camera_frame, first_image)
+
+            # A changed FPS setting must immediately use the next source
+            # frame, not wait for the prior 24 FPS throttle timestamp.
+            app._stream_options["frame_rate"] = "30 FPS"
+            app._stream_options_updated()
+            app.stream_camera_snapshot(frame)
+            self.assertEqual(app._stream_camera_serial, 3)
+
+            # Camera-off must erase the last image even within the
+            # throttling interval, and permit an immediate reconnect.
+            app.stream_clear_camera()
+            self.assertIsNone(app._stream_camera_frame)
+            self.assertIsNone(app._stream_camera_last_snapshot)
+            self.assertEqual(app._stream_camera_serial, 4)
+            app.stream_camera_snapshot(frame)
+            self.assertEqual(app._stream_camera_serial, 5)
+        self.assertEqual(convert.call_count, 4)
+        self.assertEqual(app._stream_camera_frame.size, (25, 20))
+        app.close_stream_mode()
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+
+    def test_stream_camera_snapshot_rate_policy_handles_all_three_targets(self):
+        for rate in FRAME_RATES:
+            target = int(rate.split()[0])
+            with self.subTest(target=target):
+                self.assertTrue(stream_camera_snapshot_due(None, 1.0, rate))
+                self.assertFalse(stream_camera_snapshot_due(
+                    1.0, 1.0 + 0.4 / target, rate
+                ))
+                self.assertTrue(stream_camera_snapshot_due(
+                    1.0, 1.0 + 1 / target, rate
+                ))
+                self.assertTrue(stream_camera_snapshot_due(
+                    2.0, 0.1, rate
+                ))
+        self.assertTrue(stream_camera_snapshot_due(None, 0.0, "invalid"))
 
     def test_stream_cadence_separates_refresh_ticks_from_changed_images(self):
         for target in (15, 24, 30):
