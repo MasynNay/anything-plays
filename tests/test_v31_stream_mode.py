@@ -1408,8 +1408,11 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIn("self._stream_photo", source)
         self.assertIn("photo.paste(frame)", source)
         self.assertIn("self.root.after_cancel(job)", source)
-        self.assertIn('self._stream_options["frame_rate"].split()[0]', source)
-        self.assertIn("self.root.after(interval, self._stream_render_tick)", source)
+        # The output rate is normalized before scheduling; malformed
+        # runtime state must not interrupt camera or native game input.
+        self.assertIn('raw_mode = self._stream_options.get("frame_rate")', source)
+        self.assertIn("interval = round(1000 / int(mode.split()[0]))", source)
+        self.assertIn("interval, self._stream_render_tick", source)
 
     def test_long_session_font_caching_stays_bounded(self):
         from anything_plays.ui_stream import _font
