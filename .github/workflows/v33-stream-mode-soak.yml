@@ -71,6 +71,9 @@ jobs:
           assert metrics["stream_refresh_intervals"] >= 2
           assert metrics["stream_published_images"] >= 2
           assert metrics["stream_failed_ticks"] == 0
+          assert metrics["stream_session_faults"] == 0
+          assert metrics["stream_session_recoveries"] == 0
+          assert metrics["stream_recovery_pending"] is False
           assert all(s["stream_items"] <= 1 for s in report["samples"])
           assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
           assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
@@ -97,6 +100,9 @@ jobs:
           assert report["stream_fault_blanked"] is True
           assert report["stream_fault_counted"] is True
           assert report["stream_fault_recovered"] is True
+          assert report["stream_final"]["metrics"]["stream_session_faults"] == 1
+          assert report["stream_final"]["metrics"]["stream_session_recoveries"] == 1
+          assert report["stream_final"]["metrics"]["stream_recovery_pending"] is False
           assert report["tk_callback_exception_count"] == 0
           assert report["resident_growth_mb"] <= 96
           assert report["stream_final"]["metrics"]["stream_target_refresh_fps"] in (15, 24, 30)

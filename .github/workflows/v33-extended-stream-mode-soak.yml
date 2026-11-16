@@ -76,6 +76,9 @@ jobs:
           assert report["stream_fault_blanked"] is True
           assert report["stream_fault_counted"] is True
           assert report["stream_fault_recovered"] is True
+          assert report["stream_final"]["metrics"]["stream_session_faults"] == 1
+          assert report["stream_final"]["metrics"]["stream_session_recoveries"] == 1
+          assert report["stream_final"]["metrics"]["stream_recovery_pending"] is False
           assert set(report["stream_rates_visited"]) == {"15 FPS", "24 FPS", "30 FPS"}
           assert set(report["stream_layouts_visited"]) == {"DS stacked", "Side by side"}
           assert report["real_stream_hardware_tested"] is False

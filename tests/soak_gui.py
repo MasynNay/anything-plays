@@ -210,7 +210,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     )
                     report_now = app.stream_performance_snapshot()
                     stream_fault_counted = (
-                        report_now["metrics"]["stream_failed_ticks"] >= 1
+                        report_now["metrics"]["stream_session_faults"] >= 1
+                        and report_now["metrics"]["stream_recovery_pending"]
                     )
 
                 def inspect_recovery():
@@ -220,10 +221,13 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     publication = app.stream_performance_snapshot()["metrics"][
                         "stream_published_images"
                     ]
+                    metrics = app.stream_performance_snapshot()["metrics"]
                     stream_fault_recovered = (
                         len(app._stream_canvas.find_all()) == 1
                         and app._stream_photo is not None
                         and publication > stream_prior_publications
+                        and metrics["stream_session_recoveries"] >= 1
+                        and not metrics["stream_recovery_pending"]
                     )
 
                 root.after(700, inspect_blanked)
