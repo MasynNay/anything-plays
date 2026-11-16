@@ -13,7 +13,9 @@ import sys
 import tempfile
 import time
 
-from anything_plays.preview_storage import is_v32_preview, checked_preview_directory
+from anything_plays.preview_storage import (
+    is_v32_preview, is_v33_candidate, checked_preview_directory,
+)
 
 # Libretro SRAM is normally tiny. Reject corrupt/hostile reported sizes
 # rather than allocating unlimited buffers while a game is running.
@@ -21,23 +23,25 @@ MAX_SAVE_RAM_BYTES = 64 * 1024 * 1024
 
 
 def _user_save_directory():
-    """Writable user saves; 3.2 private QA must never touch stable progress."""
-    preview = is_v32_preview()
+    """Writable user saves; isolated private QA never reads stable progress."""
+    preview = is_v32_preview() or is_v33_candidate()
+    scope = "Preview-3.3" if is_v33_candidate() else "Preview-3.2"
+    linux_scope = "3.3-candidate" if is_v33_candidate() else "3.2-preview"
     if sys.platform == "win32":
         root = os.environ.get("APPDATA")
         base = Path(root) if root else Path.home() / "AppData" / "Roaming"
         return (checked_preview_directory(
-            base / "AnythingPlays" / "Preview-3.2" / "Saves", "Preview-3.2",
+            base / "AnythingPlays" / scope / "Saves", scope,
         ) if preview else base / "AnythingPlays" / "Saves")
     if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support" / "AnythingPlays"
         return (checked_preview_directory(
-            base / "Preview-3.2" / "Saves", "Preview-3.2",
+            base / scope / "Saves", scope,
         ) if preview else base / "Saves")
     root = os.environ.get("XDG_DATA_HOME")
     base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local" / "share"
     return (checked_preview_directory(
-        base / "anything-plays" / "3.2-preview" / "saves", "3.2-preview",
+        base / "anything-plays" / linux_scope / "saves", linux_scope,
     ) if preview else base / "anything-plays" / "saves")
 
 
@@ -58,9 +62,11 @@ def _checked_native_save_path(path):
     directly into a public stable save directory. Leave stable layouts alone.
     """
     path = Path(path)
-    if not is_v32_preview():
+    if not (is_v32_preview() or is_v33_candidate()):
         return path
-    scope = "Preview-3.2" if sys.platform in ("win32", "darwin") else "3.2-preview"
+    scope = ("Preview-3.3" if is_v33_candidate() else "Preview-3.2")
+    if sys.platform not in ("win32", "darwin"):
+        scope = "3.3-candidate" if is_v33_candidate() else "3.2-preview"
     return checked_preview_directory(path, scope)
 
 
@@ -99,7 +105,7 @@ class SaveRAM:
         # Only the unreleased 3.2 preview starts in its own user data store.
         # This also means Restore NEVER reads an existing stable .sav file.
         self.path = (self.fallback_path
-                     if is_v32_preview() else self.legacy_path)
+                     if (is_v32_preview() or is_v33_candidate()) else self.legacy_path)
         self.get_data = get_data
         self.get_size = get_size
         # A fixed-size digest prevents unbounded snapshot history and avoids
@@ -121,7 +127,7 @@ class SaveRAM:
         # never replace it by an older legacy file from beside the ROM.
         if pointer and size and self.fallback_path.is_file():
             self.path = self.fallback_path
-        if pointer and size and is_v32_preview():
+        if pointer and size and (is_v32_preview() or is_v33_candidate()):
             # A preview save may be created/replaced after the SaveRAM
             # constructor ran. Refuse linked destinations before reading.
             _user_save_directory()
@@ -165,7 +171,7 @@ class SaveRAM:
         if digest == self._last_saved_digest and self.path.is_file():
             return False
         destination = self.path
-        if is_v32_preview():
+        if (is_v32_preview() or is_v33_candidate()):
             # Re-validate the preview parent immediately before replacing
             # files. No preview SRAM may follow a redirected stable directory.
             _user_save_directory()
