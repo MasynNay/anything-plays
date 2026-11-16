@@ -717,6 +717,33 @@ class StreamModeContracts(unittest.TestCase):
                 self.assertEqual(output.getpixel((middle_x, first[1])),
                                  (252, 150, 49))
 
+    def test_exact_fit_rgb_panel_does_not_resize_or_copy_pixels(self):
+        from unittest.mock import patch
+
+        rgb = Image.new("RGB", (64, 40), "#73c4a1")
+        rgb.putpixel((10, 20), (254, 9, 76))
+        bounds = (5, 7, 69, 47)
+        with patch.object(
+            Image.Image, "resize",
+            side_effect=AssertionError("exact fit must not resample"),
+        ):
+            for nearest in (True, False):
+                fitted, x, y = _contained(rgb, bounds, nearest=nearest)
+                self.assertIs(fitted, rgb, "RGB pixels are reused read-only")
+                self.assertEqual((x, y), (5, 7))
+                self.assertEqual(fitted.getpixel((10, 20)), (254, 9, 76))
+
+        # Other modes still convert to RGB and differing sizes still obey
+        # the original nearest/bilinear scaling contract.
+        rgba = Image.new("RGBA", (64, 40), (18, 70, 132, 255))
+        converted, _, _ = _contained(rgba, bounds)
+        self.assertEqual(converted.mode, "RGB")
+        self.assertEqual(converted.size, (64, 40))
+        scaled, _, _ = _contained(rgb, (0, 0, 128, 80), nearest=True)
+        self.assertEqual(scaled.size, (128, 80))
+        self.assertIsNot(scaled, rgb)
+        self.assertEqual(scaled.getpixel((20, 40)), (254, 9, 76))
+
     def test_stream_resize_cache_preserves_pixels_and_skips_unchanged_source(self):
         from PIL import ImageChops
         from unittest.mock import patch
