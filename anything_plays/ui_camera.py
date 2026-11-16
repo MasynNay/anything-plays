@@ -4,6 +4,7 @@ import os
 from queue import Empty, Queue
 import threading
 import time
+import math
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox
 
@@ -14,6 +15,25 @@ from anything_plays.cameras import discover
 from anything_plays.system_profiles import DISABLED_MAPPING
 from anything_plays.tracking import locate_target, locate_targets, zone_at
 from anything_plays.libretro_input import TWO_PLAYER_SYSTEMS
+
+
+def optional_camera_latency_start(enabled):
+    """Timestamp an opt-in input probe without ever blocking camera input.
+
+    This value is only an optional software-stage measurement. A failed
+    system timer, suspend/resume discontinuity, extension or invalid number
+    must not interrupt actual contour tracking or native held-button updates.
+    When disabled, no performance-clock call is made at all.
+    """
+    if not enabled:
+        return None
+    try:
+        stamp = time.perf_counter()
+        if type(stamp) in (int, float) and math.isfinite(stamp) and stamp >= 0:
+            return stamp
+    except Exception:
+        pass
+    return None
 
 
 class CameraMixin:
@@ -393,12 +413,10 @@ class CameraMixin:
         # captured frame -> held-input handoff -> next native input snapshot.
         # Sensor exposure, webcam read() and display delay are NOT measured.
         inputs = getattr(self.emu, "inputs", None)
-        started_at = (
-            time.perf_counter()
-            if getattr(inputs, "_latency_enabled", False) is True
+        started_at = optional_camera_latency_start(
+            getattr(inputs, "_latency_enabled", False) is True
             and self.armed and self.external_input is None
             and self.camera_input_mode.get() != "Pulse (classic)"
-            else None
         )
         frame = self.frame.copy()
         h, w = frame.shape[:2]

@@ -23,6 +23,15 @@ the report. A new observation can supersede an older one that never reached a
 native frame, and STOP discards pending observations. Counters and histogram
 arrays have constant size over long sessions.
 
+**Input safety:** the optional camera-processing clock is read only while
+this probe is enabled and the embedded held-button input path is active.
+A driver/clock exception, invalid floating-point result, negative timestamp
+or enormous integer silently skips *only that timing sample*. Real two-color
+tracking, held-button input delivery and P1/P2 release still run normally
+without a new pending sample; the next valid clock automatically resumes
+measurements without restarting a camera or emulator. These are software
+safety guarantees under synthetic tests, not physical response measurements.
+
 ## What the three time ranges mean
 
 | Stage | Start | End |

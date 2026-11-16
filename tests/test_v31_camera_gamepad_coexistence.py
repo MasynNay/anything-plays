@@ -441,6 +441,64 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertEqual(app._stream_camera_serial, 1)
         self.assertIs(app._stream_camera_frame, first_preview)
 
+    def test_opt_in_input_probe_bad_clock_never_sticks_p1_or_p2(self):
+        """Optional timing faults must not change real held control state."""
+        import time
+        import math
+        from anything_plays.ui_camera import optional_camera_latency_start
+
+        app = self.app
+        app.emu.inputs.enable_latency_probe(clock=lambda: 50.02)
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "perf_counter", return_value=50.0):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        self.assertEqual(app.emu.inputs.latency_snapshot()["samples"], 1)
+
+        # Releasing the two fish happens even if the optional clock raises,
+        # and the emulator does not acquire a stale pending timing sample.
+        app.set_pixels()
+        with patch.object(time, "perf_counter", side_effect=OSError(
+            "private camera driver /Users/owner/serial-452"
+        )):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+        self.assertEqual(app.emu.inputs.latency_snapshot()["samples"], 1)
+        self.assertTrue(app.emu.inputs._latency_enabled)
+        self.assertEqual(app.emu.inputs.commands.qsize(), 0)
+
+        # The measurement can resume without toggling the feature.
+        app.emu.inputs.latency_probe._clock = lambda: 50.12
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "perf_counter", return_value=50.10):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        self.assertEqual(app.emu.inputs.latency_snapshot()["samples"], 2)
+
+    def test_opt_in_probe_refuses_untrustworthy_timestamps(self):
+        import time
+        from anything_plays.ui_camera import optional_camera_latency_start
+        with patch.object(time, "perf_counter",
+                          side_effect=RuntimeError("secret ROM path")) as clock:
+            self.assertIsNone(optional_camera_latency_start(False))
+            clock.assert_not_called()
+            self.assertIsNone(optional_camera_latency_start(True))
+        for invalid in (
+            None, True, float("nan"), float("inf"), float("-inf"),
+            -1.0, 10**1000, "private /home/person/ROMs", [], {},
+        ):
+            with self.subTest(kind=type(invalid).__name__):
+                with patch.object(time, "perf_counter", return_value=invalid):
+                    self.assertIsNone(optional_camera_latency_start(True))
+        with patch.object(time, "perf_counter", return_value=123.456):
+            self.assertEqual(optional_camera_latency_start(True), 123.456)
+
     def test_opt_in_tracking_is_consumed_on_next_real_input_snapshot(self):
         # Exercise actual OpenCV contours -> CameraMixin -> native InputBuffer
         # with a deterministic clock. This is software only: no webcam glass,
