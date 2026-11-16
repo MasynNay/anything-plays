@@ -590,16 +590,31 @@ class StreamMixin:
             # Never skip the original camera tracking/control pipeline,
             # only the extra conversion for the optional OBS output window.
             return
-        # Bound temporary RGB memory independent of high-resolution webcams.
-        height, width = frame.shape[:2]
-        if max(height, width) > 1280:
-            scale = 1280 / max(height, width)
-            frame = cv2.resize(frame,
-                               (max(1, round(width*scale)),
-                                max(1, round(height*scale))))
-        self._stream_camera_frame = Image.fromarray(
-            cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        )
+        # This conversion is OPTIONAL. A broken OpenCV resize/color frame
+        # must not propagate into the primary camera tick and interrupt
+        # tracking, controller release or the normal in-app camera view.
+        try:
+            # Bound temporary RGB memory independent of high-res webcams.
+            height, width = frame.shape[:2]
+            if max(height, width) > 1280:
+                scale = 1280 / max(height, width)
+                frame = cv2.resize(
+                    frame, (max(1, round(width*scale)),
+                            max(1, round(height*scale)))
+                )
+            preview = Image.fromarray(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            )
+        except (cv2.error, ValueError, TypeError, IndexError, OSError):
+            # Revoke any previous private camera image immediately instead
+            # of leaving it frozen in OBS after a corrupt/invalid source.
+            if self._stream_camera_frame is not None:
+                self.stream_clear_camera()
+            # Retry at the selected Stream FPS, not on every high-rate
+            # tracking frame, to avoid a conversion-error hot loop.
+            self._stream_camera_last_snapshot = now
+            return
+        self._stream_camera_frame = preview
         self._stream_camera_serial += 1
         self._stream_camera_last_snapshot = now
 
