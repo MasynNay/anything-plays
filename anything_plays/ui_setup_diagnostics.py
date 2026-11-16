@@ -224,8 +224,14 @@ def show_setup_diagnostics(app):
     def refresh():
         try:
             report = _snapshot(app)
-        except (ValueError, tk.TclError) as exc:
-            status.set(f"Unable to check current setup: {str(exc)[:120]}")
+        except (ValueError, tk.TclError):
+            # Tk/driver error messages may contain device labels, ROM paths,
+            # or the user's home directory. Never echo them into diagnostics
+            # that can be copied or shown during a stream.
+            status.set(
+                "Unable to check current setup. Check device connection "
+                "and choose Refresh again."
+            )
             return
         snapshot["value"] = report
         for child in cards.winfo_children():
