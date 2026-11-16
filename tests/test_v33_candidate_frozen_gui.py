@@ -96,6 +96,32 @@ class FrozenV33CandidateAcceptanceTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         verify(report, home)
 
+    def test_host_qa_executes_installed_frozen_app_on_each_platform(self):
+        workflow = (Path(__file__).resolve().parents[1]
+                    / ".github/workflows/v33-private-candidate-installers.yml")
+        source = workflow.read_text(encoding="utf-8")
+        for expected in (
+            "Launch real frozen Linux Tk candidate",
+            "Install real Windows Inno candidate",
+            "Mount genuine macOS QA DMG",
+            "dpkg-deb -x",
+            "tools.assemble_v31_full_windows import unpack",
+            "hdiutil attach -readonly",
+            'ENTRY="$BUNDLE/Contents/MacOS/AnythingPlays"',
+            "$env:AP_V33_GUI_SMOKE_CHECK = '1'",
+            "AP_V33_GUI_SMOKE_CHECK=1",
+            "release/V33_FROZEN_GUI_RECEIPT.json",
+            "AP_V33_CANDIDATE: \"1\"",
+            "AP_RELEASE_BUILD: \"0\"",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, source)
+        self.assertGreaterEqual(source.count("--ap-v30-ui-smoke"), 3)
+        self.assertEqual(
+            source.count("python -m tools.v33_candidate_frozen_gui verify"),
+            3,
+        )
+
     def test_historical_changes_or_links_fail_closed(self):
         with TemporaryDirectory() as directory:
             base = Path(directory)

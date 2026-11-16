@@ -261,6 +261,30 @@ installer works in a user's desktop session. Actual Windows/macOS installation
 and all four-platform real hardware acceptance remain independent release
 gates.
 
+## Windows and macOS frozen 3.3 candidate startup checks
+
+The private candidate installer workflow also performs isolated native-OS
+startup checks on **Windows x64** and **both macOS architectures**, when
+those hosted runners are available. Windows executes the real private Inno
+installer inside a throwaway CI directory and then launches the installed
+`AnythingPlays.exe`. macOS verifies the signed candidate app on a
+read-only mounted DMG and launches its actual `Contents/MacOS/AnythingPlays`
+binary. Both must start real Tk, confirm the immutable
+`v33_candidate` identity, keep camera/controller/native-game input
+disarmed, render and close a synthetic Stream Output window, and preserve
+byte-identical dummy 3.1/3.2 settings canaries. A bounded 120-second launch
+timeout prevents an unresponsive window from hanging CI indefinitely.
+
+The same `V33_FROZEN_GUI_RECEIPT.json` verifier runs across Linux,
+Windows and macOS, with an independent installer hash and mGBA-only identity
+receipt for each host. Raw native crash output, webcam images, ROM paths and
+device identifiers are not retained as acceptance artifacts. This is
+automated frozen-app **hosted-runner** QA: it does not grant public core
+redistribution rights or prove real speakers, cameras, controllers, GameCube
+hardware, OBS recording, or owner-installed desktop compatibility. Each
+platform's CI job is only considered passed when its own frozen test and
+receipt succeed.
+
 ## Before claiming a 3.3 speedup
 
 Compare the same host, window size, theme, camera resolution, game state and
