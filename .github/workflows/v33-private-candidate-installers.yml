@@ -18,10 +18,12 @@ on:
       - 'tools/stage_v33_full_linux.py'
       - 'tools/stage_v33_full_windows.py'
       - 'tools/stage_v33_full_macos.py'
+      - 'tools/v33_full_native_link.py'
       - 'tests/test_v33_candidate_*.py'
       - 'tests/test_v33_full_linux_staging.py'
       - 'tests/test_v33_full_windows_staging.py'
       - 'tests/test_v33_full_macos_staging.py'
+      - 'tests/test_v33_full_native_link.py'
   workflow_dispatch:
 
 permissions:
@@ -96,6 +98,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_full_linux_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_windows_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_macos_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_native_link.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
@@ -362,6 +365,10 @@ jobs:
             --home "$QA_ROOT/home" \
             --report "$QA_ROOT/full-frozen.json" \
             --output private-full-v33/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+          python -m tools.v33_full_native_link \
+            --target linux-x64 \
+            --cores "$QA_ROOT/full-payload/opt/anything-plays-33-candidate/cores" \
+            --output private-full-v33/V33_FULL_NATIVE_LINK_RECEIPT.json
       - name: Retain full 11-core Linux owner-QA installer without publishing
         if: matrix.target == 'linux-x64' && success()
         uses: actions/upload-artifact@v4
@@ -371,6 +378,7 @@ jobs:
             private-full-v33/anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb
             private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json
             private-full-v33/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33/V33_FULL_NATIVE_LINK_RECEIPT.json
             private-full-v33/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
@@ -429,6 +437,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Full-native frozen Windows 3.3 Tk startup failed' }
           python -m tools.v33_candidate_frozen_gui verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output (Join-Path $PWD 'private-full-v33-windows/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json')
           if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows GUI isolation verifier failed' }
+          python -m tools.v33_full_native_link --target windows-x64 --cores (Join-Path $installDir 'cores') --output (Join-Path $PWD 'private-full-v33-windows/V33_FULL_NATIVE_LINK_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows ABI linkage failed' }
       - name: Retain full 11-core Windows owner-QA installer without publishing
         if: matrix.target == 'windows-x64' && success()
         uses: actions/upload-artifact@v4
@@ -438,6 +448,7 @@ jobs:
             private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe
             private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json
             private-full-v33-windows/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33-windows/V33_FULL_NATIVE_LINK_RECEIPT.json
             private-full-v33-windows/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
@@ -529,6 +540,10 @@ jobs:
             --home "$QA/home" \
             --report "$QA/full-frozen.json" \
             --output private-full-v33-macos/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+          python -m tools.v33_full_native_link \
+            --target "${{ matrix.target }}" \
+            --cores "$BUNDLE/Contents/Resources/cores" \
+            --output private-full-v33-macos/V33_FULL_NATIVE_LINK_RECEIPT.json
       - name: Retain full-native signed-ad-hoc macOS QA DMG without publishing
         if: (matrix.target == 'macos-arm64' || matrix.target == 'macos-x64') && success()
         uses: actions/upload-artifact@v4
@@ -538,6 +553,7 @@ jobs:
             private-full-v33-macos/AnythingPlays-3.3.0-fullqa1-macos-*.dmg
             private-full-v33-macos/V33_FULL_MACOS_QA_RECEIPT.json
             private-full-v33-macos/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33-macos/V33_FULL_NATIVE_LINK_RECEIPT.json
             private-full-v33-macos/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

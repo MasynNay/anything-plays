@@ -214,3 +214,28 @@ OBS recording, native audio, player/controller latency, Apple notarization,
 or a public 3.3 stable-upgrade validation**. The real 30-minute camera,
 GameCube and OBS acceptance requirements remain open.
 
+
+## ROM-free full-native dynamic-link gate
+
+After the full 11-core package is assembled and its frozen Tk UI opens,
+the private QA runner now probes every original-source core from the
+**installed full-native package**, not the build-tree or the mGBA-only
+installer. Each `*_libretro` library is loaded in its own bounded
+subprocess and checked for libretro ABI version 1 plus the public
+interface symbols used to connect the emulator to the application.
+
+The probe never calls `retro_init`, loads a ROM, creates a GPU context,
+opens audio/camera/SDL input, starts an emulator or emits any private
+driver error text. A crashed, stuck or missing native core fails the
+private full-native installer job; it cannot crash the main Tk test
+runner. The only retained artifact is
+`V33_FULL_NATIVE_LINK_RECEIPT.json`, with a list of known core
+filenames, pass/fail booleans, and explicit physical GameCube/OBS,
+licensing and public release signoffs set to false.
+
+Link success is a necessary *technical* gate, not a claim that all 18
+system profiles have playable games, correct audiovisual rendering,
+independent redistribution clearance or acceptable controller latency.
+GameCube GPU/audio/save and physical OBS/camera testing are still
+required for a public v3.3 stable release.
+
