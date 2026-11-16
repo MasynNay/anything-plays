@@ -13,6 +13,22 @@ import math
 # Integer bin codes are exported instead of per-frame samples or falsely
 # precise percentile values. Code 8 means >500ms; -1 means no samples.
 _NATIVE_RUN_P95_BIN_UPPER_MS = (8, 16, 25, 33, 50, 100, 250, 500)
+_MAX_TIMING_SAMPLE_SECONDS = 3600.0
+
+
+def _safe_duration_seconds(value):
+    """Validate optional native metrics without ever raising in retro_run().
+
+    A native core callback or extension may return malformed/nonfinite
+    values, including arbitrarily large Python integers. An hours-long
+    timer discontinuity should not become a frame-time sample.
+    """
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value) and 0 <= value <= _MAX_TIMING_SAMPLE_SECONDS
+    except (OverflowError, TypeError, ValueError):
+        return False
 
 
 class GameCubeNativeTiming:
@@ -36,13 +52,8 @@ class GameCubeNativeTiming:
         self.reported_core_fps = None
 
     def record_native_run(self, duration):
-        if type(duration) not in (int, float):
-            return
-        try:
-            if not math.isfinite(duration) or duration < 0:
-                return
-        except (OverflowError, ValueError, TypeError):
-            # Optional telemetry must not crash native emulation.
+        if not _safe_duration_seconds(duration):
+            # Optional telemetry must never crash native emulation.
             return
         self.native_run_calls += 1
         self.native_run_total_seconds += duration
@@ -59,7 +70,7 @@ class GameCubeNativeTiming:
         self.native_run_over_100ms += int(duration > 0.100)
 
     def record_wait(self, duration):
-        if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+        if not _safe_duration_seconds(duration):
             return
         self.scheduler_wait_calls += 1
         self.scheduler_wait_total_seconds += duration
@@ -71,7 +82,7 @@ class GameCubeNativeTiming:
         run duration already includes the GPU readback and must not be added
         to this separate missed-deadline counter.
         """
-        if type(seconds) not in (float, int) or not math.isfinite(seconds):
+        if not _safe_duration_seconds(seconds):
             return
         if seconds < 0.005:
             return
@@ -94,9 +105,14 @@ class GameCubeNativeTiming:
 
     def snapshot(self, *, gpu_readback_seconds=0.0):
         reported = self.reported_core_fps
-        if (type(reported) not in (int, float)
-                or not math.isfinite(reported) or not 20 < reported < 240):
+        if type(reported) not in (int, float):
             reported = 0.0
+        else:
+            try:
+                if not math.isfinite(reported) or not 20 < reported < 240:
+                    reported = 0.0
+            except (OverflowError, TypeError, ValueError):
+                reported = 0.0
         native = self.native_run_total_seconds
         count = self.native_run_calls
         try:
