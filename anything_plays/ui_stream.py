@@ -652,7 +652,11 @@ class StreamMixin:
             preview = Image.fromarray(
                 cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             )
-        except (cv2.error, ValueError, TypeError, IndexError, OSError):
+        except Exception:
+            # The OBS-only conversion is best-effort. Some native OpenCV
+            # wrappers raise RuntimeError, AttributeError or MemoryError
+            # instead of cv2.error; none may escape into the camera-tracking
+            # input tick or leave an old camera image on the stream.
             # Revoke any previous private camera image immediately instead
             # of leaving it frozen in OBS after a corrupt/invalid source.
             if self._stream_camera_frame is not None:
