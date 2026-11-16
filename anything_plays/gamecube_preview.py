@@ -23,8 +23,27 @@ def preview_fps(mode):
 
 
 def should_capture(last_capture, now, mode):
-    """Only skip a preview copy; never skip a native Dolphin frame."""
-    if last_capture is None:
+    """Only skip a preview copy; never skip a native Dolphin frame.
+
+    Optional GPU preview callbacks may receive corrupted clock metadata
+    after a host suspend, driver reset or test extension. Never propagate
+    a bad value into the native Dolphin callback.
+    """
+    import math
+
+    if type(now) not in (int, float):
+        return False
+    try:
+        if not math.isfinite(now) or now < 0:
+            return False
+    except (TypeError, ValueError, OverflowError):
+        return False
+    if last_capture is None or type(last_capture) not in (int, float):
+        return True
+    try:
+        if not math.isfinite(last_capture) or last_capture < 0:
+            return True
+    except (TypeError, ValueError, OverflowError):
         return True
     elapsed = now - last_capture
     if elapsed < 0:
