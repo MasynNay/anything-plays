@@ -184,10 +184,15 @@ class StreamCadenceTracker:
             return
         if self.last_tick is not None:
             delta = now - self.last_tick
-            if delta < 0:
-                # A clock reset should not produce an invented high FPS.
+            if not math.isfinite(delta) or delta < 0 or delta > 3600:
+                # A clock discontinuity or hours-long suspended window
+                # cannot safely be blended into the current FPS average.
+                # Keep the next valid tick but begin a fresh segment.
                 self.__init__()
-                self.mode = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
+                self.mode = (
+                    mode if mode in FRAME_RATES
+                    else DEFAULT_STREAM["frame_rate"]
+                )
             elif delta > 0:
                 self.tick_intervals += 1
                 self.tick_elapsed += delta
@@ -578,7 +583,7 @@ class StreamMixin:
     def stream_performance_snapshot(self):
         """Only current active Stream Mode, no camera frames or Tk details."""
         cadence = getattr(self, "_stream_cadence", None)
-        if self._stream_output_window is None or cadence is None:
+        if getattr(self, "_stream_output_window", None) is None or cadence is None:
             return None
         return {
             "format": "anything-plays-stream-cadence",
