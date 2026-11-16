@@ -1,4 +1,6 @@
-#ifdef V32UpgradeQABuild
+#ifdef V33CandidateBuild
+  #define AppName "Anything Plays 3.3 Private QA"
+#elif defined(V32UpgradeQABuild)
   #define AppName "Anything Plays 3.2"
 #elif defined(V32PreviewBuild)
   #define AppName "Anything Plays 3.2 Private Preview"
@@ -21,7 +23,9 @@
   #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-#ifdef V32UpgradeQABuild
+#ifdef V33CandidateBuild
+AppId={{4B38792D-4E9F-42A7-A14F-9B46D04B3303}
+#elif defined(V32UpgradeQABuild)
 AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
 #elif defined(V32PreviewBuild)
 AppId={{A0C96EA2-921A-49AC-AD1E-05A86EE7E320}
@@ -43,7 +47,10 @@ AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-#ifdef V32UpgradeQABuild
+#ifdef V33CandidateBuild
+DefaultDirName={autopf}\Anything Plays 3.3 Private QA
+DefaultGroupName=Anything Plays 3.3 Private QA
+#elif defined(V32UpgradeQABuild)
 DefaultDirName={autopf}\Anything Plays 3.1
 DefaultGroupName=Anything Plays 3.1
 #elif defined(V32PreviewBuild)
@@ -92,7 +99,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-#ifdef V32UpgradeQABuild
+#ifdef V33CandidateBuild
+Name: "{group}\Anything Plays 3.3 Private QA"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.3 Private QA"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+#elif defined(V32UpgradeQABuild)
 Name: "{group}\Anything Plays 3.2"; Filename: "{app}\AnythingPlays.exe"
 Name: "{autodesktop}\Anything Plays 3.2"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 #elif defined(V32PreviewBuild)
