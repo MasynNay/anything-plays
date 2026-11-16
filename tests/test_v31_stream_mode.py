@@ -517,6 +517,61 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIs(app._stream_camera_frame, reference)
         self.assertEqual(app._stream_stale_camera_clears, 0)
 
+    def test_stream_optional_snapshot_clocks_are_safe_for_tracking(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import cv2
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        frame = np.zeros((18, 24, 3), dtype=np.uint8)
+        original = cv2.cvtColor
+
+        # A broken optional clock must not convert, mutate a pending source,
+        # or throw across the actual camera-input processing callback.
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   side_effect=OSError("private serial /Users/alex/camera")):
+            app.stream_camera_snapshot(frame)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 0)
+
+        # A bad *previous* snapshot timestamp is recoverable immediately.
+        app._stream_camera_last_snapshot = "bad camera timestamp"
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=2.0),
+            patch.object(cv2, "cvtColor", wraps=original) as converted,
+        ):
+            app.stream_camera_snapshot(frame)
+        self.assertEqual(converted.call_count, 1)
+        self.assertEqual(app._stream_camera_last_snapshot, 2.0)
+        self.assertEqual(app._stream_camera_serial, 1)
+
+        # A corrupt current clock is ignored, not used for FPS math.
+        before = app._stream_camera_frame
+        app._stream_camera_last_snapshot = 2.0
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=float("nan")):
+            app.stream_camera_snapshot(frame)
+        self.assertIs(app._stream_camera_frame, before)
+        self.assertEqual(app._stream_camera_serial, 1)
+
+    def test_stream_snapshot_rate_policy_rejects_bad_clocks_without_throwing(self):
+        for bad in (float("nan"), float("inf"), float("-inf"),
+                    -1, "secret-device", True, 10**1000, [], {}):
+            with self.subTest(bad_type=type(bad).__name__):
+                self.assertFalse(stream_camera_snapshot_due(1.0, bad, "24 FPS"))
+                self.assertTrue(stream_camera_snapshot_due(bad, 1.0, "24 FPS"))
+        self.assertFalse(stream_camera_snapshot_due(1.0, 1.002, [],))
+        self.assertTrue(stream_camera_snapshot_due(1.0, 1.1, {}))
+        self.assertTrue(stream_camera_snapshot_due(None, 1.0, "30 FPS"))
+
     def test_stream_cadence_separates_refresh_ticks_from_changed_images(self):
         for target in (15, 24, 30):
             with self.subTest(target=target):
