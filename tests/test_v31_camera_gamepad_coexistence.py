@@ -289,7 +289,7 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertTrue(app.emu.held("Start", 0))
 
     def test_broken_optional_stream_rgb_cannot_block_native_button_release(self):
-        """Corrupt OBS image conversion must not affect tracking or P1 holds."""
+        """A native OBS converter crash must not affect P1/P2 held controls."""
         import time
         from types import MethodType
         from anything_plays.ui_stream import StreamMixin
@@ -315,12 +315,12 @@ class PixelAndControllerCoexistenceTests(TestCase):
 
         def convert(pixels, mode):
             if mode == cv2.COLOR_BGR2RGB and rgb_fails[0]:
-                raise cv2.error(
+                raise RuntimeError(
                     "private webcam /Users/private/usb-serial-123 failed"
                 )
             return original(pixels, mode)
 
-        app.set_pixels(primary=[(45, 60)])
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
         with (
             patch.object(time, "monotonic", side_effect=(10.0, 10.100)),
             patch.object(cv2, "cvtColor", side_effect=convert),
@@ -328,6 +328,7 @@ class PixelAndControllerCoexistenceTests(TestCase):
             app.draw_camera()
             app.emu.frame()
             self.assertTrue(app.emu.held("A", 0))
+            self.assertTrue(app.emu.held("B", 1))
             self.assertIsNotNone(app._stream_camera_frame)
             self.assertEqual(app._stream_camera_serial, 1)
 
@@ -337,6 +338,8 @@ class PixelAndControllerCoexistenceTests(TestCase):
             app.emu.frame()
         self.assertFalse(app.emu.held("A", 0),
                          "native P1 button must release on the next frame")
+        self.assertFalse(app.emu.held("B", 1),
+                         "native P2 button must release on the next frame")
         self.assertIsNone(app._stream_camera_frame,
                           "OBS may never retain a stale private camera image")
         self.assertIsNone(app._stream_last_render)
