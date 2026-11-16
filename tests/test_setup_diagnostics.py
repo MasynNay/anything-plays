@@ -223,6 +223,32 @@ class SnapshotPrivacyTests(unittest.TestCase):
         ):
             self.assertNotIn(private, encoded)
 
+    def test_stream_mode_aggregate_report_is_private_and_distinguishes_static_frames(self):
+        from anything_plays.ui_stream import StreamCadenceTracker, StreamMixin
+        from anything_plays.ui_setup_diagnostics import (
+            _snapshot, _stream_cadence_summary_lines,
+        )
+
+        class StreamHarness(PrivateApp, StreamMixin):
+            pass
+
+        app = StreamHarness("/home/private/secret-emulator.so")
+        app._stream_output_window = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.record_tick(1.0, "24 FPS", published=True)
+        app._stream_cadence.record_tick(1.04, "24 FPS", published=False)
+        report = _snapshot(app)
+        self.assertIn("stream_cadence", report)
+        lines = _stream_cadence_summary_lines(report["stream_cadence"])
+        self.assertEqual(len(lines), 3)
+        self.assertIn("Requested Stream Mode refresh: 24 FPS", lines[0])
+        self.assertIn("observed Tk tick 25.0 FPS", lines[0])
+        self.assertIn("waiting for two changed images", lines[1])
+        self.assertIn("1 unchanged ticks", lines[1])
+        self.assertNotIn("/home/private", json.dumps(report))
+        app._stream_output_window = None
+        self.assertNotIn("stream_cadence", _snapshot(app))
+
     def test_input_timing_display_has_three_stage_ranges_or_no_samples(self):
         from anything_plays.libretro_input import InputBuffer
         from anything_plays.ui_setup_diagnostics import _input_timing_summary_lines
