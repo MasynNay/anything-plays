@@ -84,6 +84,21 @@ selected rate, then normal throttling resumes. The existing three-second
 live-camera stale-image revocation still applies if no new image arrives.
 No tracking, native input or audio loop is restarted.
 
+## Repeated camera-off signals and shutdown timer safety
+
+Repeated optional Stream Mode camera-off notifications now **leave an
+already-empty camera preview unchanged** instead of bumping its image
+revision and forcing needless composition of an unchanged game-only scene.
+A prior camera image, timestamp, outstanding forced refresh or cached
+fitted camera image is still invalidated and cleared immediately. This is
+only an OBS-facing optimization; it does not suppress actual camera
+reconnect attempts, native held-button release, or game/audio rendering.
+
+Deferred Stream Settings preferences saves are optional UI work: if Tk
+is already tearing down and cannot schedule a save callback, the exception
+does not escape the settings handler or change the emulator/camera state.
+Normal valid settings saves and window-close flush remain unchanged.
+
 ## Redundant controls and destroyed-window recovery
 
 Stream Settings ignores callbacks that do not change a validated setting,

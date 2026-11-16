@@ -831,6 +831,76 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(compose.call_args.args[1])
         self.assertEqual(app._stream_stale_camera_clears, 1)
 
+    def test_repeated_empty_camera_notifications_are_idempotent_for_stream(self):
+        from types import SimpleNamespace
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app._stream_camera_serial = 6
+        still_rendered = ("static game, no camera",)
+        app._stream_last_render = still_rendered
+        for _ in range(300):
+            app.stream_clear_camera()
+        self.assertEqual(app._stream_camera_serial, 6)
+        self.assertIs(app._stream_last_render, still_rendered)
+
+        # Even with no PIL image, an old timing/backoff state must be
+        # revoked so a newly reconnected camera can render immediately.
+        app._stream_camera_last_snapshot = 42.0
+        app.stream_clear_camera()
+        self.assertEqual(app._stream_camera_serial, 7)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertIsNone(app._stream_last_render)
+
+        # A stale fitted image must be released even if its source was
+        # already dropped by another optional code path.
+        cache = StreamPanelResizeCache()
+        frame = Image.new("RGB", (18, 24), "#123456")
+        cache.contained("CAMERA", frame, (0, 0, 160, 120))
+        app._stream_resize_cache = cache
+        app._stream_last_render = ("cached",)
+        app.stream_clear_camera()
+        self.assertNotIn("CAMERA", cache._entries)
+        self.assertEqual(app._stream_camera_serial, 8)
+        self.assertIsNone(app._stream_last_render)
+        app._stream_last_render = still_rendered
+        for _ in range(100):
+            app.stream_clear_camera()
+        self.assertEqual(app._stream_camera_serial, 8)
+        self.assertIs(app._stream_last_render, still_rendered)
+
+    def test_expired_tk_root_save_timer_is_not_an_output_failure(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import tkinter as tk
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        for failure in (tk.TclError("root already destroyed"),
+                        RuntimeError("main thread is no longer in main loop"),
+                        OSError("widget owner gone")):
+            with self.subTest(failure=type(failure).__name__):
+                app.root.after.side_effect = failure
+                app._stream_last_render = ("previous composited view",)
+                app._stream_options_updated(force_camera_snapshot=False)
+                self.assertIsNone(app._stream_last_render)
+                self.assertIsNone(app._stream_save_job)
+                self.assertFalse(app._stream_camera_force_next_snapshot)
+        app.root.after.reset_mock()
+        app.root.after.side_effect = None
+        app._closing = True
+        app._stream_options_updated(force_camera_snapshot=False)
+        app.root.after.assert_not_called()
+
     def test_stream_camera_preview_conversion_is_rate_bounded(self):
         import cv2
         import numpy as np

@@ -798,8 +798,16 @@ class StreamMixin:
         if cadence is not None:
             cadence.reset_for(self._stream_options["frame_rate"])
         self._invalidate_stream()
-        if self._stream_save_job is None:
-            self._stream_save_job = self.root.after(600, self._save_stream_options)
+        if self._stream_save_job is None and not getattr(self, "_closing", False):
+            try:
+                self._stream_save_job = self.root.after(
+                    600, self._save_stream_options
+                )
+            except (tk.TclError, RuntimeError, OSError):
+                # The root may be destroyed between a variable trace and
+                # its deferred preferences write. Rendering and input are
+                # independent of this best-effort settings timer.
+                self._stream_save_job = None
 
     def _save_stream_options(self):
         self._stream_save_job = None
@@ -877,16 +885,30 @@ class StreamMixin:
         self._stream_camera_force_next_snapshot = False
 
     def stream_clear_camera(self):
-        # Even if the last frame was only milliseconds ago, disconnect or
-        # Stop must immediately clear it and accept the next reconnect.
+        """Revoke cached webcam pixels without redrawing an already-blank view.
+
+        Repeated disconnect/empty-frame notifications can arrive while the
+        camera is stopped. They should not turn static game-only Stream Mode
+        output into a continuous Tk/PIL redraw workload. A real old image,
+        valid capture timestamp, pending forced refresh or cached resize is
+        still revoked immediately and accepts the next reconnect.
+        """
+        cache = getattr(self, "_stream_resize_cache", None)
+        cache_entries = getattr(cache, "_entries", None)
+        had_pixels_or_state = (
+            self._stream_camera_frame is not None
+            or self._stream_camera_last_snapshot is not None
+            or bool(getattr(self, "_stream_camera_force_next_snapshot", False))
+            or (isinstance(cache_entries, dict) and "CAMERA" in cache_entries)
+        )
         self._stream_camera_last_snapshot = None
         self._stream_camera_force_next_snapshot = False
         self._stream_camera_frame = None
-        cache = getattr(self, "_stream_resize_cache", None)
         if cache is not None:
             cache.clear("CAMERA")
-        self._stream_camera_serial += 1
-        self._invalidate_stream()
+        if had_pixels_or_state:
+            self._stream_camera_serial += 1
+            self._invalidate_stream()
 
     def stream_performance_snapshot(self):
         """Only current active Stream Mode, no camera frames or Tk details."""
