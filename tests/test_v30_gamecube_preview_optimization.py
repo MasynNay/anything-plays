@@ -25,6 +25,16 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(preview_fps("Performance (20 FPS)"), 20)
         self.assertEqual(preview_fps("Quality (60 FPS)"), 60)
         self.assertEqual(preview_fps("bad saved preference"), 30)
+        for malformed in (None, [], {}, ["Performance (20 FPS)"], 42):
+            with self.subTest(malformed=type(malformed).__name__):
+                self.assertEqual(preview_fps(malformed), 30)
+                self.assertTrue(should_capture(None, 10.0, malformed))
+                self.assertFalse(should_capture(10.0, 10.001, malformed))
+                tracker = PreviewCadenceTracker()
+                tracker.reset_for(malformed)
+                self.assertEqual(
+                    tracker.snapshot()["gamecube_preview_target_fps"], 30
+                )
         self.assertTrue(should_capture(None, 0.0, DEFAULT_PREVIEW_MODE))
         self.assertFalse(should_capture(0.0, 0.010, DEFAULT_PREVIEW_MODE))
         self.assertTrue(should_capture(0.0, 0.035, DEFAULT_PREVIEW_MODE))
