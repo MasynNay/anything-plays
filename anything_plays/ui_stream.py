@@ -751,9 +751,17 @@ class StreamMixin:
             return
         try:
             now = time.monotonic()
+            valid_now = (
+                type(now) in (int, float) and math.isfinite(now) and now >= 0
+            )
         except Exception:
-            # Optional capture diagnostics/clock should not interrupt
-            # already-computed camera controls or the in-app preview.
+            valid_now = False
+        if not valid_now:
+            # A failed optional clock must not leave a previous private
+            # webcam image indefinitely visible in OBS. Keep native game
+            # controls untouched; clear only the stream's camera snapshot.
+            if self._stream_camera_frame is not None:
+                self.stream_clear_camera()
             return
         last = getattr(self, "_stream_camera_last_snapshot", None)
         if not stream_camera_snapshot_due(
