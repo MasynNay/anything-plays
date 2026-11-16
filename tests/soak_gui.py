@@ -98,11 +98,16 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             callback_errors = []
 
             def capture_tk_callback_error(error_type, error, traceback):
-                callback_errors.append(
-                    "Tk callback raised "
-                    + getattr(error_type, "__name__", "Exception")
-                    + ": " + str(error)[:160]
-                )
+                # Native driver exceptions may contain user paths, camera
+                # names or serials. Reports must retain only fixed classes.
+                name = getattr(error_type, "__name__", "UnexpectedError")
+                if name not in (
+                    "OSError", "RuntimeError", "ValueError", "TypeError",
+                    "TclError", "MemoryError", "IndexError", "AttributeError",
+                    "Exception", "KeyError",
+                ):
+                    name = "UnexpectedError"
+                callback_errors.append("Tk callback raised " + name)
                 if not app._closing:
                     app.close()
 
@@ -155,6 +160,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 stream_metrics = (
                     stream_report["metrics"] if stream_report else {}
                 )
+                panel_cache = getattr(app, "_stream_resize_cache", None)
+                resized_panels = (
+                    len(panel_cache._entries) if panel_cache is not None else 0
+                )
                 sample_data = {
                     "seconds": round(time.monotonic() - started, 2),
                     "rss_mb": rss_megabytes(),
@@ -163,6 +172,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     "camera_items": items_camera,
                     "game_items": items_game,
                     "stream_items": stream_items,
+                    "stream_resize_cache_items": resized_panels,
                     "stream_refresh_intervals": stream_metrics.get(
                         "stream_refresh_intervals", 0
                     ),
@@ -186,7 +196,7 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     app.close()
                     return
                 if (items_camera > 1 or items_game > 1
-                        or stream_items > 1 or
+                        or stream_items > 1 or resized_panels > 2 or
                         after_jobs > 32 or cache > 12 or
                         len(app.library_images) > 300):
                     failures.append("UI resource counts exceeded fixed bounds")

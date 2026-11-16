@@ -93,9 +93,22 @@ PYTHONPATH=. python tests/soak_gui.py --seconds 180 --enable-stream \
 ```
 
 The existing standard desktop soak still runs **without** `--enable-stream`
-and remains unchanged. Neither synthetic test certifies physical devices,
-GameCube Dolphin hardware rendering, actual OBS encoding, or 30-minute stream
-stability. Real-device acceptance is still required.
+and remains unchanged. The shorter workflow additionally verifies that the
+new source resize cache never holds more than **two fitted panels**, regardless
+of game or camera frame count.
+
+A separate [manual 30-minute Stream Mode endurance workflow](../.github/workflows/v33-extended-stream-mode-soak.yml)
+is now available on the development branch. It uses the same real Tk window
+and moving **synthetic** camera/game pixels for 1,800 seconds, requiring
+continuous publications, bounded canvas items/Tk jobs, at most two cached
+resized sources, zero callback errors and at most 96 MiB RSS growth after
+warm-up. It does **not** run on every push, open a physical camera or load
+a commercial ROM. Trigger it explicitly from the Actions tab when deeper
+source validation is useful. No build or release is produced.
+
+Neither synthetic run certifies physical devices, Dolphin GameCube hardware
+rendering, actual OBS encoding, or stability of a 30-minute **physical**
+stream. Real-device acceptance is still required.
 
 ## Before claiming a 3.3 speedup
 

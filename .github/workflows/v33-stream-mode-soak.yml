@@ -72,6 +72,7 @@ jobs:
           assert metrics["stream_published_images"] >= 2
           assert metrics["stream_failed_ticks"] == 0
           assert all(s["stream_items"] <= 1 for s in report["samples"])
+          assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
           assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
           PY
       - name: Retain aggregate-only stream soak evidence
