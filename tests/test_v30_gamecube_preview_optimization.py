@@ -156,6 +156,95 @@ class PreviewRatePolicyTests(unittest.TestCase):
         )
         self.assertEqual(session.host.read_frame.call_count, 3)
 
+    def test_native_gpu_callback_survives_failed_optional_monotonic_clock(self):
+        """A broken optional clock cannot escape through Dolphin ctypes."""
+        session = object.__new__(GameCubeHardwareSession)
+        rgb = np.full((8, 8, 3), 17, dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(return_value=rgb))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=RuntimeError(
+                       "clock unavailable /home/user/private-gpu"
+                   )):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.raw_video_callbacks, 1)
+        self.assertEqual(session.preview_readback_skips, 1)
+        self.assertEqual(session.host.read_frame.call_count, 0)
+        self.assertEqual(session.emulator.frame_serial, 0)
+        self.assertFalse(session.emulator.stop_event.is_set())
+        self.assertIsNone(session.opengl_error)
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(10.0, 10.004)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.host.read_frame.call_count, 1)
+        self.assertEqual(session.emulator.frame_serial, 1)
+        self.assertEqual(session.hardware_frames, 1)
+        self.assertEqual(session.gpu_readback_calls, 1)
+        self.assertEqual(session._preview_cadence.published, 1)
+        self.assertIs(session.emulator.frame, rgb)
+
+    def test_native_gpu_frame_still_publishes_if_timing_clock_fails(self):
+        """A failed perf_counter discards metrics, not valid GPU pixels."""
+        session = object.__new__(GameCubeHardwareSession)
+        rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(return_value=rgb))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=(20.0, 20.004)),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  side_effect=OSError("private GPU serial /Users/owner")),
+        ):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.emulator.frame_serial, 1)
+        self.assertIs(session.emulator.frame, rgb)
+        self.assertEqual(session.hardware_frames, 1)
+        self.assertEqual(session.gpu_readback_calls, 1)
+        self.assertEqual(session.gpu_readback_seconds, 0.0)
+        self.assertEqual(session._preview_cadence.published, 1)
+        self.assertIsNone(session.opengl_error)
+        self.assertFalse(session.emulator.stop_event.is_set())
+
+    def test_native_gpu_optional_clock_rejects_nonfinite_and_huge_values(self):
+        session = object.__new__(GameCubeHardwareSession)
+        for bad in (
+            float("nan"), float("inf"), -1.0, 10**1000, True,
+            "private GPU /home/owner/core", None,
+        ):
+            with self.subTest(value_type=type(bad).__name__):
+                self.assertIsNone(session._optional_clock(lambda: bad))
+        self.assertEqual(session._optional_clock(lambda: 10.0), 10.0)
+
     def test_preview_target_resets_immediately_when_new_mode_is_throttled(self):
         session = object.__new__(GameCubeHardwareSession)
         session.host = Mock(read_frame=Mock(
