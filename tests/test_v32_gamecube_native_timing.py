@@ -104,6 +104,53 @@ class NativeLoopTimingTests(unittest.TestCase):
         t.record_native_run(0.2)
         self.assertEqual(t.snapshot()["native_run_p95_bucket_code"], 6)
 
+    def test_native_scheduler_timing_faults_never_cross_core_boundary(self):
+        """Optional clock instrumentation must not kill the native worker."""
+        t = GameCubeNativeTiming()
+        for bad in (
+            10**1000, float("inf"), float("-inf"), float("nan"),
+            None, "private /home/user/game.iso", {}, [], True,
+            -1, 3601, 1e308,
+        ):
+            with self.subTest(value_type=type(bad).__name__):
+                t.record_native_run(bad)
+                t.record_wait(bad)
+                t.record_lateness(bad, resynchronized=True)
+        self.assertEqual(t.native_run_calls, 0)
+        self.assertEqual(t.scheduler_wait_calls, 0)
+        self.assertEqual(t.scheduler_late_frames, 0)
+        self.assertEqual(t.scheduler_resyncs, 0)
+
+        t.reported_core_fps = 10**1000
+        self.assertEqual(t.snapshot()["native_reported_core_fps"], 0)
+        t.reported_core_fps = float("nan")
+        self.assertEqual(t.snapshot()["native_reported_core_fps"], 0)
+        t.reported_core_fps = 59.94
+        t.record_native_run(0.017)
+        t.record_wait(0.004)
+        t.record_lateness(0.015, resynchronized=True)
+        recovered = t.snapshot()
+        self.assertEqual(recovered["native_run_calls"], 1)
+        self.assertEqual(recovered["scheduler_wait_calls"], 1)
+        self.assertEqual(recovered["scheduler_late_frames"], 1)
+        self.assertEqual(recovered["scheduler_resyncs"], 1)
+        self.assertEqual(recovered["native_reported_core_fps"], 59.94)
+        self.assertEqual(recovered["native_run_p95_bucket_code"], 2)
+        self.assertTrue(all(math.isfinite(v) for v in recovered.values()))
+
+    def test_long_suspended_clock_is_not_a_native_frame_duration(self):
+        t = GameCubeNativeTiming()
+        t.record_native_run(0.02)
+        t.record_native_run(3700.0)
+        t.record_wait(3700.0)
+        t.record_lateness(3700.0, resynchronized=True)
+        s = t.snapshot()
+        self.assertEqual(s["native_run_calls"], 1)
+        self.assertEqual(s["scheduler_wait_calls"], 0)
+        self.assertEqual(s["scheduler_resyncs"], 0)
+        self.assertEqual(s["native_run_max_ms"], 20)
+        self.assertEqual(s["native_run_p95_bucket_code"], 2)
+
     def test_counters_do_not_hold_frames_timestamps_or_game_data(self):
         t = GameCubeNativeTiming()
         for _ in range(10000):
