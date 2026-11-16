@@ -43,10 +43,28 @@ class PreviewCadenceTracker:
         self.total_seconds = 0.0
         self.max_interval_seconds = 0.0
 
+    def reset_for(self, mode):
+        """Reflect a target change immediately, even if readback is skipped.
+
+        A performance check made immediately after changing 20/30/60 must
+        never display the previous target or previous interval measurements.
+        """
+        selected = (
+            mode if isinstance(mode, str) and mode in PREVIEW_FPS
+            else DEFAULT_PREVIEW_MODE
+        )
+        if selected != self.mode:
+            self.mode = selected
+            self.last_publication = None
+            self.published = 0
+            self.intervals = 0
+            self.total_seconds = 0.0
+            self.max_interval_seconds = 0.0
+
     def record_published(self, now, mode):
         import math
 
-        selected = mode if mode in PREVIEW_FPS else DEFAULT_PREVIEW_MODE
+        self.reset_for(mode)
         if not isinstance(now, (int, float)):
             return
         try:
@@ -55,12 +73,9 @@ class PreviewCadenceTracker:
             return
         if not valid or now < 0:
             return
-        if selected != self.mode or (
-            self.last_publication is not None and now < self.last_publication
-        ):
-            # A rate change or clock discontinuity starts a new segment.
-            # Never blend 20/30/60 FPS observations into one number.
-            self.mode = selected
+        if self.last_publication is not None and now < self.last_publication:
+            # A monotonic clock discontinuity must not create a bogus
+            # capture-frequency estimate or retain unrelated old intervals.
             self.last_publication = None
             self.published = 0
             self.intervals = 0
