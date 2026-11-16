@@ -12,7 +12,8 @@ import numpy as np
 
 from anything_plays.gamecube_gpu import GameCubeHardwareSession
 from anything_plays.gamecube_preview import (
-    DEFAULT_PREVIEW_MODE, PREVIEW_FPS, preview_fps, should_capture,
+    DEFAULT_PREVIEW_MODE, PREVIEW_FPS, PreviewCadenceTracker,
+    preview_fps, should_capture,
 )
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
@@ -30,6 +31,83 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertFalse(should_capture(0.0, 0.040, "Performance (20 FPS)"))
         self.assertTrue(should_capture(0.0, 0.040, "Quality (60 FPS)"))
         self.assertTrue(should_capture(100.0, 0.0, DEFAULT_PREVIEW_MODE))
+
+    def test_preview_cadence_measures_only_published_intervals_per_mode(self):
+        tracker = PreviewCadenceTracker()
+        self.assertEqual(tracker.snapshot()["gamecube_preview_target_fps"], 0)
+        self.assertEqual(
+            tracker.snapshot()["gamecube_preview_observed_capture_fps"], 0.0
+        )
+        for stamp in (0.004, 0.039, 0.074):
+            tracker.record_published(stamp, "Balanced (30 FPS)")
+        metrics = tracker.snapshot()
+        self.assertEqual(metrics["gamecube_preview_target_fps"], 30)
+        self.assertEqual(metrics["gamecube_preview_cadence_intervals"], 2)
+        self.assertAlmostEqual(
+            metrics["gamecube_preview_observed_capture_fps"], 28.57, places=2
+        )
+        self.assertEqual(metrics["gamecube_preview_max_interval_ms"], 35.0)
+        # A new preview target must NOT mix previous capture cadence.
+        tracker.record_published(0.125, "Performance (20 FPS)")
+        changed = tracker.snapshot()
+        self.assertEqual(changed["gamecube_preview_target_fps"], 20)
+        self.assertEqual(changed["gamecube_preview_cadence_intervals"], 0)
+        tracker.record_published(0.175, "Performance (20 FPS)")
+        self.assertEqual(
+            tracker.snapshot()["gamecube_preview_observed_capture_fps"], 20
+        )
+        # A restarted clock also starts a new segment.
+        tracker.record_published(0.0, "Performance (20 FPS)")
+        self.assertEqual(tracker.snapshot()["gamecube_preview_cadence_intervals"], 0)
+
+    def test_preview_cadence_rejects_invalid_clock_without_retaining_history(self):
+        tracker = PreviewCadenceTracker()
+        for value in (None, float("nan"), float("inf"), -1, "private", 10**1000):
+            tracker.record_published(value, "Balanced (30 FPS)")
+        self.assertEqual(tracker.published, 0)
+        for i in range(10000):
+            tracker.record_published(i * 0.05, "Performance (20 FPS)")
+        snap = tracker.snapshot()
+        self.assertEqual(snap["gamecube_preview_cadence_intervals"], 9999)
+        self.assertAlmostEqual(
+            snap["gamecube_preview_observed_capture_fps"], 20, places=2
+        )
+        self.assertLessEqual(len(vars(tracker)), 6)
+        self.assertNotIn("last_publication", snap)
+        self.assertNotIn("frames", str(snap))
+
+    def test_gpu_callback_counts_real_published_preview_cadence(self):
+        session = object.__new__(GameCubeHardwareSession)
+        frame = np.zeros((8, 8, 3), dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(return_value=frame))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+        for start, end in ((0.000, 0.004), (0.035, 0.039), (0.070, 0.074)):
+            with patch("anything_plays.gamecube_gpu.time.monotonic",
+                       side_effect=(start, end)):
+                session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.hardware_frames, 3)
+        self.assertEqual(session.emulator.frame_serial, 3)
+        stats = session._preview_cadence.snapshot()
+        self.assertEqual(stats["gamecube_preview_target_fps"], 30)
+        self.assertEqual(stats["gamecube_preview_cadence_intervals"], 2)
+        self.assertAlmostEqual(
+            stats["gamecube_preview_observed_capture_fps"], 28.57, places=2
+        )
+        self.assertEqual(session.host.read_frame.call_count, 3)
 
     def test_actual_gamecube_gpu_callback_avoids_repeated_gl_readback(self):
         session = object.__new__(GameCubeHardwareSession)
