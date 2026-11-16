@@ -513,9 +513,14 @@ class Emulator:
                            *, sample_started_at=None):
         """Publish one atomic camera snapshot, with independent P1/P2 holds."""
         if self.running and self.armed:
-            self.inputs.set_camera_buttons(
-                player_one, player_two, sample_started_at=sample_started_at
-            )
+            if sample_started_at is None:
+                # Preserve the longstanding positional call contract when
+                # local performance sampling has not been enabled.
+                self.inputs.set_camera_buttons(player_one, player_two)
+            else:
+                self.inputs.set_camera_buttons(
+                    player_one, player_two, sample_started_at=sample_started_at
+                )
 
     def press(self, button, frames=8, port=0):
         if self.running and self.armed and self.inputs.id_for(button) is not None:
