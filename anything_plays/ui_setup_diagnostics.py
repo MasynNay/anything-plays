@@ -166,6 +166,18 @@ def _stream_cadence_summary_lines(stream):
         if m["stream_publication_intervals"] > 0
         else "waiting for two changed images"
     )
+    # Aggregate composition time is not Tk callback frequency or OBS FPS.
+    # Older reports may predate this field; do not invent a 0ms P95.
+    cost_bins = (
+        "0–5", "5–10", "10–16", "16–25", "25–33",
+        "33–50", "50–67", "67–100", "100–200", "200–500", ">500",
+    )
+    code = m.get("stream_render_p95_bucket_code", -1)
+    cost_p95 = (
+        cost_bins[code] + " ms"
+        if type(code) is int and 0 <= code < len(cost_bins)
+        else "not sampled"
+    )
     return (
         f"Requested Stream Mode refresh: {m['stream_target_refresh_fps']} FPS · "
         f"observed Tk tick {ticks}",
@@ -174,6 +186,11 @@ def _stream_cadence_summary_lines(stream):
         f"{m['stream_unchanged_ticks']} unchanged ticks",
         f"Longest refresh gap: {m['stream_max_refresh_gap_ms']} ms · "
         f"{m['stream_failed_ticks']} failed ticks",
+        f"Stream composition: P95 {cost_p95} · "
+        f"mean {m.get('stream_render_mean_ms', 0)} ms · "
+        f"max {m.get('stream_render_max_ms', 0)} ms · "
+        f"{m.get('stream_render_over_budget_ticks', 0)} over-budget "
+        f"of {m.get('stream_render_samples', 0)} measured ticks",
     )
 
 
