@@ -386,6 +386,17 @@ class CameraMixin:
         keyboard injection. An absent fish releases its held button on the
         following camera frame; STOP clears both players immediately.
         """
+        # Opt-in local diagnostics measure start of processing an already
+        # captured frame -> held-input handoff -> next native input snapshot.
+        # Sensor exposure, webcam read() and display delay are NOT measured.
+        inputs = getattr(self.emu, "inputs", None)
+        started_at = (
+            time.perf_counter()
+            if getattr(inputs, "_latency_enabled", False) is True
+            and self.armed and self.external_input is None
+            and self.camera_input_mode.get() != "Pulse (classic)"
+            else None
+        )
         frame = self.frame.copy()
         h, w = frame.shape[:2]
         tol = max(1, min(90, int(self.tolerance.get())))
@@ -474,7 +485,12 @@ class CameraMixin:
             else:
                 # Continuous per-frame input with no per-fish queue growth.
                 # This is the ideal mode for a tank with several moving fish.
-                self.emu.set_camera_buttons(buttons[0], buttons[1])
+                if started_at is not None:
+                    self.emu.set_camera_buttons(
+                        buttons[0], buttons[1], sample_started_at=started_at
+                    )
+                else:
+                    self.emu.set_camera_buttons(buttons[0], buttons[1])
                 self._last_camera_pulses.clear()
 
             if self.color2_enabled.get() and second_player_requested and (
