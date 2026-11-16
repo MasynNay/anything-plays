@@ -50,7 +50,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
             python3-tk xvfb xauth libgl1 libegl1 libglib2.0-0 libportaudio2
           python -m pip install -r requirements.txt
-      - name: Prove 30-minute Tk publication and bounded source-fit cache
+      - name: Prove 30-minute Tk publication, fault recovery and bounded caches
         shell: bash
         timeout-minutes: 38
         run: |
@@ -72,6 +72,10 @@ jobs:
           assert report["stream_transition_stress_requested"] is True
           assert report["stream_stress_cycles"] >= 200
           assert report["stream_forced_preview_clears"] >= 40
+          assert report["stream_fault_injected"] is True
+          assert report["stream_fault_blanked"] is True
+          assert report["stream_fault_counted"] is True
+          assert report["stream_fault_recovered"] is True
           assert set(report["stream_rates_visited"]) == {"15 FPS", "24 FPS", "30 FPS"}
           assert set(report["stream_layouts_visited"]) == {"DS stacked", "Side by side"}
           assert report["real_stream_hardware_tested"] is False

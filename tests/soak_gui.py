@@ -75,6 +75,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
         raise ValueError("Soak must run at least 8 seconds")
     if stress_stream and not enable_stream:
         raise ValueError("Stream transition stress requires --enable-stream")
+    if stress_stream and seconds < 40:
+        raise ValueError("Stream fault recovery stress requires at least 40 seconds")
     tracemalloc.start()
     report = {"seconds_requested": seconds,
               "test_type": "synthetic Tk + OpenCV UI, not native emulator",
@@ -131,6 +133,11 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             frame_number = 0
             stream_stress_cycles = 0
             stream_camera_clears = 0
+            stream_fault_injected = False
+            stream_fault_blanked = False
+            stream_fault_counted = False
+            stream_fault_recovered = False
+            stream_prior_publications = 0
             visited_rates = set()
             visited_layouts = set()
 
@@ -166,6 +173,61 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                     stream_camera_clears += 1
                 stream_stress_cycles += 1
                 root.after(8000, stress_stream_transitions)
+
+            def inject_stream_fault():
+                """Inject exactly one compositor failure into the real Tk job.
+
+                A synthetic exception never touches the camera read loop,
+                emulator's native input buffers or the Stream Settings UI.
+                The next scheduled capture should blank the OBS-facing canvas
+                and its 1-second retry should then publish a new frame.
+                """
+                nonlocal stream_fault_injected, stream_prior_publications
+                if app._closing or app._stream_output_window is None:
+                    return
+                report_before = app.stream_performance_snapshot()
+                stream_prior_publications = report_before["metrics"][
+                    "stream_published_images"
+                ]
+                original_render = app._render_stream_frame
+
+                def fail_once():
+                    # Reinstall the original class method immediately. The
+                    # error itself must be handled by StreamMixin's Tk timer.
+                    del app._render_stream_frame
+                    raise RuntimeError("Synthetic Stream Mode compositor fault")
+
+                app._render_stream_frame = fail_once
+                stream_fault_injected = True
+
+                def inspect_blanked():
+                    nonlocal stream_fault_blanked, stream_fault_counted
+                    if app._closing or app._stream_canvas is None:
+                        return
+                    items = len(app._stream_canvas.find_all())
+                    stream_fault_blanked = (
+                        items == 0 and app._stream_photo is None
+                    )
+                    report_now = app.stream_performance_snapshot()
+                    stream_fault_counted = (
+                        report_now["metrics"]["stream_failed_ticks"] >= 1
+                    )
+
+                def inspect_recovery():
+                    nonlocal stream_fault_recovered
+                    if app._closing or app._stream_canvas is None:
+                        return
+                    publication = app.stream_performance_snapshot()["metrics"][
+                        "stream_published_images"
+                    ]
+                    stream_fault_recovered = (
+                        len(app._stream_canvas.find_all()) == 1
+                        and app._stream_photo is not None
+                        and publication > stream_prior_publications
+                    )
+
+                root.after(700, inspect_blanked)
+                root.after(2500, inspect_recovery)
 
             def emit_frame():
                 nonlocal frame_number
@@ -258,6 +320,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             root.after(20, emit_frame)
             if stress_stream:
                 root.after(2000, stress_stream_transitions)
+                # Transitions occur at 2, 10, 18, 26 ... seconds; inject
+                # at 22 seconds so the 1-second retry and recovery can be
+                # observed before the next 15/24/30 FPS counter reset.
+                root.after(int((warmup + 7) * 1000), inject_stream_fault)
             root.after(1000, sample)
             root.after(int(seconds * 1000), shutdown)
             try:
@@ -269,6 +335,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             report["camera_frames"] = camera.frame_number
             report["stream_stress_cycles"] = stream_stress_cycles
             report["stream_forced_preview_clears"] = stream_camera_clears
+            report["stream_fault_injected"] = stream_fault_injected
+            report["stream_fault_blanked"] = stream_fault_blanked
+            report["stream_fault_counted"] = stream_fault_counted
+            report["stream_fault_recovered"] = stream_fault_recovered
             report["stream_rates_visited"] = sorted(visited_rates)
             report["stream_layouts_visited"] = sorted(visited_layouts)
 
@@ -314,6 +384,14 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 failures.append("Stream stress did not exercise both layouts")
             if report.get("stream_forced_preview_clears", 0) < 2:
                 failures.append("Stream camera preview reset was not exercised")
+            for field in (
+                "stream_fault_injected", "stream_fault_blanked",
+                "stream_fault_counted", "stream_fault_recovered",
+            ):
+                if report.get(field) is not True:
+                    failures.append(
+                        "Stream compositor fault recovery failed: " + field
+                    )
     baseline = next((s for s in samples if s["seconds"] >= warmup), None)
     if baseline is None and samples:
         baseline = samples[0]
