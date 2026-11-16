@@ -635,7 +635,7 @@ class StreamMixin:
             interval = 1000
             if hasattr(self, "_stream_diagnostic"):
                 self._stream_diagnostic.set(
-                    "Stream preview retrying: " + str(exc)[:100]
+                    "Stream preview retrying (" + type(exc).__name__ + ")."
                 )
         if self._stream_output_window is not None and not self._closing:
             self._stream_frame_job = self.root.after(interval, self._stream_render_tick)
