@@ -106,6 +106,10 @@ def _gamecube_performance_summary_lines(performance):
         f"{m['gpu_readback_max_ms']} ms · "
         f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
         "native execution time (included, not additive)",
+        f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
+        f"observed {m['gamecube_preview_observed_capture_fps']} FPS over "
+        f"{m['gamecube_preview_cadence_intervals']} intervals · "
+        f"maximum gap {m['gamecube_preview_max_interval_ms']} ms",
         f"Late deadlines (>5 ms): {m['scheduler_late_frames']} · "
         f"resynchronizations: {m['scheduler_resyncs']} · "
         f"maximum lateness {m['scheduler_late_max_ms']} ms",
@@ -242,9 +246,10 @@ def show_setup_diagnostics(app):
                 ).pack(anchor="w", pady=(3, 0))
             ttk.Label(
                 frame,
-                text="Observed native frame work includes synchronous GPU "
-                     "readback. These counts do not prove achieved rendered "
-                     "FPS, physical audio, game compatibility or sensor latency.",
+                text="Preview capture FPS is how often RGB frames reached "
+                     "this app, NOT native Dolphin emulation speed, visible "
+                     "screen FPS or proof of physical audio. GPU readback "
+                     "time is already included in native frame work.",
                 wraplength=545, justify="left",
             ).pack(anchor="w", pady=(5, 0))
         timing_control = getattr(app, "_input_timing_button", None)
