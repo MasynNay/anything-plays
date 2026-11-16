@@ -141,9 +141,11 @@ class VirtualEmulator:
         self.running = True
         self.armed = True
 
-    def set_camera_buttons(self, p1=(), p2=()):
+    def set_camera_buttons(self, p1=(), p2=(), *, sample_started_at=None):
         if self.running and self.armed:
-            self.inputs.set_camera_buttons(p1, p2)
+            self.inputs.set_camera_buttons(
+                p1, p2, sample_started_at=sample_started_at
+            )
 
     def set_gamepad_buttons(self, buttons):
         self.inputs.set_gamepad_buttons(buttons)
@@ -285,6 +287,43 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertFalse(app.emu.held("B", 1))
         self.assertTrue(app.emu.held("B", 0))
         self.assertTrue(app.emu.held("Start", 0))
+
+    def test_opt_in_tracking_is_consumed_on_next_real_input_snapshot(self):
+        # Exercise actual OpenCV contours -> CameraMixin -> native InputBuffer
+        # with a deterministic clock. This is software only: no webcam glass,
+        # USB, monitor or real libretro core is involved.
+        import time
+        app = self.app
+        app.emu.inputs.enable_latency_probe(
+            clock=iter((10.013, 10.040)).__next__
+        )
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "perf_counter", return_value=10.0):
+            app.draw_camera()
+        self.assertEqual(app.emu.inputs.latency_snapshot()["samples"], 0)
+        app.emu.frame()
+        result = app.emu.inputs.latency_snapshot()
+        self.assertEqual(result["samples"], 1)
+        self.assertEqual(
+            result["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "33-50",
+        )
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+
+    def test_opt_in_stop_discards_pending_camera_timestamp(self):
+        import time
+        app = self.app
+        app.emu.inputs.enable_latency_probe(clock=lambda: 10.02)
+        app.set_pixels(primary=[(45, 60)])
+        with patch.object(time, "perf_counter", return_value=10.0):
+            app.draw_camera()
+        app.stop_controls()
+        app.emu.frame()
+        report = app.emu.inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 0)
+        self.assertEqual(report["discarded_pending"], 1)
+        self.assertFalse(app.emu.held("A", 0))
 
     def test_two_colors_share_one_hsv_conversion_and_release_on_loss(self):
         app = self.app
