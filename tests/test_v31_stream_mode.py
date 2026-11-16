@@ -787,6 +787,38 @@ class StreamModeContracts(unittest.TestCase):
                 self.assertEqual(output.getpixel((middle_x, first[1])),
                                  (252, 150, 49))
 
+    def test_scaled_rgb_panels_skip_color_conversion_and_keep_interpolation(self):
+        from unittest.mock import patch
+
+        original = Image.new("RGB", (31, 19), "#a1b2c3")
+        original.putpixel((9, 8), (255, 4, 78))
+        for nearest, resampling in (
+            (True, Image.Resampling.NEAREST),
+            (False, Image.Resampling.BILINEAR),
+        ):
+            with self.subTest(nearest=nearest):
+                expected = original.resize((124, 76), resampling)
+                # Even when actual resampling is required, RGB input must
+                # not allocate an extra full-size color-space copy.
+                with patch.object(
+                    original, "convert",
+                    side_effect=AssertionError("RGB copy is redundant"),
+                ):
+                    scaled, x, y = _contained(
+                        original, (13, 17, 137, 93), nearest=nearest
+                    )
+                self.assertEqual((x, y), (13, 17))
+                self.assertEqual(scaled.mode, "RGB")
+                self.assertEqual(scaled.size, (124, 76))
+                self.assertEqual(scaled.tobytes(), expected.tobytes())
+        # Non-RGB sources must continue to convert before compositing.
+        palette = Image.new("P", (31, 19))
+        converted, _, _ = _contained(
+            palette, (0, 0, 124, 76), nearest=False
+        )
+        self.assertEqual(converted.mode, "RGB")
+        self.assertEqual(converted.size, (124, 76))
+
     def test_exact_fit_rgb_panel_does_not_resize_or_copy_pixels(self):
         from unittest.mock import patch
 
