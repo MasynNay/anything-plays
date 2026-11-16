@@ -160,6 +160,11 @@ class StreamModeContracts(unittest.TestCase):
         tracker.record_tick(9.0, "30 FPS", published=True)
         self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 0)
         self.assertEqual(tracker.snapshot()["stream_published_images"], 1)
+        # A suspended Tk window may resume hours later. Treat that jump
+        # as a new observation segment instead of a fabricated low rate.
+        tracker.record_tick(10000.0, "30 FPS", published=True)
+        self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 0)
+        self.assertEqual(tracker.snapshot()["stream_published_images"], 1)
         for i in range(10000):
             tracker.record_tick(10.0 + i / 30, "30 FPS", published=i % 2 == 0)
         self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 9999)
