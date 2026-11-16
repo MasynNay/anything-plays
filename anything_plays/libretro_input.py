@@ -7,6 +7,7 @@ released and continue to work when object controls are disarmed.
 from queue import Empty, Full, Queue
 from threading import Lock
 
+from anything_plays.input_latency import InputLatencyProbe
 from anything_plays.remote_retropad import N64_AXES, N64_DIGITAL, desired_state
 from anything_plays.gamecube_software import GAMECUBE_INPUT, gamecube_state
 
@@ -83,6 +84,31 @@ class InputBuffer:
         # each port's full state exactly once per emulation step.
         self._n64_state = {}
         self._p2_analog = {}
+        # Explicit opt-in; default gameplay has no timing-clock calls.
+        self.latency_probe = None
+        self._latency_enabled = False
+
+    def enable_latency_probe(self, *, clock=None):
+        """Start fresh local software-stage measurements; no image data."""
+        with self.state_lock:
+            self.latency_probe = InputLatencyProbe(clock=clock)
+            self._latency_enabled = True
+
+    def disable_latency_probe(self):
+        """Stop sampling, but keep aggregate results for optional copying."""
+        with self.state_lock:
+            self._latency_enabled = False
+            if self.latency_probe is not None:
+                self.latency_probe.discard()
+
+    def latency_snapshot(self):
+        with self.state_lock:
+            if self.latency_probe is None:
+                return None
+            return {
+                **self.latency_probe.snapshot(),
+                "enabled": self._latency_enabled,
+            }
 
     def id_for(self, button):
         if self.system == "n64":
@@ -108,8 +134,9 @@ class InputBuffer:
         except Full:
             pass
 
-    def set_camera_buttons(self, player_one=(), player_two=()):
-        """Set the latest held buttons from all tracked fish, atomically."""
+    def set_camera_buttons(self, player_one=(), player_two=(),
+                           *, sample_started_at=None):
+        """Set both players' held buttons; optionally time their delivery."""
         one = {identity for button in tuple(player_one)[:32]
                if (identity := self.id_for(button)) is not None}
         two = {identity for button in tuple(player_two)[:32]
@@ -117,6 +144,8 @@ class InputBuffer:
         with self.state_lock:
             self._camera_held[0] = one
             self._camera_held[1] = two
+            if self._latency_enabled and sample_started_at is not None:
+                self.latency_probe.published(sample_started_at)
 
     def set_manual(self, button, down):
         if self.id_for(button) is None:
@@ -154,6 +183,8 @@ class InputBuffer:
             self._camera_held[1].clear()
             self._n64_state.clear()
             self._p2_analog.clear()
+            if self.latency_probe is not None:
+                self.latency_probe.discard()
             while True:
                 try:
                     self.commands.get_nowait()
@@ -181,6 +212,11 @@ class InputBuffer:
                 self.pressed_p2.clear()
                 self.pressed_p2.update(self.remaining_p2)
                 self.pressed_p2.update(self._camera_held[1])
+                # Consume the timestamp *under the same lock* as the
+                # button snapshot, or a later Tk frame could be falsely
+                # attributed to the earlier native emulation step.
+                if self._latency_enabled:
+                    self.latency_probe.consumed()
         with self.manual_lock:
             manual = {self.id_for(name) for name in self.manual_buttons | self.gamepad_buttons}
         with self.state_lock:
