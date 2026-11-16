@@ -281,6 +281,60 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertFalse(stopped["enabled"])
         self.assertEqual(stopped["samples"], 1)
 
+    def test_embedded_gamecube_shows_safe_live_performance_only(self):
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines, _snapshot,
+        )
+
+        session = object.__new__(GameCubeHardwareSession)
+        session.native_run_timing = GameCubeNativeTiming()
+        session.native_run_timing.record_native_run(.05)
+        session.gpu_readback_seconds = .002
+        session.gpu_readback_max_seconds = .002
+        session.gpu_readback_calls = 1
+        session.hardware_frames = 1
+        session.preview_readback_skips = 0
+        from unittest.mock import Mock
+        session.audio = Mock(delivery_snapshot=Mock(return_value={
+            "audio_output_callback_calls": 10,
+            "audio_output_requested_frames": 1000,
+            "audio_output_underrun_frames": 80,
+            "audio_output_device_underflow_callbacks": 2,
+            "audio_queue_dropped_frames": 0,
+        }))
+        session.rom = "/home/private/secret-disc.iso"
+        session.host = Mock(serial_number="private-GPU-1234")
+
+        app = PrivateApp("/home/private/secret-core.so")
+        app.system_key = FakeSetting("gamecube")
+        emu = object.__new__(Emulator)
+        emu.system = "gamecube"
+        emu.core_path = None
+        emu.find_system_core = lambda: None
+        emu._gamecube_session = session
+        emu._gamecube_last_performance = None
+        app.emu = emu
+        report = _snapshot(app)
+        performance = report["gamecube_performance"]
+        lines = _gamecube_performance_summary_lines(performance)
+        self.assertEqual(len(lines), 4)
+        self.assertIn("Native frames: 1", lines[0])
+        self.assertIn("GPU readback", lines[1])
+        self.assertIn("Late deadlines", lines[2])
+        self.assertIn("Audio", lines[3])
+        text = json.dumps(report)
+        for private in ("secret-disc.iso", "secret-core.so", "private-GPU",
+                        "/home/", "serial_number", "rom_path"):
+            self.assertNotIn(private, text)
+        emu._gamecube_session = None
+        emu._gamecube_last_performance = performance
+        self.assertEqual(_snapshot(app)["gamecube_performance"], performance)
+        app.system_key = FakeSetting("gba")
+        self.assertNotIn("gamecube_performance", _snapshot(app))
+
     def test_bad_camera_driver_does_not_break_report(self):
         from anything_plays.ui_setup_diagnostics import _snapshot
 
