@@ -324,12 +324,23 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertIn("Native frames: 1", lines[0])
         self.assertIn("GPU readback", lines[1])
         self.assertIn("Preview captures", lines[2])
+        self.assertIn("waiting for two published preview images", lines[2])
+        self.assertNotIn("observed 0.0 FPS", lines[2])
         self.assertIn("Late deadlines", lines[3])
         self.assertIn("Audio", lines[4])
         text = json.dumps(report)
         for private in ("secret-disc.iso", "secret-core.so", "private-GPU",
                         "/home/", "serial_number", "rom_path"):
             self.assertNotIn(private, text)
+        performance["metrics"].update({
+            "gamecube_preview_target_fps": 30,
+            "gamecube_preview_observed_capture_fps": 28.57,
+            "gamecube_preview_cadence_intervals": 2,
+            "gamecube_preview_max_interval_ms": 35.0,
+        })
+        measured = _gamecube_performance_summary_lines(performance)
+        self.assertIn("target 30 FPS", measured[2])
+        self.assertIn("observed 28.57 FPS", measured[2])
         emu._gamecube_session = None
         emu._gamecube_last_performance = performance
         self.assertEqual(_snapshot(app)["gamecube_performance"], performance)
