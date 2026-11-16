@@ -99,11 +99,19 @@ def _contained(image, bounds, *, nearest=False):
     scale = min(width / original_w, height / original_h)
     dest_w = max(1, min(width, round(original_w * scale)))
     dest_h = max(1, min(height, round(original_h * scale)))
-    return (
-        image.convert("RGB").resize(
+    # A source already in display-ready RGB at the exact fitted size does
+    # not need either a color-space copy or a resampling pass. paste() reads
+    # the source without modifying it; other formats/sizes keep the original
+    # interpolation policy. This also benefits source-cache misses.
+    if image.mode == "RGB" and (original_w, original_h) == (dest_w, dest_h):
+        fitted = image
+    else:
+        fitted = image.convert("RGB").resize(
             (dest_w, dest_h),
             Image.Resampling.NEAREST if nearest else Image.Resampling.BILINEAR,
-        ),
+        )
+    return (
+        fitted,
         x0 + (width - dest_w) // 2,
         y0 + (height - dest_h) // 2,
     )
