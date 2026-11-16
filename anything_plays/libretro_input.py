@@ -144,8 +144,15 @@ class InputBuffer:
         with self.state_lock:
             self._camera_held[0] = one
             self._camera_held[1] = two
-            if self._latency_enabled and sample_started_at is not None:
-                self.latency_probe.published(sample_started_at)
+            if self._latency_enabled:
+                if sample_started_at is not None:
+                    self.latency_probe.published(sample_started_at)
+                else:
+                    # A newer camera snapshot with a missing/failed probe
+                    # clock still updates live P1/P2 inputs. Invalidate the
+                    # previous pending timing observation so the next native
+                    # frame cannot attribute *new* buttons to *old* pixels.
+                    self.latency_probe.discard()
 
     def set_manual(self, button, down):
         if self.id_for(button) is None:

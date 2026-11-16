@@ -84,6 +84,31 @@ class BoundedProbeTests(unittest.TestCase):
         self.assertIsNone(stats["stages"]["tracking_to_native"]["p95_bucket_ms"])
         self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 0)
 
+    def test_missing_newer_camera_timestamp_discards_old_pending_not_controls(self):
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=SteppedClock(
+            10.01, 10.21, 10.25,
+        ))
+        inputs.set_camera_buttons(["A"], ["B"], sample_started_at=10.0)
+        self.assertIsNotNone(inputs.latency_probe._pending)
+        # A later frame had an optional camera-timer exception; its real
+        # P1/P2 input update must replace the earlier held-button state.
+        inputs.set_camera_buttons([], [], sample_started_at=None)
+        self.assertIsNone(inputs.latency_probe._pending)
+        inputs.before_frame(armed=True)
+        report = inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 0)
+        self.assertEqual(report["discarded_pending"], 1)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 0)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 0)
+
+        inputs.set_camera_buttons(["A"], [], sample_started_at=10.2)
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 0)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 1)
+        self.assertEqual(inputs.latency_snapshot()["discarded_pending"], 1)
+
     def test_held_ports_consumed_together_under_native_frame_lock(self):
         # Native frame may consume exactly the most recent camera state.
         inputs = InputBuffer()

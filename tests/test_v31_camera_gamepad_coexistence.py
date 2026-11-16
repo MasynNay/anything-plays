@@ -499,6 +499,42 @@ class PixelAndControllerCoexistenceTests(TestCase):
         with patch.object(time, "perf_counter", return_value=123.456):
             self.assertEqual(optional_camera_latency_start(True), 123.456)
 
+    def test_bad_newer_camera_probe_clock_cannot_relabel_old_native_inputs(self):
+        import time
+        app = self.app
+        app.emu.inputs.enable_latency_probe(
+            clock=iter((50.01, 50.21, 50.25)).__next__
+        )
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "perf_counter", return_value=50.0):
+            app.draw_camera()  # Pending, not yet consumed by native loop.
+        self.assertIsNotNone(app.emu.inputs.latency_probe._pending)
+
+        # Newer camera observation loses both fish while the optional
+        # clock fails. Native release still happens, and the pending older
+        # sample must be invalidated rather than counted as current input.
+        app.set_pixels()
+        with patch.object(time, "perf_counter", side_effect=OSError(
+            "private /Users/owner/usb-camera"
+        )):
+            app.draw_camera()
+        app.emu.frame()
+        report = app.emu.inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 0)
+        self.assertEqual(report["discarded_pending"], 1)
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "perf_counter", return_value=50.2):
+            app.draw_camera()
+        app.emu.frame()
+        report = app.emu.inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 1)
+        self.assertEqual(report["discarded_pending"], 1)
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+
     def test_opt_in_tracking_is_consumed_on_next_real_input_snapshot(self):
         # Exercise actual OpenCV contours -> CameraMixin -> native InputBuffer
         # with a deterministic clock. This is software only: no webcam glass,

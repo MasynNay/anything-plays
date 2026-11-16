@@ -20,7 +20,11 @@ branch and does not describe a feature in the public 3.2.0 installers.
 No video frames, pixel locations, button names, ROM paths, usernames, serials,
 device names, sample-by-sample timestamps or raw timing traces are retained in
 the report. A new observation can supersede an older one that never reached a
-native frame, and STOP discards pending observations. Counters and histogram
+native frame. A new frame with an invalid or unavailable optional clock
+**discards its predecessor's pending timestamp** rather than attaching the
+previous image's measurement to the newer buttons. P1/P2 held-button state
+still updates and releases in the same native input buffer snapshot.
+STOP also discards pending observations. Counters and histogram
 arrays have constant size over long sessions.
 
 **Input safety:** the optional camera-processing clock is read only while
