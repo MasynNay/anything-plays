@@ -50,6 +50,28 @@ class BoundedProbeTests(unittest.TestCase):
                          "20-33")
         self.assertIsNone(probe._pending)
 
+    def test_percentile_buckets_do_not_store_or_expose_raw_samples(self):
+        # P95 is the 19th observation for a sample of 20, not the worst.
+        # The 20th outlier must not inflate the reported P95 bucket.
+        tick = [0.0]
+        probe = InputLatencyProbe(clock=lambda: tick[0])
+        for i in range(20):
+            start = 100 + i
+            tick[0] = start + 0.003
+            probe.published(start)
+            tick[0] = start + (0.650 if i == 19 else 0.004)
+            probe.consumed()
+        report = probe.snapshot()
+        self.assertEqual(report["samples"], 20)
+        self.assertEqual(
+            report["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "2-5",
+        )
+        self.assertNotIn("100.", str(report))
+        self.assertEqual(
+            sum(probe._histograms["tracking_to_native"]), 20
+        )
+
     def test_stop_discards_pending_and_never_counts_stale_input(self):
         inputs = InputBuffer()
         inputs.enable_latency_probe(clock=SteppedClock(10.02))
@@ -80,7 +102,10 @@ class BoundedProbeTests(unittest.TestCase):
         self.assertEqual(inputs.latency_snapshot()["samples"], 1)
 
     def test_invalid_clocks_never_make_fake_or_negative_samples(self):
-        for observed in (None, float("nan"), float("inf"), -1e20, "not clock"):
+        for observed in (
+            None, float("nan"), float("inf"), -1e20, 10**1000,
+            True, "not clock"
+        ):
             with self.subTest(observed=observed):
                 probe = InputLatencyProbe(clock=lambda: 10.0)
                 probe.published(observed)
