@@ -69,8 +69,13 @@ class GameCubeNativeTiming:
             reported = 0.0
         native = self.native_run_total_seconds
         count = self.native_run_calls
-        readback = float(gpu_readback_seconds)
-        if not math.isfinite(readback) or readback < 0:
+        try:
+            readback = float(gpu_readback_seconds)
+            if not math.isfinite(readback) or readback < 0:
+                readback = 0.0
+        except (ValueError, TypeError, OverflowError):
+            # Local diagnostics must not crash even if a third-party timing
+            # callback supplies invalid or unreasonably large numeric data.
             readback = 0.0
         # Clock readings can differ by a tiny amount at coarse resolution.
         readback = min(native, readback)
