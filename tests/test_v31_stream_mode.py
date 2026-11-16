@@ -505,6 +505,57 @@ class StreamModeContracts(unittest.TestCase):
         app._stream_diagnostic = None
         app._stream_update_diagnostic("Output ready")
 
+    def test_broken_settings_status_never_blanks_healthy_stream_output(self):
+        from unittest.mock import Mock, patch
+
+        class PrivateCameraDiagnostic(Exception):
+            pass
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_canvas = Mock()
+        app._stream_canvas_item = 7
+        app._stream_photo = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._render_stream_frame = Mock(return_value=True)
+
+        status = Mock()
+        status.get.side_effect = PrivateCameraDiagnostic(
+            "/Users/private/webcam-serial-456"
+        )
+        app._stream_diagnostic = status
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(10.0, 10.01)):
+            app._stream_render_tick()
+        app._render_stream_frame.assert_called_once_with()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertIsNotNone(app._stream_photo)
+        self.assertEqual(app._stream_cadence.snapshot()[
+            "stream_failed_ticks"
+        ], 0)
+        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        app.root.after.reset_mock()
+
+        # The status widget can also fail while assigning a new label.
+        status.get.side_effect = None
+        status.get.return_value = ""
+        status.set.side_effect = OSError("driver path /home/private")
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(11.0, 11.01)):
+            app._stream_render_tick()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertEqual(app._render_stream_frame.call_count, 2)
+        self.assertEqual(app._stream_cadence.snapshot()[
+            "stream_failed_ticks"
+        ], 0)
+        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+
     def test_stream_render_failure_redacts_driver_device_and_private_paths(self):
         from unittest.mock import Mock, patch
 

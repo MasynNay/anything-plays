@@ -894,9 +894,12 @@ class StreamMixin:
         try:
             if status.get() != message:
                 status.set(message)
-        except tk.TclError:
+        except Exception:
             # The uncaptured settings dialog may close independently of
-            # the actual stream window; never stop streaming on a dead label.
+            # the stream canvas. Third-party Tk variable wrappers can raise
+            # RuntimeError, OSError or custom errors in addition to
+            # TclError. This status label is best-effort: never classify its
+            # failure as a bad game/camera frame or expose exception text.
             pass
 
     def _stream_blank_output(self):

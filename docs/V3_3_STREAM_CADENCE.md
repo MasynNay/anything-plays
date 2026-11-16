@@ -80,6 +80,14 @@ rate, then regular 15/24/30 FPS throttling resumes. The existing
 three-second live-camera stale-image revocation still applies when no
 new image arrives. No tracking, native input or audio loop is restarted.
 
+## Uncaptured Stream Settings status is not an output dependency
+
+The separate Stream Settings status label is **best-effort only**.
+A Tk widget destroyed while streaming, or an unexpected error from a
+third-party variable wrapper during a status read/write, cannot be counted
+as an output failure or blank a healthy capture canvas. No raw exception
+messages, device serials or local file paths are forwarded.
+
 ## Session-wide compositor fault/recovery metrics
 
 The safe local report now includes `stream_session_faults`,
