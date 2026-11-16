@@ -607,6 +607,86 @@ class StreamModeContracts(unittest.TestCase):
         app.root.after.assert_called_once_with(1000, app._stream_render_tick)
         self.assertEqual(app._stream_last_render, None)
 
+    def test_stream_settings_same_value_does_not_repaint_or_schedule_save(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        original = ("last composited stream image",)
+        app._stream_last_render = original
+        app._stream_output_window = Mock()
+        app._stream_vars = {
+            "frame_rate": SimpleNamespace(get=lambda: "24 FPS"),
+            "border_width": SimpleNamespace(get=lambda: "6"),
+            "layout": SimpleNamespace(get=lambda: "DS stacked"),
+        }
+        app._stream_controls_changed()
+        self.assertIs(app._stream_last_render, original)
+        self.assertIsNone(app._stream_save_job)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        app.root.after.assert_not_called()
+        app._stream_output_window.geometry.assert_not_called()
+
+    def test_destroyed_stream_window_during_layout_change_is_optional(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import tkinter as tk
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        app._stream_last_render = ("old",)
+        app._stream_output_window = Mock()
+        app._stream_output_window.winfo_screenwidth.side_effect = tk.TclError(
+            "window destroyed before geometry"
+        )
+        app._stream_vars = {
+            "layout": SimpleNamespace(get=lambda: "Side by side"),
+        }
+        app._stream_controls_changed()
+        self.assertEqual(app._stream_options["layout"], "Side by side")
+        self.assertIsNone(app._stream_last_render)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        app.root.after.assert_called_once_with(
+            600, app._save_stream_options
+        )
+
+    def test_destroyed_stream_controls_variable_never_changes_output(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class PrivateWidgetFailure(Exception):
+            pass
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        original = ("safe output",)
+        app._stream_last_render = original
+        var = Mock()
+        var.get.side_effect = PrivateWidgetFailure(
+            "private camera /Users/person/serial-72"
+        )
+        app._stream_vars = {"frame_rate": var}
+        app._stream_controls_changed()
+        self.assertIs(app._stream_last_render, original)
+        self.assertEqual(app._stream_options["frame_rate"], "24 FPS")
+        app.root.after.assert_not_called()
+
     def test_visual_stream_settings_reuse_camera_snapshot_until_fps_changes(self):
         from types import SimpleNamespace
         from unittest.mock import Mock, patch

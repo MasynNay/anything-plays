@@ -739,23 +739,44 @@ class StreamMixin:
         for key, var in self._stream_vars.items():
             try:
                 options[key] = var.get()
-            except tk.TclError:
+            except Exception:
+                # The settings dialog can close independently of output.
+                # A destroyed/custom Tk variable must not unwind the
+                # main UI event loop or erase a healthy stream image.
                 return
         previous_layout = self._stream_options["layout"]
         previous_rate = self._stream_options["frame_rate"]
-        self._stream_options = validate_stream_settings(
+        updated = validate_stream_settings(
             options, self.THEMES, self.theme_name.get(),
         )
+        if updated == self._stream_options:
+            # Tk traces and scale controls may fire without a real change.
+            # Avoid unnecessary full-canvas work, camera snapshots and
+            # preferences writes in the live UI loop.
+            return
+        self._stream_options = updated
         if self._stream_options["layout"] != previous_layout:
             # Present a natural portrait/landscape capture window on layout
             # change. Manual resizing afterwards remains fully supported.
             popup = getattr(self, "_stream_output_window", None)
             if popup is not None:
-                natural = ((760, 980) if self._stream_options["layout"] == "DS stacked"
-                           else (1180, 720))
-                width = min(natural[0], max(450, popup.winfo_screenwidth()-65))
-                height = min(natural[1], max(480, popup.winfo_screenheight()-90))
-                popup.geometry(f"{width}x{height}")
+                try:
+                    natural = (
+                        (760, 980) if self._stream_options["layout"] == "DS stacked"
+                        else (1180, 720)
+                    )
+                    width = min(
+                        natural[0], max(450, popup.winfo_screenwidth() - 65)
+                    )
+                    height = min(
+                        natural[1], max(480, popup.winfo_screenheight() - 90)
+                    )
+                    popup.geometry(f"{width}x{height}")
+                except Exception:
+                    # A destroyed window or foreign Tk wrapper can fail
+                    # during layout resizing. Persist the new selection
+                    # and invalidate composition; only geometry is optional.
+                    pass
         self._stream_options_updated(
             force_camera_snapshot=(
                 self._stream_options["frame_rate"] != previous_rate

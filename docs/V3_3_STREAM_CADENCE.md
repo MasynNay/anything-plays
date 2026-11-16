@@ -84,6 +84,17 @@ selected rate, then normal throttling resumes. The existing three-second
 live-camera stale-image revocation still applies if no new image arrives.
 No tracking, native input or audio loop is restarted.
 
+## Redundant controls and destroyed-window recovery
+
+Stream Settings ignores callbacks that do not change a validated setting,
+rather than scheduling an unnecessary canvas recomposition or disk write.
+If a layout switch races with destruction of the OBS output window,
+geometry adjustment is best-effort; the selected layout can still be
+stored and the main Tk event loop is not interrupted by its stale window.
+Unexpected errors from the separate settings-variable wrapper are also
+isolated, without forwarding private error text. This does not alter
+emulator input, the live camera reader, or audio.
+
 ## Uncaptured Stream Settings status is not an output dependency
 
 The separate Stream Settings status label is **best-effort only**.
