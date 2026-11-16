@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from anything_plays.build_identity import current_identity
+from anything_plays.libretro_input import InputBuffer
 from anything_plays.setup_health import build_setup_report
 from anything_plays.ui_setup_theme import bind_theme_canvas
 
@@ -44,7 +45,7 @@ def _snapshot(app):
     enabled = app.gamepad_enabled.get()
     connected = bool(enabled and reader is not None
                      and reader.controller is not None)
-    return build_setup_report(
+    report = build_setup_report(
         system=app.system_key.get(),
         camera_count=len(app.camera_options),
         camera_selected=selected,
@@ -55,6 +56,14 @@ def _snapshot(app):
         embedded_mode=bool(app.uses_embedded_emulator()),
         preview_minimal=current_identity()["channel"] == "v32_preview",
     )
+    # Only include measurements from the first-party, opt-in and bounded
+    # histogram implementation. Never copy arbitrary device or plugin data.
+    inputs = getattr(app.emu, "inputs", None)
+    if isinstance(inputs, InputBuffer):
+        timing = inputs.latency_snapshot()
+        if timing is not None:
+            report["input_latency"] = timing
+    return report
 
 
 def show_setup_diagnostics(app):
@@ -146,6 +155,36 @@ def show_setup_diagnostics(app):
             ttk.Label(
                 frame, text=item["next"], wraplength=545, justify="left",
             ).pack(anchor="w", pady=(3, 0))
+        timing = report.get("input_latency")
+        if timing is not None:
+            frame = ttk.LabelFrame(
+                cards, text="OPTIONAL CAMERA INPUT TIMING", padding=10,
+            )
+            frame.pack(fill="x", pady=(0, 9), padx=(0, 3))
+            native = timing["stages"]["tracking_to_native"]
+            p95 = native["p95_bucket_ms"] or "no samples"
+            state = "Measuring" if timing["enabled"] else "Stopped"
+            ttk.Label(
+                frame,
+                text=f"{state} · {timing['samples']} held-input samples "
+                     f"· P95 software path {p95} ms",
+                style="Value.TLabel",
+            ).pack(anchor="w")
+            ttk.Label(
+                frame,
+                text="Measures camera-frame processing start to the next "
+                     "native input snapshot. Not sensor, screen, pulse-mode "
+                     "or physical response latency; no footage is recorded.",
+                wraplength=545, justify="left",
+            ).pack(anchor="w", pady=(3, 0))
+        timing_control = getattr(app, "_input_timing_button", None)
+        if timing_control is not None:
+            buffer = getattr(app.emu, "inputs", None)
+            if isinstance(buffer, InputBuffer):
+                timing_control.configure(
+                    text="Stop input timing" if buffer._latency_enabled
+                    else "Start input timing"
+                )
         status.set(
             "Local checks refreshed. No device names or personal paths collected."
         )
@@ -177,6 +216,22 @@ def show_setup_diagnostics(app):
 
     footer = ttk.Frame(shell)
     footer.pack(fill="x", pady=(11, 0))
+    inputs = getattr(app.emu, "inputs", None)
+    if isinstance(inputs, InputBuffer):
+        def toggle_timing():
+            # Explicit local action only. Never start cameras or game cores.
+            if inputs._latency_enabled:
+                inputs.disable_latency_probe()
+            else:
+                inputs.enable_latency_probe()
+            refresh()
+
+        app._input_timing_button = ttk.Button(
+            footer, text="Start input timing", command=toggle_timing,
+        )
+        app._input_timing_button.pack(side="left", padx=(0, 8))
+    else:
+        app._input_timing_button = None
     ttk.Button(
         footer, text="Refresh checks", command=refresh,
         style="Accent.TButton",
