@@ -22,6 +22,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 LAYOUTS = ("DS stacked", "Side by side")
 FRAME_RATES = ("15 FPS", "24 FPS", "30 FPS")
+# Fixed-duration buckets for opt-in-style local aggregate diagnostics.
+# Only an integer code is exported, never a sequence of frame timings.
+_STREAM_RENDER_BIN_UPPER_MS = (5, 10, 16, 25, 33, 50, 67, 100, 200, 500)
 _HEX = re.compile(r"#[0-9a-fA-F]{6}\Z")
 DEFAULT_STREAM = {
     "layout": "DS stacked",
@@ -166,6 +169,11 @@ class StreamCadenceTracker:
         self.publications = 0
         self.unchanged = 0
         self.failures = 0
+        self.render_samples = 0
+        self.render_total_seconds = 0.0
+        self.render_max_seconds = 0.0
+        self.render_over_budget = 0
+        self.render_histogram = [0] * (len(_STREAM_RENDER_BIN_UPPER_MS) + 1)
 
     def reset_for(self, mode):
         mode = mode if mode in FRAME_RATES else DEFAULT_STREAM["frame_rate"]
@@ -173,7 +181,8 @@ class StreamCadenceTracker:
             self.__init__()
             self.mode = mode
 
-    def record_tick(self, now, mode, *, published=False, failed=False):
+    def record_tick(self, now, mode, *, published=False, failed=False,
+                    render_seconds=None):
         self.reset_for(mode)
         if type(now) not in (float, int):
             return
@@ -198,6 +207,27 @@ class StreamCadenceTracker:
                 self.tick_elapsed += delta
                 self.max_tick_gap = max(self.max_tick_gap, delta)
         self.last_tick = now
+        # Record composition cost independently of changed-image cadence;
+        # even an unchanged frame has some work. No trace buffers grow.
+        if type(render_seconds) in (float, int):
+            try:
+                valid_cost = math.isfinite(render_seconds) and 0 <= render_seconds <= 3600
+            except (OverflowError, TypeError, ValueError):
+                valid_cost = False
+            if valid_cost:
+                cost_ms = render_seconds * 1000
+                index = next(
+                    (i for i, upper in enumerate(_STREAM_RENDER_BIN_UPPER_MS)
+                     if cost_ms <= upper),
+                    len(_STREAM_RENDER_BIN_UPPER_MS),
+                )
+                self.render_histogram[index] += 1
+                self.render_samples += 1
+                self.render_total_seconds += render_seconds
+                self.render_max_seconds = max(self.render_max_seconds, render_seconds)
+                target = int(self.mode.split()[0])
+                if render_seconds > 1 / target:
+                    self.render_over_budget += 1
         if failed:
             self.failures += 1
         elif published:
@@ -214,6 +244,15 @@ class StreamCadenceTracker:
 
     def snapshot(self):
         target = int(self.mode.split()[0]) if self.mode is not None else 0
+        percentile = -1
+        if self.render_samples:
+            rank = math.ceil(self.render_samples * 0.95)
+            cumulative = 0
+            for index, count in enumerate(self.render_histogram):
+                cumulative += count
+                if cumulative >= rank:
+                    percentile = index
+                    break
         tick_rate = (
             self.tick_intervals / self.tick_elapsed
             if self.tick_intervals and self.tick_elapsed > 0 else 0.0
@@ -232,6 +271,14 @@ class StreamCadenceTracker:
             "stream_published_images": self.publications,
             "stream_unchanged_ticks": self.unchanged,
             "stream_failed_ticks": self.failures,
+            "stream_render_samples": self.render_samples,
+            "stream_render_mean_ms": (
+                round(self.render_total_seconds * 1000 / self.render_samples, 2)
+                if self.render_samples else 0.0
+            ),
+            "stream_render_max_ms": round(self.render_max_seconds * 1000, 2),
+            "stream_render_p95_bucket_code": percentile,
+            "stream_render_over_budget_ticks": self.render_over_budget,
         }
 
 
@@ -659,6 +706,7 @@ class StreamMixin:
                 cadence.record_tick(
                     finished, self._stream_options["frame_rate"],
                     published=published,
+                    render_seconds=finished - started,
                 )
             if hasattr(self, "_stream_diagnostic"):
                 self._stream_diagnostic.set(
@@ -670,9 +718,10 @@ class StreamMixin:
         except Exception as exc:
             cadence = getattr(self, "_stream_cadence", None)
             if cadence is not None:
+                finished = time.perf_counter()
                 cadence.record_tick(
-                    time.perf_counter(), self._stream_options["frame_rate"],
-                    failed=True,
+                    finished, self._stream_options["frame_rate"],
+                    failed=True, render_seconds=finished - started,
                 )
             # A corrupt driver frame must not spin at the selected output FPS.
             # Back off, show a useful diagnostic, and retry without stopping
