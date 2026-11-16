@@ -161,3 +161,30 @@ No public `v3.2.0` program, preferences or files are changed. This
 is packaging evidence, not physical-controller, GameCube GPU/audio,
 macOS compatibility, redistribution clearance or public release approval.
 
+
+## Full-native 3.3 macOS QA staging (unreleased; runner pending)
+
+The macOS Intel and Apple Silicon candidate workflow now includes a
+full-native stage mirroring the validated Linux/Windows private repacks.
+For each architecture it verifies exact published `v3.2.0` DMG bytes
+using the published `SHA256SUMS.txt`, verifies the current 3.3
+mGBA-only DMG receipt and frozen private app identity, and copies the
+original 11 native cores with their original notices into the separate
+`AnythingPlays33Candidate.app`. The source app's Python/Tk/OpenCV
+runtime remains from the exact 3.3 candidate build.
+
+Because the app bundle is modified, macOS QA ad-hoc signs the new app,
+verifies its signature and native-core bytes, creates an independent
+`AnythingPlays-3.3.0-fullqa1-macos-ARCH.dmg`, mounts that final DMG,
+and rechecks identity, signature and native-core provenance. The expected
+output is a private 14-day artifact with a full DMG SHA256 and
+`V33_FULL_MACOS_QA_RECEIPT.json`, explicitly marking notarization,
+public approval and real camera/controller/GameCube verification false.
+
+**Both hosted Mac jobs were queued when this was authored.** The code and
+pure provenance/identity source tests alone do not prove a DMG was built
+or that a real Mac ran it. Do not mark either platform passed until that
+exact-head job completes and its full-native artifact exists. The
+eventual public 3.3 stable-upgrade installer still requires distinct
+release identity, source and license review, and real-host acceptance.
+

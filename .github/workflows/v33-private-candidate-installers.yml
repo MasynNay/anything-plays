@@ -17,9 +17,11 @@ on:
       - 'tools/v33_candidate_frozen_gui.py'
       - 'tools/stage_v33_full_linux.py'
       - 'tools/stage_v33_full_windows.py'
+      - 'tools/stage_v33_full_macos.py'
       - 'tests/test_v33_candidate_*.py'
       - 'tests/test_v33_full_linux_staging.py'
       - 'tests/test_v33_full_windows_staging.py'
+      - 'tests/test_v33_full_macos_staging.py'
   workflow_dispatch:
 
 permissions:
@@ -93,6 +95,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_candidate_frozen_gui.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_linux_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_windows_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_macos_staging.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
@@ -374,6 +377,56 @@ jobs:
             private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe
             private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json
             private-full-v33-windows/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Stage published 3.2 full-native cores into independent 3.3 macOS QA
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ARCH="${{ matrix.target }}"
+          ARCH="${ARCH#macos-}"
+          test "$ARCH" = arm64 || test "$ARCH" = x64
+          mkdir -p baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern "AnythingPlays-3.2.0-macos-$ARCH.dmg" --dir baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          python -m tools.stage_v33_full_macos \
+            --arch "$ARCH" \
+            --stable "baseline-v32/AnythingPlays-3.2.0-macos-$ARCH.dmg" \
+            --preview "${{ matrix.installer }}" \
+            --checksums baseline-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_CANDIDATE_QA_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output private-full-v33-macos
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path("private-full-v33-macos/V33_FULL_MACOS_QA_RECEIPT.json").read_text())
+          assert r["source_revision"] == os.environ["QA_SOURCE_SHA"]
+          assert r["target"] in ("macos-x64","macos-arm64")
+          assert r["native_core_count"] == 11 and r["console_profiles"] == 18
+          assert r["native_core_bytes_preserved"] is True
+          assert r["settings_namespace"] == "anything-plays-33-candidate"
+          assert r["adhoc_signed"] is True and r["notarized"] is False
+          assert r["public_release_approved"] is False
+          assert r["redistribution_audit_complete"] is False
+          print("Verified isolated full-native 3.3 Mac QA; no public approval")
+          PY
+      - name: Retain full-native signed-ad-hoc macOS QA DMG without publishing
+        if: (matrix.target == 'macos-arm64' || matrix.target == 'macos-x64') && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-${{ matrix.target }}-UNRELEASED
+          path: |
+            private-full-v33-macos/AnythingPlays-3.3.0-fullqa1-macos-*.dmg
+            private-full-v33-macos/V33_FULL_MACOS_QA_RECEIPT.json
+            private-full-v33-macos/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
