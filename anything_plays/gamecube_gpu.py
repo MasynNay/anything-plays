@@ -163,16 +163,21 @@ class GameCubeHardwareSession(CoreSession):
                         or shape[2] != 3 or
                         str(getattr(rgb, "dtype", "")) != "uint8"):
                     raise ValueError("GPU readback returned invalid RGB pixels")
-            except (RuntimeError, ValueError, OSError, TypeError,
-                    OverflowError, MemoryError) as exc:
-                # A native driver can disappear during glReadPixels. Request
-                # shutdown while inside this Python callback: an uncaught
-                # exception crossing ctypes can leave Dolphin running with a
-                # permanently stale display. Do not retry this broken host.
-                # Native GL/driver messages can include private filesystem
-                # locations or attached-device identifiers. Preserve only a
-                # fixed failure type for the app and private research report.
-                self.opengl_error = f"GPU readback failed ({type(exc).__name__})"
+            except Exception as exc:
+                # Driver/GL wrappers can raise additional exception classes
+                # (including unexpected extension-defined ones). Let none
+                # unwind through Dolphin's ctypes video callback. Stop this
+                # broken host and preserve only a fixed, safe error category;
+                # native driver paths, device IDs and custom exception class
+                # names must never enter the GUI diagnostic report.
+                kind = type(exc).__name__
+                if kind not in (
+                    "RuntimeError", "ValueError", "OSError", "TypeError",
+                    "OverflowError", "MemoryError", "AttributeError",
+                    "IndexError", "KeyError", "AssertionError",
+                ):
+                    kind = "UnexpectedError"
+                self.opengl_error = f"GPU readback failed ({kind})"
                 self.emulator.stop_event.set()
                 return
             finished = self._optional_clock(time.perf_counter)
