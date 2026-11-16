@@ -109,6 +109,54 @@ class PreviewRatePolicyTests(unittest.TestCase):
         )
         self.assertEqual(session.host.read_frame.call_count, 3)
 
+    def test_preview_target_resets_immediately_when_new_mode_is_throttled(self):
+        session = object.__new__(GameCubeHardwareSession)
+        session.host = Mock(read_frame=Mock(
+            return_value=np.zeros((8, 8, 3), dtype=np.uint8)
+        ))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(0.0, 0.004)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session._preview_cadence.snapshot()[
+            "gamecube_preview_target_fps"], 30)
+
+        session.emulator.gamecube_preview_mode = "Performance (20 FPS)"
+        # The last frame was 20ms ago: a 20 FPS capture must skip this
+        # callback, but the setup checker must already show 20, not 30.
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   return_value=0.020):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        snap = session._preview_cadence.snapshot()
+        self.assertEqual(snap["gamecube_preview_target_fps"], 20)
+        self.assertEqual(snap["gamecube_preview_cadence_intervals"], 0)
+        self.assertEqual(session.host.read_frame.call_count, 1)
+        self.assertEqual(session.preview_readback_skips, 1)
+
+        session.emulator.gamecube_preview_mode = "Quality (60 FPS)"
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(0.030, 0.034)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        snap = session._preview_cadence.snapshot()
+        self.assertEqual(snap["gamecube_preview_target_fps"], 60)
+        self.assertEqual(snap["gamecube_preview_cadence_intervals"], 0)
+        self.assertEqual(session.hardware_frames, 2)
+
     def test_actual_gamecube_gpu_callback_avoids_repeated_gl_readback(self):
         session = object.__new__(GameCubeHardwareSession)
         frame = np.zeros((120, 160, 3), dtype=np.uint8)
