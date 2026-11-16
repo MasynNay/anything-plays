@@ -99,14 +99,14 @@ def _contained(image, bounds, *, nearest=False):
     scale = min(width / original_w, height / original_h)
     dest_w = max(1, min(width, round(original_w * scale)))
     dest_h = max(1, min(height, round(original_h * scale)))
-    # A source already in display-ready RGB at the exact fitted size does
-    # not need either a color-space copy or a resampling pass. paste() reads
-    # the source without modifying it; other formats/sizes keep the original
-    # interpolation policy. This also benefits source-cache misses.
-    if image.mode == "RGB" and (original_w, original_h) == (dest_w, dest_h):
-        fitted = image
+    # Game and camera snapshots normally arrive as RGB PIL images.
+    # Avoid a full-sized color-space copy on every newly animated frame.
+    # The actual scaling filter and pixel geometry stay exactly the same.
+    prepared = image if image.mode == "RGB" else image.convert("RGB")
+    if prepared.size == (dest_w, dest_h):
+        fitted = prepared
     else:
-        fitted = image.convert("RGB").resize(
+        fitted = prepared.resize(
             (dest_w, dest_h),
             Image.Resampling.NEAREST if nearest else Image.Resampling.BILINEAR,
         )
