@@ -742,6 +742,7 @@ class StreamMixin:
             except tk.TclError:
                 return
         previous_layout = self._stream_options["layout"]
+        previous_rate = self._stream_options["frame_rate"]
         self._stream_options = validate_stream_settings(
             options, self.THEMES, self.theme_name.get(),
         )
@@ -755,14 +756,23 @@ class StreamMixin:
                 width = min(natural[0], max(450, popup.winfo_screenwidth()-65))
                 height = min(natural[1], max(480, popup.winfo_screenheight()-90))
                 popup.geometry(f"{width}x{height}")
-        self._stream_options_updated()
+        self._stream_options_updated(
+            force_camera_snapshot=(
+                self._stream_options["frame_rate"] != previous_rate
+            )
+        )
 
-    def _stream_options_updated(self):
-        # Request an immediate *next* annotated frame, but do not erase
-        # the last successful camera freshness timestamp. That would
-        # wrongly turn a still-live OBS image into an invalid/stale image
-        # and cause avoidable blanking on every slider/FPS/layout change.
-        self._stream_camera_force_next_snapshot = True
+    def _stream_options_updated(self, *, force_camera_snapshot=True):
+        # Styling, screen layout and panel-size changes can reuse the
+        # current annotated camera pixels. Forcing a fresh BGR->RGB
+        # conversion for every slider step can defeat the chosen 15/24/30
+        # FPS camera-preview limit. Only a changed refresh cap requires
+        # an immediate next source conversion, while direct API callers
+        # still request the historical immediate refresh by default.
+        # Never erase the successful freshness timestamp: live-preview
+        # privacy expiry still depends on the last real camera frame.
+        if force_camera_snapshot:
+            self._stream_camera_force_next_snapshot = True
         cadence = getattr(self, "_stream_cadence", None)
         if cadence is not None:
             cadence.reset_for(self._stream_options["frame_rate"])

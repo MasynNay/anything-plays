@@ -607,6 +607,62 @@ class StreamModeContracts(unittest.TestCase):
         app.root.after.assert_called_once_with(1000, app._stream_render_tick)
         self.assertEqual(app._stream_last_render, None)
 
+    def test_visual_stream_settings_reuse_camera_snapshot_until_fps_changes(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+        import numpy as np
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        app._stream_output_window = object()
+        camera_frame = np.zeros((16, 22, 3), dtype=np.uint8)
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.0):
+            app.stream_camera_snapshot(camera_frame)
+        original = app._stream_camera_frame
+        self.assertEqual(app._stream_camera_serial, 1)
+        app._stream_last_render = ("before",)
+        app._stream_vars = {
+            "border_width": SimpleNamespace(get=lambda: "12"),
+        }
+        app._stream_controls_changed()
+        self.assertEqual(app._stream_options["border_width"], 12)
+        self.assertIsNone(app._stream_last_render)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        self.assertIs(app._stream_camera_frame, original)
+        self.assertEqual(app._stream_camera_last_snapshot, 10.0)
+        app.root.after.assert_called_once_with(
+            600, app._save_stream_options
+        )
+
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.01), patch(
+                       "anything_plays.ui_stream.cv2.cvtColor",
+                       wraps=cv2.cvtColor,
+                   ) as convert:
+            app.stream_camera_snapshot(camera_frame)
+        self.assertIs(app._stream_camera_frame, original)
+        self.assertEqual(convert.call_count, 0)
+
+        # A changed refresh rate bypasses the previous 24 FPS deadline
+        # for the next source frame, but styling changes do not.
+        app._stream_vars = {
+            "frame_rate": SimpleNamespace(get=lambda: "30 FPS"),
+        }
+        app._stream_controls_changed()
+        self.assertTrue(app._stream_camera_force_next_snapshot)
+        with patch("anything_plays.ui_stream.time.monotonic",
+                   return_value=10.011):
+            app.stream_camera_snapshot(camera_frame)
+        self.assertEqual(app._stream_camera_serial, 2)
+        self.assertIsNot(app._stream_camera_frame, original)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+
     def test_stream_option_change_keeps_fresh_webcam_until_next_snapshot(self):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, Mock, patch
