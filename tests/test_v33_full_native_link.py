@@ -123,17 +123,21 @@ class V33NativeCoreLinkTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "demo_libretro.so"
             path.write_bytes(b"fake")
-            with patch.object(link.ctypes, "CDLL", return_value=native) as loader:
-                link.isolated_probe(path)
-                loader.assert_called_once()
-            native.retro_api_version.assert_called_once_with()
-            native.retro_init.assert_not_called()
-            native.retro_load_game.assert_not_called()
-            native.retro_run.assert_not_called()
-            native.retro_api_version.return_value = 9
-            with patch.object(link.ctypes, "CDLL", return_value=native):
-                with self.assertRaisesRegex(ValueError, "ABI"):
+            # On Windows the genuine runtime registrar requires a signed
+            # original-source manifest. This fixture is intentionally fake;
+            # mock that boundary rather than weaken production provenance.
+            with patch.object(link, "enable_windows_trial_runtime"):
+                with patch.object(link.ctypes, "CDLL", return_value=native) as loader:
                     link.isolated_probe(path)
+                    loader.assert_called_once()
+                native.retro_api_version.assert_called_once_with()
+                native.retro_init.assert_not_called()
+                native.retro_load_game.assert_not_called()
+                native.retro_run.assert_not_called()
+                native.retro_api_version.return_value = 9
+                with patch.object(link.ctypes, "CDLL", return_value=native):
+                    with self.assertRaisesRegex(ValueError, "ABI"):
+                        link.isolated_probe(path)
 
 
 if __name__ == "__main__":
