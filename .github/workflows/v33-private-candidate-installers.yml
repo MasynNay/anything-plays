@@ -16,8 +16,10 @@ on:
       - 'tools/v33_candidate_verify.py'
       - 'tools/v33_candidate_frozen_gui.py'
       - 'tools/stage_v33_full_linux.py'
+      - 'tools/stage_v33_full_windows.py'
       - 'tests/test_v33_candidate_*.py'
       - 'tests/test_v33_full_linux_staging.py'
+      - 'tests/test_v33_full_windows_staging.py'
   workflow_dispatch:
 
 permissions:
@@ -90,6 +92,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_candidate_verify.py' -v
           python -m unittest discover -s tests -p 'test_v33_candidate_frozen_gui.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_linux_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_windows_staging.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
@@ -337,6 +340,40 @@ jobs:
             private-full-v33/anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb
             private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json
             private-full-v33/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Stage 11 published 3.2 native cores into independent full Windows 3.3 QA
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path baseline-v32 | Out-Null
+          gh release download v3.2.0 --repo $env:GITHUB_REPOSITORY --pattern 'AnythingPlaysSetup-3.2.0.exe' --dir baseline-v32
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch published 3.2 Windows source baseline' }
+          gh release download v3.2.0 --repo $env:GITHUB_REPOSITORY --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch published 3.2 checksum manifest' }
+          python -m tools.stage_v33_full_windows `
+            --stable 'baseline-v32/AnythingPlaysSetup-3.2.0.exe' `
+            --preview 'release/AnythingPlaysSetup-3.3.0-qa1.exe' `
+            --checksums 'baseline-v32/SHA256SUMS.txt' `
+            --source-receipt 'release/V33_CANDIDATE_QA_RECEIPT.json' `
+            --source-sha $env:QA_SOURCE_SHA `
+            --output private-full-v33-windows
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to stage private 11-core 3.3 Windows QA' }
+          python -c "import json,os,pathlib; p=pathlib.Path('private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json'); r=json.loads(p.read_text()); assert r['source_revision']==os.environ['QA_SOURCE_SHA']; assert r['native_core_count']==11 and r['console_profiles']==18; assert r['native_core_bytes_preserved'] and r['settings_namespace']=='anything-plays-33-candidate'; assert r['public_release_approved'] is False and r['redistribution_audit_complete'] is False; print('Verified Windows 3.3 full-native PRIVATE QA receipt')"
+          if ($LASTEXITCODE -ne 0) { throw 'Wrong full-native Windows QA verification receipt' }
+      - name: Retain full 11-core Windows owner-QA installer without publishing
+        if: matrix.target == 'windows-x64' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-windows-x64-UNRELEASED
+          path: |
+            private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe
+            private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json
+            private-full-v33-windows/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

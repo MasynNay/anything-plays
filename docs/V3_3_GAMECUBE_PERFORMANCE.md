@@ -140,3 +140,24 @@ compatibility, asset distribution rights, or an approved public 3.3
 release.** The macOS and Windows full-native staged upgrades still
 require their own verified workflows and physical-owner acceptance.
 
+
+## Private full-native 3.3 Windows packaging bridge (unreleased)
+
+Windows x64 has a companion to the Linux 11-core staging path. In a
+throwaway hosted Windows QA machine it downloads the public `v3.2.0`
+`AnythingPlaysSetup-3.2.0.exe` and its original `SHA256SUMS.txt`,
+verifies those exact published bytes, and verifies the current 3.3
+mGBA-only candidate and its frozen `v33_candidate` identity. It uses
+Inno's real isolated install procedure to extract both applications,
+copies the unmodified published original 11-core payload and notices
+into the **separately installed 3.3** app runtime, and compiles a second
+`AnythingPlaysSetup-3.3.0-fullqa1.exe` under the distinct 3.3 QA AppId.
+
+The new Inno installer is then installed again inside the disposable
+runner and its frozen identity plus all native core bytes are rechecked.
+The result is a separate, 14-day, **UNRELEASED** full-native Windows QA
+artifact with its own SHA256 and `V33_FULL_WINDOWS_QA_RECEIPT.json`.
+No public `v3.2.0` program, preferences or files are changed. This
+is packaging evidence, not physical-controller, GameCube GPU/audio,
+macOS compatibility, redistribution clearance or public release approval.
+
