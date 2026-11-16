@@ -348,6 +348,11 @@ class SnapshotPrivacyTests(unittest.TestCase):
         lines = _gamecube_performance_summary_lines(performance)
         self.assertEqual(len(lines), 5)
         self.assertIn("Native frames: 1", lines[0])
+        # Previously saved 3.2/early 3.3 snapshots remain readable.
+        self.assertIn("P95 not sampled", lines[0])
+        performance["metrics"]["native_run_p95_bucket_code"] = 4
+        with_p95 = _gamecube_performance_summary_lines(performance)
+        self.assertIn("P95 33–50 ms", with_p95[0])
         self.assertIn("GPU readback", lines[1])
         self.assertIn("Preview captures", lines[2])
         self.assertIn("waiting for two published preview images", lines[2])
