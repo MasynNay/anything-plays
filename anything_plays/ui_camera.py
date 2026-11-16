@@ -36,6 +36,28 @@ def optional_camera_latency_start(enabled):
     return None
 
 
+def optional_camera_pulse_now():
+    """Read classic-pulse cooldown time without interrupting native input.
+
+    Timer errors make this one camera observation ineligible for *new*
+    pulses, but tracking and the complete held-button release path continue.
+    """
+    try:
+        now = time.monotonic()
+        if type(now) in (int, float) and math.isfinite(now) and now >= 0:
+            return now
+    except Exception:
+        pass
+    return None
+
+
+def camera_pulse_due(previous, now, cooldown):
+    """Allow a fresh pulse after cooldown or a monotonic clock reset."""
+    if now is None:
+        return False
+    return previous is None or now < previous or now - previous >= cooldown
+
+
 class CameraMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -482,23 +504,27 @@ class CameraMixin:
             if self.external_input is not None:
                 # Developer-only external controller bridges do not support
                 # a second port. Use bounded classic pulses for P1 only.
-                now = time.monotonic()
+                now = optional_camera_pulse_now()
                 cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
                 for button in sorted(buttons[0]):
                     key = (0, button)
-                    if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
+                    if camera_pulse_due(
+                        self._last_camera_pulses.get(key), now, cooldown
+                    ):
                         self.external_input.press(button, self.hold_frames.get())
                         self._last_camera_pulses[key] = now
             elif self.camera_input_mode.get() == 'Pulse (classic)':
                 # Each button has an independent cooldown; multiple objects
                 # trigger multiple keys on the same emulator frame.
                 self.emu.set_camera_buttons((), ())
-                now = time.monotonic()
+                now = optional_camera_pulse_now()
                 cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
                 for port in (0, 1):
                     for button in sorted(buttons[port]):
                         key = (port, button)
-                        if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
+                        if camera_pulse_due(
+                            self._last_camera_pulses.get(key), now, cooldown
+                        ):
                             self.emu.press(
                                 button, self.hold_frames.get(), port=port
                             )

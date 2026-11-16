@@ -666,6 +666,78 @@ class PixelAndControllerCoexistenceTests(TestCase):
         self.assertTrue(app.emu.held("Start"))
         self.assertIn("Primary objects: 2", app.action.get())
 
+    def test_classic_pulse_clock_fault_never_interrupts_two_player_tracking(self):
+        from unittest.mock import patch
+        import time
+
+        app = self.app
+        app.camera_input_mode.set("Pulse (classic)")
+        app.set_pixels(primary=[(45, 60)], secondary=[(145, 60)])
+        with patch.object(time, "monotonic", side_effect=OSError(
+            "/Users/private/camera cooldown driver 786"
+        )):
+            app.draw_camera()  # Must not throw or issue accidental presses.
+        app.emu.frame()
+        self.assertFalse(app.emu.held("A", 0))
+        self.assertFalse(app.emu.held("B", 1))
+        self.assertEqual(app.emu.inputs.commands.qsize(), 0)
+        self.assertEqual(app._last_camera_pulses, {})
+
+        with patch.object(time, "monotonic", return_value=101.0):
+            app.draw_camera()
+        app.emu.frame()
+        self.assertTrue(app.emu.held("A", 0))
+        self.assertTrue(app.emu.held("B", 1))
+        self.assertEqual(app._last_camera_pulses[(0, "A")], 101.0)
+        self.assertEqual(app._last_camera_pulses[(1, "B")], 101.0)
+
+        # A resumed/restarted clock must not freeze pulse controls until the
+        # machine's previous monotonic value is reached again.
+        app._last_camera_pulses[(0, "A")] = 1000.0
+        app._last_camera_pulses[(1, "B")] = 1000.0
+        with patch.object(time, "monotonic", return_value=1.0):
+            app.draw_camera()
+        self.assertEqual(app.emu.inputs.commands.qsize(), 2)
+        self.assertEqual(app._last_camera_pulses[(0, "A")], 1.0)
+        self.assertEqual(app._last_camera_pulses[(1, "B")], 1.0)
+
+    def test_external_pulse_bridge_skips_bad_clock_and_recovers(self):
+        from unittest.mock import Mock
+        import time
+
+        app = self.app
+        app.external_input = Mock()
+        app.color2_enabled.set(False)
+        app.set_pixels(primary=[(45, 60)])
+        with patch.object(time, "monotonic", return_value=float("nan")):
+            app.draw_camera()
+        app.external_input.press.assert_not_called()
+        self.assertEqual(app._last_camera_pulses, {})
+        with patch.object(time, "monotonic", return_value=200.0):
+            app.draw_camera()
+        app.external_input.press.assert_called_once_with("A", 4)
+        self.assertEqual(app._last_camera_pulses[(0, "A")], 200.0)
+
+    def test_pulse_helpers_reject_invalid_timestamps_and_clock_reversals(self):
+        from anything_plays.ui_camera import (
+            optional_camera_pulse_now, camera_pulse_due,
+        )
+        import time
+
+        for value in (None, True, float("nan"), float("inf"),
+                      -1, 10**1000, "private", {}, []):
+            with self.subTest(kind=type(value).__name__):
+                with patch.object(time, "monotonic", return_value=value):
+                    self.assertIsNone(optional_camera_pulse_now())
+        with patch.object(time, "monotonic",
+                          side_effect=RuntimeError("private GPU driver")):
+            self.assertIsNone(optional_camera_pulse_now())
+        self.assertFalse(camera_pulse_due(None, None, .1))
+        self.assertTrue(camera_pulse_due(None, 1.0, .1))
+        self.assertFalse(camera_pulse_due(1.0, 1.05, .1))
+        self.assertTrue(camera_pulse_due(1.0, 1.11, .1))
+        self.assertTrue(camera_pulse_due(1000.0, 1.0, .1))
+
     def test_pulse_camera_queue_expires_but_controller_remains(self):
         app = self.app
         app.color2_enabled.set(False)

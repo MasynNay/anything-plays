@@ -51,7 +51,15 @@ are observable. No old timestamps cross a Stop/ROM boundary.
 
 **Not measured:** sensor exposure, webcam `read()` blocking time, display
 latency, rendered response, physical audio, native game reaction, pulse-mode
-inputs, or external emulator bridges. These cases require independent physical
+inputs, or external emulator bridges.
+
+**Classic pulse robustness (separate from this probe):** both native
+two-player pulses and the optional external-input bridge now guard their
+monotonic cooldown clock. A failed or nonfinite clock skips *new* pulses for
+that frame without throwing across camera tracking; a reset/reversed clock
+allows fresh pulses rather than stranding the cooldown until the old timer
+value is reached. Existing finite-duration pulse release, gamepad and manual
+keyboard input remain independent of these optional camera clocks. These cases require independent physical
 measurement, not just the software probe. Do not compare bucket bounds as
 precise measurements or report them as a verified FPS improvement.
 
