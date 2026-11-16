@@ -1,20 +1,25 @@
 name: 3.3 | Manual 30-minute Tk Stream Mode endurance (unreleased)
 
-# Owner-triggered deep synthetic endurance gate. Deliberately no pull_request
-# trigger: avoid 30-minute CI costs on every source edit. Never publishes.
+# Opt in by adding the 'v33-long-soak' label to draft PR #246.
+# GitHub manual Actions dispatch normally requires a workflow on the default
+# branch; the label event works while 3.3 remains an unreleased draft PR.
+# No pull_request synchronize trigger: no 30-minute run on every push.
 on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: v33-extended-tk-stream-${{ github.ref }}
+  group: v33-extended-tk-stream-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
   stream-mode-30-minute-synthetic:
-    if: ${{ github.ref == 'refs/heads/feature/v3.3-stream-render-latency' }}
+    if: ${{ (github.event_name == 'pull_request' && github.event.label.name == 'v33-long-soak' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.3-stream-render-latency') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.3-stream-render-latency') }}
     name: Real Tk + synthetic camera and game | 1,800 seconds | Linux x64
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -25,7 +30,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Require exact opt-in source revision
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

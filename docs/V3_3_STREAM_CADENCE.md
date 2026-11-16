@@ -103,8 +103,11 @@ and moving **synthetic** camera/game pixels for 1,800 seconds, requiring
 continuous publications, bounded canvas items/Tk jobs, at most two cached
 resized sources, zero callback errors and at most 96 MiB RSS growth after
 warm-up. It does **not** run on every push, open a physical camera or load
-a commercial ROM. Trigger it explicitly from the Actions tab when deeper
-source validation is useful. No build or release is produced.
+a commercial ROM. While 3.3 remains in draft PR #246, explicitly opt in by
+adding the `v33-long-soak` PR label (create the label once in the repository
+if necessary); the workflow reacts to that `labeled` event, not to routine
+source changes. Manual Actions dispatch is also defined for when this workflow
+is present on the repository's default branch. No build or release is produced.
 
 Neither synthetic run certifies physical devices, Dolphin GameCube hardware
 rendering, actual OBS encoding, or stability of a 30-minute **physical**
