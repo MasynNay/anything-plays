@@ -70,6 +70,28 @@ class PreviewRatePolicyTests(unittest.TestCase):
         tracker.record_published(0.0, "Performance (20 FPS)")
         self.assertEqual(tracker.snapshot()["gamecube_preview_cadence_intervals"], 0)
 
+    def test_preview_cadence_discards_suspend_gap_but_keeps_normal_stalls(self):
+        tracker = PreviewCadenceTracker()
+        tracker.record_published(10.0, DEFAULT_PREVIEW_MODE)
+        tracker.record_published(10.05, DEFAULT_PREVIEW_MODE)
+        self.assertEqual(tracker.snapshot()["gamecube_preview_cadence_intervals"], 1)
+        # A normal gameplay stall is still a genuine measurement.
+        tracker.record_published(12.05, DEFAULT_PREVIEW_MODE)
+        self.assertEqual(tracker.snapshot()["gamecube_preview_cadence_intervals"], 2)
+        # Sleep/resume must not pollute the new active-session FPS average.
+        tracker.record_published(4000.0, DEFAULT_PREVIEW_MODE)
+        after_resume = tracker.snapshot()
+        self.assertEqual(after_resume["gamecube_preview_target_fps"], 30)
+        self.assertEqual(after_resume["gamecube_preview_cadence_intervals"], 0)
+        self.assertEqual(after_resume["gamecube_preview_observed_capture_fps"], 0.0)
+        self.assertEqual(after_resume["gamecube_preview_max_interval_ms"], 0.0)
+        self.assertEqual(tracker.published, 1)
+        tracker.record_published(4000.05, DEFAULT_PREVIEW_MODE)
+        self.assertEqual(tracker.snapshot()["gamecube_preview_cadence_intervals"], 1)
+        self.assertAlmostEqual(
+            tracker.snapshot()["gamecube_preview_observed_capture_fps"], 20.0
+        )
+
     def test_preview_cadence_rejects_invalid_clock_without_retaining_history(self):
         tracker = PreviewCadenceTracker()
         for value in (None, float("nan"), float("inf"), -1, "private", 10**1000):
