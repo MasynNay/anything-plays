@@ -389,7 +389,16 @@ class SnapshotPrivacyTests(unittest.TestCase):
         legacy = _gamecube_performance_summary_lines(performance)
         self.assertIn("P95 not sampled", legacy[0])
         performance["metrics"]["native_run_p95_bucket_code"] = code
+        # Older session reports may not carry the new readback clock fields.
+        timed = performance["metrics"].pop("gpu_readback_timing_samples")
+        faults = performance["metrics"].pop("gamecube_preview_clock_failures")
+        previous = _gamecube_performance_summary_lines(performance)
+        self.assertNotIn("invalid clock reads", previous[1])
+        performance["metrics"]["gpu_readback_timing_samples"] = timed
+        performance["metrics"]["gamecube_preview_clock_failures"] = faults
         self.assertIn("GPU readback", lines[1])
+        self.assertIn("timed 0 of 1 captures", lines[1])
+        self.assertIn("0 invalid clock reads", lines[1])
         self.assertIn("Preview captures", lines[2])
         self.assertIn("waiting for two published preview images", lines[2])
         self.assertNotIn("observed 0.0 FPS", lines[2])

@@ -183,7 +183,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
                    )):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
         self.assertEqual(session.raw_video_callbacks, 1)
-        self.assertEqual(session.preview_readback_skips, 1)
+        self.assertEqual(session.preview_readback_skips, 0)
+        self.assertEqual(session.preview_clock_failures, 1)
         self.assertEqual(session.host.read_frame.call_count, 0)
         self.assertEqual(session.emulator.frame_serial, 0)
         self.assertFalse(session.emulator.stop_event.is_set())
@@ -195,6 +196,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.emulator.frame_serial, 1)
         self.assertEqual(session.hardware_frames, 1)
         self.assertEqual(session.gpu_readback_calls, 1)
+        self.assertEqual(session.gpu_readback_timing_samples, 1)
+        self.assertEqual(session.preview_clock_failures, 1)
         self.assertEqual(session._preview_cadence.published, 1)
         self.assertIs(session.emulator.frame, rgb)
 
@@ -231,6 +234,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.hardware_frames, 1)
         self.assertEqual(session.gpu_readback_calls, 1)
         self.assertEqual(session.gpu_readback_seconds, 0.0)
+        self.assertEqual(session.gpu_readback_timing_samples, 0)
+        self.assertEqual(session.preview_clock_failures, 1)
         self.assertEqual(session._preview_cadence.published, 1)
         self.assertIsNone(session.opengl_error)
         self.assertFalse(session.emulator.stop_event.is_set())

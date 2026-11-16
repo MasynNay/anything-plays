@@ -74,6 +74,8 @@ class GameCubeHardwareSession(CoreSession):
         self.gpu_readback_seconds = 0.0
         self.gpu_readback_max_seconds = 0.0
         self.gpu_readback_calls = 0
+        self.gpu_readback_timing_samples = 0
+        self.preview_clock_failures = 0
         self.native_run_timing = GameCubeNativeTiming()
         self.preview_readback_skips = 0
         self._last_preview_capture = None
@@ -140,6 +142,13 @@ class GameCubeHardwareSession(CoreSession):
                 # Show the requested new preview cap immediately, even when
                 # throttling skips the first callback after a mode change.
                 tracker.reset_for(mode)
+            if now is None:
+                # Invalid timing is neither a deliberately skipped GL
+                # readback nor a native emulation frame failure.
+                self.preview_clock_failures = (
+                    getattr(self, "preview_clock_failures", 0) + 1
+                )
+                return
             if not should_capture(self._last_preview_capture, now, mode):
                 self.preview_readback_skips += 1
                 return
@@ -174,6 +183,13 @@ class GameCubeHardwareSession(CoreSession):
                 self.gpu_readback_max_seconds = max(
                     self.gpu_readback_max_seconds, duration
                 )
+                self.gpu_readback_timing_samples = (
+                    getattr(self, "gpu_readback_timing_samples", 0) + 1
+                )
+            else:
+                self.preview_clock_failures = (
+                    getattr(self, "preview_clock_failures", 0) + 1
+                )
             self.gpu_readback_calls += 1
             self._last_preview_capture = now
             with self.emulator.lock:
@@ -189,9 +205,12 @@ class GameCubeHardwareSession(CoreSession):
             if tracker is not None:
                 # Record the completed publication time, *after* GL readback,
                 # not the earlier callback start used for throttle checks.
-                tracker.record_published(
-                    self._optional_clock(time.monotonic), mode
-                )
+                publication_time = self._optional_clock(time.monotonic)
+                if publication_time is None:
+                    self.preview_clock_failures = (
+                        getattr(self, "preview_clock_failures", 0) + 1
+                    )
+                tracker.record_published(publication_time, mode)
             return
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
@@ -208,6 +227,12 @@ class GameCubeHardwareSession(CoreSession):
         )
         metrics.update({
             "gpu_readback_calls": self.gpu_readback_calls,
+            "gpu_readback_timing_samples": getattr(
+                self, "gpu_readback_timing_samples", 0
+            ),
+            "gamecube_preview_clock_failures": getattr(
+                self, "preview_clock_failures", 0
+            ),
             "gpu_readback_max_ms": round(
                 self.gpu_readback_max_seconds * 1000, 3
             ),

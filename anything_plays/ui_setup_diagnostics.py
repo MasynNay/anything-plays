@@ -130,6 +130,14 @@ def _gamecube_performance_summary_lines(performance):
         if type(p95_code) is int and 0 <= p95_code < len(p95_labels)
         else "not sampled"
     )
+    readback_timing = (
+        f" · timed {m['gpu_readback_timing_samples']} of "
+        f"{m['gpu_readback_calls']} captures · "
+        f"{m['gamecube_preview_clock_failures']} invalid clock reads"
+        if ("gpu_readback_timing_samples" in m
+            and "gamecube_preview_clock_failures" in m)
+        else ""
+    )
     return (
         f"Native frames: {m['native_run_calls']} · average "
         f"{m['native_run_mean_ms']} ms · maximum "
@@ -138,7 +146,8 @@ def _gamecube_performance_summary_lines(performance):
         f"GPU readback: {m['gpu_readback_calls']} captures · maximum "
         f"{m['gpu_readback_max_ms']} ms · "
         f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% of "
-        "native execution time (included, not additive)",
+        "native execution time (included, not additive)"
+        f"{readback_timing}",
         f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
         f"observed {observed_preview} over "
         f"{m['gamecube_preview_cadence_intervals']} intervals · "
