@@ -373,6 +373,25 @@ class SnapshotPrivacyTests(unittest.TestCase):
         app.system_key = FakeSetting("gba")
         self.assertNotIn("gamecube_performance", _snapshot(app))
 
+    def test_refresh_error_message_never_echoes_private_driver_details(self):
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_refresh_failure_message,
+        )
+        import tkinter as tk
+
+        for failure in (
+            ValueError("ROM /home/owner/private/game.iso could not be opened"),
+            tk.TclError("Private Webcam USB serial 45345 not found"),
+            OSError("Driver /Users/person/Library/secret-device.dat"),
+        ):
+            with self.subTest(error=type(failure).__name__):
+                message = _safe_refresh_failure_message(failure)
+                self.assertIn("Unable to check current setup", message)
+                for private in ("/home/", "/Users/", "USB serial",
+                                "game.iso", "secret-device", "45345"):
+                    self.assertNotIn(private, message)
+                self.assertLess(len(message), 140)
+
     def test_bad_camera_driver_does_not_break_report(self):
         from anything_plays.ui_setup_diagnostics import _snapshot
 
