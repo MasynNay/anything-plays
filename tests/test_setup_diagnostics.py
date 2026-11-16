@@ -244,7 +244,8 @@ class SnapshotPrivacyTests(unittest.TestCase):
         report = _snapshot(app)
         self.assertIn("stream_cadence", report)
         lines = _stream_cadence_summary_lines(report["stream_cadence"])
-        self.assertEqual(len(lines), 4)
+        self.assertEqual(len(lines), 5)
+        self.assertIn("Source resize cache: not measured", lines[4])
         self.assertIn("Requested Stream Mode refresh: 24 FPS", lines[0])
         self.assertIn("observed Tk tick 25.0 FPS", lines[0])
         self.assertIn("waiting for two changed images", lines[1])
@@ -254,6 +255,23 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertEqual(
             report["stream_cadence"]["metrics"]["stream_render_samples"], 2
         )
+        # A real active Stream Mode supplies only aggregate hit/miss counts.
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+        cache = StreamPanelResizeCache()
+        pixels = Image.new("RGB", (32, 24), "#112233")
+        cache.contained("CAMERA", pixels, (0, 0, 160, 120))
+        cache.contained("CAMERA", pixels, (0, 0, 160, 120))
+        app._stream_resize_cache = cache
+        report = _snapshot(app)
+        metrics = report["stream_cadence"]["metrics"]
+        self.assertEqual(metrics["stream_resize_cache_hits"], 1)
+        self.assertEqual(metrics["stream_resize_cache_misses"], 1)
+        self.assertIn(
+            "1 reused · 1 resized",
+            _stream_cadence_summary_lines(report["stream_cadence"])[4],
+        )
+        self.assertNotIn("112233", json.dumps(report))
         self.assertNotIn("/home/private", json.dumps(report))
         # Old reports remain legible without the new timing fields.
         old = {"metrics": {
