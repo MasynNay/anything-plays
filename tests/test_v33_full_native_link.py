@@ -12,8 +12,8 @@ from tools import v33_full_native_link as link
 GOOD = {
     "native_core_count": 11,
     "all_console_profiles": 18,
-    "source_built_dolphin": True,
-    "source_built_tia": True,
+    "source_built_dolphin": {"source_commit": "synthetic-original"},
+    "source_built_tia": {"source_commit": "synthetic-original"},
 }
 
 

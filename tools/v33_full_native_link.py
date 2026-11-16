@@ -64,8 +64,8 @@ def core_files(directory, target):
     row = validate_trial_core_directory(directory, extension)
     if (row.get("native_core_count") != 11
             or row.get("all_console_profiles") != 18
-            or row.get("source_built_dolphin") is not True
-            or row.get("source_built_tia") is not True):
+            or not isinstance(row.get("source_built_dolphin"), dict)
+            or not isinstance(row.get("source_built_tia"), dict)):
         raise ValueError("Full-native original-source provenance mismatch")
     return files
 
