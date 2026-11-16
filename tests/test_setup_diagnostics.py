@@ -235,17 +235,34 @@ class SnapshotPrivacyTests(unittest.TestCase):
         app = StreamHarness("/home/private/secret-emulator.so")
         app._stream_output_window = object()
         app._stream_cadence = StreamCadenceTracker()
-        app._stream_cadence.record_tick(1.0, "24 FPS", published=True)
-        app._stream_cadence.record_tick(1.04, "24 FPS", published=False)
+        app._stream_cadence.record_tick(
+            1.0, "24 FPS", published=True, render_seconds=0.012
+        )
+        app._stream_cadence.record_tick(
+            1.04, "24 FPS", published=False, render_seconds=0.055
+        )
         report = _snapshot(app)
         self.assertIn("stream_cadence", report)
         lines = _stream_cadence_summary_lines(report["stream_cadence"])
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(len(lines), 4)
         self.assertIn("Requested Stream Mode refresh: 24 FPS", lines[0])
         self.assertIn("observed Tk tick 25.0 FPS", lines[0])
         self.assertIn("waiting for two changed images", lines[1])
         self.assertIn("1 unchanged ticks", lines[1])
+        self.assertIn("Stream composition: P95 50–67 ms", lines[3])
+        self.assertIn("1 over-budget of 2 measured ticks", lines[3])
+        self.assertEqual(
+            report["stream_cadence"]["metrics"]["stream_render_samples"], 2
+        )
         self.assertNotIn("/home/private", json.dumps(report))
+        # Old reports remain legible without the new timing fields.
+        old = {"metrics": {
+            key: value for key, value in report["stream_cadence"]["metrics"].items()
+            if not key.startswith("stream_render_")
+        }}
+        self.assertIn(
+            "P95 not sampled", _stream_cadence_summary_lines(old)[3]
+        )
         app._stream_output_window = None
         self.assertNotIn("stream_cadence", _snapshot(app))
 
