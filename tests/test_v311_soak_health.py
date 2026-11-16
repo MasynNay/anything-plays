@@ -1,10 +1,27 @@
 """Regression checks: a broken Tk session must never be a green QA report."""
 import unittest
 
-from anything_plays.soak_health import completion_failures
+from anything_plays.soak_health import (
+    completion_failures, stream_target_is_valid,
+)
 
 
 class SoakWatchdogTests(unittest.TestCase):
+    def test_stream_stress_accepts_all_three_rates_but_fixed_soak_only_24(self):
+        # A long stress test switches between settings and must not fail
+        # merely because its last rate was not the default.
+        for fps in (15, 24, 30):
+            self.assertTrue(stream_target_is_valid(fps, stress_stream=True))
+        self.assertTrue(stream_target_is_valid(24))
+        self.assertFalse(stream_target_is_valid(15))
+        self.assertFalse(stream_target_is_valid(30))
+        for invalid in (None, True, 0, 60, "24", "24 FPS", [], {}):
+            with self.subTest(value_type=type(invalid).__name__):
+                self.assertFalse(stream_target_is_valid(invalid))
+                self.assertFalse(stream_target_is_valid(
+                    invalid, stress_stream=True
+                ))
+
     def test_completed_session_with_samples_and_no_callback_error_passes(self):
         self.assertEqual(completion_failures(180, 180.08, [{"rss_mb": 100}], []), [])
         self.assertEqual(completion_failures(180, 179.3, [{"rss_mb": 100}], []), [])

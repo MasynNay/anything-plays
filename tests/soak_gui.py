@@ -25,7 +25,9 @@ from unittest.mock import patch
 import numpy as np
 
 from app import App
-from anything_plays.soak_health import completion_failures
+from anything_plays.soak_health import (
+    completion_failures, stream_target_is_valid,
+)
 
 
 def rss_megabytes():
@@ -189,8 +191,6 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 stream_prior_publications = report_before["metrics"][
                     "stream_published_images"
                 ]
-                original_render = app._render_stream_frame
-
                 def fail_once():
                     # Reinstall the original class method immediately. The
                     # error itself must be handled by StreamMixin's Tk timer.
@@ -320,10 +320,11 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             root.after(20, emit_frame)
             if stress_stream:
                 root.after(2000, stress_stream_transitions)
-                # Transitions occur at 2, 10, 18, 26 ... seconds; inject
-                # at 22 seconds so the 1-second retry and recovery can be
-                # observed before the next 15/24/30 FPS counter reset.
-                root.after(int((warmup + 7) * 1000), inject_stream_fault)
+                # Transitions occur at 2, 10, 18, 26 ... seconds. Inject
+                # at precisely 22 seconds for both 45s and 1800s stress:
+                # the 1-second retry and recovered frame precede the next
+                # 15/24/30 FPS counter reset at 26 seconds.
+                root.after(22000, inject_stream_fault)
             root.after(1000, sample)
             root.after(int(seconds * 1000), shutdown)
             try:
@@ -357,7 +358,10 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
         final = report.get("stream_final")
         summary = final["metrics"] if isinstance(final, dict) else {}
         if (not summary
-                or summary.get("stream_target_refresh_fps") != 24
+                or not stream_target_is_valid(
+                    summary.get("stream_target_refresh_fps"),
+                    stress_stream=stress_stream,
+                )
                 or summary.get("stream_refresh_intervals", 0) < 2
                 or summary.get("stream_published_images", 0) < 2):
             failures.append(

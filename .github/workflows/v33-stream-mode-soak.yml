@@ -75,11 +75,43 @@ jobs:
           assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
           assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
           PY
+      - name: Exercise 45-second real-Tk stream fault blanking and recovery
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py \
+              --seconds 45 --enable-stream --stress-stream --max-growth-mb 96 \
+              --report test-evidence/v33-stream-mode-45-second-fault-recovery.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(
+              "test-evidence/v33-stream-mode-45-second-fault-recovery.json"
+          ).read_text(encoding="utf-8"))
+          assert report["passed"] is True
+          assert report["seconds_requested"] == 45
+          assert report["stream_transition_stress_requested"] is True
+          assert report["stream_fault_injected"] is True
+          assert report["stream_fault_blanked"] is True
+          assert report["stream_fault_counted"] is True
+          assert report["stream_fault_recovered"] is True
+          assert report["tk_callback_exception_count"] == 0
+          assert report["resident_growth_mb"] <= 96
+          assert report["stream_final"]["metrics"]["stream_target_refresh_fps"] in (15, 24, 30)
+          assert all(s["stream_items"] <= 1 for s in report["samples"])
+          assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
+          assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
+          assert report["physical_camera_tested"] is False
+          PY
       - name: Retain aggregate-only stream soak evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: AnythingPlays-v33-Tk-Stream-180second-synthetic-UNRELEASED
-          path: test-evidence/v33-stream-mode-180-second-soak.json
+          name: AnythingPlays-v33-Tk-Stream-180s-and-45s-recovery-UNRELEASED
+          path: |
+            test-evidence/v33-stream-mode-180-second-soak.json
+            test-evidence/v33-stream-mode-45-second-fault-recovery.json
           if-no-files-found: warn
           retention-days: 14

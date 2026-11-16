@@ -128,6 +128,15 @@ PYTHONPATH=. python tests/soak_gui.py --seconds 180 --enable-stream \
   --max-growth-mb 96 --report stream-soak.json
 ```
 
+The automated workflow also runs a separate **45-second actual Tk**
+transition/fault-recovery check. It exercises all three output refresh
+options, both layouts and one deliberately injected synthetic compositor
+exception, proving the canvas blanks and resumes without an unhandled Tk
+callback. It is separate from the unchanged-image/zero-fault 180-second
+baseline. The final stream rate is allowed to be **15, 24 or 30 FPS** in
+a rotating-rate stress run; the normal 180-second baseline still requires
+exactly **24 FPS**. Neither uses physical hardware.
+
 The existing standard desktop soak still runs **without** `--enable-stream`
 and remains unchanged. The shorter workflow additionally verifies that the
 new source resize cache never holds more than **two fitted panels**, regardless

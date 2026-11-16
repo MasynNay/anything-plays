@@ -22,3 +22,15 @@ def completion_failures(requested_seconds, elapsed_seconds, samples, callback_er
             f"{requested_seconds}s requested"
         )
     return errors
+
+
+def stream_target_is_valid(fps, *, stress_stream=False):
+    """Separate a fixed-rate 180-second soak from a rotating-rate stress run.
+
+    The stress test deliberately ends at an arbitrary 15/24/30 FPS target,
+    so requiring precisely 24 FPS at shutdown would falsely fail healthy
+    long-running Tk sessions. Do not accept strings/bools as numeric FPS.
+    """
+    return type(fps) is int and fps in (
+        (15, 24, 30) if stress_stream else (24,)
+    )
