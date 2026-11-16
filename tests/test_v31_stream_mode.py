@@ -9,6 +9,7 @@ from PIL import Image
 from anything_plays.ui_stream import (
     DEFAULT_STREAM, FRAME_RATES, LAYOUTS, StreamMixin, compose_stream_output,
     stream_panel_boxes, stream_render_delay_ms, StreamCadenceTracker,
+    StreamPanelResizeCache, _contained,
     stream_camera_snapshot_due, validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
@@ -520,6 +521,91 @@ class StreamModeContracts(unittest.TestCase):
                 middle_x = (first[0] + first[2]) // 2
                 self.assertEqual(output.getpixel((middle_x, first[1])),
                                  (252, 150, 49))
+
+    def test_stream_resize_cache_preserves_pixels_and_skips_unchanged_source(self):
+        from PIL import ImageChops
+        from unittest.mock import patch
+
+        game = Image.new("RGB", (160, 144), "#c3341a")
+        camera = Image.new("RGB", (640, 480), "#29d492")
+        camera.putpixel((310, 220), (255, 0, 0))
+        cache = StreamPanelResizeCache()
+        settings = dict(DEFAULT_STREAM)
+        size = (720, 1080)
+
+        def compose(g, cam, *, options=settings, cache_enabled=True,
+                    active_game=True, active_camera=True):
+            return compose_stream_output(
+                g, cam, size=size, settings=options, themes=THEMES,
+                game_active=active_game, camera_active=active_camera,
+                resize_cache=cache if cache_enabled else None,
+            )
+
+        with patch("anything_plays.ui_stream._contained", wraps=_contained) as fit:
+            first = compose(game, camera)
+            self.assertEqual(fit.call_count, 2)
+            self.assertIsNone(ImageChops.difference(
+                first, compose(game, camera, cache_enabled=False)
+            ).getbbox())
+            self.assertEqual(fit.call_count, 4)  # uncached comparison
+            same = compose(game, camera)
+            self.assertEqual(fit.call_count, 4, "both fitted sources were reused")
+            self.assertIsNone(ImageChops.difference(first, same).getbbox())
+            new_camera = camera.copy()
+            new_camera.putpixel((300, 200), (18, 70, 255))
+            changed = compose(game, new_camera)
+            self.assertEqual(fit.call_count, 5, "only new camera was resized")
+            self.assertIsNone(ImageChops.difference(
+                changed, compose(game, new_camera, cache_enabled=False)
+            ).getbbox())
+            self.assertEqual(fit.call_count, 7)
+            # Changing colors, not panel geometry, can reuse fitted pixels.
+            recolor = {**settings, "border_color": "#9a6611"}
+            compose(game, new_camera, options=recolor)
+            self.assertEqual(fit.call_count, 7)
+            # A new panel arrangement invalidates fits, not the raw sources.
+            swapped = {**settings, "swap_screens": True}
+            alternate = compose(game, new_camera, options=swapped)
+            self.assertEqual(fit.call_count, 9)
+            self.assertIsNone(ImageChops.difference(
+                alternate, compose(
+                    game, new_camera, options=swapped, cache_enabled=False
+                )
+            ).getbbox())
+        self.assertEqual(set(cache._entries), {"GAME", "CAMERA"})
+        self.assertEqual(len(cache._entries), 2)
+        counts = cache.snapshot()
+        self.assertGreaterEqual(counts["stream_resize_cache_hits"], 5)
+        self.assertEqual(counts["stream_resize_cache_misses"], 5)
+        self.assertNotIn("frame", str(counts).lower())
+
+    def test_resize_cache_clears_private_camera_when_disconnected(self):
+        cache = StreamPanelResizeCache()
+        game = Image.new("RGB", (80, 72), "#ba0234")
+        private = Image.new("RGB", (160, 120), "#123456")
+        bounds = (12, 17, 180, 200)
+        cache.contained("GAME", game, bounds, nearest=True)
+        cache.contained("CAMERA", private, bounds)
+        self.assertIs(cache._entries["CAMERA"][0], private)
+        self.assertIsNone(cache.contained("CAMERA", None, bounds))
+        self.assertNotIn("CAMERA", cache._entries)
+        self.assertIn("GAME", cache._entries)
+        cache.clear()
+        self.assertEqual(len(cache._entries), 0)
+
+    def test_resize_cache_is_constant_memory_for_thousands_of_source_frames(self):
+        cache = StreamPanelResizeCache()
+        for i in range(3000):
+            pixels = Image.new("RGB", (16, 12), (i % 256, 60, 180))
+            cache.contained(
+                "CAMERA", pixels, (5, 5, 80, 90), nearest=False
+            )
+            self.assertLessEqual(len(cache._entries), 1)
+        summary = cache.snapshot()
+        self.assertEqual(summary["stream_resize_cache_misses"], 3000)
+        self.assertEqual(summary["stream_resize_cache_hits"], 0)
+        self.assertEqual(len(cache._entries), 1)
+        self.assertIs(cache._entries["CAMERA"][0], pixels)
 
     def test_camera_off_and_game_off_never_show_stale_frames(self):
         game = Image.new("RGB", (320, 240), "#e92b38")
