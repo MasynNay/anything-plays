@@ -381,6 +381,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
             RuntimeError("OpenGL context destroyed"),
             MemoryError("native allocation failed"),
             TypeError("invalid video surface"),
+            AttributeError("invalid native GL wrapper object"),
+            KeyError("missing native framebuffer lookup"),
         ):
             with self.subTest(error=type(error).__name__):
                 session = object.__new__(GameCubeHardwareSession)
@@ -415,6 +417,47 @@ class PreviewRatePolicyTests(unittest.TestCase):
                 # a broken GL host or publish a frame after Stop.
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
                 session.host.read_frame.assert_called_once()
+
+    def test_unexpected_native_gl_exception_is_private_and_stops_core(self):
+        """Custom GL wrapper failures must not propagate out of ctypes."""
+        class PrivateDeviceSerialXYZ(Exception):
+            pass
+
+        session = object.__new__(GameCubeHardwareSession)
+        old_pixels = np.full((4, 4, 3), 111, dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(side_effect=PrivateDeviceSerialXYZ(
+            "driver failed /Users/owner/private/serial-123"
+        )))
+        session.emulator = SimpleNamespace(
+            frame=old_pixels, frame_serial=7, lock=threading.Lock(),
+            stop_event=threading.Event(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+        )
+        session.opengl_error = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        self.assertEqual(
+            session.opengl_error, "GPU readback failed (UnexpectedError)"
+        )
+        for forbidden in (
+            "/Users/", "serial-123", "PrivateDeviceSerialXYZ", "driver failed"
+        ):
+            self.assertNotIn(forbidden, session.opengl_error)
+        self.assertTrue(session.emulator.stop_event.is_set())
+        self.assertIs(session.emulator.frame, old_pixels)
+        self.assertEqual(session.emulator.frame_serial, 7)
+        self.assertEqual(session.hardware_frames, 0)
+        self.assertEqual(session.gpu_readback_calls, 0)
+        session.video(RETRO_HW_FRAME_BUFFER_VALID, 4, 4, 16)
+        session.host.read_frame.assert_called_once()
 
     def test_stop_during_readback_must_not_repaint_old_game(self):
         session = object.__new__(GameCubeHardwareSession)
