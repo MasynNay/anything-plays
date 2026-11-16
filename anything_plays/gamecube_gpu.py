@@ -21,7 +21,9 @@ import time
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
-from anything_plays.gamecube_preview import should_capture, DEFAULT_PREVIEW_MODE
+from anything_plays.gamecube_preview import (
+    should_capture, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
+)
 from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
@@ -57,6 +59,7 @@ class GameCubeHardwareSession(CoreSession):
         self.native_run_timing = GameCubeNativeTiming()
         self.preview_readback_skips = 0
         self._last_preview_capture = None
+        self._preview_cadence = PreviewCadenceTracker()
         self.raw_video_callbacks = 0
         self.null_video_callbacks = 0
         self.opengl_error = None
@@ -154,6 +157,11 @@ class GameCubeHardwareSession(CoreSession):
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1
+            tracker = getattr(self, "_preview_cadence", None)
+            if tracker is not None:
+                # Record the completed publication time, *after* GL readback,
+                # not the earlier callback start used for throttle checks.
+                tracker.record_published(time.monotonic(), mode)
             return
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
@@ -177,6 +185,11 @@ class GameCubeHardwareSession(CoreSession):
             "gamecube_preview_readback_skips": self.preview_readback_skips,
         })
         metrics.update(self.audio.delivery_snapshot())
+        tracker = getattr(self, "_preview_cadence", None)
+        metrics.update(
+            tracker.snapshot() if tracker is not None
+            else PreviewCadenceTracker().snapshot()
+        )
         return {
             "format": "anything-plays-gamecube-performance",
             "version": 1,
