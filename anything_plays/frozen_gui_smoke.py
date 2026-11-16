@@ -159,6 +159,48 @@ def run_smoke_gui(app_type, systems):
                             "or isolated settings namespace was not verified"
                         )
                 if (result["passed"]
+                        and os.environ.get("AP_V33_GUI_SMOKE_CHECK") == "1"):
+                    # Inspect the actual running *frozen* 3.3 QA App.
+                    # An env variable alone cannot authorize this identity:
+                    # the bundled immutable marker must match exactly.
+                    from anything_plays.build_identity import (
+                        current_identity, make_identity,
+                    )
+                    expected = make_identity("v33_candidate")
+                    identity = current_identity()
+                    preferences = getattr(app, "preferences_path", None)
+                    reader = getattr(app, "_gamepad", None)
+                    emulator = getattr(app, "emu", None)
+                    inert_inputs = (
+                        getattr(app, "armed", None) is False
+                        and getattr(app, "cap", None) is None
+                        and reader is not None
+                        and getattr(reader, "api", None) is None
+                        and emulator is not None
+                        and getattr(emulator, "running", None) is False
+                    )
+                    correct = bool(
+                        result["frozen_binary"]
+                        and identity == expected
+                        and preferences is not None
+                        and preferences.parent.name ==
+                            expected["settings_namespace"]
+                        and root.title() == expected["title"]
+                        and inert_inputs
+                    )
+                    result["v33_frozen_isolation_verified"] = correct
+                    result["v33_input_disarmed_at_startup"] = bool(inert_inputs)
+                    result["v33_settings_namespace"] = (
+                        expected["settings_namespace"]
+                        if correct else "IDENTITY_MISMATCH"
+                    )
+                    result["passed"] = bool(result["passed"] and correct)
+                    if not correct:
+                        result["error"] = (
+                            "Frozen 3.3 candidate identity or isolated "
+                            "startup input state was not verified"
+                        )
+                if (result["passed"]
                         and os.environ.get("AP_V32_SETUP_SMOKE_CHECK") == "1"):
                     try:
                         from anything_plays.preview_setup_smoke import (

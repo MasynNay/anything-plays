@@ -14,6 +14,7 @@ on:
       - 'app.py'
       - 'tools/write_v31_identity.py'
       - 'tools/v33_candidate_verify.py'
+      - 'tools/v33_candidate_frozen_gui.py'
       - 'tests/test_v33_candidate_*.py'
   workflow_dispatch:
 
@@ -85,6 +86,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
           python -m unittest discover -s tests -p 'test_v33_candidate_isolation.py' -v
           python -m unittest discover -s tests -p 'test_v33_candidate_verify.py' -v
+          python -m unittest discover -s tests -p 'test_v33_candidate_frozen_gui.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
@@ -104,7 +106,7 @@ jobs:
           set -euo pipefail
           sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
           sudo apt-get -o Acquire::Retries=2 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb xauth
       - name: Install Windows Inno Setup
         if: runner.os == 'Windows'
         shell: pwsh
@@ -157,6 +159,47 @@ jobs:
           test -f "$QA_ROOT/usr/share/applications/anything-plays-33-candidate.desktop"
           test ! -e "$QA_ROOT/opt/anything-plays-31"
           test ! -e "$QA_ROOT/opt/anything-plays-32-preview"
+      - name: Launch real frozen Linux Tk candidate in disposable HOME
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$QA_ROOT"' EXIT
+          mkdir -p "$QA_ROOT/home" "$QA_ROOT/payload"
+          python -m tools.v33_candidate_frozen_gui seed --home "$QA_ROOT/home"
+          dpkg-deb -x '${{ matrix.installer }}' "$QA_ROOT/payload"
+          ENTRY="$QA_ROOT/payload/opt/anything-plays-33-candidate/AnythingPlays"
+          test -x "$ENTRY"
+          # This is the actual installed/frozen entry point, not a source
+          # import. No real webcam, ROM, controller or public HOME is read.
+          HOME="$QA_ROOT/home" \
+          XDG_CONFIG_HOME="$QA_ROOT/home/.config" \
+          XDG_STATE_HOME="$QA_ROOT/home/.local/state" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V33_GUI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA_ROOT/frozen.json" \
+          SDL_VIDEODRIVER=dummy \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+            timeout 75 xvfb-run -a -s '-screen 0 1600x900x24' \
+              "$ENTRY" --ap-v30-ui-smoke
+          python -m tools.v33_candidate_frozen_gui verify \
+            --home "$QA_ROOT/home" \
+            --report "$QA_ROOT/frozen.json" \
+            --output release/V33_FROZEN_GUI_RECEIPT.json
+          # Only aggregate booleans, no pixels or previous-user settings.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("release/V33_FROZEN_GUI_RECEIPT.json").read_text())
+          assert data["frozen_candidate_gui_started"] is True
+          assert data["synthetic_stream_window_verified"] is True
+          assert data["historical_settings_unchanged"] is True
+          assert data["public_release_approved"] is False
+          assert data["hardware_camera_tested"] is False
+          PY
       - name: Retain only unreleased installer and aggregate proof
         if: success()
         uses: actions/upload-artifact@v4
@@ -165,6 +208,7 @@ jobs:
           path: |
             ${{ matrix.installer }}
             release/V33_CANDIDATE_QA_RECEIPT.json
+            release/V33_FROZEN_GUI_RECEIPT.json
             release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

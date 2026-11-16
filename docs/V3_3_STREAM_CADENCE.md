@@ -240,6 +240,27 @@ Neither synthetic run certifies physical devices, Dolphin GameCube hardware
 rendering, actual OBS encoding, or stability of a 30-minute **physical**
 stream. Real-device acceptance is still required.
 
+## Linux frozen 3.3 candidate startup QA (still synthetic)
+
+The 3.3 owner-QA installer workflow now *executes the frozen Linux application*
+extracted from its actual isolated Debian package under Xvfb. A fresh
+disposable HOME contains dummy canaries for the 3.1/stable and 3.2 preview
+settings folders. The frozen app must prove its immutable
+`v33_candidate` identity and private `anything-plays-33-candidate`
+namespace, start a genuine Tk event loop with gameplay and camera controls
+disarmed, open and customize the separate Stream Output window using
+synthetic camera pixels, and close its windows and frame timers cleanly.
+The verifier also confirms the older settings canaries are byte-for-byte
+unchanged. Only boolean outcomes are retained in
+`V33_FROZEN_GUI_RECEIPT.json`.
+
+This strengthens static installer identity/checksum verification but
+**does not** launch any real ROM, Dolphin core, physical camera, controller,
+speaker or OBS encoder. Linux runner startup is not evidence that the
+installer works in a user's desktop session. Actual Windows/macOS installation
+and all four-platform real hardware acceptance remain independent release
+gates.
+
 ## Before claiming a 3.3 speedup
 
 Compare the same host, window size, theme, camera resolution, game state and
