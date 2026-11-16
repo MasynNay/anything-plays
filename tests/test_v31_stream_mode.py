@@ -8,7 +8,8 @@ from PIL import Image
 
 from anything_plays.ui_stream import (
     DEFAULT_STREAM, LAYOUTS, StreamMixin, compose_stream_output,
-    stream_panel_boxes, stream_render_delay_ms, validate_stream_settings,
+    stream_panel_boxes, stream_render_delay_ms, StreamCadenceTracker,
+    validate_stream_settings,
 )
 from anything_plays.ui_theme import ThemeMixin
 
@@ -116,6 +117,86 @@ class StreamModeContracts(unittest.TestCase):
             app._stream_render_tick()
         app.root.after.assert_called_once_with(1000, app._stream_render_tick)
         self.assertEqual(app._stream_last_render, None)
+
+    def test_stream_cadence_separates_refresh_ticks_from_changed_images(self):
+        for target in (15, 24, 30):
+            with self.subTest(target=target):
+                tracker = StreamCadenceTracker()
+                mode = f"{target} FPS"
+                for i in range(7):
+                    tracker.record_tick(
+                        1.0 + i / target, mode, published=(i % 2 == 0)
+                    )
+                snapshot = tracker.snapshot()
+                self.assertEqual(snapshot["stream_target_refresh_fps"], target)
+                self.assertEqual(snapshot["stream_refresh_intervals"], 6)
+                self.assertAlmostEqual(
+                    snapshot["stream_observed_refresh_fps"], target, places=2
+                )
+                self.assertEqual(snapshot["stream_published_images"], 4)
+                self.assertEqual(snapshot["stream_unchanged_ticks"], 3)
+                self.assertAlmostEqual(
+                    snapshot["stream_observed_publication_fps"],
+                    target / 2, places=2,
+                )
+                self.assertNotIn("last_tick", snapshot)
+                self.assertNotIn("last_published", snapshot)
+
+    def test_stream_rate_change_resets_cadence_and_invalid_clocks_are_ignored(self):
+        tracker = StreamCadenceTracker()
+        tracker.record_tick(1.0, "24 FPS", published=True)
+        tracker.record_tick(1.05, "24 FPS", failed=True)
+        self.assertEqual(tracker.snapshot()["stream_failed_ticks"], 1)
+        self.assertEqual(tracker.snapshot()["stream_publication_intervals"], 0)
+        tracker.reset_for("30 FPS")
+        self.assertEqual(tracker.snapshot()["stream_target_refresh_fps"], 30)
+        self.assertEqual(tracker.snapshot()["stream_failed_ticks"], 0)
+        self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 0)
+        for value in (float("nan"), float("inf"), None, "device",
+                      10**1000, -1):
+            tracker.record_tick(value, "30 FPS", published=True)
+        self.assertEqual(tracker.snapshot()["stream_published_images"], 0)
+        tracker.record_tick(10.0, "30 FPS", published=True)
+        tracker.record_tick(9.0, "30 FPS", published=True)
+        self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 0)
+        self.assertEqual(tracker.snapshot()["stream_published_images"], 1)
+        for i in range(10000):
+            tracker.record_tick(10.0 + i / 30, "30 FPS", published=i % 2 == 0)
+        self.assertEqual(tracker.snapshot()["stream_refresh_intervals"], 9999)
+        self.assertLessEqual(len(vars(tracker)), 12)
+
+    def test_stream_tick_measures_actual_changed_image_publication(self):
+        from unittest.mock import Mock, patch, call
+
+        class Harness(StreamMixin):
+            pass
+
+        app = Harness()
+        app._stream_output_window = object()
+        app._closing = False
+        app._stream_options = dict(DEFAULT_STREAM)
+        app.root = Mock()
+        app._stream_diagnostic = Mock()
+        app._stream_cadence = StreamCadenceTracker()
+        app._render_stream_frame = Mock(side_effect=(True, False, True))
+        with patch("anything_plays.ui_stream.time.perf_counter",
+                   side_effect=(1.0, 1.010, 1.040, 1.052, 1.080, 1.090)):
+            for _ in range(3):
+                app._stream_render_tick()
+        m = app.stream_performance_snapshot()["metrics"]
+        self.assertEqual(m["stream_target_refresh_fps"], 24)
+        self.assertAlmostEqual(m["stream_observed_refresh_fps"], 25)
+        self.assertEqual(m["stream_published_images"], 2)
+        self.assertEqual(m["stream_unchanged_ticks"], 1)
+        self.assertEqual(m["stream_publication_intervals"], 1)
+        self.assertAlmostEqual(m["stream_observed_publication_fps"], 12.5)
+        app.root.after.assert_has_calls([
+            call(32, app._stream_render_tick),
+            call(30, app._stream_render_tick),
+            call(32, app._stream_render_tick),
+        ])
+        app._stream_output_window = None
+        self.assertIsNone(app.stream_performance_snapshot())
 
     def test_pure_stacked_and_side_by_side_geometry_never_overlaps(self):
         for size, layout in (
