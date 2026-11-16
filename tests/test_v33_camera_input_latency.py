@@ -115,6 +115,74 @@ class BoundedProbeTests(unittest.TestCase):
         probe.published(2.0)  # clock moved backward, rejected
         self.assertEqual(probe.snapshot()["samples"], 0)
 
+    def test_failed_optional_clock_cannot_break_native_buttons(self):
+        # A diagnostics-only timing callback must never escape through the
+        # native Libretro input snapshot, even if a clock implementation
+        # raises private device/path details.
+        times = iter((100.010, OSError("/home/private/camera-id"),
+                      100.110, 100.150))
+
+        def sometimes_fails():
+            result = next(times)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=sometimes_fails)
+        inputs.set_camera_buttons(["A"], ["B"], sample_started_at=100.0)
+        inputs.before_frame(armed=True)  # clock raises; game remains armed
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 1)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 0)
+        inputs.after_frame()
+        inputs.set_camera_buttons(["A"], sample_started_at=100.1)
+        inputs.before_frame(armed=True)  # later valid timing recovers
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+        self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 0)
+        report = inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 1)
+        self.assertNotIn("/home/private", str(report))
+
+    def test_bad_newer_publication_revokes_old_pending_latency(self):
+        ticks = iter((2.01, RuntimeError("private device"),
+                      2.21, 2.25))
+
+        def tick():
+            value = next(ticks)
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        probe = InputLatencyProbe(clock=tick)
+        probe.published(2.0)
+        self.assertIsNotNone(probe._pending)
+        probe.published(2.1)  # newer frame; invalid clock
+        self.assertIsNone(probe._pending)
+        self.assertEqual(probe.snapshot()["discarded_pending"], 1)
+        probe.consumed()  # old timestamp cannot be attributed to new input
+        self.assertEqual(probe.snapshot()["samples"], 0)
+        probe.published(2.2)
+        probe.consumed()
+        self.assertEqual(probe.snapshot()["samples"], 1)
+        self.assertIsNone(probe._pending)
+        self.assertEqual(
+            probe.snapshot()["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "33-50"
+        )
+
+    def test_exhausted_clock_is_optional_and_recovers_when_reenabled(self):
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=iter(()).__next__)
+        inputs.set_camera_buttons(["A"], sample_started_at=1.0)
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.state(0, 1, 0, IDS["A"]), 1)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 0)
+        inputs.enable_latency_probe(clock=SteppedClock(2.03, 2.06))
+        inputs.set_camera_buttons(["A"], sample_started_at=2.0)
+        inputs.before_frame(armed=True)
+        self.assertEqual(inputs.latency_snapshot()["samples"], 1)
+
     def test_constant_memory_after_thousands_of_samples(self):
         clock = [1.0]
         def current():
