@@ -976,7 +976,12 @@ class StreamMixin:
         still revoked immediately and accepts the next reconnect.
         """
         cache = getattr(self, "_stream_resize_cache", None)
-        cache_entries = getattr(cache, "_entries", None)
+        try:
+            cache_entries = getattr(cache, "_entries", None)
+        except Exception:
+            # Cache wrappers are strictly optional; an extension-defined
+            # property error must not escape a webcam disconnect path.
+            cache_entries = None
         had_pixels_or_state = (
             self._stream_camera_frame is not None
             or self._stream_camera_last_snapshot is not None
@@ -986,9 +991,17 @@ class StreamMixin:
         self._stream_camera_last_snapshot = None
         self._stream_camera_force_next_snapshot = False
         self._stream_camera_frame = None
+        cache_failed = False
         if cache is not None:
-            cache.clear("CAMERA")
-        if had_pixels_or_state:
+            try:
+                cache.clear("CAMERA")
+            except Exception:
+                # Fail closed: drop the whole resized-image cache reference
+                # rather than keeping any old private webcam pixels. Never
+                # interrupt native P1/P2 disarm, reconnect or Stream Output.
+                self._stream_resize_cache = None
+                cache_failed = True
+        if had_pixels_or_state or cache_failed:
             self._stream_camera_serial += 1
             self._invalidate_stream()
 
@@ -997,15 +1010,24 @@ class StreamMixin:
         cadence = getattr(self, "_stream_cadence", None)
         if getattr(self, "_stream_output_window", None) is None or cadence is None:
             return None
+        cache = getattr(self, "_stream_resize_cache", None)
+        cache_stats = {}
+        # Diagnostics must not invoke untrusted native/custom cache hooks or
+        # include arbitrary plugin data. Only the first-party bounded cache
+        # may supply its two aggregate hit/miss counters; if it breaks,
+        # the useful Stream cadence data still remains available.
+        if type(cache) is StreamPanelResizeCache:
+            try:
+                cache_stats = cache.snapshot()
+            except Exception:
+                cache_stats = {}
         return {
             "format": "anything-plays-stream-cadence",
             "version": 1,
             "scope": "tk_refresh_and_changed_image_publications_not_obs_fps",
             "metrics": {
                 **cadence.snapshot(),
-                **(self._stream_resize_cache.snapshot()
-                   if getattr(self, "_stream_resize_cache", None) is not None
-                   else {}),
+                **cache_stats,
                 "stream_stale_camera_clears": getattr(
                     self, "_stream_stale_camera_clears", 0
                 ),
@@ -1311,9 +1333,15 @@ class StreamMixin:
         self._stream_last_render = None
         self._stream_cadence = None
         cache = getattr(self, "_stream_resize_cache", None)
-        if cache is not None:
-            cache.clear()
         self._stream_resize_cache = None
+        if cache is not None:
+            try:
+                cache.clear()
+            except Exception:
+                # The output references have already been revoked. A
+                # third-party cache failure must not prevent destroying
+                # the capture window or clearing the rest of its state.
+                pass
         self._stream_stale_camera_clears = 0
         self._stream_session_faults = 0
         self._stream_session_recoveries = 0

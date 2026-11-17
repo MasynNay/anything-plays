@@ -84,6 +84,27 @@ selected rate, then normal throttling resumes. The existing three-second
 live-camera stale-image revocation still applies if no new image arrives.
 No tracking, native input or audio loop is restarted.
 
+### Fail-closed optional resize-cache errors on camera disconnect or Stream close
+
+Stream Mode uses a bounded first-party cache to reuse fitted GAME and CAMERA
+PIL pixels. During camera unplug or a Stream Mode close, the preview cache
+is optional: a destroyed or customized native cache may fail while clearing
+a channel. The webcam disconnect path now **drops the entire cache reference**
+if eviction fails, clears its camera snapshot/timestamp and invalidates the
+OBS composite. The same error cannot prevent the Stream Output window from
+closing or its image references from being revoked. Repeated camera-off
+notifications remain idempotent, and active native game input/controls are
+not affected.
+
+The Stream Mode local diagnostics report now only accepts the two aggregate
+cache counters from the exact built-in `StreamPanelResizeCache`. Arbitrary
+cache plugin metrics and exceptions cannot enter the diagnostic clipboard or
+`Check my setup` display. If built-in cache reporting fails, the regular
+Tk cadence measurements remain available. Regression tests cover camera
+disconnect, hidden-only cache errors, safe report generation, and optional
+window teardown. Synthetic tests do **not** verify actual webcam hotplug
+or OBS encoder output.
+
 ## Repeated camera-off signals and shutdown timer safety
 
 Repeated optional Stream Mode camera-off notifications now **leave an

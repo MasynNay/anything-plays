@@ -909,6 +909,132 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(compose.call_args.args[1])
         self.assertEqual(app._stream_stale_camera_clears, 1)
 
+    def test_broken_cache_cannot_interrupt_webcam_disconnect_or_reconnect(self):
+        """Optional native resize wrappers cannot keep old private pixels."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        old_camera = Image.new("RGB", (18, 24), "#eb005a")
+        app._stream_camera_frame = old_camera
+        app._stream_camera_last_snapshot = 23.0
+        app._stream_camera_force_next_snapshot = True
+        app._stream_camera_serial = 8
+        app._stream_last_render = ("last frame",)
+        cache = Mock()
+        cache.clear.side_effect = RuntimeError(
+            "camera /dev/video0 private /home/user/serial"
+        )
+        app._stream_resize_cache = cache
+        app.stream_clear_camera()
+        cache.clear.assert_called_once_with("CAMERA")
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertFalse(app._stream_camera_force_next_snapshot)
+        self.assertIsNone(app._stream_last_render)
+        self.assertEqual(app._stream_camera_serial, 9)
+        # Subsequent camera-off signals remain completely idempotent.
+        app._stream_last_render = ("no webcam; game still active",)
+        for _ in range(20):
+            app.stream_clear_camera()
+        self.assertEqual(app._stream_camera_serial, 9)
+        self.assertEqual(
+            app._stream_last_render, ("no webcam; game still active",),
+        )
+
+    def test_cache_only_failure_invalidates_stale_obs_composite(self):
+        """Even without a visible webcam source, failed eviction forces redraw."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app._stream_camera_serial = 6
+        app._stream_last_render = ("stale fitted camera",)
+        cache = Mock()
+        cache.clear.side_effect = OSError("/Users/owner/webcam serial")
+        app._stream_resize_cache = cache
+        app.stream_clear_camera()
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIsNone(app._stream_last_render)
+        self.assertEqual(app._stream_camera_serial, 7)
+
+    def test_custom_cache_cannot_inject_stream_qa_metrics(self):
+        """Setup/clipboard must never invoke third-party cache snapshots."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app._stream_output_window = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.reset_for("24 FPS")
+        cache = Mock()
+        cache.snapshot.side_effect = RuntimeError(
+            "/Users/private/secret camera ID")
+        app._stream_resize_cache = cache
+        report = app.stream_performance_snapshot()
+        self.assertEqual(report["format"], "anything-plays-stream-cadence")
+        self.assertEqual(report["metrics"]["stream_target_refresh_fps"], 24)
+        self.assertNotIn("stream_resize_cache_hits", report["metrics"])
+        self.assertNotIn("private", str(report).lower())
+        cache.snapshot.assert_not_called()
+
+        # A broken built-in cache snapshot also remains non-fatal.
+        builtin = StreamPanelResizeCache()
+        app._stream_resize_cache = builtin
+        with unittest.mock.patch.object(
+            StreamPanelResizeCache, "snapshot",
+            side_effect=ValueError("private driver /home/device"),
+        ):
+            report = app.stream_performance_snapshot()
+        self.assertIn("stream_target_refresh_fps", report["metrics"])
+        self.assertNotIn("stream_resize_cache_hits", report["metrics"])
+
+    def test_stream_window_closes_when_cache_clear_raises(self):
+        """A detached native cache must not prevent OBS window destruction."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Dark")
+        app.initialize_stream_mode({})
+        app.root = Mock()
+        window = Mock()
+        app._stream_output_window = window
+        app._stream_photo = object()
+        app._stream_game_frame = Image.new("RGB", (12, 12), "red")
+        app._stream_camera_frame = Image.new("RGB", (12, 12), "blue")
+        cache = Mock()
+        cache.clear.side_effect = RuntimeError("private ROM /home/driver")
+        app._stream_resize_cache = cache
+        app.close_stream_mode()
+        window.destroy.assert_called_once_with()
+        cache.clear.assert_called_once_with()
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIsNone(app._stream_output_window)
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_cadence)
+
     def test_repeated_empty_camera_notifications_are_idempotent_for_stream(self):
         from types import SimpleNamespace
 
