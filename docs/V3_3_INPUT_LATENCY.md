@@ -128,6 +128,20 @@ destroyed Tk canvases, unexpected extension-defined errors, the launch
 handoff, and reentrant widget callbacks; these are synthetic checks,
 not physical OBS or GameCube gameplay evidence.
 
+### Late software Libretro video callbacks after Stop
+
+The shared native **software** video callback now checks the emulator's
+Stop event both **before** copying core-owned frame memory and **under the
+emulator frame lock** immediately before publishing. A software core that
+finishes decoding an old frame after Stop cannot restore that image to the
+primary Tk view or the OBS Stream Output, even if Stop and cleanup overlap
+the native callback. The hardware-accelerated GameCube callback already
+has its own equivalent guard. Normal running video, keyboard/controller
+input, camera tracking, emulation frames and audio are unchanged. Synthetic
+threaded tests cover Stop before decode, during decode and while acquiring
+the shared frame lock, as well as healthy video publication. These tests
+do not replace physical USB, OBS or ROM-switch acceptance.
+
 ## Late camera input after Stop / source changes
 
 3.3 now binds each real camera-to-native P1/P2 update (both continuous

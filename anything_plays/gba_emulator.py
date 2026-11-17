@@ -244,13 +244,25 @@ class CoreSession:
         return False
 
     def video(self, data, width, height, pitch):
-        """Copy a core-owned video frame before the native callback returns."""
+        """Copy native video only while this emulator session is active.
+
+        A software core can finish a callback after Stop was requested. The
+        expensive frame decode is skipped when Stop is already visible; the
+        final stop check is inside the same lock as the UI/frame publication
+        so a late callback cannot restore pixels after the Stop path clears
+        its frame. The hardware GameCube callback has an equivalent guard.
+        """
+        stop = getattr(self.emulator, "stop_event", None)
+        if isinstance(stop, threading.Event) and stop.is_set():
+            return
         try:
             frame = decode_frame(data, width, height, pitch, self.pixel_format)
         except (ValueError, OverflowError):
             return
         if frame is not None:
             with self.emulator.lock:
+                if isinstance(stop, threading.Event) and stop.is_set():
+                    return
                 self.emulator.frame = frame
                 self.emulator.frame_serial += 1
 
