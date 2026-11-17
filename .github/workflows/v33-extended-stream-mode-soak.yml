@@ -14,7 +14,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: v33-extended-tk-stream-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  # Repeated opt-ins on one PR supersede stale 30-minute source revisions;
+  # checkout still validates the exact event head before any test begins.
+  group: v33-extended-tk-stream-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

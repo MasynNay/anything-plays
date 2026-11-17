@@ -1,7 +1,8 @@
 name: 3.3 | Four-platform isolated owner QA installers (unreleased)
 
-# Private acceptance candidates for the exact PR head. These only contain
-# independently staged mGBA and are NOT public 3.3 or full-console releases.
+# Private acceptance candidates for the exact PR head: a minimal mGBA
+# startup package and a separately staged 11-core/18-profile full-native QA
+# package. Neither is a public 3.3 installer or a stable upgrade.
 # No tags, Releases API writes, deployment credentials or automatic install.
 on:
   pull_request:
@@ -30,7 +31,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: v33-candidate-build-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  # Latest PR head wins. A SHA suffix prevented cancellation and left
+  # redundant macOS builds queued after every development commit.
+  # Exact source remains pinned by the checkout/receipt below, not this key.
+  group: v33-candidate-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -99,6 +103,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_full_windows_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_macos_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_native_link.py' -v
+          python -m unittest discover -s tests -p 'test_v33_workflow_concurrency.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
