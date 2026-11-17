@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import json
 import math
+import threading
 import time
 from functools import lru_cache
 import tkinter as tk
@@ -1183,6 +1184,7 @@ class StreamMixin:
         if canvas is None or not canvas.winfo_exists():
             self.close_stream_mode()
             return False
+        output = self._stream_output_window
         w = max(320, min(1920, canvas.winfo_width()))
         h = max(400, min(1600, canvas.winfo_height()))
         active_game = bool(self.emu.running and self.uses_embedded_emulator())
@@ -1200,9 +1202,24 @@ class StreamMixin:
                              else self.emu.frame[:, :, :3].copy())
                     changed = True
             if changed:
-                self._stream_game_frame = (
-                    Image.fromarray(fresh) if fresh is not None else None
-                )
+                converted = Image.fromarray(fresh) if fresh is not None else None
+                # Stop/ROM replacement may have revoked this source while
+                # PIL converted a large copied frame outside the native
+                # lock. Never reattach that old PIL image after cleanup.
+                stop = getattr(self.emu, "stop_event", None)
+                with self.emu.lock:
+                    still_current = (
+                        self.emu.running
+                        and getattr(self.emu, "frame_serial", 0) == serial
+                        and not (
+                            isinstance(stop, threading.Event)
+                            and stop.is_set()
+                        )
+                    )
+                if not still_current:
+                    self._stream_last_render = None
+                    return False
+                self._stream_game_frame = converted
                 self._stream_game_serial = serial
         else:
             serial = None
@@ -1282,6 +1299,45 @@ class StreamMixin:
             camera_active=camera_active, camera_reference=camera_ref,
             resize_cache=getattr(self, "_stream_resize_cache", None),
         )
+        # Compositing and resizing happen OUTSIDE the native frame lock.
+        # Stop, camera unplug, changed settings or a closed/reopened window
+        # may invalidate those pixels during a slow PIL operation. Before
+        # mutating an existing Tk PhotoImage (which OBS may be capturing),
+        # verify that the source generations and target still match.
+        if (self._stream_output_window is not output
+                or self._stream_canvas is not canvas):
+            return False  # The old window is already retired.
+        changed_camera = self._stream_camera_serial != state[3]
+        changed_settings = tuple(self._stream_options.items()) != state[5]
+        still_active = bool(
+            self.emu.running and self.uses_embedded_emulator()
+        )
+        changed_game = still_active != active_game
+        if active_game:
+            stop = getattr(self.emu, "stop_event", None)
+            with self.emu.lock:
+                changed_game = changed_game or (
+                    getattr(self.emu, "frame_serial", 0) != serial
+                    or not self.emu.running
+                    or (isinstance(stop, threading.Event) and stop.is_set())
+                )
+        if changed_game or changed_camera or changed_settings:
+            cache = getattr(self, "_stream_resize_cache", None)
+            if changed_game and self._stream_game_serial == serial:
+                self._stream_game_frame = None
+                self._stream_game_serial = None
+            if cache is not None and (changed_game or changed_camera):
+                try:
+                    if changed_game:
+                        cache.clear("GAME")
+                    if changed_camera:
+                        cache.clear("CAMERA")
+                except Exception:
+                    # No old privacy-sensitive fitted source may survive a
+                    # failed optional cache eviction.
+                    self._stream_resize_cache = None
+            self._stream_blank_output()
+            return False
         photo = self._stream_photo
         if photo is None or photo.width() != w or photo.height() != h:
             photo = ImageTk.PhotoImage(frame, master=self._stream_output_window)

@@ -320,6 +320,26 @@ without an unload, the still-live camera, invalid cache wrappers and
 active-game fit reuse. Native GameCube, controller, microphone and physical
 OBS recording still require separate owner acceptance.
 
+### Source-generation fence before publishing the OBS composite
+
+Tk Stream Mode deliberately converts native game pixels and resizes the
+game/webcam panels outside the emulator's frame lock. A Stop, ROM switch,
+camera disconnect, settings edit or Stream window close can arrive while
+PIL is still processing the earlier sources. 3.3 now checks the native
+frame serial/Stop signal **after conversion**, and checks the game, camera
+and output-window generations **after composition but before touching the
+OBS-facing Tk PhotoImage**. Superseded frames are discarded rather than
+published. A changed camera/game source selectively evicts stale fitted
+cache pixels while leaving the unrelated source intact; if an optional
+cache fails, its entire reference is dropped. Closing the output during
+composition cannot recreate the retired Tk image. Source comparisons
+are short and do not hold a native frame lock across PIL or Tk calls.
+
+Synthetic adversarial tests exercise Stop during game conversion, Stop or
+camera disconnection during PIL composition, a settings change and a
+closed window. The fence is not a replacement for owner physical OBS
+recording, camera hotplug and 30-minute GameCube QA.
+
 ## Collect privacy-safe Stream Mode QA evidence
 
 While **Stream Output** and **Stream Settings** are open, use
