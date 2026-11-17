@@ -524,11 +524,12 @@ class Emulator:
             sink.set_volume(volume)
 
     def set_camera_buttons(self, player_one=(), player_two=(),
-                           *, sample_started_at=None):
-        """Publish one atomic camera snapshot, with independent P1/P2 holds."""
-        # Read generation BEFORE armed: Stop may run between this check
-        # and acquiring the native input lock. Old input is then rejected.
-        generation = self.inputs.camera_generation()
+                           *, sample_started_at=None, generation=None):
+        """Publish an atomic P1/P2 snapshot from its original camera frame."""
+        # The real camera pipeline provides a token from frame START. Older
+        # API callers still sample generation before checking armed state.
+        if generation is None:
+            generation = self.inputs.camera_generation()
         if self.running and self.armed:
             if sample_started_at is None:
                 self.inputs.set_camera_buttons(
@@ -540,12 +541,14 @@ class Emulator:
                     generation=generation,
                 )
 
-    def press(self, button, frames=8, port=0):
-        generation = self.inputs.camera_generation()
+    def press(self, button, frames=8, port=0, *, generation=None):
+        if generation is None:
+            generation = self.inputs.camera_generation()
         if self.running and self.armed:
-            self.inputs.queue_press(
+            return self.inputs.queue_press(
                 button, frames, port=port, generation=generation
             )
+        return False
 
     def set_manual(self, button, down):
         self.inputs.set_manual(button, down)

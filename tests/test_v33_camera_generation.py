@@ -129,5 +129,117 @@ class CameraGenerationSafetyTests(unittest.TestCase):
         self.assertEqual(inputs.state(0, 1, 0, IDS["B"]), 1)
 
 
+
+class CameraFrameBoundaryTests(unittest.TestCase):
+    """A frame begun before Stop must not control the next ROM session."""
+
+    @staticmethod
+    def build_scene(mode):
+        import numpy as np
+        from unittest.mock import Mock
+        from anything_plays.ui_camera import CameraMixin
+
+        class V:
+            def __init__(self, value):
+                self.value = value
+            def get(self):
+                return self.value
+            def set(self, value):
+                self.value = value
+
+        app = CameraMixin()
+        emu = object.__new__(Emulator)
+        emu.inputs = InputBuffer()
+        emu.inputs.system = "snes"
+        emu.running = True
+        emu.armed = True
+        emu.inputs.enable_latency_probe(clock=lambda: 1.0)
+        app.emu = emu
+        app.armed = True
+        app.external_input = None
+        app.frame = np.zeros((128, 192, 3), dtype=np.uint8)
+        app.tolerance = V(18)
+        app.min_area = V(55)
+        app.multi_fish_enabled = V(False)
+        app.color2_enabled = V(True)
+        app.color2_player = V("Player 2")
+        app.camera_input_mode = V(mode)
+        app.shuffle_enabled = V(False)
+        app.system_key = V("snes")
+        app.hold_frames = V(4)
+        app.cooldown = V(100)
+        app.mapping_vars = {"PrimaryZone": V("A"), "SecondaryZone": V("B")}
+        app.cfg = {
+            "rgb": [50, 250, 90], "rgb2": [240, 50, 190],
+            "zones": {
+                "PrimaryZone": [0, 0, 0.5, 1],
+                "SecondaryZone": [0.5, 0, 1, 1],
+            },
+        }
+        app._last_camera_pulses = {}
+        app._shuffle_latched = False
+        app.action = V("")
+        app.render_zones = lambda frame, active: frame
+        app.geometry = lambda: None
+        app._stream_output_window = None
+        app.camera_photo = None
+        return app
+
+    def test_slow_tracking_from_old_game_never_updates_restarted_game(self):
+        import numpy as np
+        from unittest.mock import patch
+
+        for mode in ("Held while visible", "Pulse (classic)"):
+            with self.subTest(mode=mode):
+                app = self.build_scene(mode)
+                contour = np.array([[[1, 1]], [[2, 1]], [[2, 2]]], dtype=np.int32)
+                primary = [((45, 60), contour)]
+                secondary = [((145, 60), contour)]
+                calls = [0]
+                def locate(*args, **kwargs):
+                    calls[0] += 1
+                    if calls[0] == 1:
+                        # Stop and rapid rearm while an earlier image is still
+                        # being analyzed by OpenCV. Original image must lose.
+                        app.emu.disarm()
+                        app.emu.running = True
+                        app.emu.armed = True
+                    return primary if calls[0] % 2 else secondary
+                def zone(center, *args):
+                    return "PrimaryZone" if center[0] < 100 else "SecondaryZone"
+                with patch("anything_plays.ui_camera.locate_targets",
+                           side_effect=locate), patch(
+                    "anything_plays.ui_camera.zone_at", side_effect=zone
+                ):
+                    app.draw_camera()
+                    app.emu.inputs.before_frame(True)
+                    self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["A"]), 0)
+                    self.assertEqual(app.emu.inputs.state(1, 1, 0, IDS["B"]), 0)
+                    self.assertEqual(app.emu.inputs.commands.qsize(), 0)
+                    self.assertNotIn((0, "A"), app._last_camera_pulses)
+                    self.assertNotIn((1, "B"), app._last_camera_pulses)
+                    self.assertGreaterEqual(
+                        app.emu.inputs.latency_snapshot()[
+                            "late_camera_updates_dropped"
+                        ], 1
+                    )
+                    # A fresh real frame from the new session must work,
+                    # including classic pulses after a rejected old frame.
+                    app.draw_camera()
+                    app.emu.inputs.before_frame(True)
+                    self.assertEqual(app.emu.inputs.state(0, 1, 0, IDS["A"]), 1)
+                    self.assertEqual(app.emu.inputs.state(1, 1, 0, IDS["B"]), 1)
+
+    def test_legacy_frame_adapter_receives_no_new_keyword_args(self):
+        from unittest.mock import Mock, patch
+        app = self.build_scene("Held while visible")
+        adapter = Mock()
+        adapter.inputs = object()
+        app.emu = adapter
+        with patch("anything_plays.ui_camera.locate_targets", return_value=[]):
+            app.draw_camera()
+        adapter.set_camera_buttons.assert_called_once_with(set(), set())
+
+
 if __name__ == "__main__":
     unittest.main()

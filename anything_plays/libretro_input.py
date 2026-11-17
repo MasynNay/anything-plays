@@ -137,22 +137,22 @@ class InputBuffer:
         # Invalid frames/ports must not crash the camera processing loop or
         # invent a button press. Valid legacy durations still clamp to 1..60.
         if type(button) is not str or type(port) is not int or port not in (0, 1):
-            return
+            return False
         if type(frames) not in (int, float, str):
-            return
+            return False
         try:
             duration = max(1, min(60, int(frames)))
         except (ValueError, TypeError, OverflowError):
-            return
+            return False
         button_id = self.id_for(button)
         if button_id is None:
-            return
+            return False
         with self.state_lock:
             if generation is not None and (
                     type(generation) is not int
                     or generation != self._camera_generation):
                 self._late_camera_updates_dropped += 1
-                return
+                return False
             try:
                 # Preserve the existing two-item queue format for P1.
                 # Queue/disarm are serialized; an old camera observation
@@ -161,8 +161,9 @@ class InputBuffer:
                     (button_id, duration) if port == 0
                     else (button_id, duration, 1)
                 )
+                return True
             except Full:
-                pass
+                return False
 
     def set_camera_buttons(self, player_one=(), player_two=(),
                            *, sample_started_at=None, generation=None):

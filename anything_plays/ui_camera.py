@@ -482,6 +482,15 @@ class CameraMixin:
         # captured frame -> held-input handoff -> next native input snapshot.
         # Sensor exposure, webcam read() and display delay are NOT measured.
         inputs = getattr(self.emu, "inputs", None)
+        # A frame can spend time in OpenCV while Stop and a new ROM session
+        # happen on another thread. Bind this frame to its ORIGINAL input
+        # generation before tracking begins, never at the late dispatch.
+        # Other supported emulator adapters retain their historical API.
+        from anything_plays.gba_emulator import Emulator
+        frame_generation = (
+            inputs.camera_generation()
+            if isinstance(self.emu, Emulator) else None
+        )
         started_at = optional_camera_latency_start(
             getattr(inputs, "_latency_enabled", False) is True
             and self.armed and self.external_input is None
@@ -563,7 +572,10 @@ class CameraMixin:
             elif self.camera_input_mode.get() == 'Pulse (classic)':
                 # Each button has an independent cooldown; multiple objects
                 # trigger multiple keys on the same emulator frame.
-                self.emu.set_camera_buttons((), ())
+                if frame_generation is None:
+                    self.emu.set_camera_buttons((), ())
+                else:
+                    self.emu.set_camera_buttons((), (), generation=frame_generation)
                 now = optional_camera_pulse_now()
                 cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
                 for port in (0, 1):
@@ -572,19 +584,35 @@ class CameraMixin:
                         if camera_pulse_due(
                             self._last_camera_pulses.get(key), now, cooldown
                         ):
-                            self.emu.press(
-                                button, self.hold_frames.get(), port=port
-                            )
-                            self._last_camera_pulses[key] = now
+                            if frame_generation is None:
+                                delivered = self.emu.press(
+                                    button, self.hold_frames.get(), port=port
+                                )
+                            else:
+                                delivered = self.emu.press(
+                                    button, self.hold_frames.get(), port=port,
+                                    generation=frame_generation,
+                                )
+                            # False means the native buffer rejected an old
+                            # frame after disarm. Do not consume the cooldown
+                            # for a button that was never queued. Legacy
+                            # adapters may still return None on success.
+                            if delivered is not False:
+                                self._last_camera_pulses[key] = now
             else:
                 # Continuous per-frame input with no per-fish queue growth.
                 # This is the ideal mode for a tank with several moving fish.
+                kwargs = (
+                    {"generation": frame_generation}
+                    if frame_generation is not None else {}
+                )
                 if started_at is not None:
                     self.emu.set_camera_buttons(
-                        buttons[0], buttons[1], sample_started_at=started_at
+                        buttons[0], buttons[1], sample_started_at=started_at,
+                        **kwargs,
                     )
                 else:
-                    self.emu.set_camera_buttons(buttons[0], buttons[1])
+                    self.emu.set_camera_buttons(buttons[0], buttons[1], **kwargs)
                 self._last_camera_pulses.clear()
 
             if self.color2_enabled.get() and second_player_requested and (

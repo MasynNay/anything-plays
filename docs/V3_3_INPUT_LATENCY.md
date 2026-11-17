@@ -133,7 +133,17 @@ tracked colors, frame pixels, button labels, file paths, timestamps or
 identifiers enter the report. Starting a fresh timing probe resets its
 local dropped-update count. No network upload occurs.
 
-This fixes a software handoff race under deterministic thread tests; it
+3.3 now also captures the camera-input generation at the **beginning of
+OpenCV frame analysis**. A slow old frame therefore cannot inject held inputs
+or classic P1/P2 pulses into a newly restarted ROM even if Stop and rearm
+happen while contour detection is still running. Rejected pulse deliveries
+do not consume that button's cooldown, so the next fresh frame can respond
+normally. Third-party adapters keep their existing positional API.
+Synthetic end-to-end tracking tests cover Stop/rearm during slow detection,
+both input modes, both ports, and a fresh replacement frame; they do not
+measure physical webcam exposure or game responsiveness.
+
+This fixes software handoff races under deterministic thread tests; it
 **does not** claim physical camera hotplug/reconnect or native gamepad timing
 has been verified. Owner hardware and long-session checks are still required.
 
