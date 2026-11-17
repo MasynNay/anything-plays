@@ -41,7 +41,11 @@ frames or audio, benchmark an external emulator, or verify a real speaker.
 Click **Copy safe report** only if you choose to retain the aggregate. The
 report is generated from fixed allowlisted scalar counters. The emulator
 retains no closed Dolphin session, GL context, ROM handle or audio samples
-for diagnostics. Do not share external system-information screenshots
+for diagnostics. The **Check my setup** report is optional both during
+gameplay and after stopping: a failed native driver/audio timing snapshot
+returns **unavailable** without ending gameplay, converting a clean Stop into
+an error, or masking an actual emulation failure. A new session may collect
+fresh metrics; no native report exception text is copied to the interface. Do not share external system-information screenshots
 alongside it unless you have reviewed them for personal data.
 
 ## Clock integrity and native gameplay

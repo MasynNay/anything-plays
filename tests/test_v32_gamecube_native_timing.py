@@ -349,6 +349,86 @@ class NativeLoopTimingTests(unittest.TestCase):
         emu.system = "gba"
         self.assertIsNone(emu.gamecube_performance_snapshot())
 
+    def test_live_gamecube_diagnostics_fail_without_interrupting_emulation(self):
+        """A native audio/GL counter error is not a gameplay error."""
+        from anything_plays.gba_emulator import Emulator
+
+        emu = Emulator()
+        emu.system = "gamecube"
+        fake = Mock()
+        fake.performance_snapshot.side_effect = RuntimeError(
+            "private audio driver /home/owner/device XYZSERIAL"
+        )
+        emu._gamecube_session = fake
+        self.assertIsNone(emu.gamecube_performance_snapshot())
+        self.assertIs(emu._gamecube_session, fake)
+        self.assertIsNone(emu.error)
+        self.assertIsNone(emu.last_error)
+        fake.performance_snapshot.assert_called_once()
+
+    def test_gamecube_shutdown_diagnostic_failure_does_not_turn_stop_into_error(self):
+        """An optional report must not mask a successful native Stop."""
+        from anything_plays.gba_emulator import Emulator
+
+        emu = Emulator()
+        emu.system = "gamecube"
+        emu.rom = "/home/private/owned-game.iso"
+        emu.core_path = "/home/private/native-core.so"
+        bad = Mock()
+        bad.run.return_value = None
+        bad.performance_snapshot.side_effect = OSError(
+            "speaker failed /home/private/device SERIALXYZ"
+        )
+        with patch("anything_plays.gamecube_gpu.GameCubeHardwareSession",
+                   return_value=bad):
+            emu._run()
+        self.assertIsNone(emu._gamecube_session)
+        self.assertIsNone(emu._gamecube_last_performance)
+        self.assertIsNone(emu.gamecube_performance_snapshot())
+        self.assertIsNone(emu.last_error)
+        self.assertIsNone(emu.error)
+        self.assertFalse(emu.running)
+        self.assertFalse(emu.launching)
+
+        # A future successful ROM is still able to record a valid report.
+        good_report = {
+            "format": "anything-plays-gamecube-performance",
+            "version": 1,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": {"native_run_calls": 10},
+        }
+        good = Mock()
+        good.performance_snapshot.return_value = good_report
+        with patch("anything_plays.gamecube_gpu.GameCubeHardwareSession",
+                   return_value=good):
+            emu._run()
+        self.assertIsNone(emu._gamecube_session)
+        self.assertEqual(emu.gamecube_performance_snapshot(), good_report)
+        self.assertIsNone(emu.last_error)
+
+    def test_real_core_failure_is_not_masked_by_failed_shutdown_metrics(self):
+        """Preserve a native error, never replace it with a driver report."""
+        from anything_plays.gba_emulator import Emulator
+
+        emu = Emulator()
+        emu.system = "gamecube"
+        emu.rom = "/synthetic/private.iso"
+        bad = Mock()
+        bad.run.side_effect = RuntimeError("Native emulator stopped")
+        bad.performance_snapshot.side_effect = OSError(
+            "driver serial XYZSECRET /Users/private"
+        )
+        with patch("anything_plays.gamecube_gpu.GameCubeHardwareSession",
+                   return_value=bad):
+            emu._run()
+        self.assertEqual(emu.last_error, "RuntimeError: Native emulator stopped")
+        self.assertEqual(emu.error, emu.last_error)
+        self.assertNotIn("XYZSECRET", emu.error)
+        self.assertNotIn("/Users/", emu.error)
+        self.assertIsNone(emu._gamecube_last_performance)
+        self.assertIsNone(emu._gamecube_session)
+        self.assertFalse(emu.running)
+
     def test_research_metrics_are_allowlisted_not_raw_logs(self):
         from tools.v32_extended_native_runtime import safe_evidence
         raw = {

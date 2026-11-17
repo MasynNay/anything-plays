@@ -507,7 +507,13 @@ class Emulator:
             return None
         session = self._gamecube_session
         if session is not None:
-            return session.performance_snapshot()
+            try:
+                return session.performance_snapshot()
+            except Exception:
+                # Setup diagnostics are optional. A failing native audio or
+                # GPU counter must not interrupt a running game or expose
+                # driver/device details through the Check my setup dialog.
+                return self._gamecube_last_performance
         return self._gamecube_last_performance
 
     def set_volume(self, level):
@@ -605,6 +611,12 @@ class Emulator:
                         self._gamecube_last_performance = (
                             session.performance_snapshot()
                         )
+                    except Exception:
+                        # Shutdown metrics are optional; failure must not
+                        # overwrite the real CoreSession exit result, or turn
+                        # a clean Stop into an emulator error. Never surface
+                        # untrusted native driver exception text as a report.
+                        self._gamecube_last_performance = None
                     finally:
                         self._gamecube_session = None
             elif self.system == "n64" and sys.platform == "darwin":
