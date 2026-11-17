@@ -110,6 +110,23 @@ This behavior has synthetic fault-injection coverage. The real camera
 driver's permissions, USB reconnect timing and native-controller release
 still require physical-device QA.
 
+## Late camera input after Stop / source changes
+
+3.3 now binds each real camera-to-native P1/P2 update (both continuous
+**Held while visible** snapshots and **Pulse (classic)** requests) to the
+input generation observed **before** checking the emulator's armed state.
+Stop, ROM switching and camera disarm invalidate that generation under the
+same native input lock that protects both ports and the bounded pulse queue.
+If processing a frame overlaps a Stop, late input from the earlier generation
+is discarded instead of reviving its held buttons or queued presses. Normal
+keyboard and controller state remains independently managed. Malformed
+classic pulse durations, invalid port numbers and unrecognized button names
+are ignored rather than crashing an otherwise healthy tracking frame.
+
+This fixes a software handoff race under deterministic thread tests; it
+**does not** claim physical camera hotplug/reconnect or native gamepad timing
+has been verified. Owner hardware and long-session checks are still required.
+
 ## Manual 3.3 acceptance
 
 Capture separate baselines per host/OS, camera resolution, single vs two

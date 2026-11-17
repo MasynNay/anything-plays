@@ -80,6 +80,9 @@ class InputBuffer:
         # snapshots. Two fish in two zones are pressed in the SAME emulated
         # frame; missing fish are released on the next camera update.
         self._camera_held = {0: set(), 1: set()}
+        # Stop advances this token under state_lock. Work computed by the
+        # prior camera tick must never be inserted after a Stop/restart.
+        self._camera_generation = 0
         # N64 and GameCube may poll many analogue inputs per frame. Cache
         # each port's full state exactly once per emulation step.
         self._n64_state = {}
@@ -87,6 +90,11 @@ class InputBuffer:
         # Explicit opt-in; default gameplay has no timing-clock calls.
         self.latency_probe = None
         self._latency_enabled = False
+
+    def camera_generation(self):
+        """Capture the input generation before checking the facade's armed flag."""
+        with self.state_lock:
+            return self._camera_generation
 
     def enable_latency_probe(self, *, clock=None):
         """Start fresh local software-stage measurements; no image data."""
@@ -119,29 +127,50 @@ class InputBuffer:
             return NEO_GEO_POCKET_IDS.get(button)
         return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
 
-    def queue_press(self, button, frames, port=0):
-        """Queue bounded camera pulses; simultaneous presses support P1/P2."""
-        button_id = self.id_for(button)
-        if button_id is None or port not in (0, 1):
+    def queue_press(self, button, frames, port=0, *, generation=None):
+        """Queue bounded P1/P2 pulses, never reviving an expired camera tick."""
+        # Tk settings can be corrupt or change during a live session.
+        # Invalid frames/ports must not crash the camera processing loop or
+        # invent a button press. Valid legacy durations still clamp to 1..60.
+        if type(button) is not str or type(port) is not int or port not in (0, 1):
             return
-        duration = max(1, min(60, int(frames)))
+        if type(frames) not in (int, float, str):
+            return
         try:
-            # Preserve the existing two-item queue format for player one.
-            self.commands.put_nowait(
-                (button_id, duration) if port == 0
-                else (button_id, duration, 1)
-            )
-        except Full:
-            pass
+            duration = max(1, min(60, int(frames)))
+        except (ValueError, TypeError, OverflowError):
+            return
+        button_id = self.id_for(button)
+        if button_id is None:
+            return
+        with self.state_lock:
+            if generation is not None and (
+                    type(generation) is not int
+                    or generation != self._camera_generation):
+                return
+            try:
+                # Preserve the existing two-item queue format for P1.
+                # Queue/disarm are serialized; an old camera observation
+                # cannot sneak into the next session after its Stop.
+                self.commands.put_nowait(
+                    (button_id, duration) if port == 0
+                    else (button_id, duration, 1)
+                )
+            except Full:
+                pass
 
     def set_camera_buttons(self, player_one=(), player_two=(),
-                           *, sample_started_at=None):
+                           *, sample_started_at=None, generation=None):
         """Set both players' held buttons; optionally time their delivery."""
         one = {identity for button in tuple(player_one)[:32]
                if (identity := self.id_for(button)) is not None}
         two = {identity for button in tuple(player_two)[:32]
                if (identity := self.id_for(button)) is not None}
         with self.state_lock:
+            if generation is not None and (
+                    type(generation) is not int
+                    or generation != self._camera_generation):
+                return
             self._camera_held[0] = one
             self._camera_held[1] = two
             if self._latency_enabled:
@@ -182,6 +211,7 @@ class InputBuffer:
         # Clear queued presses under the same lock as before_frame: a pending
         # camera command cannot be applied AFTER the user presses Stop.
         with self.state_lock:
+            self._camera_generation += 1
             self.remaining.clear()
             self.remaining_p2.clear()
             self.pressed.clear()

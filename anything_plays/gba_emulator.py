@@ -526,19 +526,26 @@ class Emulator:
     def set_camera_buttons(self, player_one=(), player_two=(),
                            *, sample_started_at=None):
         """Publish one atomic camera snapshot, with independent P1/P2 holds."""
+        # Read generation BEFORE armed: Stop may run between this check
+        # and acquiring the native input lock. Old input is then rejected.
+        generation = self.inputs.camera_generation()
         if self.running and self.armed:
             if sample_started_at is None:
-                # Preserve the longstanding positional call contract when
-                # local performance sampling has not been enabled.
-                self.inputs.set_camera_buttons(player_one, player_two)
+                self.inputs.set_camera_buttons(
+                    player_one, player_two, generation=generation
+                )
             else:
                 self.inputs.set_camera_buttons(
-                    player_one, player_two, sample_started_at=sample_started_at
+                    player_one, player_two, sample_started_at=sample_started_at,
+                    generation=generation,
                 )
 
     def press(self, button, frames=8, port=0):
-        if self.running and self.armed and self.inputs.id_for(button) is not None:
-            self.inputs.queue_press(button, frames, port=port)
+        generation = self.inputs.camera_generation()
+        if self.running and self.armed:
+            self.inputs.queue_press(
+                button, frames, port=port, generation=generation
+            )
 
     def set_manual(self, button, down):
         self.inputs.set_manual(button, down)
