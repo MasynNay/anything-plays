@@ -632,6 +632,9 @@ class StreamMixin:
         self._stream_camera_force_next_snapshot = False
         self._stream_camera_frame = None
         self._stream_camera_serial = 0
+        # A disconnect must revoke even an IN-FLIGHT preview when no
+        # previous camera image existed to advance the render serial.
+        self._stream_camera_epoch = 0
         self._stream_stale_camera_clears = 0
         self._stream_session_faults = 0
         self._stream_session_recoveries = 0
@@ -905,11 +908,26 @@ class StreamMixin:
 
     def stream_camera_snapshot(self, frame):
         """Accept an existing *annotated* BGR frame, never open a new capture."""
-        if self._stream_output_window is None:
+        output = self._stream_output_window
+        if output is None:
             return
         if frame is None:
             self.stream_clear_camera()
             return
+        # OpenCV/PIL conversion may yield to a disconnect, a newer frame or
+        # a closed/reopened OBS output. Capture identity BEFORE conversion,
+        # including camera-off notifications with no prior cached pixels.
+        camera_serial = self._stream_camera_serial
+        camera_epoch = self._stream_camera_epoch
+
+        def current_camera_output():
+            return (
+                self._stream_output_window is output
+                and self._stream_camera_serial == camera_serial
+                and self._stream_camera_epoch == camera_epoch
+                and not getattr(self, "_closing", False)
+            )
+
         try:
             now = time.monotonic()
             valid_now = (
@@ -918,6 +936,8 @@ class StreamMixin:
         except Exception:
             valid_now = False
         if not valid_now:
+            if not current_camera_output():
+                return
             # A failed optional clock must not leave a previous private
             # webcam image indefinitely visible in OBS. Keep native game
             # controls untouched; clear only the stream's camera snapshot.
@@ -949,6 +969,10 @@ class StreamMixin:
                 cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             )
         except Exception:
+            if not current_camera_output():
+                # A late failure from the old conversion must not clear a
+                # newer camera image or change its refresh timestamp.
+                return
             # The OBS-only conversion is best-effort. Some native OpenCV
             # wrappers raise RuntimeError, AttributeError or MemoryError
             # instead of cv2.error; none may escape into the camera-tracking
@@ -961,6 +985,10 @@ class StreamMixin:
             # tracking frame, to avoid a conversion-error hot loop.
             self._stream_camera_last_snapshot = now
             self._stream_camera_force_next_snapshot = False
+            return
+        if not current_camera_output():
+            # Preserve newer camera pixels and never republish a disconnected
+            # frame or attach a preview to a newly opened Stream window.
             return
         self._stream_camera_frame = preview
         self._stream_camera_serial += 1
@@ -976,6 +1004,11 @@ class StreamMixin:
         valid capture timestamp, pending forced refresh or cached resize is
         still revoked immediately and accepts the next reconnect.
         """
+        # Advance even when already blank: an earlier BGR->PIL conversion
+        # could still be running with NO previously published camera frame.
+        # This epoch never enters the render-state key, so idle disconnect
+        # polls remain redraw-idempotent.
+        self._stream_camera_epoch += 1
         cache = getattr(self, "_stream_resize_cache", None)
         try:
             cache_entries = getattr(cache, "_entries", None)

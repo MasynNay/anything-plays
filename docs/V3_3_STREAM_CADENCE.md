@@ -344,6 +344,17 @@ refresh rather than being unnecessarily blanked. Added regression tests
 for prior-photo Stop revocation, normal next-frame continuity, and
 window-close/reopen during conversion.
 
+The webcam's extra BGR-to-RGB/PIL preview conversion now independently
+checks Stream window identity and camera source generation before accepting
+a frame **or** clearing a preview after conversion failure. A monotonic
+camera-revocation epoch advances even if disconnect occurs before the first
+frame was ever cached; unlike the visible render serial, it does not cause
+idle camera-off notifications to redraw the output. Late conversions cannot
+reattach disconnected private pixels, overwrite a newer camera frame, or
+clear a new Stream window after the old conversion fails. Four reentrant
+synthetic tests cover those cases. This does not establish physical USB
+disconnect or OBS encoder acceptance.
+
 Synthetic adversarial tests exercise Stop during game conversion, Stop or
 camera disconnection during PIL composition, a settings change and a
 closed window. The fence is not a replacement for owner physical OBS

@@ -255,5 +255,82 @@ class StreamPublicationFenceTests(unittest.TestCase):
         app._stream_canvas.delete.assert_called_with("all")
 
 
+    def test_camera_disconnect_during_first_conversion_cannot_republish(self):
+        """No existing image/serial does not make an in-flight frame safe."""
+        app = self.make_app(game=False, camera=False)
+        raw = np.full((16, 24, 3), 80, dtype=np.uint8)
+        old_serial = app._stream_camera_serial
+
+        def disconnect(_frame, _code):
+            app.stream_clear_camera()
+            return np.full_like(raw, 180)
+
+        with patch("anything_plays.ui_stream.cv2.cvtColor",
+                   side_effect=disconnect):
+            app.stream_camera_snapshot(raw)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertEqual(app._stream_camera_serial, old_serial)
+        self.assertEqual(app._stream_camera_epoch, 1)
+
+    def test_camera_disconnect_during_conversion_revokes_previous_photo(self):
+        app = self.make_app(game=False, camera=True)
+        previous = app._stream_camera_frame
+        app._stream_camera_last_snapshot = None
+        raw = np.full((16, 24, 3), 80, dtype=np.uint8)
+
+        def disconnect(_frame, _code):
+            app.stream_clear_camera()
+            return np.full_like(raw, 180)
+
+        with patch("anything_plays.ui_stream.cv2.cvtColor",
+                   side_effect=disconnect):
+            app.stream_camera_snapshot(raw)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertEqual(app._stream_camera_serial, 5)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+        self.assertIsNot(app._stream_camera_frame, previous)
+
+    def test_camera_conversion_cannot_overwrite_newer_camera_generation(self):
+        app = self.make_app(game=False, camera=True)
+        replacement = Image.new("RGB", (24, 16), "blue")
+        raw = np.full((16, 24, 3), 80, dtype=np.uint8)
+
+        def newer_frame(_frame, _code):
+            app._stream_camera_frame = replacement
+            app._stream_camera_serial += 1
+            app._stream_camera_last_snapshot = 91.0
+            return np.full_like(raw, 180)
+
+        with patch("anything_plays.ui_stream.cv2.cvtColor",
+                   side_effect=newer_frame):
+            app.stream_camera_snapshot(raw)
+        self.assertIs(app._stream_camera_frame, replacement)
+        self.assertEqual(app._stream_camera_serial, 5)
+        self.assertEqual(app._stream_camera_last_snapshot, 91.0)
+
+    def test_failed_old_camera_conversion_cannot_clear_reopened_output(self):
+        app = self.make_app(game=False, camera=True)
+        replacement = Image.new("RGB", (24, 16), "blue")
+        new_window = Mock()
+        raw = np.full((16, 24, 3), 80, dtype=np.uint8)
+
+        def reopen_then_fail(_frame, _code):
+            app._stream_output_window = new_window
+            app._stream_camera_frame = replacement
+            app._stream_camera_serial += 1
+            app._stream_camera_last_snapshot = 91.0
+            raise ValueError("old conversion failed")
+
+        with patch("anything_plays.ui_stream.cv2.cvtColor",
+                   side_effect=reopen_then_fail):
+            app.stream_camera_snapshot(raw)
+        self.assertIs(app._stream_output_window, new_window)
+        self.assertIs(app._stream_camera_frame, replacement)
+        self.assertEqual(app._stream_camera_serial, 5)
+        self.assertEqual(app._stream_camera_last_snapshot, 91.0)
+
+
 if __name__ == "__main__":
     unittest.main()
