@@ -25,6 +25,7 @@ on:
       - 'tests/test_v33_full_windows_staging.py'
       - 'tests/test_v33_full_macos_staging.py'
       - 'tests/test_v33_full_native_link.py'
+      - 'tests/test_v33_legacy_runner_isolation.py'
   workflow_dispatch:
 
 permissions:
@@ -104,6 +105,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v33_full_macos_staging.py' -v
           python -m unittest discover -s tests -p 'test_v33_full_native_link.py' -v
           python -m unittest discover -s tests -p 'test_v33_workflow_concurrency.py' -v
+          python -m unittest discover -s tests -p 'test_v33_legacy_runner_isolation.py' -v
           python - <<'PY'
           import os
           from anything_plays.build_identity import make_identity
