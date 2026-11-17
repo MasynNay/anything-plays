@@ -136,6 +136,37 @@ class OptionalGameCubeClockTests(unittest.TestCase):
         self.assertIn("measurements unavailable", lines[0])
         self.assertNotIn("Native frames: 0", lines[0])
 
+
+    def test_missing_native_clock_still_shows_independent_audio_and_preview(self):
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        timing = GameCubeNativeTiming()
+        for _ in range(4):
+            timing.record_completed_run()
+        m = timing.snapshot()
+        m.update({
+            "gpu_readback_calls": 2,
+            "gpu_readback_timing_samples": 1,
+            "gamecube_preview_clock_failures": 2,
+            "gpu_readback_max_ms": 12.5,
+            "gamecube_preview_observed_capture_fps": 29.0,
+            "gamecube_preview_cadence_intervals": 2,
+            "gamecube_preview_target_fps": 30,
+            "gamecube_preview_max_interval_ms": 36.0,
+            "audio_output_device_underflow_callbacks": 1,
+            "audio_output_underrun_frames": 5,
+            "audio_queue_dropped_frames": 0,
+        })
+        lines = _gamecube_performance_summary_lines({"metrics": m})
+        self.assertEqual(len(lines), 5)
+        self.assertIn("Native frames completed: 4", lines[0])
+        self.assertIn("no valid GameCube native timing samples", lines[0])
+        self.assertIn("2 captures", lines[1])
+        self.assertIn("share unavailable (native timing missing)", lines[1])
+        self.assertNotIn("0.0%", lines[1])
+        self.assertIn("observed 29.0 FPS", lines[2])
+        self.assertIn("Late deadlines", lines[3])
+        self.assertIn("1 device underflow callbacks", lines[4])
+
     def test_setup_panel_does_not_confuse_missing_clock_with_stopped_game(self):
         lines = _gamecube_performance_summary_lines(
             {"metrics": {"native_run_calls": 0}}

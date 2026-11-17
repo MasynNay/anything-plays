@@ -138,15 +138,34 @@ def _gamecube_performance_summary_lines(performance):
         # Clock failure does not erase independently completed retro_run
         # calls. Old reports with no completion counter remain conservative.
         if completed:
-            return (
+            native_line = (
                 f"Native frames completed: {completed} · "
                 "no valid GameCube native timing samples "
-                "(performance measurements unavailable).",
+                "(performance measurements unavailable)."
             )
-        return (
-            "No valid GameCube native timing samples yet "
-            "(gameplay may still be running).",
+        else:
+            native_line = (
+                "No valid GameCube native timing samples yet "
+                "(gameplay may still be running)."
+            )
+        # Legacy minimal reports may only include a native timing counter.
+        # Complete first-party snapshots can still show independent GPU
+        # publication, audio and scheduler data despite the bad clock.
+        independent_fields = (
+            "gpu_readback_calls", "gpu_readback_max_ms",
+            "gamecube_preview_observed_capture_fps",
+            "gamecube_preview_cadence_intervals",
+            "gamecube_preview_target_fps",
+            "gamecube_preview_max_interval_ms",
+            "scheduler_late_frames", "scheduler_resyncs",
+            "scheduler_late_max_ms",
+            "audio_output_device_underflow_callbacks",
+            "audio_output_underrun_frames", "audio_queue_dropped_frames",
         )
+        if not all(field in m for field in independent_fields):
+            return (native_line,)
+    else:
+        native_line = None
     observed_preview = (
         f"{m['gamecube_preview_observed_capture_fps']} FPS"
         if m['gamecube_preview_cadence_intervals'] > 0
@@ -193,7 +212,16 @@ def _gamecube_performance_summary_lines(performance):
             f">16 ms: {slow16} · >33 ms: {slow33} "
             f"(of {timed} valid samples)",
         )
-    if type(timed) is int and captures > 0 and timed == 0:
+    if not valid_samples:
+        # Readback may have its own valid clock, but there is no measured
+        # native-run denominator for a readback-share percentage.
+        readback_cost = (
+            f"maximum {m['gpu_readback_max_ms']} ms · "
+            "share unavailable (native timing missing)"
+            if type(timed) is int and timed > 0
+            else "maximum unmeasured · share unavailable"
+        )
+    elif type(timed) is int and captures > 0 and timed == 0:
         # A perf_counter() failure is not evidence that glReadPixels is free.
         readback_cost = "maximum unmeasured · share unavailable"
     elif type(timed) is int and 0 < timed < captures:
@@ -209,10 +237,10 @@ def _gamecube_performance_summary_lines(performance):
             "of native execution time (included, not additive)"
         )
     return (
-        f"Native frames: {completed} · timed {valid_samples} of {completed} · average "
-        f"{m['native_run_mean_ms']} ms · maximum "
-        f"{m['native_run_max_ms']} ms per retro_run · P95 " 
-        f"{p95_label}",
+        (native_line if native_line is not None else
+         f"Native frames: {completed} · timed {valid_samples} of {completed} · "
+         f"average {m['native_run_mean_ms']} ms · maximum "
+         f"{m['native_run_max_ms']} ms per retro_run · P95 {p95_label}"),
         f"GPU readback: {captures} captures · {readback_cost}"
         f"{readback_timing}",
         *readback_p95,

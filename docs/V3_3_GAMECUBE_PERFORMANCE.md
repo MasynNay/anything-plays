@@ -60,8 +60,14 @@ are unavailable, **Check my setup** displays the observed completed-frame
 count and explicitly says performance measurements are unavailable. When
 some succeed, it shows the timed-frame coverage next to the total.
 This is an aggregate count, not an estimate of gameplay FPS, completed
-rendered images, audio quality or GPU performance. Neither the original
-native scheduling nor controller/camera input and audio paths change.
+rendered images, audio quality or GPU performance. If native timing
+samples are completely unavailable but a full GameCube snapshot exists,
+the setup panel still displays separately measured GPU preview cadence,
+native deadline status and audio symptoms. It does **not** calculate a
+readback share without a measured native-run denominator. Older partial
+reports retain their conservative one-line unavailable message.
+Neither the original native scheduling nor controller/camera input and
+audio paths change.
 
 ## Clock integrity and native gameplay
 
