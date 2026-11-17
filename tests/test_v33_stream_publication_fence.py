@@ -461,5 +461,88 @@ class StreamPublicationFenceTests(unittest.TestCase):
         app._stream_canvas.delete.assert_called_once_with("all")
 
 
+    def test_healthy_next_native_frame_during_composition_keeps_previous_photo(self):
+        """New healthy frames must not flicker the last OBS image."""
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        previous_photo = Mock()
+        app._stream_photo = previous_photo
+        app._stream_canvas_item = 21
+        app._stream_last_render = ("last published native image",)
+        old_game = Image.new("RGB", (24, 16), "blue")
+        app._stream_game_frame = old_game
+        app._stream_game_serial = 6
+        app._stream_resize_cache.contained("GAME", old_game, (0, 0, 72, 56))
+        def publish_next(*_args, **_kwargs):
+            app.emu.frame_serial += 1
+            return Image.new("RGB", (760, 980), "red")
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  side_effect=publish_next),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        photo.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertIs(app._stream_photo, previous_photo)
+        self.assertEqual(app._stream_canvas_item, 21)
+        self.assertTrue(app.emu.running)
+        self.assertFalse(app.emu.stop_event.is_set())
+        self.assertIsNone(app._stream_last_render)
+        self.assertIn("GAME", app._stream_resize_cache._entries)
+        # The very next tick can catch up to the new native serial.
+        self.assertNotEqual(app.emu.frame_serial, app._stream_game_serial)
+
+    def test_rom_restart_during_composition_revokes_old_obs_photo(self):
+        """A replaced native session is not a harmless fresh frame."""
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 22
+        old_game = Image.new("RGB", (24, 16), "blue")
+        app._stream_game_frame = old_game
+        app._stream_game_serial = 6
+        app._stream_resize_cache.contained("GAME", old_game, (0, 0, 72, 56))
+        def restart_rom(*_args, **_kwargs):
+            app.emu.session_generation += 1
+            app.emu.frame_serial += 1
+            return Image.new("RGB", (760, 980), "red")
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  side_effect=restart_rom),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        photo.assert_not_called()
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        self.assertNotIn("GAME", app._stream_resize_cache._entries)
+
+    def test_rom_restart_during_native_conversion_cannot_reattach_old_pixels(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        old_game = Image.new("RGB", (24, 16), "red")
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 23
+        app._stream_game_frame = old_game
+        app._stream_game_serial = 6
+        def replace_session(_pixels):
+            # A fast stop/start may have already cleared the stop event.
+            app.emu.session_generation += 1
+            app.emu.frame_serial += 1
+            return old_game
+        with patch("anything_plays.ui_stream.Image.fromarray",
+                   side_effect=replace_session):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        app._stream_canvas.delete.assert_called_once_with("all")
+
+
+
 if __name__ == "__main__":
     unittest.main()

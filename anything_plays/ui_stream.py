@@ -1258,6 +1258,7 @@ class StreamMixin:
             fresh = None
             with self.emu.lock:
                 serial = getattr(self.emu, "frame_serial", 0)
+                game_generation = getattr(self.emu, "session_generation", None)
                 if serial != self._stream_game_serial:
                     fresh = (None if self.emu.frame is None
                              else self.emu.frame[:, :, :3].copy())
@@ -1269,8 +1270,13 @@ class StreamMixin:
                 # lock. Never reattach that old PIL image after cleanup.
                 stop = getattr(self.emu, "stop_event", None)
                 with self.emu.lock:
+                    same_session = (
+                        getattr(self.emu, "session_generation", None)
+                        == game_generation
+                    )
                     still_current = (
-                        self.emu.running
+                        same_session
+                        and self.emu.running
                         and getattr(self.emu, "frame_serial", 0) == serial
                         and not (
                             isinstance(stop, threading.Event)
@@ -1294,7 +1300,8 @@ class StreamMixin:
                     # photo immediately, rather than leave the old image
                     # visible until a later Stream tick.
                     stopped = (
-                        not self.emu.running
+                        not same_session
+                        or not self.emu.running
                         or (isinstance(stop, threading.Event)
                             and stop.is_set())
                     )
@@ -1405,15 +1412,29 @@ class StreamMixin:
             self.emu.running and self.uses_embedded_emulator()
         )
         changed_game = still_active != active_game
+        game_revoked = changed_game
         if active_game:
             stop = getattr(self.emu, "stop_event", None)
             with self.emu.lock:
+                game_revoked = (
+                    not self.emu.running
+                    or (isinstance(stop, threading.Event) and stop.is_set())
+                    or (getattr(self.emu, "session_generation", None)
+                        != game_generation)
+                )
                 changed_game = changed_game or (
                     getattr(self.emu, "frame_serial", 0) != serial
-                    or not self.emu.running
-                    or (isinstance(stop, threading.Event) and stop.is_set())
+                    or game_revoked
                 )
         if changed_game or changed_camera or changed_settings:
+            if (changed_game and not game_revoked and
+                    not changed_camera and not changed_settings):
+                # A healthy native frame arrived DURING slow PIL resizing.
+                # Discard this uncommitted composition but keep the last
+                # OBS-facing image visible until the next tick; a frame
+                # serial advance is not a Stop or privacy revocation.
+                self._stream_last_render = None
+                return False
             cache = getattr(self, "_stream_resize_cache", None)
             if changed_game and self._stream_game_serial == serial:
                 self._stream_game_frame = None

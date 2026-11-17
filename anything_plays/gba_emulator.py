@@ -506,7 +506,10 @@ class Emulator:
         self._gamecube_session = None
         self._gamecube_last_performance = None
         self.frame = None
-        self.frame_serial = 0  # Monotonic per-session video revision for Tk.
+        self.frame_serial = 0  # Monotonic video revision for Tk.
+        # Distinguish an ordinary new image from a Stop/ROM restart that
+        # occurs while Stream Mode composes its old native snapshot.
+        self.session_generation = 0
         self.lock = threading.Lock()
         self.system = "gba"
         self.core_path = find_core(self.system)
@@ -540,6 +543,7 @@ class Emulator:
         with self.lock:
             self.frame = None
             self.frame_serial += 1
+            self.session_generation += 1
         self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
 

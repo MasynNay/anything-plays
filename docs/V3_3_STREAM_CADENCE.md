@@ -340,9 +340,17 @@ during the earlier RGB-to-PIL conversion, the previous OBS PhotoImage is
 also revoked **immediately**, not just the attempted new copy. The
 camera's independent cached fit is preserved. If only a newer healthy
 frame serial arrived, the old photo can stay visible until the next
-refresh rather than being unnecessarily blanked. Added regression tests
-for prior-photo Stop revocation, normal next-frame continuity, and
-window-close/reopen during conversion.
+refresh rather than being unnecessarily blanked. The compositor's
+**post-composition** fence now makes the same distinction: an ordinary
+frame-serial advance during resizing discards the unfinished new output
+but retains the previous visible OBS photo, avoiding unnecessary flicker
+under load. A monotonic native-session generation increments at each
+emulator Start; Stop/ROM replacement invalidates the old image even
+if a fast restart has already cleared Stop's event. This applies both
+during the native-pixel-to-PIL conversion and during later composition.
+Three synthetic regressions cover healthy frame turnover and both
+ROM restart race windows; existing Stop, camera-disconnect and window
+reopen tests continue to enforce immediate private image revocation.
 
 The webcam's extra BGR-to-RGB/PIL preview conversion now independently
 checks Stream window identity and camera source generation before accepting
