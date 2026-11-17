@@ -73,9 +73,21 @@ def main():
                     # pipeline, not from a second camera or emulator.
                     app.stream_camera_snapshot(np.zeros((80, 100, 3), dtype=np.uint8))
                     app._render_stream_frame()
-                    assert tuple(app._stream_canvas.find_all()) == original_stream_item
+                    # This synthetic image has no live VideoCapture behind
+                    # it. The 3.3 privacy fence correctly revokes the webcam
+                    # pixels and the *previous* OBS PhotoImage immediately,
+                    # then creates one clean waiting/game-only image. Do not
+                    # require the old canvas item to survive a revocation.
+                    revoked_stream_item = tuple(app._stream_canvas.find_all())
+                    assert len(revoked_stream_item) == 1
+                    assert revoked_stream_item != original_stream_item
+                    assert app._stream_camera_frame is None
+                    assert app._stream_photo is not None
                     app.stream_clear_camera()
                     app._render_stream_frame()
+                    # Repeated empty-camera notifications must not flicker
+                    # the newly safe output or create extra canvas items.
+                    assert tuple(app._stream_canvas.find_all()) == revoked_stream_item
                     app.close_stream_mode()
                     assert app._stream_output_window is None
                     assert app._stream_controls_window is None
