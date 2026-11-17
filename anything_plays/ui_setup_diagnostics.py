@@ -130,7 +130,13 @@ def _gamecube_performance_summary_lines(performance):
     """Explain native costs without inventing rendered or audible FPS."""
     m = performance["metrics"]
     if not m["native_run_calls"]:
-        return ("GameCube has not completed a native gameplay frame yet.",)
+        # Optional perf_counter failures can suppress every timing sample
+        # even while native Dolphin frames keep running normally. Never
+        # describe a missing timer observation as proof of zero gameplay.
+        return (
+            "No valid GameCube native timing samples yet "
+            "(gameplay may still be running).",
+        )
     observed_preview = (
         f"{m['gamecube_preview_observed_capture_fps']} FPS"
         if m['gamecube_preview_cadence_intervals'] > 0

@@ -10,6 +10,7 @@ camera input; manual controls operate independently.
 """
 
 import ctypes as C
+import math
 import os
 from pathlib import Path
 import sys
@@ -44,6 +45,23 @@ from anything_plays.systems import SYSTEMS
 # memory allocation. GameCube/other disc systems must use full-path loading,
 # not silently copy entire disc images into the application's heap.
 MAX_IN_MEMORY_ROM_BYTES = 256 * 1024 * 1024
+
+
+def _optional_gamecube_perf_clock():
+    """Read optional native A/V timing without ever breaking retro_run().
+
+    The clock is diagnostic, not part of Dolphin's actual frame scheduler.
+    Broken platform clocks, injected native extensions and nonfinite values
+    must discard just that sample, never the emulated frame or its audio.
+    Other consoles do not call this optional helper.
+    """
+    try:
+        tick = time.perf_counter()
+        if type(tick) in (int, float) and math.isfinite(tick) and tick >= 0:
+            return tick
+    except Exception:
+        pass
+    return None
 
 
 class NativeCore:
@@ -401,12 +419,17 @@ class CoreSession:
                 gamecube_timing.reported_core_fps = frames_per_second
             while not self.emulator.stop_event.is_set():
                 self.emulator.inputs.before_frame(self.emulator.armed)
-                native_start = time.perf_counter() if gamecube_timing else None
+                native_start = (
+                    _optional_gamecube_perf_clock()
+                    if gamecube_timing is not None else None
+                )
                 self.native.run()
-                if gamecube_timing:
-                    gamecube_timing.record_native_run(
-                        time.perf_counter() - native_start
-                    )
+                if native_start is not None:
+                    native_end = _optional_gamecube_perf_clock()
+                    if native_end is not None and native_end >= native_start:
+                        gamecube_timing.record_native_run(
+                            native_end - native_start
+                        )
                 self.emulator.inputs.after_frame()
                 frame_number += 1
                 if frame_number % 300 == 0:
@@ -421,12 +444,15 @@ class CoreSession:
                         -remaining, resynchronized=remaining < -0.25
                     )
                 if remaining > 0:
-                    wait_start = time.perf_counter() if gamecube_timing else None
+                    wait_start = (
+                        _optional_gamecube_perf_clock()
+                        if gamecube_timing is not None else None
+                    )
                     self.emulator.stop_event.wait(remaining)
-                    if gamecube_timing:
-                        gamecube_timing.record_wait(
-                            time.perf_counter() - wait_start
-                        )
+                    if wait_start is not None:
+                        wait_end = _optional_gamecube_perf_clock()
+                        if wait_end is not None and wait_end >= wait_start:
+                            gamecube_timing.record_wait(wait_end - wait_start)
                 elif remaining < -0.25:
                     next_frame = time.monotonic()
             self.persist_game_progress()

@@ -56,7 +56,13 @@ deadline-lateness counters. An invalid or oversized reported core-FPS value
 is displayed as unavailable rather than crashing the report. The 20/30/60
 FPS readback policy also rejects invalid clock values safely. These
 safeguards operate on local *measurement data*: they do not skip a native
-Dolphin `retro_run` or modify its audio/input loop.
+Dolphin `retro_run` or modify its audio/input loop. The native worker also
+uses a failure-isolated optional `perf_counter` read before and after
+`retro_run` and scheduler waits. If this diagnostic clock raises, returns an
+invalid value or reverses, only that timing sample is omitted. Emulation,
+frame scheduling, audio, saves and P1/P2 inputs continue. A report with **zero
+valid native timing samples** does *not* prove zero emulated frames; the
+setup panel explicitly says the timing data is unavailable.
 
 An ignored timing sample is not evidence of successful gameplay. A
 suspend/resume or native graphics fault still requires observation on the
