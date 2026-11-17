@@ -5,6 +5,22 @@ already published 3.2.0 installer. It gathers local, aggregate timing from
 the embedded Dolphin Libretro worker; it does not send telemetry, record game
 frames or audio, benchmark an external emulator, or verify a real speaker.
 
+## Bounded native GPU negotiation history
+
+For GameCube, the native Libretro core may request a hardware render
+context again during a driver failure or reinitialization. Anything Plays
+now preserves at most **16** recent allowlisted scalar request records,
+with a separate total request count. It prints only the first 16
+negotiations to local diagnostic logs. This prevents a broken core from
+producing unbounded Python records or repeated log output during a long
+session while keeping the latest negotiation outcome available for
+development debugging. The hardware negotiation itself is never skipped
+or throttled; valid context requests still reach the real GL backend.
+
+Synthetic tests exercise 10,000 repeated native-pointer requests, a
+late rejection and a null callback. They cannot substitute for a real
+GameCube GPU/driver endurance run.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,

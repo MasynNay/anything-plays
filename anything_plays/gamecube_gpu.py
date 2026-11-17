@@ -30,6 +30,9 @@ from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
 
 
+MAX_GPU_NEGOTIATION_RECORDS = 16
+
+
 class GameCubeHardwareSession(CoreSession):
     """Connect Libretro Dolphin to the same framebuffer the GUI displays."""
 
@@ -88,6 +91,7 @@ class GameCubeHardwareSession(CoreSession):
         self.null_video_callbacks = 0
         self.opengl_error = None
         self.hardware_requests = []
+        self.hardware_negotiations_total = 0
 
     def environment(self, command, data):
         if command == 14:  # RETRO_ENVIRONMENT_SET_HW_RENDER
@@ -100,15 +104,23 @@ class GameCubeHardwareSession(CoreSession):
                     "version": [int(callback.version_major), int(callback.version_minor)],
                     "granted": False,
                 }
+                # A faulty core may request the hardware context repeatedly.
+                # Keep only the most recent few scalar records, not an
+                # unbounded list of native handshake events.
+                self.hardware_negotiations_total += 1
+                if len(self.hardware_requests) == MAX_GPU_NEGOTIATION_RECORDS:
+                    del self.hardware_requests[0]
                 self.hardware_requests.append(request)
             accepted = bool(
                 self.host is not None and self.host.accept_core_render(data)
             )
             if request is not None:
                 request["granted"] = accepted
-                # Preserve native negotiation evidence even if a macOS
-                # core aborts before Python can serialize its report.
-                print("GAMECUBE-GPU-NEGOTIATION:", request, flush=True)
+                # The first few requests are useful in crash logs (not
+                # device identifiers). Never emit unbounded repeated lines
+                # from a looping native callback over a long session.
+                if self.hardware_negotiations_total <= MAX_GPU_NEGOTIATION_RECORDS:
+                    print("GAMECUBE-GPU-NEGOTIATION:", request, flush=True)
             return accepted
         if command == 0x10000 | 44:  # HW shared context (Dolphin fork)
             return True
