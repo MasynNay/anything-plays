@@ -50,8 +50,10 @@ class UbuntuPackageMirrorRecoveryTests(unittest.TestCase):
     def test_unreleased_installer_checks_apt_metadata_after_update(self):
         flow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn(
-            "sudo bash tools/ci_use_canonical_ubuntu_mirror.sh "
-            "--repair-missing-packages", flow,
+            'sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" '
+            'RUNNER_OS="$RUNNER_OS" bash '
+            'tools/ci_use_canonical_ubuntu_mirror.sh '
+            '--repair-missing-packages', flow,
         )
         self.assertIn("sudo apt-get -o Acquire::Retries=2 update", flow)
         self.assertIn("tools/ci_use_canonical_ubuntu_mirror.sh", flow)

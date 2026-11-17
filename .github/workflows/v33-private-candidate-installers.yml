@@ -130,7 +130,9 @@ jobs:
           # A hosted runner can silently omit all Ubuntu indexes while
           # updating a separate Microsoft feed successfully. Recover only
           # if required package metadata is missing, with signed sources.
-          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh --repair-missing-packages
+          # sudo clears custom runner environment by default. Pass only
+          # the two identity flags needed by the guarded recovery helper.
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_OS="$RUNNER_OS" bash tools/ci_use_canonical_ubuntu_mirror.sh --repair-missing-packages
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb xauth
       - name: Install Windows Inno Setup
         if: runner.os == 'Windows'
