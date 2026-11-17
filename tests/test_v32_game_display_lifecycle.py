@@ -152,6 +152,23 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertEqual(app.emu.stop.call_count, 6)
         self.assertEqual(app._stream_canvas.delete.call_count, 6)
 
+    def test_fresh_launch_survives_destroyed_cosmetic_bezel(self):
+        """Bezel failures cannot turn a valid native launch into an error."""
+        class NativeBezelFailure(Exception):
+            pass
+
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app.game_bezel.set_active.side_effect = NativeBezelFailure("expired")
+        app.start_rom("/synthetic/new-first.gba")
+        app.emu.start.assert_called_once_with("/synthetic/new-first.gba")
+        app.show_playing_info.assert_called_once()
+        self.assertEqual(app.current_rom, "/synthetic/new-first.gba")
+        self.assertIn("Starting", app.game_status.set.call_args.args[0])
+
     def test_stable_missing_core_keeps_prior_game_intact(self):
         app = LibraryHost()
         app.emu.running = True

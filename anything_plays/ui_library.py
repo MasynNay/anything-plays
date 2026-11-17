@@ -375,7 +375,12 @@ class LibraryMixin:
         self.stop_controls()
         bezel = getattr(self, "game_bezel", None)
         if bezel is not None:
-            bezel.set_active(False)
+            try:
+                bezel.set_active(False)
+            except Exception:
+                # A destroyed or customized bezel must never prevent the
+                # previous ROM from stopping and the new core from loading.
+                pass
         # Save the selected path before starting a background Libretro worker.
         # A failure in retro_init/retro_load_game can then be retried in-place.
         self.current_rom = str(path)
@@ -457,11 +462,19 @@ class LibraryMixin:
             if self.uses_embedded_emulator():
                 self.game_status.set('Starting ' + Path(path).stem)
             if bezel is not None:
-                bezel.set_active(True)
+                try:
+                    bezel.set_active(True)
+                except Exception:
+                    # Decorative failures are independent of a running game.
+                    pass
             self.show_playing_info()
         except Exception as exc:
             if bezel is not None:
-                bezel.set_active(False)
+                try:
+                    bezel.set_active(False)
+                except Exception:
+                    # Report the original launch failure, not bezel teardown.
+                    pass
             self.game_status.set(
                 "Game could not start: " + str(exc)[:220]
                 + " · Select Restart game after correcting the issue."
