@@ -16,6 +16,9 @@ producing unbounded Python records or repeated log output during a long
 session while keeping the latest negotiation outcome available for
 development debugging. The hardware negotiation itself is never skipped
 or throttled; valid context requests still reach the real GL backend.
+A broken or closed local stdout stream is also ignored for this optional
+logging: neither an accepted nor a rejected GPU request may raise merely
+because its diagnostic print failed during the native Libretro callback.
 
 Synthetic tests exercise 10,000 repeated native-pointer requests, a
 late rejection and a null callback. They cannot substitute for a real

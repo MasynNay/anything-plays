@@ -64,6 +64,47 @@ class GameCubeNegotiationBoundsTests(unittest.TestCase):
         self.assertEqual(session.hardware_requests[-1]["version"], [4, 1])
         self.assertEqual(logging.call_count, MAX_GPU_NEGOTIATION_RECORDS)
 
+    def test_closed_stdout_does_not_change_native_context_acceptance(self):
+        session = self.make_session()
+        request = HardwareRenderCallback()
+        request.context_type = 3
+        request.version_major = 3
+        request.version_minor = 3
+        request.context_reset = 8
+        address = C.addressof(request)
+        # A closed stdout can trigger either BrokenPipeError on a pipe
+        # or ValueError on a closed TextIOWrapper. Neither must change
+        # Libretro's HW negotiation result.
+        for index, failure in enumerate((
+            BrokenPipeError("output closed"),
+            ValueError("I/O operation on closed file"),
+        )):
+            with self.subTest(failure=type(failure).__name__):
+                session.host.accept_core_render.return_value = index == 0
+                with patch("builtins.print", side_effect=failure):
+                    self.assertEqual(session.environment(14, address), index == 0)
+                self.assertEqual(session.hardware_requests[-1]["granted"],
+                                 index == 0)
+        self.assertEqual(session.hardware_negotiations_total, 2)
+        self.assertEqual(session.host.accept_core_render.call_count, 2)
+
+    def test_closed_stdout_after_log_budget_is_not_used_again(self):
+        session = self.make_session()
+        request = HardwareRenderCallback()
+        request.context_type = 3
+        request.version_major = 3
+        request.version_minor = 3
+        request.context_reset = 5
+        with patch("builtins.print"):
+            for _ in range(MAX_GPU_NEGOTIATION_RECORDS):
+                self.assertTrue(session.environment(14, C.addressof(request)))
+        with patch("builtins.print", side_effect=OSError("stdout lost")) as log:
+            self.assertTrue(session.environment(14, C.addressof(request)))
+        log.assert_not_called()
+        self.assertEqual(session.hardware_negotiations_total,
+                         MAX_GPU_NEGOTIATION_RECORDS + 1)
+        self.assertEqual(len(session.hardware_requests), MAX_GPU_NEGOTIATION_RECORDS)
+
     def test_no_callback_pointer_does_not_grow_handshake_history(self):
         session = self.make_session()
         session.host.accept_core_render.return_value = False

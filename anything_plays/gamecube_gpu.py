@@ -120,7 +120,13 @@ class GameCubeHardwareSession(CoreSession):
                 # device identifiers). Never emit unbounded repeated lines
                 # from a looping native callback over a long session.
                 if self.hardware_negotiations_total <= MAX_GPU_NEGOTIATION_RECORDS:
-                    print("GAMECUBE-GPU-NEGOTIATION:", request, flush=True)
+                    try:
+                        print("GAMECUBE-GPU-NEGOTIATION:", request, flush=True)
+                    except Exception:
+                        # A closed/broken stdout pipe is not a failed
+                        # OpenGL context. Never unwind optional logging
+                        # through a native Libretro ctypes callback.
+                        pass
             return accepted
         if command == 0x10000 | 44:  # HW shared context (Dolphin fork)
             return True
