@@ -1711,6 +1711,146 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(sample(reference, second), (34, 216, 117))
         self.assertNotEqual(sample(reference, first), (233, 43, 56))
 
+    def test_completed_native_game_retires_resize_pixels_but_preserves_camera(self):
+        """A self-ending native core has no Library unload to clear OBS cache."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return True
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        old_game = Image.new("RGB", (24, 20), "#ac1436")
+        live_camera = Image.new("RGB", (24, 20), "#24ad87")
+        cache = StreamPanelResizeCache()
+        cache.contained("GAME", old_game, (0, 0, 96, 80))
+        cache.contained("CAMERA", live_camera, (0, 0, 96, 80))
+        app._stream_resize_cache = cache
+        app._stream_game_frame = old_game
+        app._stream_game_serial = 91
+        app._stream_camera_frame = live_camera
+        app._stream_camera_serial = 7
+        app.emu = SimpleNamespace(running=False)
+        app.cap = None
+        app.reference_image = True
+        app.frame = object()
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+            # Repeated inactive ticks remain idempotent and do not remove
+            # the camera's still-live resized image or re-show old game.
+            self.assertFalse(app._render_stream_frame())
+
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        self.assertNotIn("GAME", cache._entries)
+        self.assertEqual(set(cache._entries), {"CAMERA"})
+        self.assertIs(cache._entries["CAMERA"][0], live_camera)
+        self.assertIs(app._stream_camera_frame, live_camera)
+        self.assertIsNone(compose.call_args.args[0])
+        self.assertIs(compose.call_args.args[1], live_camera)
+        self.assertTrue(compose.call_args.kwargs["camera_reference"])
+
+    def test_failed_optional_resize_cache_does_not_fail_finished_game_output(self):
+        """An untrusted cache wrapper cannot propagate a private error."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, Mock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return True
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        app.emu = SimpleNamespace(running=False)
+        app._stream_game_frame = Image.new("RGB", (24, 20), "red")
+        app._stream_game_serial = 2
+        cache = Mock()
+        cache.clear.side_effect = RuntimeError(
+            "driver /Users/private/rom-name GAME")
+        app._stream_resize_cache = cache
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.cap = None
+        app.reference_image = False
+        app.frame = None
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        cache.clear.assert_called_once_with("GAME")
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(compose.call_args.args[0])
+        self.assertIsNone(compose.call_args.kwargs["resize_cache"])
+
+    def test_running_native_game_keeps_its_cached_game_fit(self):
+        """The retention fix may not evict an active native game's pixels."""
+        import threading
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+
+        class Harness(StreamMixin):
+            THEMES = THEMES
+
+            def uses_embedded_emulator(self):
+                return True
+
+        app = Harness()
+        app.theme_name = SimpleNamespace(get=lambda: "Ocean Dark")
+        app.initialize_stream_mode({})
+        game = Image.new("RGB", (24, 20), "#fe3476")
+        cache = StreamPanelResizeCache()
+        cache.contained("GAME", game, (0, 0, 96, 80))
+        app._stream_resize_cache = cache
+        app._stream_game_frame = game
+        app._stream_game_serial = 9
+        app.emu = SimpleNamespace(
+            running=True, frame_serial=9, frame=None, lock=threading.Lock(),
+        )
+        app._stream_output_window = object()
+        app._stream_canvas = MagicMock()
+        app._stream_canvas.winfo_exists.return_value = True
+        app._stream_canvas.winfo_width.return_value = 760
+        app._stream_canvas.winfo_height.return_value = 980
+        app._stream_canvas.create_image.return_value = 11
+        app.cap = None
+        app.reference_image = False
+        app.frame = None
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980))) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage"),
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIs(app._stream_game_frame, game)
+        self.assertIs(cache._entries["GAME"][0], game)
+        self.assertIs(compose.call_args.args[0], game)
+
     def test_failed_camera_probe_clears_private_snapshot_without_stopping_game(self):
         """A broken/closed webcam must not freeze its last image in OBS."""
         from types import SimpleNamespace

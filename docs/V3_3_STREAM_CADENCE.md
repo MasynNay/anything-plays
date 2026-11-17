@@ -285,6 +285,20 @@ hardware, OBS recording, or owner-installed desktop compatibility. Each
 platform's CI job is only considered passed when its own frozen test and
 receipt succeed.
 
+### Native core endings cannot retain old game pixels in Stream cache
+
+A game may exit or fail on its own without the user invoking Library Stop.
+Stream Output already hides the old game image when `emu.running` becomes
+false; 3.3 now also immediately evicts the fitted **GAME** image and
+underlying PIL source from its independent resize cache on that transition.
+It leaves the cached **CAMERA** image and live camera snapshot untouched,
+and keeps successful game frames cached while a native core is running.
+A misbehaving optional cache is dropped without breaking OBS capture or
+showing raw driver exception text. Synthetic tests cover a core finishing
+without an unload, the still-live camera, invalid cache wrappers and
+active-game fit reuse. Native GameCube, controller, microphone and physical
+OBS recording still require separate owner acceptance.
+
 ## Collect privacy-safe Stream Mode QA evidence
 
 While **Stream Output** and **Stream Settings** are open, use

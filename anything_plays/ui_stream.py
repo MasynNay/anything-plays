@@ -1186,6 +1186,19 @@ class StreamMixin:
             serial = None
             self._stream_game_frame = None
             self._stream_game_serial = None
+            # Native cores can finish or crash without an explicit Library
+            # Stop/ROM-switch command. In that case the visible stream game
+            # goes blank, but the resize cache can still retain both the old
+            # PIL source image and its fitted pixels. Discard only GAME;
+            # the live camera cache and camera snapshot remain untouched.
+            cache = getattr(self, "_stream_resize_cache", None)
+            if cache is not None:
+                try:
+                    cache.clear("GAME")
+                except Exception:
+                    # An optional/customized cache must not break Stream
+                    # Output or expose private driver exception details.
+                    self._stream_resize_cache = None
         # An unplugged or misbehaving webcam may throw from isOpened()
         # before the main camera tick processes its disconnect. Treat that
         # driver failure as camera-off for OBS; never leave a stale private
