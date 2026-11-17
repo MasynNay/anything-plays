@@ -332,17 +332,31 @@ def main():
                     assert app.camera_photo is None
                     assert not app.canvas.find_all()
 
+                    # These synthetic frame draws model an ACTIVE native
+                    # session. 3.3 intentionally clears pixels if the core
+                    # has finished; leaving running=False here accidentally
+                    # tests the stopped-game privacy path instead of reuse.
+                    app.emu.running = True
+                    app.emu.launching = False
                     with app.emu.lock:
                         app.emu.frame = np.zeros((180, 240, 3), dtype=np.uint8)
                         app.emu.frame_serial += 1
                     app.draw_game()
                     first_game_image = app.game_photo
+                    assert first_game_image is not None
                     for _ in range(100):
                         with app.emu.lock:
                             app.emu.frame_serial += 1
                         app.draw_game()
                     assert app.game_photo is first_game_image
                     assert len(app.game_canvas.find_all()) == 1
+                    # A core that exits on its own must now release the
+                    # native game photo and its canvas item. Verify this in
+                    # real Tk, not only in isolated/mock lifecycle tests.
+                    app.emu.running = False
+                    app.draw_game()
+                    assert app.game_photo is None
+                    assert not app.game_canvas.find_all()
                     root.after(200, app.close)
                     root.mainloop()
                     assert app._closing
