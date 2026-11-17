@@ -22,6 +22,7 @@ class CameraGenerationSafetyTests(unittest.TestCase):
 
     def test_stop_invalidates_prior_held_buttons_and_both_pulse_ports(self):
         inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=lambda: 2.0)
         original = inputs.camera_generation()
         inputs.set_camera_buttons(("A",), ("B",), generation=original)
         inputs.queue_press("X", 4, port=0, generation=original)
@@ -32,6 +33,11 @@ class CameraGenerationSafetyTests(unittest.TestCase):
         inputs.queue_press("X", 4, port=0, generation=original)
         inputs.queue_press("Y", 4, port=1, generation=original)
         self.assertTrue(inputs.commands.empty())
+        report = inputs.latency_snapshot()
+        self.assertEqual(report["late_camera_updates_dropped"], 3)
+        from anything_plays.ui_setup_diagnostics import _input_timing_summary_lines
+        notices = _input_timing_summary_lines(report)
+        self.assertTrue(any("Rejected 3 late camera updates" in line for line in notices))
         inputs.before_frame(True)
         for port, name in ((0, "A"), (1, "B"), (0, "X"), (1, "Y")):
             self.assertEqual(inputs.state(port, 1, 0, IDS[name]), 0)

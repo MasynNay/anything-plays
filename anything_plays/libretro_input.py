@@ -83,6 +83,8 @@ class InputBuffer:
         # Stop advances this token under state_lock. Work computed by the
         # prior camera tick must never be inserted after a Stop/restart.
         self._camera_generation = 0
+        # Constant-memory, local-only evidence of rejected late input.
+        self._late_camera_updates_dropped = 0
         # N64 and GameCube may poll many analogue inputs per frame. Cache
         # each port's full state exactly once per emulation step.
         self._n64_state = {}
@@ -100,6 +102,7 @@ class InputBuffer:
         """Start fresh local software-stage measurements; no image data."""
         with self.state_lock:
             self.latency_probe = InputLatencyProbe(clock=clock)
+            self._late_camera_updates_dropped = 0
             self._latency_enabled = True
 
     def disable_latency_probe(self):
@@ -115,6 +118,7 @@ class InputBuffer:
                 return None
             return {
                 **self.latency_probe.snapshot(),
+                "late_camera_updates_dropped": self._late_camera_updates_dropped,
                 "enabled": self._latency_enabled,
             }
 
@@ -147,6 +151,7 @@ class InputBuffer:
             if generation is not None and (
                     type(generation) is not int
                     or generation != self._camera_generation):
+                self._late_camera_updates_dropped += 1
                 return
             try:
                 # Preserve the existing two-item queue format for P1.
@@ -170,6 +175,7 @@ class InputBuffer:
             if generation is not None and (
                     type(generation) is not int
                     or generation != self._camera_generation):
+                self._late_camera_updates_dropped += 1
                 return
             self._camera_held[0] = one
             self._camera_held[1] = two

@@ -92,8 +92,26 @@ def _snapshot(app):
 
 def _input_timing_summary_lines(timing):
     """Render known aggregate-only stages, never arbitrary diagnostic text."""
+    # Counters are owned by first-party bounded probes. Never print supplied
+    # error text, paths, serials, per-frame samples or private camera labels.
+    notices = []
+    discontinuities = timing.get("clock_discontinuities", 0)
+    if type(discontinuities) is int and discontinuities > 0:
+        notices.append(
+            f"Discarded {discontinuities} suspended/invalid clock intervals "
+            "(software timing only)."
+        )
+    late_updates = timing.get("late_camera_updates_dropped", 0)
+    if type(late_updates) is int and late_updates > 0:
+        notices.append(
+            f"Rejected {late_updates} late camera updates after disarm "
+            "(P1/P2 safety)."
+        )
     if not timing["samples"]:
-        return ("No software input samples yet (enable held camera controls).",)
+        return (
+            "No software input samples yet (enable held camera controls).",
+            *notices,
+        )
     lines = []
     for stage, label in (
         ("tracking_to_dispatch", "Tracking → input buffer"),
@@ -105,7 +123,7 @@ def _input_timing_summary_lines(timing):
             f"{label}: P50 {bucket['p50_bucket_ms']} ms · "
             f"P95 {bucket['p95_bucket_ms']} ms"
         )
-    return tuple(lines)
+    return tuple(lines + notices)
 
 
 def _gamecube_performance_summary_lines(performance):

@@ -117,11 +117,21 @@ still require physical-device QA.
 input generation observed **before** checking the emulator's armed state.
 Stop, ROM switching and camera disarm invalidate that generation under the
 same native input lock that protects both ports and the bounded pulse queue.
-If processing a frame overlaps a Stop, late input from the earlier generation
+If input publication overlaps a Stop, late input from the earlier generation
 is discarded instead of reviving its held buttons or queued presses. Normal
 keyboard and controller state remains independently managed. Malformed
 classic pulse durations, invalid port numbers and unrecognized button names
 are ignored rather than crashing an otherwise healthy tracking frame.
+
+The opt-in **Check my setup → Start input timing** report now exposes two
+strictly local counts alongside the three software P50/P95 stages:
+`late_camera_updates_dropped` counts stale P1/P2 updates rejected after
+disarm, and `clock_discontinuities` counts discarded invalid/suspended
+timing intervals. The setup window shows these only when nonzero, even if
+there are no valid timing samples yet. Both are aggregate integers; no
+tracked colors, frame pixels, button labels, file paths, timestamps or
+identifiers enter the report. Starting a fresh timing probe resets its
+local dropped-update count. No network upload occurs.
 
 This fixes a software handoff race under deterministic thread tests; it
 **does not** claim physical camera hotplug/reconnect or native gamepad timing

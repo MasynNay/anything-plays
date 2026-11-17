@@ -250,6 +250,19 @@ class BoundedProbeTests(unittest.TestCase):
         self.assertEqual(inputs.state(1, 1, 0, IDS["B"]), 0)
         self.assertEqual(inputs.latency_snapshot()["samples"], 1)
 
+    def test_clock_discontinuities_are_explained_without_raw_timestamps(self):
+        from anything_plays.ui_setup_diagnostics import _input_timing_summary_lines
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=lambda: 4005.0)
+        inputs.set_camera_buttons(("A",), sample_started_at=0.0)
+        report = inputs.latency_snapshot()
+        self.assertEqual(report["samples"], 0)
+        self.assertEqual(report["clock_discontinuities"], 1)
+        lines = _input_timing_summary_lines(report)
+        self.assertIn("No software input samples", lines[0])
+        self.assertTrue(any("Discarded 1 suspended/invalid clock" in s for s in lines))
+        self.assertNotIn("4005", " ".join(lines))
+
     def test_constant_memory_after_thousands_of_samples(self):
         clock = [1.0]
         def current():
