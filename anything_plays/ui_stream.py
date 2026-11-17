@@ -1018,11 +1018,14 @@ class StreamMixin:
             # Cache wrappers are strictly optional; an extension-defined
             # property error must not escape a webcam disconnect path.
             cache_entries = None
-        had_pixels_or_state = (
+        had_camera_pixels = (
             self._stream_camera_frame is not None
+            or (isinstance(cache_entries, dict) and "CAMERA" in cache_entries)
+        )
+        had_pixels_or_state = (
+            had_camera_pixels
             or self._stream_camera_last_snapshot is not None
             or bool(getattr(self, "_stream_camera_force_next_snapshot", False))
-            or (isinstance(cache_entries, dict) and "CAMERA" in cache_entries)
         )
         self._stream_camera_last_snapshot = None
         self._stream_camera_force_next_snapshot = False
@@ -1039,7 +1042,15 @@ class StreamMixin:
                 cache_failed = True
         if had_pixels_or_state or cache_failed:
             self._stream_camera_serial += 1
-            self._invalidate_stream()
+            if (had_camera_pixels or cache_failed) and getattr(
+                self, "_stream_photo", None
+            ) is not None:
+                # Never leave previously displayed private camera pixels in
+                # OBS while waiting for a later refresh/backoff timer. Keep
+                # the independent game image and fitted cache intact.
+                self._stream_blank_output()
+            else:
+                self._invalidate_stream()
 
     def stream_performance_snapshot(self):
         """Only current active Stream Mode, no camera frames or Tk details."""

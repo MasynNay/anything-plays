@@ -360,8 +360,17 @@ A separate output-window identity fence now also protects the **scheduled
 Tk render tick**, not just its inner PIL composition: a retired tick must
 not record cadence into, blank, close, or schedule a duplicate refresh for
 a newly reopened Stream window. Reentrant synthetic tests cover old-frame
-completion, compositor errors and destroyed-widget Tcl errors. This does
-not establish physical USB disconnect or OBS encoder acceptance.
+completion, compositor errors and destroyed-widget Tcl errors.
+
+A real camera revocation now immediately removes an already-displayed
+OBS-facing Tk PhotoImage and canvas item, including cache-only camera
+pixels. The previous screenshot could otherwise remain visible until
+the next stream refresh or one-second error backoff. Game source frames
+and fitted GAME images remain available for the next game-only render.
+Repeated camera-off signals without cached webcam pixels preserve the
+healthy game-only photo without flicker. Three synthetic regressions
+cover these cases. Physical USB unplug and OBS encoder acceptance are
+still required.
 
 Synthetic adversarial tests exercise Stop during game conversion, Stop or
 camera disconnection during PIL composition, a settings change and a

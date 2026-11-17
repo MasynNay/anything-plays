@@ -410,5 +410,56 @@ class StreamPublicationFenceTests(unittest.TestCase):
         app.root.after.assert_not_called()
 
 
+    def test_camera_revocation_blanks_prior_obs_photo_without_dropping_game(self):
+        app = self.make_app(game=True, camera=True)
+        prior_photo = Mock()
+        game = Image.new("RGB", (24, 16), "green")
+        camera = app._stream_camera_frame
+        app._stream_game_frame = game
+        app._stream_game_serial = 7
+        app._stream_resize_cache.contained("GAME", game, (0, 0, 72, 56))
+        app._stream_photo = prior_photo
+        app._stream_canvas_item = 24
+        app._stream_last_render = ("visible webcam and game",)
+        app.stream_clear_camera()
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+        self.assertIs(app._stream_game_frame, game)
+        self.assertIs(app._stream_resize_cache._entries["GAME"][0], game)
+        self.assertIsNot(app._stream_camera_frame, camera)
+        self.assertIsNone(app._stream_last_render)
+
+    def test_repeated_blank_camera_signals_do_not_flicker_game_only_photo(self):
+        app = self.make_app(game=True, camera=False)
+        photo = Mock()
+        app._stream_photo = photo
+        app._stream_canvas_item = 25
+        app._stream_last_render = ("static game only",)
+        for _ in range(15):
+            app.stream_clear_camera()
+        self.assertIs(app._stream_photo, photo)
+        self.assertEqual(app._stream_canvas_item, 25)
+        self.assertEqual(app._stream_last_render, ("static game only",))
+        self.assertEqual(app._stream_camera_serial, 0)
+        app._stream_canvas.delete.assert_not_called()
+
+    def test_cache_only_camera_revocation_blanks_old_obs_composite(self):
+        app = self.make_app(game=True, camera=False)
+        cached_camera = Image.new("RGB", (24, 16), "red")
+        app._stream_resize_cache.contained("CAMERA", cached_camera,
+                                          (0, 0, 72, 56))
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 26
+        app._stream_last_render = ("stale camera fit in obs",)
+        app.stream_clear_camera()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+        app._stream_canvas.delete.assert_called_once_with("all")
+
+
 if __name__ == "__main__":
     unittest.main()
