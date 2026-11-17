@@ -129,10 +129,20 @@ def _input_timing_summary_lines(timing):
 def _gamecube_performance_summary_lines(performance):
     """Explain native costs without inventing rendered or audible FPS."""
     m = performance["metrics"]
-    if not m["native_run_calls"]:
-        # Optional perf_counter failures can suppress every timing sample
-        # even while native Dolphin frames keep running normally. Never
-        # describe a missing timer observation as proof of zero gameplay.
+    valid_samples = m["native_run_calls"]
+    completed = m.get("native_completed_frames", valid_samples)
+    if type(completed) is not int or completed < valid_samples:
+        # Legacy reports predate a separate completed-frame count.
+        completed = valid_samples
+    if not valid_samples:
+        # Clock failure does not erase independently completed retro_run
+        # calls. Old reports with no completion counter remain conservative.
+        if completed:
+            return (
+                f"Native frames completed: {completed} · "
+                "no valid GameCube native timing samples "
+                "(performance measurements unavailable).",
+            )
         return (
             "No valid GameCube native timing samples yet "
             "(gameplay may still be running).",
@@ -199,7 +209,7 @@ def _gamecube_performance_summary_lines(performance):
             "of native execution time (included, not additive)"
         )
     return (
-        f"Native frames: {m['native_run_calls']} · average "
+        f"Native frames: {completed} · timed {valid_samples} of {completed} · average "
         f"{m['native_run_mean_ms']} ms · maximum "
         f"{m['native_run_max_ms']} ms per retro_run · P95 " 
         f"{p95_label}",

@@ -33,6 +33,10 @@ def _safe_duration_seconds(value):
 
 class GameCubeNativeTiming:
     def __init__(self):
+        # Independent of the optional high-resolution measurement clock:
+        # a completed retro_run is still a real native frame when its
+        # perf_counter observation was dropped.
+        self.native_completed_frames = 0
         self.native_run_calls = 0
         self.native_run_total_seconds = 0.0
         self.native_run_max_seconds = 0.0
@@ -50,6 +54,10 @@ class GameCubeNativeTiming:
         self.scheduler_late_max_seconds = 0.0
         self.scheduler_resyncs = 0
         self.reported_core_fps = None
+
+    def record_completed_run(self):
+        """Count one returned retro_run even if its timer failed."""
+        self.native_completed_frames += 1
 
     def record_native_run(self, duration):
         if not _safe_duration_seconds(duration):
@@ -126,6 +134,7 @@ class GameCubeNativeTiming:
         # Clock readings can differ by a tiny amount at coarse resolution.
         readback = min(native, readback)
         return {
+            "native_completed_frames": self.native_completed_frames,
             "native_run_calls": count,
             "native_reported_core_fps": round(reported, 3),
             "native_run_mean_ms": round(1000 * native / count, 3) if count else 0.0,

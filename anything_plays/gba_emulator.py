@@ -436,6 +436,10 @@ class CoreSession:
                     if gamecube_timing is not None else None
                 )
                 self.native.run()
+                if gamecube_timing is not None:
+                    # A successful native frame counts even with a missing
+                    # or reversed diagnostic timer. This is NOT rendered FPS.
+                    gamecube_timing.record_completed_run()
                 if native_start is not None:
                     native_end = _optional_gamecube_perf_clock()
                     if native_end is not None and native_end >= native_start:

@@ -82,6 +82,7 @@ class OptionalGameCubeClockTests(unittest.TestCase):
             self.assertEqual(session.emulator.inputs.before_frame.call_count, 4)
             self.assertEqual(session.emulator.inputs.after_frame.call_count, 4)
             self.assertEqual(timing.native_run_calls, 0)
+            self.assertEqual(timing.native_completed_frames, 4)
             self.assertEqual(timing.scheduler_wait_calls, 0)
             self.assertGreater(timing.reported_core_fps, 20)
             self.assertFalse(session.emulator.launching)
@@ -119,9 +120,21 @@ class OptionalGameCubeClockTests(unittest.TestCase):
             self.assertEqual(fake.run.call_count, 5)
             self.assertEqual(session.emulator.inputs.after_frame.call_count, 5)
             self.assertEqual(timing.native_run_calls, 2)
+            self.assertEqual(timing.native_completed_frames, 5)
             self.assertAlmostEqual(timing.native_run_total_seconds, 0.010)
             self.assertEqual(timing.scheduler_wait_calls, 0)
             fake.close.assert_called_once()
+
+    def test_setup_panel_shows_completed_frames_when_all_clocks_fail(self):
+        lines = _gamecube_performance_summary_lines(
+            {"metrics": {"native_run_calls": 0,
+                         "native_completed_frames": 4}}
+        )
+        self.assertEqual(len(lines), 1)
+        self.assertIn("Native frames completed: 4", lines[0])
+        self.assertIn("no valid GameCube native timing samples", lines[0])
+        self.assertIn("measurements unavailable", lines[0])
+        self.assertNotIn("Native frames: 0", lines[0])
 
     def test_setup_panel_does_not_confuse_missing_clock_with_stopped_game(self):
         lines = _gamecube_performance_summary_lines(

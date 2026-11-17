@@ -48,6 +48,21 @@ an error, or masking an actual emulation failure. A new session may collect
 fresh metrics; no native report exception text is copied to the interface. Do not share external system-information screenshots
 alongside it unless you have reviewed them for personal data.
 
+## Completed native frames versus valid timing samples
+
+The GameCube native loop now separately counts `native_completed_frames`
+after each real `retro_run()` returns, without depending on the optional
+`perf_counter`. The original `native_run_calls` remains the number of
+**validly timed** frames contributing to mean, max and fixed-bin P95.
+A failed, missing, reversed or suspended diagnostic clock must not make
+the report claim that no native frames executed. When all timing samples
+are unavailable, **Check my setup** displays the observed completed-frame
+count and explicitly says performance measurements are unavailable. When
+some succeed, it shows the timed-frame coverage next to the total.
+This is an aggregate count, not an estimate of gameplay FPS, completed
+rendered images, audio quality or GPU performance. Neither the original
+native scheduling nor controller/camera input and audio paths change.
+
 ## Clock integrity and native gameplay
 
 3.3 discards invalid, nonfinite, negative or hours-long timing samples
@@ -94,7 +109,7 @@ is not proof of an actual GPU speedup; compare measured physical sessions.
 
 | Observed field | Meaning | Important limit |
 | --- | --- | --- |
-| `native_run_calls`, `native_run_mean_ms`, `native_run_max_ms` | Number and elapsed time of completed native `retro_run` calls | Does **not** measure displayed FPS or completed game scenes |
+| `native_completed_frames`, `native_run_calls`, `native_run_mean_ms`, `native_run_max_ms` | Independently counted returned `retro_run()` frames versus valid timing observations and their costs | Neither count is displayed FPS or completed game scenes; timing coverage may be incomplete |
 | `native_run_p95_bucket_code` | Nearest-rank P95 `retro_run` duration bucket, using fixed ranges 0–8, 8–16, 16–25, 25–33, 33–50, 50–100, 100–250, 250–500 and >500 ms (codes 0–8). -1 means no valid native frames | This is an interval, not a fabricated precise percentile or physical FPS; only nine aggregate counters are retained, no per-frame timing history |
 | `gpu_readback_calls`, `gpu_readback_max_ms`, `gpu_readback_share_of_native_run` | Synchronous UI preview pixel readbacks and their portion of native run cost | Readback time is **included in**, not added to, `retro_run` time |
 | `gpu_readback_timing_samples`, `gamecube_preview_clock_failures` | Number of successfully timed GPU readbacks and rejected optional clock observations | A valid clock on every frame or proof that the physical GPU was slow; an otherwise successful captured frame may have no timing sample |

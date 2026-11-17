@@ -16,6 +16,20 @@ from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 
 
 class NativeLoopTimingTests(unittest.TestCase):
+    def test_completed_native_frames_are_independent_of_timing_samples(self):
+        t = GameCubeNativeTiming()
+        t.record_completed_run()
+        t.record_native_run(0.016)
+        t.record_completed_run()  # perf_counter missing on this frame
+        t.record_completed_run()  # reversed diagnostic clock
+        snap = t.snapshot()
+        self.assertEqual(snap["native_completed_frames"], 3)
+        self.assertEqual(snap["native_run_calls"], 1)
+        self.assertEqual(snap["native_run_p95_bucket_code"], 1)
+        self.assertEqual(snap["native_run_mean_ms"], 16)
+        self.assertEqual(len(t.native_run_histogram), 9)
+        self.assertNotIn("frame_timestamps", snap)
+
     def test_native_run_exceeds_20fps_limit_while_readback_remains_small(self):
         t = GameCubeNativeTiming()
         t.record_native_run(0.160)
@@ -156,7 +170,9 @@ class NativeLoopTimingTests(unittest.TestCase):
         for _ in range(10000):
             t.record_native_run(0.006)
         self.assertEqual(t.native_run_calls, 10000)
-        self.assertLessEqual(len(vars(t)), 14)
+        # One extra scalar counts returned native frames independently
+        # from successful optional timing observations.
+        self.assertLessEqual(len(vars(t)), 15)
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):

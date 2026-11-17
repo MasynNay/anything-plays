@@ -359,6 +359,7 @@ class SnapshotPrivacyTests(unittest.TestCase):
 
         session = object.__new__(GameCubeHardwareSession)
         session.native_run_timing = GameCubeNativeTiming()
+        session.native_run_timing.record_completed_run()
         session.native_run_timing.record_native_run(.05)
         session.gpu_readback_seconds = .002
         session.gpu_readback_max_seconds = .002
@@ -390,6 +391,7 @@ class SnapshotPrivacyTests(unittest.TestCase):
         lines = _gamecube_performance_summary_lines(performance)
         self.assertEqual(len(lines), 5)
         self.assertIn("Native frames: 1", lines[0])
+        self.assertIn("timed 1 of 1", lines[0])
         self.assertIn("P95 33–50 ms", lines[0])
         # Previously saved 3.2/early 3.3 snapshots remain readable.
         code = performance["metrics"].pop("native_run_p95_bucket_code")
