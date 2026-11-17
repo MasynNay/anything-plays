@@ -5,7 +5,6 @@ GPU, camera, controller or sound card.
 """
 import ctypes as C
 import unittest
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from anything_plays.gamecube_gpu import (
@@ -67,6 +66,7 @@ class GameCubeNegotiationBoundsTests(unittest.TestCase):
 
     def test_no_callback_pointer_does_not_grow_handshake_history(self):
         session = self.make_session()
+        session.host.accept_core_render.return_value = False
         with patch("builtins.print") as logging:
             self.assertFalse(session.environment(14, None))
         self.assertEqual(session.hardware_requests, [])
