@@ -194,6 +194,81 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNone(app._stream_game_frame)
         app.game_canvas.delete.assert_called_once_with("all")
 
+    def test_destroyed_main_canvas_does_not_leave_private_stream_frame(self):
+        """Main Tk destruction must not stop clearing OBS and other views."""
+        import tkinter as tk
+
+        app = VideoHost()
+        retained_camera = app._stream_camera_frame
+        app.game_canvas.delete.side_effect = tk.TclError("main destroyed")
+        clear_game_video(app)
+        self.assertIsNone(app.emu.frame)
+        self.assertEqual(app.emu.frame_serial, 13)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_last_render)
+        app._game_only_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertIs(app._stream_camera_frame, retained_camera)
+        app.game_bezel.set_active.assert_called_once_with(False)
+
+    def test_optional_widget_failures_are_isolated_before_new_rom_launch(self):
+        """No optional widget exception can preserve stopped game pixels."""
+        class PrivateNativeWidget(Exception):
+            pass
+
+        app = LibraryHost()
+        app.emu.running = True
+        app.game_canvas.delete.side_effect = PrivateNativeWidget(
+            "video device /home/private/serial-ABC"
+        )
+        app._game_only_canvas.delete.side_effect = RuntimeError("gone")
+        app._stream_canvas.delete.side_effect = OSError("window detached")
+        app.game_bezel.set_active.side_effect = PrivateNativeWidget("bezel")
+        camera = app._stream_camera_frame
+        app.emu.stop.side_effect = lambda: None
+
+        def check_new_game(path):
+            self.assertEqual(path, "/synthetic/restarted.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_game_serial)
+            self.assertIsNone(app._stream_last_render)
+            self.assertIs(app._stream_camera_frame, camera)
+
+        app.emu.start.side_effect = check_new_game
+        app.start_rom("/synthetic/restarted.gba")
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._game_only_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        app.emu.start.assert_called_once_with("/synthetic/restarted.gba")
+
+    def test_native_and_stream_frames_are_retired_before_any_canvas_deletion(self):
+        """Reentrant widget callbacks cannot observe old game image refs."""
+        app = VideoHost()
+        retained_camera = app._stream_camera_frame
+        call_order = []
+
+        def inspect(canvas):
+            call_order.append(canvas)
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_game_serial)
+            self.assertIsNone(app._stream_last_render)
+            self.assertIs(app._stream_camera_frame, retained_camera)
+
+        app.game_canvas.delete.side_effect = lambda *args: inspect("main")
+        app._game_only_canvas.delete.side_effect = (
+            lambda *args: inspect("game only")
+        )
+        app._stream_canvas.delete.side_effect = lambda *args: inspect("stream")
+        clear_game_video(app)
+        self.assertEqual(call_order, ["main", "game only", "stream"])
+
     def test_double_cleanup_is_idempotent_and_never_touches_camera(self):
         app = VideoHost()
         camera = app._stream_camera_frame

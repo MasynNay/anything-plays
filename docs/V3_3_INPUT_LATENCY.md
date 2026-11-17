@@ -110,6 +110,21 @@ This behavior has synthetic fault-injection coverage. The real camera
 driver's permissions, USB reconnect timing and native-controller release
 still require physical-device QA.
 
+### ROM switch / Stop cleanup across all rendered views
+
+The same fail-closed policy now applies to the **game** framebuffer on
+ROM replacement or unload: native pixels are revoked under the emulator
+lock, then all in-memory primary, Game-only, and OBS Stream Output game
+images/serials are retired **before any Tk widget deletion**. Each of the
+three optional canvas deletes and the decorative bezel are independent.
+Even if a destroyed main canvas or a native widget wrapper raises, other
+views are cleared and a replacement ROM can start without keeping the
+previous game's cached pixels. The live webcam Stream snapshot remains
+independent and is not discarded by a game-only transition. Tests exercise
+destroyed Tk canvases, unexpected extension-defined errors, the launch
+handoff, and reentrant widget callbacks; these are synthetic checks,
+not physical OBS or GameCube gameplay evidence.
+
 ## Late camera input after Stop / source changes
 
 3.3 now binds each real camera-to-native P1/P2 update (both continuous

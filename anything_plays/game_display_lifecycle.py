@@ -1,55 +1,52 @@
-"""Shared 3.2 game-video cleanup after a native session is stopped.
+"""Shared game-video cleanup after a native session is stopped.
 
-Switching consoles and unloading a ROM must have identical cleanup, or one
-view can retain a previous game's pixels. The caller stops the emulator first.
-No SDL, camera, ROM or native library is opened from this module.
+Native video state is retired before touching optional Tk canvases. If one
+widget was destroyed while switching ROMs, the other views still clear and
+the next game starts without the previous game's OBS-facing pixel objects.
+This never opens a camera, changes controller state or accesses a ROM.
 """
-
-import tkinter as tk
 
 
 def clear_game_video(app):
-    """Clear all representations of an old game, preserving camera data.
+    """Retire old game frames in every view; preserve live camera pixels.
 
-    Frame mutations use the emulator lock, as do the native frame readers.
-    Clearing the frame serial also invalidates revision-based Tk rendering.
-    Repeated calls are safe and do not mutate saves or controller profiles.
+    Call after stopping the emulator. The native frame must be revoked under
+    its lock first. In-memory Tk/Stream references are revoked before any
+    optional UI methods, which may fail during window destruction or from
+    third-party widget wrappers.
     """
     with app.emu.lock:
         app.emu.frame = None
         serial = getattr(app.emu, "frame_serial", None)
-        if isinstance(serial, int):
+        if type(serial) is int:
             app.emu.frame_serial = serial + 1
 
     app.game_photo = None
     app._last_game_render = None
     app._game_image_item = None
     app._game_image_canvas = None
-    app.game_canvas.delete("all")
-    game_only = getattr(app, "_game_only_canvas", None)
-    if game_only is not None:
-        try:
-            game_only.delete("all")
-        except tk.TclError:
-            # A detached Game-only window can be destroyed by the user
-            # between a native stop and this UI cleanup callback.
-            pass
-
     app._stream_game_frame = None
     app._stream_game_serial = None
     app._stream_last_render = None
-    # An OBS capture of the standalone output must not retain the prior
-    # game until the next stream refresh. Only the stream's rendered canvas
-    # is removed: its live camera snapshot is intentionally preserved.
-    stream_canvas = getattr(app, "_stream_canvas", None)
-    if stream_canvas is not None:
-        try:
-            stream_canvas.delete("all")
-        except tk.TclError:
-            pass
     app._stream_canvas_item = None
     app._stream_photo = None
 
+    # Clear all three independently. A destroyed main canvas must not prevent
+    # revoking OBS pixels, and an unresponsive OBS surface must not prevent
+    # a fresh ROM from using the primary canvas. Do not expose driver paths
+    # or extension-defined exception text to the user.
+    for name in ("game_canvas", "_game_only_canvas", "_stream_canvas"):
+        canvas = getattr(app, name, None)
+        if canvas is not None:
+            try:
+                canvas.delete("all")
+            except Exception:
+                pass
+
     bezel = getattr(app, "game_bezel", None)
     if bezel is not None:
-        bezel.set_active(False)
+        try:
+            bezel.set_active(False)
+        except Exception:
+            # Cosmetic border failure cannot resurrect a stopped game.
+            pass
