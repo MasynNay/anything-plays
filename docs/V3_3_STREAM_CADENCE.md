@@ -334,6 +334,15 @@ cache pixels while leaving the unrelated source intact; if an optional
 cache fails, its entire reference is dropped. Closing the output during
 composition cannot recreate the retired Tk image. Source comparisons
 are short and do not hold a native frame lock across PIL or Tk calls.
+An extra post-conversion target-window check prevents an in-flight copy
+from touching a newly reopened Stream window. If Stop or core exit occurs
+during the earlier RGB-to-PIL conversion, the previous OBS PhotoImage is
+also revoked **immediately**, not just the attempted new copy. The
+camera's independent cached fit is preserved. If only a newer healthy
+frame serial arrived, the old photo can stay visible until the next
+refresh rather than being unnecessarily blanked. Added regression tests
+for prior-photo Stop revocation, normal next-frame continuity, and
+window-close/reopen during conversion.
 
 Synthetic adversarial tests exercise Stop during game conversion, Stop or
 camera disconnection during PIL composition, a settings change and a

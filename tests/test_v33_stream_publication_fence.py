@@ -68,6 +68,98 @@ class StreamPublicationFenceTests(unittest.TestCase):
         photo.assert_not_called()
         self.assertIsNone(app._stream_last_render)
 
+    def test_stop_during_conversion_blanks_old_obs_photo_immediately(self):
+        """Rejecting a late copy must also revoke the prior OBS game photo."""
+        app = self.make_app()
+        previous_photo = Mock()
+        app._stream_photo = previous_photo
+        app._stream_canvas_item = 11
+        app._stream_last_render = ("old game, still visible in OBS",)
+        game = Image.new("RGB", (24, 16), "red")
+        app._stream_game_frame = game
+        app._stream_game_serial = 6
+        app._stream_resize_cache.contained("GAME", game, (0, 0, 72, 56))
+        camera = app._stream_camera_frame
+        with (
+            patch("anything_plays.ui_stream.Image.fromarray",
+                  side_effect=lambda pixels: self._stop_and_return(app, game)),
+            patch("anything_plays.ui_stream.compose_stream_output") as compose,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        compose.assert_not_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        self.assertNotIn("GAME", app._stream_resize_cache._entries)
+        self.assertIs(app._stream_resize_cache._entries["CAMERA"][0], camera)
+        self.assertIsNone(app._stream_last_render)
+
+    def test_healthy_new_frame_during_conversion_retains_prior_photo(self):
+        """A frame-serial change alone is not a Stop or privacy revocation."""
+        app = self.make_app(camera=False)
+        previous_photo = Mock()
+        app._stream_photo = previous_photo
+        app._stream_canvas_item = 12
+        old_game = Image.new("RGB", (24, 16), "red")
+        app._stream_game_frame = old_game
+        app._stream_game_serial = 6
+        app._stream_resize_cache.contained(
+            "GAME", old_game, (0, 0, 72, 56)
+        )
+        def next_frame(pixels):
+            app.emu.frame_serial += 1
+            return Image.new("RGB", (24, 16), "green")
+        with (
+            patch("anything_plays.ui_stream.Image.fromarray",
+                  side_effect=next_frame),
+            patch("anything_plays.ui_stream.compose_stream_output") as compose,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        compose.assert_not_called()
+        self.assertTrue(app.emu.running)
+        self.assertIs(app._stream_photo, previous_photo)
+        self.assertEqual(app._stream_canvas_item, 12)
+        app._stream_canvas.delete.assert_not_called()
+        self.assertIs(app._stream_game_frame, old_game)
+        self.assertIn("GAME", app._stream_resize_cache._entries)
+        self.assertIsNone(app._stream_last_render)
+
+    def test_reopened_window_during_conversion_keeps_new_output_untouched(self):
+        """An old PIL conversion cannot poison a newly reopened Stream Mode."""
+        app = self.make_app(camera=False)
+        new_window = Mock()
+        new_canvas = MagicMock()
+        new_photo = Mock()
+        replacement_game = Image.new("RGB", (24, 16), "blue")
+        new_cache = StreamPanelResizeCache()
+        new_cache.contained("GAME", replacement_game, (0, 0, 72, 56))
+
+        def close_and_reopen(_pixels):
+            app._stream_output_window = new_window
+            app._stream_canvas = new_canvas
+            app._stream_photo = new_photo
+            app._stream_game_frame = replacement_game
+            app._stream_game_serial = 7
+            app._stream_last_render = ("new output generation",)
+            app._stream_resize_cache = new_cache
+            return Image.new("RGB", (24, 16), "red")
+
+        with (
+            patch("anything_plays.ui_stream.Image.fromarray",
+                  side_effect=close_and_reopen),
+            patch("anything_plays.ui_stream.compose_stream_output") as compose,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        compose.assert_not_called()
+        self.assertIs(app._stream_photo, new_photo)
+        self.assertIs(app._stream_game_frame, replacement_game)
+        self.assertEqual(app._stream_game_serial, 7)
+        self.assertEqual(app._stream_last_render, ("new output generation",))
+        self.assertIs(new_cache._entries["GAME"][0], replacement_game)
+        new_canvas.delete.assert_not_called()
+
     @staticmethod
     def _stop_and_return(app, image):
         app.emu.stop_event.set()

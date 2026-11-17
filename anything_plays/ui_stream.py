@@ -1216,8 +1216,39 @@ class StreamMixin:
                             and stop.is_set()
                         )
                     )
+                # A reentrant preview hook can also close/reopen Stream
+                # Mode during PIL conversion. Do not attach a copied frame
+                # to a new output generation even if the native serial
+                # itself has not changed.
+                same_output = (
+                    self._stream_output_window is output
+                    and self._stream_canvas is canvas
+                )
+                if not same_output:
+                    return False
                 if not still_current:
-                    self._stream_last_render = None
+                    # Merely receiving the NEXT healthy native frame does
+                    # not revoke the previously displayed game image.
+                    # Actual Stop/core exit does: blank its OBS-facing Tk
+                    # photo immediately, rather than leave the old image
+                    # visible until a later Stream tick.
+                    stopped = (
+                        not self.emu.running
+                        or (isinstance(stop, threading.Event)
+                            and stop.is_set())
+                    )
+                    if stopped:
+                        self._stream_game_frame = None
+                        self._stream_game_serial = None
+                        cache = getattr(self, "_stream_resize_cache", None)
+                        if cache is not None:
+                            try:
+                                cache.clear("GAME")
+                            except Exception:
+                                self._stream_resize_cache = None
+                        self._stream_blank_output()
+                    else:
+                        self._stream_last_render = None
                     return False
                 self._stream_game_frame = converted
                 self._stream_game_serial = serial
