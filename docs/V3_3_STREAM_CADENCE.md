@@ -160,6 +160,20 @@ published after a fault; an unchanged tick cannot claim one. Closing and
 reopening the output resets all three counters. No frame, clock history,
 camera identity or filesystem path is retained.
 
+## Expiring webcam frames during slow UI publication
+
+A webcam snapshot can be within its three-second freshness limit when
+Stream Mode begins composing, but become stale while a slow PIL resize or
+Tk PhotoImage is processing. The final publication fence now rechecks
+the live webcam snapshot timestamp after composition and image updates.
+A missing/invalid/reversed optional clock revokes private webcam pixels.
+Intentional static reference art remains exempt from webcam expiry.
+
+Three synthetic regressions cover slow composition, expiration during
+PhotoImage construction, and retained static reference images. This does
+not change game input polling, native emulation, audio or save handling
+and is not a physical camera/OBS certification.
+
 ## Last-mile Tk image publication safety
 
 The native/PIL composition fence now repeats its source/window checks

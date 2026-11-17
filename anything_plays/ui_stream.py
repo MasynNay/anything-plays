@@ -1434,6 +1434,33 @@ class StreamMixin:
                     )
                 except Exception:
                     lost_camera_source = True
+                if (not lost_camera_source
+                        and self._stream_camera_frame is not None):
+                    # The webcam may age out while PIL/Tk is blocked.
+                    # Freshness must hold at publication, not only at the
+                    # beginning of the optional OBS composition.
+                    last_success = getattr(
+                        self, "_stream_camera_last_snapshot", None
+                    )
+                    try:
+                        now = time.monotonic()
+                        valid_clock = (
+                            type(now) in (int, float)
+                            and math.isfinite(now) and now >= 0
+                        )
+                        valid_last = (
+                            type(last_success) in (int, float)
+                            and math.isfinite(last_success)
+                            and last_success >= 0
+                        )
+                    except Exception:
+                        valid_clock = valid_last = False
+                    if (not valid_clock or not valid_last or
+                            stream_camera_frame_is_stale(last_success, now)):
+                        self._stream_stale_camera_clears = (
+                            getattr(self, "_stream_stale_camera_clears", 0) + 1
+                        )
+                        lost_camera_source = True
             if lost_camera_source:
                 self.stream_clear_camera()
 

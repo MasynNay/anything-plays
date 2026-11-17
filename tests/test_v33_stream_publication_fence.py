@@ -672,6 +672,74 @@ class StreamPublicationFenceTests(unittest.TestCase):
         self.assertIsNone(app._stream_camera_frame)
 
 
+    def test_webcam_expires_during_slow_composition_before_tk_photo(self):
+        app = self.make_app(game=True, camera=False)
+        webcam = Image.new("RGB", (24, 16), "red")
+        app.cap = Mock()
+        app.cap.isOpened.return_value = True
+        app._stream_camera_frame = webcam
+        app._stream_camera_last_snapshot = 10.0
+        app._stream_camera_serial = 3
+        app._stream_resize_cache.contained("CAMERA", webcam, (0, 0, 72, 56))
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 62
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=(10.1, 13.5)),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        compose.assert_called_once()
+        photo.assert_not_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertIsNone(app._stream_camera_last_snapshot)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+        app._stream_canvas.delete.assert_called_with("all")
+        self.assertTrue(app.emu.running)
+
+    def test_webcam_expires_while_tk_photo_is_created(self):
+        app = self.make_app(game=True, camera=False)
+        webcam = Image.new("RGB", (24, 16), "red")
+        app.cap = Mock()
+        app.cap.isOpened.return_value = True
+        app._stream_camera_frame = webcam
+        app._stream_camera_last_snapshot = 10.0
+        app._stream_camera_serial = 4
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  side_effect=(10.1, 10.2, 14.0)),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        photo.assert_called_once()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_stale_camera_clears, 1)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+
+    def test_static_reference_image_never_expires_during_publication(self):
+        app = self.make_app(game=False, camera=True)
+        app.cap = None
+        reference = app._stream_camera_frame
+        app._stream_camera_last_snapshot = 1.0
+        with (
+            patch("anything_plays.ui_stream.time.monotonic",
+                  return_value=4000.0),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertTrue(app._render_stream_frame())
+        photo.assert_called_once()
+        self.assertIs(app._stream_camera_frame, reference)
+        self.assertEqual(app._stream_stale_camera_clears, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
