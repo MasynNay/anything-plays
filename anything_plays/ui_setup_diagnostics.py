@@ -158,6 +158,25 @@ def _gamecube_performance_summary_lines(performance):
     )
     timed = m.get("gpu_readback_timing_samples")
     captures = m["gpu_readback_calls"]
+    # Fixed P95 buckets from successful, validly timed GL captures only.
+    # Older report schemas do not contain these fields: remain compatible.
+    labels = (
+        "0–2", "2–4", "4–8", "8–16", "16–33",
+        "33–50", "50–100", "100–250", ">250",
+    )
+    code = m.get("gpu_readback_p95_bucket_code", -1)
+    slow16 = m.get("gpu_readback_over_16ms")
+    slow33 = m.get("gpu_readback_over_33ms")
+    readback_p95 = ()
+    if (type(timed) is int and timed > 0 and type(code) is int
+            and 0 <= code < len(labels)
+            and type(slow16) is int and type(slow33) is int
+            and 0 <= slow33 <= slow16 <= timed):
+        readback_p95 = (
+            f"GPU readback P95 (timed captures): {labels[code]} ms · "
+            f">16 ms: {slow16} · >33 ms: {slow33} "
+            f"(of {timed} valid samples)",
+        )
     if type(timed) is int and captures > 0 and timed == 0:
         # A perf_counter() failure is not evidence that glReadPixels is free.
         readback_cost = "maximum unmeasured · share unavailable"
@@ -180,6 +199,7 @@ def _gamecube_performance_summary_lines(performance):
         f"{p95_label}",
         f"GPU readback: {captures} captures · {readback_cost}"
         f"{readback_timing}",
+        *readback_p95,
         f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
         f"observed {observed_preview} over "
         f"{m['gamecube_preview_cadence_intervals']} intervals · "

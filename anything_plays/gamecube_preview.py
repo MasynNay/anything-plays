@@ -51,6 +51,62 @@ def should_capture(last_capture, now, mode):
     # Small tolerance compensates for timer jitter; avoids 29.9 FPS output.
     return elapsed >= (1 / preview_fps(mode)) - 0.001
 
+
+_GPU_READBACK_BIN_MAX_MS = (2, 4, 8, 16, 33, 50, 100, 250)
+
+
+class ReadbackTimingHistogram:
+    """Fixed-memory GPU preview-copy costs, no frame traces or device data.
+
+    Counters are per GameCube session, across all 20/30/60 FPS preview modes.
+    Only copies with a valid perf_counter duration contribute to the P95.
+    """
+
+    def __init__(self):
+        self.buckets = [0] * (len(_GPU_READBACK_BIN_MAX_MS) + 1)
+        self.samples = 0
+        self.over_16ms = 0
+        self.over_33ms = 0
+
+    def record(self, seconds):
+        import math
+
+        if type(seconds) not in (int, float):
+            return False
+        try:
+            valid = math.isfinite(seconds) and 0 <= seconds <= 3600
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            return False
+        elapsed_ms = seconds * 1000
+        i = next(
+            (n for n, upper in enumerate(_GPU_READBACK_BIN_MAX_MS)
+             if elapsed_ms <= upper), len(_GPU_READBACK_BIN_MAX_MS),
+        )
+        self.buckets[i] += 1
+        self.samples += 1
+        self.over_16ms += int(elapsed_ms > 16)
+        self.over_33ms += int(elapsed_ms > 33)
+        return True
+
+    def snapshot(self):
+        p95 = -1
+        if self.samples:
+            rank = (self.samples * 95 + 99) // 100  # nearest-rank P95
+            cumulative = 0
+            for i, count in enumerate(self.buckets):
+                cumulative += count
+                if cumulative >= rank:
+                    p95 = i
+                    break
+        return {
+            "gpu_readback_p95_bucket_code": p95,
+            "gpu_readback_over_16ms": self.over_16ms,
+            "gpu_readback_over_33ms": self.over_33ms,
+        }
+
+
 class PreviewCadenceTracker:
     """Constant-memory capture *publication* cadence for one preview mode.
 

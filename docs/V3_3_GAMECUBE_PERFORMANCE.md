@@ -18,8 +18,9 @@ frames or audio, benchmark an external emulator, or verify a real speaker.
    network service is needed.
 3. Play for at least 2 minutes. Refresh the window and inspect native
    `retro_run` calls/mean/max cost and P95 frame-time **bucket**,
-   GPU readback captures/max/share, >5 ms scheduler deadline misses/resyncs,
-   and audio delivery counters.
+   GPU readback captures/max/share and session-wide readback P95 bucket /
+   slow-copy counts, >5 ms scheduler deadline misses/resyncs, and audio
+   delivery counters.
 4. Repeat the same segment with the embedded GameCube preview rate set to
    **20, 30 and 60 FPS** (Performance, Balanced, Quality). The separately
    configured **Stream Mode** supports 15, 24 and 30 FPS; those numbers
@@ -87,12 +88,19 @@ is not proof of an actual GPU speedup; compare measured physical sessions.
 | `native_run_p95_bucket_code` | Nearest-rank P95 `retro_run` duration bucket, using fixed ranges 0–8, 8–16, 16–25, 25–33, 33–50, 50–100, 100–250, 250–500 and >500 ms (codes 0–8). -1 means no valid native frames | This is an interval, not a fabricated precise percentile or physical FPS; only nine aggregate counters are retained, no per-frame timing history |
 | `gpu_readback_calls`, `gpu_readback_max_ms`, `gpu_readback_share_of_native_run` | Synchronous UI preview pixel readbacks and their portion of native run cost | Readback time is **included in**, not added to, `retro_run` time |
 | `gpu_readback_timing_samples`, `gamecube_preview_clock_failures` | Number of successfully timed GPU readbacks and rejected optional clock observations | A valid clock on every frame or proof that the physical GPU was slow; an otherwise successful captured frame may have no timing sample |
+| `gpu_readback_p95_bucket_code`, `gpu_readback_over_16ms`, `gpu_readback_over_33ms` | Nearest-rank P95 fixed duration bucket (0–2, 2–4, 4–8, 8–16, 16–33, 33–50, 50–100, 100–250, >250 ms, codes 0–8; -1 without data) and slow-copy counts | Only successfully timed GPU captures; not a native game FPS metric. A partial sample or mixed preview target can bias the distribution |
 | `scheduler_late_frames`, `scheduler_late_max_ms`, `scheduler_resyncs` | Delays beyond the native frame deadline and scheduler resets | Missing a deadline does not prove a hardware driver fault |
 | `audio_output_device_underflow_callbacks` | PortAudio reported output-device underrun callbacks | A nonzero value signals a scheduling symptom, not its root cause |
 | `audio_output_underrun_frames`, `audio_queue_dropped_frames` | PCM output frames filled with silence or dropped from the bounded queue | No recorded waveform or audible-speaker confirmation |
 | `gamecube_hardware_frames`, `gamecube_preview_readback_skips` | Game frames published to the embedded UI vs deliberately skipped preview readbacks | Does not mean the emulator skipped `retro_run` or game input |
 | `gamecube_preview_target_fps`, `gamecube_preview_observed_capture_fps` | Selected 20/30/60 FPS preview cap versus aggregate **successful frame publication cadence** since the most recent preview mode switch | Observed publication frequency is not native Dolphin emulation FPS or physical monitor FPS |
 | `gamecube_preview_cadence_intervals`, `gamecube_preview_max_interval_ms` | Number of measured gaps between published preview images and longest such gap | With fewer than two published frames, observed cadence is zero meaning **insufficient samples**, not a 0 FPS performance result |
+
+Readback P95 is computed from nine bounded integer buckets, never a
+per-frame history, pixel buffer, ROM name or device identifier. It is a
+**range**, not an exact latency value, and covers the whole GameCube session.
+Restart the game before comparing 20/30/60 FPS preview modes so each trial
+has a fresh histogram. Invalid/suspended clock samples cannot contribute.
 
 Readback diagnostics now distinguish **successful GL pixel captures**
 (`gpu_readback_calls`) from **valid readback timing samples**

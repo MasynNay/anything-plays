@@ -24,6 +24,7 @@ from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
 from anything_plays.gamecube_preview import (
     should_capture, preview_fps, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
+    ReadbackTimingHistogram,
 )
 from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
@@ -75,6 +76,7 @@ class GameCubeHardwareSession(CoreSession):
         self.gpu_readback_max_seconds = 0.0
         self.gpu_readback_calls = 0
         self.gpu_readback_timing_samples = 0
+        self._readback_histogram = ReadbackTimingHistogram()
         self.preview_clock_failures = 0
         self.native_run_timing = GameCubeNativeTiming()
         self.preview_readback_skips = 0
@@ -214,6 +216,9 @@ class GameCubeHardwareSession(CoreSession):
                 self.gpu_readback_timing_samples = (
                     getattr(self, "gpu_readback_timing_samples", 0) + 1
                 )
+                hist = getattr(self, "_readback_histogram", None)
+                if hist is not None:
+                    hist.record(duration)
             else:
                 self.preview_clock_failures = (
                     getattr(self, "preview_clock_failures", 0) + 1
@@ -280,6 +285,11 @@ class GameCubeHardwareSession(CoreSession):
             "gamecube_hardware_frames": self.hardware_frames,
             "gamecube_preview_readback_skips": self.preview_readback_skips,
         })
+        hist = getattr(self, "_readback_histogram", None)
+        metrics.update(
+            hist.snapshot() if hist is not None
+            else ReadbackTimingHistogram().snapshot()
+        )
         metrics.update(self.audio.delivery_snapshot())
         tracker = getattr(self, "_preview_cadence", None)
         metrics.update(
