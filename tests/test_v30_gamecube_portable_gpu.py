@@ -107,9 +107,13 @@ class PortableGameCubeHostTests(TestCase):
                 if name == "glGetError":
                     return 0
                 if name == "glGetIntegerv":
-                    value = (state["read_fbo"]
-                             if args[0] == GL_READ_FRAMEBUFFER_BINDING
-                             else state["pack"])
+                    value = (
+                        state["read_fbo"]
+                        if args[0] == GL_READ_FRAMEBUFFER_BINDING else
+                        state["pack"]
+                        if args[0] == GL_PACK_ALIGNMENT else
+                        0
+                    )
                     C.cast(args[1], C.POINTER(C.c_int))[0] = value
                 if name == "glBindFramebuffer":
                     self.assertEqual(args[0], GL_READ_FRAMEBUFFER)
@@ -153,8 +157,10 @@ class PortableGameCubeHostTests(TestCase):
                 if name == "glGetIntegerv":
                     C.cast(args[1], C.POINTER(C.c_int))[0] = (
                         state["read_fbo"]
-                        if args[0] == GL_READ_FRAMEBUFFER_BINDING
-                        else state["pack"]
+                        if args[0] == GL_READ_FRAMEBUFFER_BINDING else
+                        state["pack"]
+                        if args[0] == GL_PACK_ALIGNMENT else
+                        0
                     )
                 if name == "glBindFramebuffer":
                     state["read_fbo"] = args[1]
@@ -169,6 +175,76 @@ class PortableGameCubeHostTests(TestCase):
         with self.assertRaisesRegex(OSError, "native GL transfer interrupted"):
             host.read_frame(4, 4)
         self.assertEqual(state, {"read_fbo": 28, "pack": 8})
+
+
+    def test_native_pixel_pack_buffer_and_row_offsets_are_never_used_for_client_pixels(self):
+        """A PBO and large inherited row/skip offsets must not corrupt the copy."""
+        from anything_plays.libretro_gpu_egl import (
+            GL_READ_BUFFER, GL_READ_FRAMEBUFFER, GL_READ_FRAMEBUFFER_BINDING,
+            GL_COLOR_ATTACHMENT0, GL_PIXEL_PACK_BUFFER,
+            GL_PIXEL_PACK_BUFFER_BINDING, GL_PACK_ALIGNMENT,
+            GL_PACK_ROW_LENGTH, GL_PACK_SKIP_ROWS, GL_PACK_SKIP_PIXELS,
+        )
+        for should_fail in (False, True):
+            with self.subTest(driver_error=should_fail):
+                host = EGLFrameHost.__new__(EGLFrameHost)
+                host.owner = threading.get_ident()
+                host.width, host.height, host.fbo = 7, 3, 12
+                # Target FBO initially has no read attachment; native
+                # Dolphin may have an unrelated active PBO and row layout.
+                original = {
+                    GL_READ_FRAMEBUFFER_BINDING: 29,
+                    GL_PIXEL_PACK_BUFFER_BINDING: 77,
+                    GL_PACK_ALIGNMENT: 8,
+                    GL_PACK_ROW_LENGTH: 256,
+                    GL_PACK_SKIP_ROWS: 2,
+                    GL_PACK_SKIP_PIXELS: 5,
+                    GL_READ_BUFFER: 0,
+                }
+                state = original.copy()
+                transfers = []
+
+                def gl(name, _result, _arguments):
+                    def call(*args):
+                        if name == "glGetError":
+                            return 0
+                        if name == "glGetIntegerv":
+                            C.cast(args[1], C.POINTER(C.c_int))[0] = state[args[0]]
+                        elif name == "glBindFramebuffer":
+                            self.assertEqual(args[0], GL_READ_FRAMEBUFFER)
+                            state[GL_READ_FRAMEBUFFER_BINDING] = args[1]
+                        elif name == "glBindBuffer":
+                            self.assertEqual(args[0], GL_PIXEL_PACK_BUFFER)
+                            state[GL_PIXEL_PACK_BUFFER_BINDING] = args[1]
+                        elif name == "glPixelStorei":
+                            state[args[0]] = args[1]
+                        elif name == "glReadBuffer":
+                            state[GL_READ_BUFFER] = args[0]
+                        elif name == "glReadPixels":
+                            self.assertEqual(state[GL_READ_FRAMEBUFFER_BINDING], 12)
+                            self.assertEqual(state[GL_PIXEL_PACK_BUFFER_BINDING], 0)
+                            self.assertEqual(state[GL_PACK_ALIGNMENT], 1)
+                            self.assertEqual(state[GL_PACK_ROW_LENGTH], 0)
+                            self.assertEqual(state[GL_PACK_SKIP_ROWS], 0)
+                            self.assertEqual(state[GL_PACK_SKIP_PIXELS], 0)
+                            self.assertEqual(state[GL_READ_BUFFER], GL_COLOR_ATTACHMENT0)
+                            self.assertEqual((args[2], args[3]), (7, 3))
+                            transfers.append(1)
+                            if should_fail:
+                                raise OSError("fake GL driver fault")
+                            args[-1][0:4] = [24, 35, 46, 255]
+                    return call
+
+                host._gl = gl
+                if should_fail:
+                    with self.assertRaisesRegex(OSError, "fake GL driver fault"):
+                        host.read_frame(7, 3, flip_vertical=False)
+                else:
+                    result = host.read_frame(7, 3, flip_vertical=False)
+                    self.assertEqual(result.shape, (3, 7, 3))
+                    self.assertEqual(result[0, 0].tolist(), [24, 35, 46])
+                self.assertEqual(transfers, [1])
+                self.assertEqual(state, original)
 
     def test_selects_proven_egl_for_linux(self):
         with patch("anything_plays.libretro_gpu_portable.sys.platform", "linux"):

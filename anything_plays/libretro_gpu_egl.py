@@ -34,6 +34,12 @@ GL_TEXTURE_MAG_FILTER = 0x2800
 GL_LINEAR = 0x2601
 GL_DEPTH24_STENCIL8 = 0x88F0
 GL_PACK_ALIGNMENT = 0x0D05
+GL_PACK_ROW_LENGTH = 0x0D02
+GL_PACK_SKIP_ROWS = 0x0D04
+GL_PACK_SKIP_PIXELS = 0x0D06
+GL_PIXEL_PACK_BUFFER = 0x88EB
+GL_PIXEL_PACK_BUFFER_BINDING = 0x88ED
+GL_READ_BUFFER = 0x0C02
 GL_VERSION = 0x1F02
 GL_RENDERER = 0x1F01
 GL_VENDOR = 0x1F00
@@ -248,18 +254,31 @@ class EGLFrameHost:
             self.last_gl_error = 1
             raise RuntimeError("GPU readback OpenGL error")
 
-        # Pixel-pack alignment is shared GL context state. The frontend
-        # needs tightly packed bytes for its RGBA -> RGB snapshot, but
-        # leaving PACK_ALIGNMENT=1 behind changes Dolphin's subsequent GL
-        # transfers (including after a failed driver readback). Retain the
-        # prior value and restore it alongside the read framebuffer.
-        old_read = C.c_int()
-        old_pack = C.c_int(4)
+        # Native Dolphin can leave a pixel pack buffer or a nondefault
+        # row length/skip offset bound when its video callback fires.
+        # glReadPixels treats a pointer as a PBO offset in that case, and
+        # row/skip state can write beyond our exact w*h*4 client buffer.
+        # Isolate ALL pack layout needed for this tightly packed RGBA copy;
+        # restore native GL state even after a failed transfer.
         get_int = self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])
+        old_read = C.c_int()
         get_int(GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read))
-        get_int(GL_PACK_ALIGNMENT, C.byref(old_pack))
+        old_pbo = C.c_int()
+        get_int(GL_PIXEL_PACK_BUFFER_BINDING, C.byref(old_pbo))
+        pack_state = (
+            (GL_PACK_ALIGNMENT, C.c_int(4), 1),
+            (GL_PACK_ROW_LENGTH, C.c_int(0), 0),
+            (GL_PACK_SKIP_ROWS, C.c_int(0), 0),
+            (GL_PACK_SKIP_PIXELS, C.c_int(0), 0),
+        )
+        for pname, previous, _desired in pack_state:
+            get_int(pname, C.byref(previous))
+
         bind_read = self._gl(
             "glBindFramebuffer", None, [C.c_uint, C.c_uint]
+        )
+        bind_pack = self._gl(
+            "glBindBuffer", None, [C.c_uint, C.c_uint]
         )
         pixel_store = self._gl(
             "glPixelStorei", None, [C.c_uint, C.c_int]
@@ -270,18 +289,41 @@ class EGLFrameHost:
             [C.c_int, C.c_int, C.c_int, C.c_int,
              C.c_uint, C.c_uint, C.c_void_p],
         )
-        # Allocate native transfer storage *before* modifying GL state.
+        # Allocate native transfer storage before mutating GL state.
         image = (C.c_ubyte * (w * h * 4))()
+        # Read-buffer selection belongs to the FBO, not the global pack
+        # state. Query it only AFTER binding our FBO; restore it before
+        # returning to the previously active native read framebuffer.
+        old_read_buffer = C.c_int(GL_COLOR_ATTACHMENT0)
+        read_buffer_known = False
         try:
             bind_read(GL_READ_FRAMEBUFFER, self.fbo)
-            read_buffer(GL_COLOR_ATTACHMENT0)
-            pixel_store(GL_PACK_ALIGNMENT, 1)
+            get_int(GL_READ_BUFFER, C.byref(old_read_buffer))
+            read_buffer_known = True
+            if old_read_buffer.value != GL_COLOR_ATTACHMENT0:
+                read_buffer(GL_COLOR_ATTACHMENT0)
+            if old_pbo.value:
+                bind_pack(GL_PIXEL_PACK_BUFFER, 0)
+            for pname, previous, desired in pack_state:
+                if previous.value != desired:
+                    pixel_store(pname, desired)
             read_pixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image)
         finally:
             try:
-                pixel_store(GL_PACK_ALIGNMENT, old_pack.value)
+                for pname, previous, desired in pack_state:
+                    if previous.value != desired:
+                        pixel_store(pname, previous.value)
             finally:
-                bind_read(GL_READ_FRAMEBUFFER, old_read.value)
+                try:
+                    if old_pbo.value:
+                        bind_pack(GL_PIXEL_PACK_BUFFER, old_pbo.value)
+                finally:
+                    try:
+                        if (read_buffer_known
+                                and old_read_buffer.value != GL_COLOR_ATTACHMENT0):
+                            read_buffer(old_read_buffer.value)
+                    finally:
+                        bind_read(GL_READ_FRAMEBUFFER, old_read.value)
         self.last_gl_error = get_error()
         if self.last_gl_error:
             # glReadPixels can fail without raising a Python exception. The

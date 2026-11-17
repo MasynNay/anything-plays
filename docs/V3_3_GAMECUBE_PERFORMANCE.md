@@ -116,13 +116,19 @@ is not proof of an actual GPU speedup; compare measured physical sessions.
 All three embedded Dolphin GPU backends (Linux EGL, Windows WGL,
 macOS CGL) share the same bounded readback implementation. It now
 preserves and restores the previously active OpenGL pixel-pack
-alignment as well as the read framebuffer binding after preview
-`glReadPixels`. This avoids leaking the frontend's tightly packed
-screenshot setting into subsequent Dolphin GL work, even when a
-native transfer raises an exception. The RGB pixel content and
-20/30/60 FPS preview-copy budget are unchanged. Native no-game
-synthetic tests cover successful RGBA8 conversion at odd widths
-and restoration following an interrupted driver readback.
+alignment, row length, skipped rows/pixels, pixel pack buffer binding
+and per-FBO read buffer, together with the prior read framebuffer binding
+after preview `glReadPixels`. It temporarily unbinds Dolphin's PBO
+so the destination is treated as a **client memory pointer**, not an
+offset into a native buffer object. It also resets inherited row/skip
+offsets before using an exactly-sized RGBA buffer, then restores them
+on success or error. This avoids a potentially unsafe driver write
+or a stale GL state interaction; see
+[Khronos glReadPixels](https://wikis.khronos.org/opengl/GLAPI/glReadPixels)
+and [glPixelStore](https://wikis.khronos.org/opengl/GLAPI/glPixelStore).
+The RGB pixel content and 20/30/60 FPS preview-copy policy are unchanged.
+Native no-game synthetic tests cover odd-width transfers, nonzero PBO
+and hostile row/skip offsets, and restoration following a driver exception.
 
 This removes a potential GL state interaction; it does **not**
 certify actual Dolphin GPU stability or improve measured FPS without
