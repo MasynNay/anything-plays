@@ -454,7 +454,18 @@ class LibraryMixin:
                         "_stream_game_frame", "_stream_photo",
                     )
                 )
-                if prior_render:
+                # Stream Mode also retains an independent PIL source and
+                # fitted image for GAME. They can outlive the visible photo
+                # refs when the output is blanked or a window is detached.
+                # A ROM replacement must clear those pixels before native
+                # startup even if no Tk photo is currently displayed. Do
+                # not destroy an unrelated, still-live CAMERA resize entry.
+                cache = getattr(self, "_stream_resize_cache", None)
+                entries = getattr(cache, "_entries", None)
+                prior_game_cache = (
+                    isinstance(entries, dict) and "GAME" in entries
+                )
+                if prior_render or prior_game_cache:
                     from anything_plays.game_display_lifecycle import clear_game_video
                     clear_game_video(self)
                 self.emu.start(str(path))

@@ -211,6 +211,87 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNone(app._stream_game_frame)
         app.game_canvas.delete.assert_called_once_with("all")
 
+    def test_rom_switch_clears_hidden_game_fit_without_visible_photos(self):
+        """An OBS resize-cache-only game must not survive ROM replacement."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = LibraryHost()
+        cache = StreamPanelResizeCache()
+        old_game = Image.new("RGB", (20, 15), "#bd1932")
+        live_camera = Image.new("RGB", (20, 15), "#16ab92")
+        cache.contained("GAME", old_game, (0, 0, 90, 60))
+        cache.contained("CAMERA", live_camera, (0, 0, 90, 60))
+        self.assertEqual(set(cache._entries), {"GAME", "CAMERA"})
+
+        # Reproduce an OBS window which blanked its photo refs but still
+        # retained fitted pixels through its independent resize cache.
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app._stream_resize_cache = cache
+        original_camera = app._stream_camera_frame
+        observed = []
+
+        def start_new(path):
+            observed.append(path)
+            self.assertEqual(path, "/synthetic/new-game.gba")
+            self.assertNotIn("GAME", cache._entries)
+            self.assertIn("CAMERA", cache._entries)
+            self.assertIs(cache._entries["CAMERA"][0], live_camera)
+            self.assertIs(app._stream_camera_frame, original_camera)
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app._stream_photo)
+
+        app.emu.start.side_effect = start_new
+        app.start_rom("/synthetic/new-game.gba")
+        self.assertEqual(observed, ["/synthetic/new-game.gba"])
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertEqual(app.emu.frame_serial, 13)
+        self.assertEqual(app.current_rom, "/synthetic/new-game.gba")
+
+    def test_first_launch_with_camera_only_cache_leaves_camera_untouched(self):
+        """Camera capture alone must never trigger a game cleanup."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = LibraryHost()
+        cache = StreamPanelResizeCache()
+        live_camera = Image.new("RGB", (20, 15), "#23b79a")
+        cache.contained("CAMERA", live_camera, (0, 0, 90, 60))
+        app._stream_resize_cache = cache
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        camera = app._stream_camera_frame
+
+        app.start_rom("/synthetic/first-with-camera.gba")
+        app.emu.start.assert_called_once_with(
+            "/synthetic/first-with-camera.gba"
+        )
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertEqual(set(cache._entries), {"CAMERA"})
+        self.assertIs(cache._entries["CAMERA"][0], live_camera)
+        self.assertIs(app._stream_camera_frame, camera)
+
+    def test_unrecognized_or_absent_stream_cache_does_not_block_launch(self):
+        """A third-party cache facade must not be queried for old pixels."""
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app._stream_resize_cache = Mock()
+        app.start_rom("/synthetic/third-party-cache.gba")
+        app.emu.start.assert_called_once_with(
+            "/synthetic/third-party-cache.gba"
+        )
+        app.game_canvas.delete.assert_not_called()
+
     def test_rom_cleanup_evicts_only_old_game_resize_cache_pixels(self):
         """No hidden PIL cache keeps private ROM frames after game unload."""
         from PIL import Image

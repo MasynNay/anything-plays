@@ -118,7 +118,12 @@ lock, then all in-memory primary, Game-only, and OBS Stream Output game
 images/serials are retired **before any Tk widget deletion**. The OBS
 compositor's separate fitted **GAME** resize-cache entry is evicted at the
 same time without disturbing the still-live **CAMERA** cache; if a custom
-cache fails, the entire optional resize cache is discarded instead. Each
+cache fails, the entire optional resize cache is discarded instead.
+The ROM-switch path now also recognizes this independent retained **GAME**
+cache as prior rendered content even when the Tk and Stream Output photo
+references have already been blanked. The next ROM cannot inherit cached
+old-game pixels. A camera-only resize cache does not cause an unnecessary
+game cleanup and remains intact on first launch. Each
 of the three optional canvas deletes and the decorative bezel are independent.
 Even if a destroyed main canvas or a native widget wrapper raises, other
 views are cleared and a replacement ROM can start without keeping the
