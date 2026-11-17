@@ -578,5 +578,100 @@ class StreamPublicationFenceTests(unittest.TestCase):
 
 
 
+    def test_camera_unplug_inside_compositor_clears_old_obs_photo(self):
+        """A driver can close before the next normal camera tracking tick."""
+        app = self.make_app(game=True, camera=False)
+        camera = Image.new("RGB", (24, 16), "red")
+        app._stream_camera_frame = camera
+        app._stream_camera_serial = 5
+        app._stream_camera_last_snapshot = 10.0
+        app._stream_resize_cache.contained("CAMERA", camera, (0, 0, 60, 48))
+        app.cap = Mock()
+        app.cap.isOpened.side_effect = (True, False)
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 41
+        with (
+            patch("anything_plays.ui_stream.time.monotonic", return_value=10.2),
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as new_photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        compose.assert_called_once()
+        new_photo.assert_not_called()
+        app._stream_canvas.delete.assert_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertNotIn("CAMERA", app._stream_resize_cache._entries)
+        self.assertEqual(app._stream_camera_serial, 6)
+        self.assertTrue(app.emu.running)
+
+    def test_reopened_window_during_tk_photo_creation_keeps_new_output(self):
+        app = self.make_app(game=True, camera=False)
+        new_window = Mock()
+        new_canvas = MagicMock()
+        new_photo = Mock()
+        def reopen_during_photo(*_args, **_kwargs):
+            app._stream_output_window = new_window
+            app._stream_canvas = new_canvas
+            app._stream_photo = new_photo
+            app._stream_canvas_item = 55
+            app._stream_last_render = ("new session",)
+            return Mock()
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage",
+                  side_effect=reopen_during_photo),
+        ):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIs(app._stream_photo, new_photo)
+        self.assertIs(app._stream_canvas, new_canvas)
+        self.assertEqual(app._stream_canvas_item, 55)
+        self.assertEqual(app._stream_last_render, ("new session",))
+        new_canvas.delete.assert_not_called()
+
+    def test_stop_during_tk_photo_creation_never_republishes_old_game(self):
+        app = self.make_app(game=True, camera=False)
+        app._stream_photo = Mock()
+        app._stream_photo.width.return_value = 1  # force new PhotoImage
+        app._stream_canvas_item = 43
+        def stop_during_photo(*_args, **_kwargs):
+            app.emu.stop_event.set()
+            return Mock()
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "red")),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage",
+                  side_effect=stop_during_photo),
+        ):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        app._stream_canvas.delete.assert_called_with("all")
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+
+    def test_camera_disconnect_during_existing_photo_paste_blanks_obs(self):
+        app = self.make_app(game=True, camera=True)
+        existing = Mock()
+        existing.width.return_value = 760
+        existing.height.return_value = 980
+        app._stream_photo = existing
+        app._stream_canvas_item = 44
+        def unplug_during_paste(_frame):
+            app.stream_clear_camera()
+        existing.paste.side_effect = unplug_during_paste
+        with patch("anything_plays.ui_stream.compose_stream_output",
+                   return_value=Image.new("RGB", (760, 980), "red")):
+            self.assertFalse(app._render_stream_frame())
+        self.assertEqual(existing.paste.call_count, 1)
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_canvas_item)
+        app._stream_canvas.delete.assert_called()
+        self.assertIsNone(app._stream_camera_frame)
+
+
+
 if __name__ == "__main__":
     unittest.main()

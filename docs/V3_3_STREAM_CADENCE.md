@@ -160,6 +160,27 @@ published after a fault; an unchanged tick cannot claim one. Closing and
 reopening the output resets all three counters. No frame, clock history,
 camera identity or filesystem path is retained.
 
+## Last-mile Tk image publication safety
+
+The native/PIL composition fence now repeats its source/window checks
+**after Tk PhotoImage construction**, **after reusing an existing Tk image
+via paste()**, and **after canvas image attachment**. A Stop, privacy
+camera disconnect, or close/reopen occurring inside those synchronous
+operations cannot publish an old-source image into a replacement OBS
+window or resurrect a revoked camera photo. In addition, a webcam
+disconnected during PIL compositing is detected immediately by a
+post-composition device-open check, even before the next main camera
+tick calls its ordinary disconnect handler. A still-active static
+reference image is intentionally not expired by losing the webcam.
+
+Normal healthy emulator frame turnover still preserves the most
+recently published Stream photo until the next valid frame. Four
+synthetic adversarial tests cover camera loss during composition,
+output reopen during Tk image creation, Stop during Tk image creation,
+and camera disconnect during existing image paste. Native emulation
+thread timing, camera control polling, audio, and saved games are
+unchanged. This does not certify physical OBS or webcam behavior.
+
 ## Stream compositor failure and privacy recovery
 
 If a PIL image conversion, Tk photo update or native preview wrapper fails,

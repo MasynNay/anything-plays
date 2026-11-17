@@ -1409,47 +1409,66 @@ class StreamMixin:
             camera_active=camera_active, camera_reference=camera_ref,
             resize_cache=getattr(self, "_stream_resize_cache", None),
         )
-        # Compositing and resizing happen OUTSIDE the native frame lock.
-        # Stop, camera unplug, changed settings or a closed/reopened window
-        # may invalidate those pixels during a slow PIL operation. Before
-        # mutating an existing Tk PhotoImage (which OBS may be capturing),
-        # verify that the source generations and target still match.
-        if (self._stream_output_window is not output
-                or self._stream_canvas is not canvas):
-            return False  # The old window is already retired.
-        changed_camera = self._stream_camera_serial != state[3]
-        changed_settings = tuple(self._stream_options.items()) != state[5]
-        still_active = bool(
-            self.emu.running and self.uses_embedded_emulator()
-            and not (
-                isinstance(stop_event, threading.Event)
-                and stop_event.is_set()
+        # Compositing, Tk PhotoImage creation, and image paste can each
+        # overlap a native Stop, webcam disconnect or a reentrant window
+        # close/reopen. Check more than once: the first publication fence
+        # alone cannot protect the later Tcl image construction/paste.
+        def publication_invalidated():
+            if (self._stream_output_window is not output
+                    or self._stream_canvas is not canvas):
+                return True  # This output was retired; never touch its replacement.
+
+            # A device may disconnect DURING PIL composition before the
+            # camera tick has a chance to issue stream_clear_camera().
+            # Revalidate the selected source, but never expire intentional
+            # static reference art merely because its webcam is disconnected.
+            lost_camera_source = False
+            if camera_ref:
+                lost_camera_source = not bool(
+                    self.reference_image and self.frame is not None
+                )
+            elif camera_active:
+                try:
+                    lost_camera_source = (
+                        self.cap is None or not bool(self.cap.isOpened())
+                    )
+                except Exception:
+                    lost_camera_source = True
+            if lost_camera_source:
+                self.stream_clear_camera()
+
+            changed_camera = self._stream_camera_serial != state[3]
+            changed_settings = tuple(self._stream_options.items()) != state[5]
+            still_active = bool(
+                self.emu.running and self.uses_embedded_emulator()
+                and not (
+                    isinstance(stop_event, threading.Event)
+                    and stop_event.is_set()
+                )
             )
-        )
-        changed_game = still_active != active_game
-        game_revoked = changed_game
-        if active_game:
-            stop = getattr(self.emu, "stop_event", None)
-            with self.emu.lock:
-                game_revoked = (
-                    not self.emu.running
-                    or (isinstance(stop, threading.Event) and stop.is_set())
-                    or (getattr(self.emu, "session_generation", None)
-                        != game_generation)
-                )
-                changed_game = changed_game or (
-                    getattr(self.emu, "frame_serial", 0) != serial
-                    or game_revoked
-                )
-        if changed_game or changed_camera or changed_settings:
+            changed_game = still_active != active_game
+            game_revoked = changed_game
+            if active_game:
+                with self.emu.lock:
+                    game_revoked = (
+                        not self.emu.running
+                        or (isinstance(stop_event, threading.Event)
+                            and stop_event.is_set())
+                        or (getattr(self.emu, "session_generation", None)
+                            != game_generation)
+                    )
+                    changed_game = changed_game or (
+                        getattr(self.emu, "frame_serial", 0) != serial
+                        or game_revoked
+                    )
+            if not (changed_game or changed_camera or changed_settings):
+                return False
             if (changed_game and not game_revoked and
                     not changed_camera and not changed_settings):
-                # A healthy native frame arrived DURING slow PIL resizing.
-                # Discard this uncommitted composition but keep the last
-                # OBS-facing image visible until the next tick; a frame
-                # serial advance is not a Stop or privacy revocation.
+                # A healthy next native frame is not a privacy revocation:
+                # retry next tick without flickering the previous OBS photo.
                 self._stream_last_render = None
-                return False
+                return True
             cache = getattr(self, "_stream_resize_cache", None)
             if changed_game and self._stream_game_serial == serial:
                 self._stream_game_frame = None
@@ -1461,24 +1480,38 @@ class StreamMixin:
                     if changed_camera:
                         cache.clear("CAMERA")
                 except Exception:
-                    # No old privacy-sensitive fitted source may survive a
-                    # failed optional cache eviction.
                     self._stream_resize_cache = None
             self._stream_blank_output()
+            return True
+
+        if publication_invalidated():
             return False
         photo = self._stream_photo
         if photo is None or photo.width() != w or photo.height() != h:
-            photo = ImageTk.PhotoImage(frame, master=self._stream_output_window)
+            # Do not assign the new PhotoImage to self before the second
+            # fence. A callback can reopen the output inside image creation.
+            photo = ImageTk.PhotoImage(frame, master=output)
+            if publication_invalidated():
+                return False
             self._stream_photo = photo
         else:
             photo.paste(frame)
+            # paste() mutates an image OBS may ALREADY be capturing. A
+            # disconnect/Stop during that call must blank the old output,
+            # not record a successful publish of its stale game pixels.
+            if publication_invalidated():
+                return False
         item = self._stream_canvas_item
         if item is None or not canvas.type(item):
             canvas.delete("all")
             item = canvas.create_image(0, 0, image=photo, anchor="nw")
+            if publication_invalidated():
+                return False
             self._stream_canvas_item = item
         else:
             canvas.itemconfigure(item, image=photo)
+        if publication_invalidated():
+            return False
         self._stream_last_render = state
         return True
 
