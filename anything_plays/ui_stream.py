@@ -918,13 +918,13 @@ class StreamMixin:
         # a closed/reopened OBS output. Capture identity BEFORE conversion,
         # including camera-off notifications with no prior cached pixels.
         camera_serial = self._stream_camera_serial
-        camera_epoch = self._stream_camera_epoch
+        camera_epoch = getattr(self, "_stream_camera_epoch", 0)
 
         def current_camera_output():
             return (
                 self._stream_output_window is output
                 and self._stream_camera_serial == camera_serial
-                and self._stream_camera_epoch == camera_epoch
+                and getattr(self, "_stream_camera_epoch", 0) == camera_epoch
                 and not getattr(self, "_closing", False)
             )
 
@@ -1008,7 +1008,9 @@ class StreamMixin:
         # could still be running with NO previously published camera frame.
         # This epoch never enters the render-state key, so idle disconnect
         # polls remain redraw-idempotent.
-        self._stream_camera_epoch += 1
+        self._stream_camera_epoch = getattr(
+            self, "_stream_camera_epoch", 0
+        ) + 1
         cache = getattr(self, "_stream_resize_cache", None)
         try:
             cache_entries = getattr(cache, "_entries", None)
@@ -1139,8 +1141,13 @@ class StreamMixin:
 
     def _stream_render_tick(self):
         self._stream_frame_job = None
-        if self._stream_output_window is None or getattr(self, "_closing", False):
+        output = self._stream_output_window
+        if output is None or getattr(self, "_closing", False):
             return
+        # A slow/reentrant compositor may close this output and open another
+        # while the old Tk callback is still on the stack. That old callback
+        # must not record metrics, blank, close or schedule a second timer on
+        # the new capture session.
         # Stream Mode clocks and canvas composition are optional. Neither
         # may stall the native emulator's independent video/audio/input loop.
         raw_mode = self._stream_options.get("frame_rate")
@@ -1154,7 +1161,11 @@ class StreamMixin:
             if started is None:
                 raise RuntimeError("Stream composition timer unavailable")
             published = self._render_stream_frame() is True
+            if self._stream_output_window is not output:
+                return
             finished = stream_optional_perf_clock()
+            if self._stream_output_window is not output:
+                return
             if finished is None or finished < started:
                 raise RuntimeError("Stream composition timer unavailable")
             elapsed = finished - started
@@ -1165,6 +1176,8 @@ class StreamMixin:
                     finished, mode, published=published,
                     render_seconds=elapsed,
                 )
+            if self._stream_output_window is not output:
+                return
             if published and getattr(self, "_stream_recovery_pending", False):
                 self._stream_session_recoveries = (
                     getattr(self, "_stream_session_recoveries", 0) + 1
@@ -1174,9 +1187,12 @@ class StreamMixin:
                 "Output ready · Game and camera are mirrored, not restarted."
             )
         except tk.TclError:
-            self.close_stream_mode()
+            if self._stream_output_window is output:
+                self.close_stream_mode()
             return
         except Exception as exc:
+            if self._stream_output_window is not output:
+                return
             cadence = getattr(self, "_stream_cadence", None)
             if cadence is not None:
                 finished = stream_optional_perf_clock()
@@ -1204,13 +1220,14 @@ class StreamMixin:
                 "Stream preview retrying ("
                 + stream_safe_failure_class(exc) + ")."
             )
-        if self._stream_output_window is not None and not self._closing:
+        if self._stream_output_window is output and not self._closing:
             try:
                 self._stream_frame_job = self.root.after(
                     interval, self._stream_render_tick
                 )
             except (tk.TclError, RuntimeError):
-                self.close_stream_mode()
+                if self._stream_output_window is output:
+                    self.close_stream_mode()
 
     def _render_stream_frame(self):
         canvas = self._stream_canvas

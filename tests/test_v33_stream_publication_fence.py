@@ -332,5 +332,83 @@ class StreamPublicationFenceTests(unittest.TestCase):
         self.assertEqual(app._stream_camera_last_snapshot, 91.0)
 
 
+    def test_legacy_camera_mixins_without_epoch_still_publish_and_revoke(self):
+        """Older manually bound StreamMixin callers remain supported."""
+        app = self.make_app(game=False, camera=False)
+        del app._stream_camera_epoch
+        raw = np.full((16, 24, 3), 80, dtype=np.uint8)
+        app.stream_camera_snapshot(raw)
+        self.assertIsNotNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 1)
+        app.stream_clear_camera()
+        self.assertIsNone(app._stream_camera_frame)
+        self.assertEqual(app._stream_camera_serial, 2)
+        self.assertEqual(app._stream_camera_epoch, 1)
+
+    def test_old_tick_after_reopening_output_does_not_schedule_duplicate(self):
+        app = self.make_app(game=False, camera=False)
+        app._closing = False
+        app._stream_cadence = Mock()
+        new_cadence = Mock()
+        new_output = Mock()
+        def reopen():
+            app._stream_output_window = new_output
+            app._stream_cadence = new_cadence
+            return False
+        with (
+            patch.object(app, "_render_stream_frame", side_effect=reopen),
+            patch("anything_plays.ui_stream.stream_optional_perf_clock",
+                  return_value=10.0),
+        ):
+            app._stream_render_tick()
+        app.root.after.assert_not_called()
+        new_cadence.record_tick.assert_not_called()
+        self.assertIs(app._stream_output_window, new_output)
+
+    def test_failed_old_tick_cannot_blank_reopened_output(self):
+        app = self.make_app(game=False, camera=False)
+        app._closing = False
+        new_output = Mock()
+        new_photo = Mock()
+        new_canvas = MagicMock()
+        def reopen_and_fail():
+            app._stream_output_window = new_output
+            app._stream_canvas = new_canvas
+            app._stream_photo = new_photo
+            raise RuntimeError("old converter error")
+        with (
+            patch.object(app, "_render_stream_frame",
+                         side_effect=reopen_and_fail),
+            patch("anything_plays.ui_stream.stream_optional_perf_clock",
+                  return_value=10.0),
+        ):
+            app._stream_render_tick()
+        self.assertIs(app._stream_photo, new_photo)
+        self.assertIs(app._stream_canvas, new_canvas)
+        new_canvas.delete.assert_not_called()
+        app.root.after.assert_not_called()
+
+    def test_old_tcl_error_cannot_close_reopened_output(self):
+        import tkinter as tk
+
+        app = self.make_app(game=False, camera=False)
+        app._closing = False
+        new_output = Mock()
+        def reopen_and_fail():
+            app._stream_output_window = new_output
+            raise tk.TclError("old window destroyed")
+        with (
+            patch.object(app, "_render_stream_frame",
+                         side_effect=reopen_and_fail),
+            patch.object(app, "close_stream_mode") as close,
+            patch("anything_plays.ui_stream.stream_optional_perf_clock",
+                  return_value=10.0),
+        ):
+            app._stream_render_tick()
+        close.assert_not_called()
+        self.assertIs(app._stream_output_window, new_output)
+        app.root.after.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

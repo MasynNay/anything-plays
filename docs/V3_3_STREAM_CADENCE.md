@@ -352,8 +352,16 @@ frame was ever cached; unlike the visible render serial, it does not cause
 idle camera-off notifications to redraw the output. Late conversions cannot
 reattach disconnected private pixels, overwrite a newer camera frame, or
 clear a new Stream window after the old conversion fails. Four reentrant
-synthetic tests cover those cases. This does not establish physical USB
-disconnect or OBS encoder acceptance.
+synthetic tests cover those cases. For older manually bound StreamMixin
+adapters, a missing epoch starts at zero; the 3.1 P1/P2 coexistence tests
+must still pass without a full Stream initialization.
+
+A separate output-window identity fence now also protects the **scheduled
+Tk render tick**, not just its inner PIL composition: a retired tick must
+not record cadence into, blank, close, or schedule a duplicate refresh for
+a newly reopened Stream window. Reentrant synthetic tests cover old-frame
+completion, compositor errors and destroyed-widget Tcl errors. This does
+not establish physical USB disconnect or OBS encoder acceptance.
 
 Synthetic adversarial tests exercise Stop during game conversion, Stop or
 camera disconnection during PIL composition, a settings change and a
