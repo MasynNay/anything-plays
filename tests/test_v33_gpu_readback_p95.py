@@ -102,7 +102,7 @@ class GPUReadbackP95Tests(unittest.TestCase):
                             for line in ui))
         encoded = json.dumps(report)
         self.assertNotIn("/home/", encoded)
-        self.assertNotIn("device", encoded)
+        self.assertNotIn("private", encoded)
         self.assertNotIn("buckets", encoded)
 
 
