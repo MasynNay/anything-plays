@@ -59,11 +59,13 @@ user's actual GPU and speakers.
 
 ### Readback completion-based preview pacing
 
-The 20/30/60 FPS **preview-copy** limiter now starts its next-copy interval
-from when the previous GL image was successfully published to the Tk game
-frame, rather than when the synchronous `glReadPixels` began. On a slow GPU,
-this avoids performing another expensive readback immediately after a long
-blocking copy and reduces extra pressure on native Dolphin `retro_run`.
+The 20/30/60 FPS **preview-copy** limiter retains the normal start-to-start
+cadence for fast GPU readbacks. When the previous blocking `glReadPixels`
+consumed at least one preview frame budget, the limiter additionally waits
+until a full budget has passed since that image was published to Tk. This
+protects Dolphin from repeated back-to-back GPU copies without unnecessarily
+halving 30/60 FPS preview targets on fast GPUs. A new copy only happens
+when **both** applicable timing conditions are satisfied.
 It does **not** change the frequency of game execution, input polling, core
 audio, or the OBS-facing Stream Output cap; those remain independent.
 
@@ -73,7 +75,8 @@ run timing already does. Such frames may still be valid and published, while
 the optional readback timing sample is marked missing. A failed/reversed
 publication clock falls back to the valid callback-start time **for scheduling
 only** and cannot introduce fictitious cadence samples. Synthetic tests cover
-slow readbacks, suspended timing, clock reversal and healthy recovery. This
+fast 30/60 FPS preview cadence, slow readbacks, suspended timing, clock
+reversal and healthy recovery. This
 is not proof of an actual GPU speedup; compare measured physical sessions.
 
 ## Interpretation

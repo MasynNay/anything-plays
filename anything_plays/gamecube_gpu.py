@@ -23,7 +23,7 @@ import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
 from anything_plays.gamecube_preview import (
-    should_capture, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
+    should_capture, preview_fps, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
 )
 from anything_plays.gamecube_native_timing import GameCubeNativeTiming
 from anything_plays.libretro_video import RETRO_HW_FRAME_BUFFER_VALID
@@ -79,6 +79,8 @@ class GameCubeHardwareSession(CoreSession):
         self.native_run_timing = GameCubeNativeTiming()
         self.preview_readback_skips = 0
         self._last_preview_capture = None
+        self._last_preview_publication = None
+        self._last_preview_readback_duration = 0.0
         self._preview_cadence = PreviewCadenceTracker()
         self.raw_video_callbacks = 0
         self.null_video_callbacks = 0
@@ -149,7 +151,22 @@ class GameCubeHardwareSession(CoreSession):
                     getattr(self, "preview_clock_failures", 0) + 1
                 )
                 return
-            if not should_capture(self._last_preview_capture, now, mode):
+            # Keep normal fast GPU copies on the target start-to-start
+            # cadence. Only an *over-budget* previous readback adds a short
+            # recovery interval from completion; otherwise even a healthy
+            # 60 FPS / 4ms GPU would be needlessly reduced to ~30 FPS.
+            interval = 1.0 / preview_fps(mode) - 0.001
+            previous_slow = (
+                getattr(self, "_last_preview_readback_duration", 0.0)
+                >= interval
+            )
+            previous_publication = getattr(
+                self, "_last_preview_publication", None
+            )
+            if (not should_capture(self._last_preview_capture, now, mode)
+                    or (previous_slow and not should_capture(
+                        previous_publication, now, mode
+                    ))):
                 self.preview_readback_skips += 1
                 return
             begun = self._optional_clock(time.perf_counter)
@@ -211,21 +228,27 @@ class GameCubeHardwareSession(CoreSession):
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1
-            # The preview budget starts when the finished image is visible
-            # to Tk, not when the blocking GPU readback began. Otherwise a
-            # slow glReadPixels can cause another expensive copy immediately
-            # on the next Dolphin callback, worsening native frame pacing.
+            # Normal preview cadence stays anchored to the callback start.
+            # An over-budget GL readback additionally delays the next copy
+            # from publication, so a slow readback cannot trigger an
+            # immediate second GPU stall. This changes preview copies only.
+            self._last_preview_capture = now
             publication_time = self._optional_clock(time.monotonic)
             if publication_time is None or publication_time < now:
                 self.preview_clock_failures = (
                     getattr(self, "preview_clock_failures", 0) + 1
                 )
-                # Fall back to the valid callback-start clock for scheduling
-                # only. No fabricated publication interval enters metrics.
-                self._last_preview_capture = now
+                # Never fabricate a publication time on an invalid clock.
+                self._last_preview_publication = None
+                self._last_preview_readback_duration = 0.0
                 publication_time = None
             else:
-                self._last_preview_capture = publication_time
+                self._last_preview_publication = publication_time
+                elapsed = publication_time - now
+                # A suspended host is not 3600s of active GPU readback.
+                self._last_preview_readback_duration = (
+                    elapsed if elapsed <= 3600.0 else 0.0
+                )
             tracker = getattr(self, "_preview_cadence", None)
             if tracker is not None:
                 tracker.record_published(publication_time, mode)

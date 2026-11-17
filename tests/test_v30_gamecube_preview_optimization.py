@@ -142,8 +142,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         session.null_video_callbacks = 0
         session.opengl_error = None
         session._preview_cadence = PreviewCadenceTracker()
-        # Pacing is based on when glReadPixels completes, not just starts.
-        for start, end in ((0.000, 0.004), (0.039, 0.043), (0.078, 0.082)):
+        # Fast readbacks retain start-based cadence at the requested cap.
+        for start, end in ((0.000, 0.004), (0.035, 0.039), (0.070, 0.074)):
             with patch("anything_plays.gamecube_gpu.time.monotonic",
                        side_effect=(start, end)):
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
@@ -153,9 +153,48 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(stats["gamecube_preview_target_fps"], 30)
         self.assertEqual(stats["gamecube_preview_cadence_intervals"], 2)
         self.assertAlmostEqual(
-            stats["gamecube_preview_observed_capture_fps"], 25.64, places=2
+            stats["gamecube_preview_observed_capture_fps"], 28.57, places=2
         )
         self.assertEqual(session.host.read_frame.call_count, 3)
+
+    def test_fast_gpu_readbacks_retain_30_and_60_fps_cap_cadence(self):
+        # A 4ms normal readback must not force a full 33/16ms idle *after*
+        # publication, which would needlessly halve the requested cap.
+        for mode, frames in (
+            ("Balanced (30 FPS)", ((0.000, 0.004), (0.035, 0.039),
+                                    (0.070, 0.074))),
+            ("Quality (60 FPS)", ((0.000, 0.004), (0.017, 0.021),
+                                  (0.034, 0.038))),
+        ):
+            with self.subTest(preview_mode=mode):
+                session = object.__new__(GameCubeHardwareSession)
+                session.host = Mock(read_frame=Mock(
+                    return_value=np.zeros((8, 8, 3), dtype=np.uint8)
+                ))
+                session.emulator = SimpleNamespace(
+                    frame=None, frame_serial=0, lock=threading.Lock(),
+                    gamecube_preview_mode=mode,
+                    stop_event=threading.Event(),
+                )
+                session.hardware_frames = 0
+                session.gpu_readback_seconds = 0.0
+                session.gpu_readback_max_seconds = 0.0
+                session.gpu_readback_calls = 0
+                session.preview_readback_skips = 0
+                session._last_preview_capture = None
+                session.raw_video_callbacks = 0
+                session.null_video_callbacks = 0
+                session.opengl_error = None
+                session._preview_cadence = PreviewCadenceTracker()
+                for started, completed in frames:
+                    with patch("anything_plays.gamecube_gpu.time.monotonic",
+                               side_effect=(started, completed)):
+                        session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+                self.assertEqual(session.host.read_frame.call_count, 3)
+                self.assertEqual(session.preview_readback_skips, 0)
+                self.assertEqual(session.emulator.frame_serial, 3)
+                self.assertEqual(session._preview_cadence.snapshot()[
+                    "gamecube_preview_cadence_intervals"], 2)
 
     def test_slow_gpu_readback_budgets_from_publication_not_callback_start(self):
         # The first synchronous readback takes 40ms. The next native video
@@ -182,7 +221,9 @@ class PreviewRatePolicyTests(unittest.TestCase):
         with patch("anything_plays.gamecube_gpu.time.monotonic",
                    side_effect=(0.000, 0.040)):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
-        self.assertEqual(session._last_preview_capture, 0.040)
+        self.assertEqual(session._last_preview_capture, 0.000)
+        self.assertEqual(session._last_preview_publication, 0.040)
+        self.assertAlmostEqual(session._last_preview_readback_duration, 0.040)
         with patch("anything_plays.gamecube_gpu.time.monotonic",
                    return_value=0.060):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
@@ -191,7 +232,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         with patch("anything_plays.gamecube_gpu.time.monotonic",
                    side_effect=(0.075, 0.105)):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
-        self.assertEqual(session._last_preview_capture, 0.105)
+        self.assertEqual(session._last_preview_capture, 0.075)
+        self.assertEqual(session._last_preview_publication, 0.105)
         with patch("anything_plays.gamecube_gpu.time.monotonic",
                    return_value=0.115):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
@@ -237,7 +279,9 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.gpu_readback_max_seconds, 0)
         self.assertIs(session.emulator.frame, rgb)
         self.assertEqual(session.emulator.frame_serial, 1)
-        self.assertEqual(session._last_preview_capture, 4010.0)
+        self.assertEqual(session._last_preview_capture, 10.0)
+        self.assertEqual(session._last_preview_publication, 4010.0)
+        self.assertEqual(session._last_preview_readback_duration, 0.0)
         self.assertFalse(session.emulator.stop_event.is_set())
         # A valid new active interval recovers normal timing counters.
         with (
