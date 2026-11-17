@@ -349,8 +349,14 @@ emulator Start; Stop/ROM replacement invalidates the old image even
 if a fast restart has already cleared Stop's event. This applies both
 during the native-pixel-to-PIL conversion and during later composition.
 Three synthetic regressions cover healthy frame turnover and both
-ROM restart race windows; existing Stop, camera-disconnect and window
-reopen tests continue to enforce immediate private image revocation.
+ROM restart race windows. A Stop request now also invalidates the
+"active game" state **before** unchanged-frame short-circuiting,
+even if the native worker remains running while awaiting retro_run()
+shutdown and no new frame serial is published. The next OBS tick
+composes a safe game-off image without retaining its cached GAME fit;
+a synthetic real-Tk-style callback regression covers that pending-Stop
+window. Existing Stop, camera-disconnect and window reopen tests
+continue to enforce private image revocation.
 
 The webcam's extra BGR-to-RGB/PIL preview conversion now independently
 checks Stream window identity and camera source generation before accepting

@@ -544,5 +544,39 @@ class StreamPublicationFenceTests(unittest.TestCase):
 
 
 
+    def test_pending_stop_with_unchanged_serial_replaces_previous_obs_game(self):
+        """Stop may be requested while retro_run still reports running."""
+        app = self.make_app(game=True, camera=False)
+        game = Image.new("RGB", (24, 16), "red")
+        app._stream_game_frame = game
+        app._stream_game_serial = 7
+        app._stream_resize_cache.contained("GAME", game, (0, 0, 72, 56))
+        previous_photo = Mock()
+        app._stream_photo = previous_photo
+        app._stream_canvas_item = 31
+        app._stream_last_render = (
+            760, 980, 7, app._stream_camera_serial,
+            (True, False, False), tuple(app._stream_options.items()),
+        )
+        app.emu.stop_event.set()
+        self.assertTrue(app.emu.running)
+        self.assertEqual(app.emu.frame_serial, 7)
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output",
+                  return_value=Image.new("RGB", (760, 980), "black")) as compose,
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as new_photo,
+        ):
+            self.assertTrue(app._render_stream_frame())
+        self.assertIsNone(compose.call_args.args[0])
+        self.assertFalse(compose.call_args.kwargs["game_active"])
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_game_serial)
+        self.assertNotIn("GAME", app._stream_resize_cache._entries)
+        self.assertIs(app._stream_photo, new_photo.return_value)
+        self.assertIsNot(app._stream_photo, previous_photo)
+        self.assertEqual(app._stream_last_render[4][0], False)
+
+
+
 if __name__ == "__main__":
     unittest.main()

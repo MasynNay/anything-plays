@@ -1248,7 +1248,18 @@ class StreamMixin:
         output = self._stream_output_window
         w = max(320, min(1920, canvas.winfo_width()))
         h = max(400, min(1600, canvas.winfo_height()))
-        active_game = bool(self.emu.running and self.uses_embedded_emulator())
+        stop_event = getattr(self.emu, "stop_event", None)
+        stop_pending = (
+            isinstance(stop_event, threading.Event) and stop_event.is_set()
+        )
+        # A native worker can still report running=True while Stop waits
+        # for retro_run() or its four-second join. Never shortcut the
+        # unchanged-frame cache and keep its old OBS pixels alive merely
+        # because frame_serial has not advanced since Stop was requested.
+        active_game = bool(
+            self.emu.running and self.uses_embedded_emulator()
+            and not stop_pending
+        )
         if active_game:
             # Protect only the native-owned pixel snapshot. Converting a
             # possibly large NumPy array to a PIL image can allocate/copy
@@ -1410,6 +1421,10 @@ class StreamMixin:
         changed_settings = tuple(self._stream_options.items()) != state[5]
         still_active = bool(
             self.emu.running and self.uses_embedded_emulator()
+            and not (
+                isinstance(stop_event, threading.Event)
+                and stop_event.is_set()
+            )
         )
         changed_game = still_active != active_game
         game_revoked = changed_game
