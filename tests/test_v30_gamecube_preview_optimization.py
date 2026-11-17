@@ -230,12 +230,12 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(session.preview_readback_skips, 1)
         self.assertEqual(session.host.read_frame.call_count, 1)
         with patch("anything_plays.gamecube_gpu.time.monotonic",
-                   side_effect=(0.075, 0.105)):
+                   side_effect=(0.075, 0.115)):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
         self.assertEqual(session._last_preview_capture, 0.075)
-        self.assertEqual(session._last_preview_publication, 0.105)
+        self.assertEqual(session._last_preview_publication, 0.115)
         with patch("anything_plays.gamecube_gpu.time.monotonic",
-                   return_value=0.115):
+                   return_value=0.125):
             session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
         self.assertEqual(session.host.read_frame.call_count, 2)
         self.assertEqual(session.preview_readback_skips, 2)
