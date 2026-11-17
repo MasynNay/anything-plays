@@ -145,6 +145,17 @@ a *lower bound* and the report says **partial timing**. The counter
 it does not represent a native Dolphin `retro_run` failure. Failed timing
 reads are never counted as deliberately throttled readback skips.
 
+The hardware readback callback additionally requires that each returned
+RGB8 image's width and height **exactly match** Dolphin's requested
+Libretro video callback dimensions. The first-party EGL/WGL/CGL hosts
+already return pixels in this format; a stale or partial GL buffer from
+a torn context must not be treated as the current game image simply
+because it has three channels and an 8-bit pixel type. A mismatch
+causes a controlled, fixed-category GPU stop without publishing the
+incorrect pixels or modifying P1/P2 buttons, saves or audio pacing.
+Synthetic tests cover both width and height mismatches. This is not a
+claim that every physical OpenGL driver has been tested.
+
 A native GL readback that raises an unexpected extension-defined exception
 causes a **controlled stop** of the broken GameCube hardware session; it
 cannot cross the ctypes callback and leave the core with a permanently

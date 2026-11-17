@@ -178,9 +178,15 @@ class GameCubeHardwareSession(CoreSession):
                 # A torn GL context can return an empty or malformed buffer
                 # without raising. Never publish it to Tk/OBS as a fresh
                 # game image or count it as a valid hardware frame.
-                if (len(shape) != 3 or shape[0] <= 0 or shape[1] <= 0
-                        or shape[2] != 3 or
+                if (len(shape) != 3 or shape[0] != height
+                        or shape[1] != width or shape[2] != 3 or
                         str(getattr(rgb, "dtype", "")) != "uint8"):
+                    # Shape and channel type alone are insufficient: an
+                    # interrupted/resized GL readback can return an RGB8
+                    # frame for a PREVIOUS viewport. Never publish those
+                    # stale or mismatched pixels as the active native game.
+                    # The first-party GL host returns exactly (height,
+                    # width, 3) on a successful bounded readback.
                     raise ValueError("GPU readback returned invalid RGB pixels")
             except Exception as exc:
                 # Driver/GL wrappers can raise additional exception classes

@@ -706,6 +706,10 @@ class PreviewRatePolicyTests(unittest.TestCase):
             np.zeros((8, 8), dtype=np.uint8),
             np.zeros((8, 8, 4), dtype=np.uint8),
             np.zeros((8, 8, 3), dtype=np.float32),
+            # These are valid-looking RGB8 buffers but belong to the
+            # wrong viewport and must never appear on Tk or OBS.
+            np.zeros((7, 8, 3), dtype=np.uint8),
+            np.zeros((8, 7, 3), dtype=np.uint8),
         ):
             with self.subTest(frame_type=type(malformed).__name__,
                               shape=getattr(malformed, "shape", None)):
