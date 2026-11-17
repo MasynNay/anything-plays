@@ -142,7 +142,8 @@ class PreviewRatePolicyTests(unittest.TestCase):
         session.null_video_callbacks = 0
         session.opengl_error = None
         session._preview_cadence = PreviewCadenceTracker()
-        for start, end in ((0.000, 0.004), (0.035, 0.039), (0.070, 0.074)):
+        # Pacing is based on when glReadPixels completes, not just starts.
+        for start, end in ((0.000, 0.004), (0.039, 0.043), (0.078, 0.082)):
             with patch("anything_plays.gamecube_gpu.time.monotonic",
                        side_effect=(start, end)):
                 session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
@@ -152,9 +153,138 @@ class PreviewRatePolicyTests(unittest.TestCase):
         self.assertEqual(stats["gamecube_preview_target_fps"], 30)
         self.assertEqual(stats["gamecube_preview_cadence_intervals"], 2)
         self.assertAlmostEqual(
-            stats["gamecube_preview_observed_capture_fps"], 28.57, places=2
+            stats["gamecube_preview_observed_capture_fps"], 25.64, places=2
         )
         self.assertEqual(session.host.read_frame.call_count, 3)
+
+    def test_slow_gpu_readback_budgets_from_publication_not_callback_start(self):
+        # The first synchronous readback takes 40ms. The next native video
+        # callback may arrive 20ms after publication and must not immediately
+        # start another costly GL copy, even though 60ms passed since start.
+        session = object.__new__(GameCubeHardwareSession)
+        rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(return_value=rgb))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(0.000, 0.040)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session._last_preview_capture, 0.040)
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   return_value=0.060):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.preview_readback_skips, 1)
+        self.assertEqual(session.host.read_frame.call_count, 1)
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(0.075, 0.105)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session._last_preview_capture, 0.105)
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   return_value=0.115):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.host.read_frame.call_count, 2)
+        self.assertEqual(session.preview_readback_skips, 2)
+        self.assertEqual(session.emulator.frame_serial, 2)
+        self.assertEqual(session.hardware_frames, 2)
+        self.assertFalse(session.emulator.stop_event.is_set())
+        self.assertEqual(session._preview_cadence.snapshot()[
+            "gamecube_preview_cadence_intervals"], 1)
+
+    def test_suspended_gpu_readback_measurement_is_ignored_not_game_frame(self):
+        session = object.__new__(GameCubeHardwareSession)
+        rgb = np.ones((8, 8, 3), dtype=np.uint8)
+        session.host = Mock(read_frame=Mock(return_value=rgb))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=(10.0, 4010.0)),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  side_effect=(1.0, 4002.0)),
+        ):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.gpu_readback_calls, 1)
+        self.assertEqual(session.gpu_readback_timing_samples, 0)
+        self.assertEqual(session.preview_clock_failures, 1)
+        self.assertEqual(session.gpu_readback_seconds, 0)
+        self.assertEqual(session.gpu_readback_max_seconds, 0)
+        self.assertIs(session.emulator.frame, rgb)
+        self.assertEqual(session.emulator.frame_serial, 1)
+        self.assertEqual(session._last_preview_capture, 4010.0)
+        self.assertFalse(session.emulator.stop_event.is_set())
+        # A valid new active interval recovers normal timing counters.
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=(4010.040, 4010.045)),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  side_effect=(4100.0, 4100.005)),
+        ):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.gpu_readback_calls, 2)
+        self.assertEqual(session.gpu_readback_timing_samples, 1)
+        self.assertEqual(session.hardware_frames, 2)
+        self.assertEqual(session.preview_clock_failures, 1)
+        self.assertEqual(session.emulator.frame_serial, 2)
+
+    def test_reverse_publication_clock_does_not_poison_preview_rate(self):
+        session = object.__new__(GameCubeHardwareSession)
+        session.host = Mock(read_frame=Mock(
+            return_value=np.zeros((8, 8, 3), dtype=np.uint8)
+        ))
+        session.emulator = SimpleNamespace(
+            frame=None, frame_serial=0, lock=threading.Lock(),
+            gamecube_preview_mode=DEFAULT_PREVIEW_MODE,
+            stop_event=threading.Event(),
+        )
+        session.hardware_frames = 0
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.preview_readback_skips = 0
+        session._last_preview_capture = None
+        session.raw_video_callbacks = 0
+        session.null_video_callbacks = 0
+        session.opengl_error = None
+        session._preview_cadence = PreviewCadenceTracker()
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(2.0, 1.9)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session._last_preview_capture, 2.0)
+        self.assertEqual(session.preview_clock_failures, 1)
+        self.assertEqual(session._preview_cadence.snapshot()[
+            "gamecube_preview_cadence_intervals"], 0)
+        self.assertFalse(session.emulator.stop_event.is_set())
+        with patch("anything_plays.gamecube_gpu.time.monotonic",
+                   side_effect=(2.040, 2.045)):
+            session.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(session.hardware_frames, 2)
+        self.assertEqual(session._preview_cadence.published, 1)
 
     def test_native_gpu_callback_survives_failed_optional_monotonic_clock(self):
         """A broken optional clock cannot escape through Dolphin ctypes."""

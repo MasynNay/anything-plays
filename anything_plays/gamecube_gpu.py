@@ -181,8 +181,14 @@ class GameCubeHardwareSession(CoreSession):
                 self.emulator.stop_event.set()
                 return
             finished = self._optional_clock(time.perf_counter)
-            if (begun is not None and finished is not None
-                    and finished >= begun):
+            # A host sleep/resume in glReadPixels (or a discontinuous
+            # diagnostic timer) must not report hours of active GPU cost.
+            # Preserve the actual captured pixels independently of timing.
+            valid_readback_timing = (
+                begun is not None and finished is not None
+                and finished >= begun and finished - begun <= 3600.0
+            )
+            if valid_readback_timing:
                 duration = finished - begun
                 self.gpu_readback_seconds += duration
                 self.gpu_readback_max_seconds = max(
@@ -196,7 +202,6 @@ class GameCubeHardwareSession(CoreSession):
                     getattr(self, "preview_clock_failures", 0) + 1
                 )
             self.gpu_readback_calls += 1
-            self._last_preview_capture = now
             with self.emulator.lock:
                 # A Stop can arrive while glReadPixels is blocking. Never
                 # let that late result repaint a stopped/failed session even
@@ -206,15 +211,23 @@ class GameCubeHardwareSession(CoreSession):
                 self.emulator.frame = rgb
                 self.emulator.frame_serial += 1
             self.hardware_frames += 1
+            # The preview budget starts when the finished image is visible
+            # to Tk, not when the blocking GPU readback began. Otherwise a
+            # slow glReadPixels can cause another expensive copy immediately
+            # on the next Dolphin callback, worsening native frame pacing.
+            publication_time = self._optional_clock(time.monotonic)
+            if publication_time is None or publication_time < now:
+                self.preview_clock_failures = (
+                    getattr(self, "preview_clock_failures", 0) + 1
+                )
+                # Fall back to the valid callback-start clock for scheduling
+                # only. No fabricated publication interval enters metrics.
+                self._last_preview_capture = now
+                publication_time = None
+            else:
+                self._last_preview_capture = publication_time
             tracker = getattr(self, "_preview_cadence", None)
             if tracker is not None:
-                # Record the completed publication time, *after* GL readback,
-                # not the earlier callback start used for throttle checks.
-                publication_time = self._optional_clock(time.monotonic)
-                if publication_time is None:
-                    self.preview_clock_failures = (
-                        getattr(self, "preview_clock_failures", 0) + 1
-                    )
                 tracker.record_published(publication_time, mode)
             return
         # Cores may supply a software frame even after HW negotiation.

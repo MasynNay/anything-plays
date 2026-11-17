@@ -57,6 +57,25 @@ An ignored timing sample is not evidence of successful gameplay. A
 suspend/resume or native graphics fault still requires observation on the
 user's actual GPU and speakers.
 
+### Readback completion-based preview pacing
+
+The 20/30/60 FPS **preview-copy** limiter now starts its next-copy interval
+from when the previous GL image was successfully published to the Tk game
+frame, rather than when the synchronous `glReadPixels` began. On a slow GPU,
+this avoids performing another expensive readback immediately after a long
+blocking copy and reduces extra pressure on native Dolphin `retro_run`.
+It does **not** change the frequency of game execution, input polling, core
+audio, or the OBS-facing Stream Output cap; those remain independent.
+
+The optional GL readback timing probe also rejects invalid or greater-than-
+3,600-second duration observations (for example a host suspend), as native
+run timing already does. Such frames may still be valid and published, while
+the optional readback timing sample is marked missing. A failed/reversed
+publication clock falls back to the valid callback-start time **for scheduling
+only** and cannot introduce fictitious cadence samples. Synthetic tests cover
+slow readbacks, suspended timing, clock reversal and healthy recovery. This
+is not proof of an actual GPU speedup; compare measured physical sessions.
+
 ## Interpretation
 
 | Observed field | Meaning | Important limit |
