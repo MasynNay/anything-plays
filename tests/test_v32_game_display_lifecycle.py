@@ -69,6 +69,82 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNotNone(app._stream_camera_frame)
         self.assertEqual(app._stream_camera_serial, 4)
 
+    def test_native_worker_self_stop_clears_main_canvas_and_stream_pixels(self):
+        """Core exits without Library Stop; the last Tk image must disappear."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = False
+        camera = app._stream_camera_frame
+        GameplayMixin.draw_game(app)
+        self.check_cleared(app)
+        self.assertIs(app._stream_camera_frame, camera)
+        # Repeated idle ticks cannot delete the canvas or increment serial.
+        GameplayMixin.draw_game(app)
+        self.assertEqual(app.emu.frame_serial, 13)
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+
+    def test_idle_camera_only_stream_does_not_trigger_game_cleanup(self):
+        """A valid camera-only OBS photo is not a stale native game photo."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = False
+        app.emu.frame = None
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = object()  # Existing camera-only OBS composite
+        camera = app._stream_camera_frame
+        GameplayMixin.draw_game(app)
+        self.assertIsNotNone(app._stream_photo)
+        self.assertIs(app._stream_camera_frame, camera)
+        self.assertEqual(app.emu.frame_serial, 12)
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+
+    def test_game_launch_wait_does_not_clear_video_before_native_ready(self):
+        """launching=True is distinct from a worker that already exited."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = True
+        app.emu.frame = None
+        app.game_photo = None
+        app._last_game_render = None
+        app._game_only_canvas.winfo_width.return_value = 320
+        app._game_only_canvas.winfo_height.return_value = 240
+        GameplayMixin.draw_game(app)
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertEqual(app.emu.frame_serial, 12)
+
+    def test_active_game_still_renders_to_the_existing_canvas(self):
+        """Automatic-exit cleanup never turns ordinary rendering off."""
+        from anything_plays.ui_gameplay import GameplayMixin
+        import numpy as np
+
+        app = VideoHost()
+        app.emu.running = True
+        app.emu.launching = False
+        app.emu.frame = np.full((12, 16, 3), 48, dtype=np.uint8)
+        app.game_photo = None
+        app._last_game_render = None
+        app._game_only_canvas.winfo_width.return_value = 320
+        app._game_only_canvas.winfo_height.return_value = 240
+        app._game_only_canvas.create_image.return_value = 17
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage") as photo:
+            GameplayMixin.draw_game(app)
+        photo.assert_called_once()
+        self.assertEqual(app._last_game_render[0], 12)
+        self.assertEqual(app._game_image_item, 17)
+        self.assertIs(app.game_photo, photo.return_value)
+        app._game_only_canvas.create_image.assert_called_once()
+
     def test_shared_cleanup_clears_every_game_surface(self):
         app = VideoHost()
         clear_game_video(app)

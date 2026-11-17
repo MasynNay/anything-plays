@@ -133,6 +133,22 @@ destroyed Tk canvases, unexpected extension-defined errors, the launch
 handoff, and reentrant widget callbacks; these are synthetic checks,
 not physical OBS or GameCube gameplay evidence.
 
+### Unexpected native exit also clears the main game canvas
+
+A Libretro worker can stop itself after a core error, with no player
+**Stop** click. The main Tk renderer previously short-circuited on an
+unchanged native frame serial and could keep the stopped game's last
+`PhotoImage` visible indefinitely. On an inactive, fully exited game
+(`running=False`, `launching=False`), the UI now detects stale native
+pixels or its own rendered game photo and calls the shared game-video
+cleanup once. The primary, Game-only and OBS-facing game refs/canvases
+are retired; an independent camera image and an idle camera-only Stream
+Output composite do **not** trigger unnecessary cleanup. A core that is
+still launching is not mistaken for a stopped session. Regression tests
+cover unexpected exit, idempotent idle ticks, active game rendering,
+startup and a camera-only stream. These are synthetic UI checks, not
+real ROM/GPU or webcam acceptance.
+
 ### Late software Libretro video callbacks after Stop
 
 The shared native **software** video callback now checks the emulator's

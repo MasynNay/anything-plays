@@ -364,6 +364,25 @@ class GameplayMixin:
 
     def draw_game(self):
         """Render a fresh frame only when the game or canvas changed."""
+        # The native worker may exit on its own after an error or a core
+        # shutdown, without the user requesting Library Stop. The last
+        # PhotoImage can otherwise remain visible forever because there is
+        # no new frame serial to trigger a redraw. Fail closed for old game
+        # pixels, but never blank a still-launching core or an independent
+        # Stream Mode camera-only composition.
+        if not self.emu.running and not getattr(self.emu, "launching", False):
+            with self.emu.lock:
+                stale_native = self.emu.frame is not None
+            stale_game = (
+                stale_native
+                or getattr(self, "game_photo", None) is not None
+                or getattr(self, "_last_game_render", None) is not None
+            )
+            if stale_game:
+                from anything_plays.game_display_lifecycle import clear_game_video
+                clear_game_video(self)
+            return
+
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
         canvas_width = max(1, canvas.winfo_width())
         canvas_height = max(1, canvas.winfo_height())
