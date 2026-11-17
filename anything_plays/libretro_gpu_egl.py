@@ -248,25 +248,40 @@ class EGLFrameHost:
             self.last_gl_error = 1
             raise RuntimeError("GPU readback OpenGL error")
 
+        # Pixel-pack alignment is shared GL context state. The frontend
+        # needs tightly packed bytes for its RGBA -> RGB snapshot, but
+        # leaving PACK_ALIGNMENT=1 behind changes Dolphin's subsequent GL
+        # transfers (including after a failed driver readback). Retain the
+        # prior value and restore it alongside the read framebuffer.
         old_read = C.c_int()
-        self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])(
-            GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read)
+        old_pack = C.c_int(4)
+        get_int = self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])
+        get_int(GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read))
+        get_int(GL_PACK_ALIGNMENT, C.byref(old_pack))
+        bind_read = self._gl(
+            "glBindFramebuffer", None, [C.c_uint, C.c_uint]
         )
-        self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
-            GL_READ_FRAMEBUFFER, self.fbo
+        pixel_store = self._gl(
+            "glPixelStorei", None, [C.c_uint, C.c_int]
         )
-        self._gl("glReadBuffer", None, [C.c_uint])(GL_COLOR_ATTACHMENT0)
-        self._gl("glPixelStorei", None, [C.c_uint, C.c_int])(GL_PACK_ALIGNMENT, 1)
+        read_buffer = self._gl("glReadBuffer", None, [C.c_uint])
+        read_pixels = self._gl(
+            "glReadPixels", None,
+            [C.c_int, C.c_int, C.c_int, C.c_int,
+             C.c_uint, C.c_uint, C.c_void_p],
+        )
+        # Allocate native transfer storage *before* modifying GL state.
         image = (C.c_ubyte * (w * h * 4))()
         try:
-            self._gl("glReadPixels", None, [C.c_int, C.c_int, C.c_int, C.c_int,
-                                          C.c_uint, C.c_uint, C.c_void_p])(
-                0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image
-            )
+            bind_read(GL_READ_FRAMEBUFFER, self.fbo)
+            read_buffer(GL_COLOR_ATTACHMENT0)
+            pixel_store(GL_PACK_ALIGNMENT, 1)
+            read_pixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image)
         finally:
-            self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
-                GL_READ_FRAMEBUFFER, old_read.value
-            )
+            try:
+                pixel_store(GL_PACK_ALIGNMENT, old_pack.value)
+            finally:
+                bind_read(GL_READ_FRAMEBUFFER, old_read.value)
         self.last_gl_error = get_error()
         if self.last_gl_error:
             # glReadPixels can fail without raising a Python exception. The

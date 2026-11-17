@@ -111,6 +111,23 @@ fast 30/60 FPS preview cadence, slow readbacks, suspended timing, clock
 reversal and healthy recovery. This
 is not proof of an actual GPU speedup; compare measured physical sessions.
 
+## OpenGL state isolation during GameCube preview readbacks
+
+All three embedded Dolphin GPU backends (Linux EGL, Windows WGL,
+macOS CGL) share the same bounded readback implementation. It now
+preserves and restores the previously active OpenGL pixel-pack
+alignment as well as the read framebuffer binding after preview
+`glReadPixels`. This avoids leaking the frontend's tightly packed
+screenshot setting into subsequent Dolphin GL work, even when a
+native transfer raises an exception. The RGB pixel content and
+20/30/60 FPS preview-copy budget are unchanged. Native no-game
+synthetic tests cover successful RGBA8 conversion at odd widths
+and restoration following an interrupted driver readback.
+
+This removes a potential GL state interaction; it does **not**
+certify actual Dolphin GPU stability or improve measured FPS without
+a real-game physical run.
+
 ## Interpretation
 
 | Observed field | Meaning | Important limit |

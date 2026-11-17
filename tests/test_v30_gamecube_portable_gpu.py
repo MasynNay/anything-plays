@@ -88,6 +88,88 @@ class PortableGameCubeHostTests(TestCase):
         self.assertEqual(frame[0, 0].tolist(), [15, 33, 47])
         self.assertEqual(host.last_gl_error, 0)
 
+
+    def test_shared_frame_reader_restores_prior_pixel_pack_and_fbo(self):
+        """Dolphin GL state survives preview readback, including odd widths."""
+        from anything_plays.libretro_gpu_egl import (
+            GL_PACK_ALIGNMENT, GL_READ_FRAMEBUFFER,
+            GL_READ_FRAMEBUFFER_BINDING, GL_RGBA, GL_UNSIGNED_BYTE,
+        )
+        host = EGLFrameHost.__new__(EGLFrameHost)
+        host.owner = threading.get_ident()
+        host.width, host.height, host.fbo = 7, 3, 12
+        state = {"read_fbo": 23, "pack": 8}
+        calls = []
+
+        def gl(name, _result, _arguments):
+            def call(*args):
+                calls.append((name, args[0] if args else None))
+                if name == "glGetError":
+                    return 0
+                if name == "glGetIntegerv":
+                    value = (state["read_fbo"]
+                             if args[0] == GL_READ_FRAMEBUFFER_BINDING
+                             else state["pack"])
+                    C.cast(args[1], C.POINTER(C.c_int))[0] = value
+                if name == "glBindFramebuffer":
+                    self.assertEqual(args[0], GL_READ_FRAMEBUFFER)
+                    state["read_fbo"] = args[1]
+                if name == "glPixelStorei":
+                    self.assertEqual(args[0], GL_PACK_ALIGNMENT)
+                    state["pack"] = args[1]
+                if name == "glReadPixels":
+                    self.assertEqual((args[2], args[3]), (7, 3))
+                    self.assertEqual((args[4], args[5]),
+                                     (GL_RGBA, GL_UNSIGNED_BYTE))
+                    self.assertEqual((state["read_fbo"], state["pack"]),
+                                     (12, 1))
+                    args[-1][0:4] = [9, 11, 17, 255]
+            return call
+
+        host._gl = gl
+        frame = host.read_frame(7, 3, flip_vertical=False)
+        self.assertEqual(frame.shape, (3, 7, 3))
+        self.assertEqual(frame[0, 0].tolist(), [9, 11, 17])
+        self.assertEqual(state, {"read_fbo": 23, "pack": 8})
+        self.assertEqual(
+            [call for call in calls if call[0] == "glPixelStorei"],
+            [("glPixelStorei", GL_PACK_ALIGNMENT)] * 2,
+        )
+        self.assertEqual(calls[-1][0], "glGetError")
+
+    def test_shared_frame_reader_restores_gl_state_on_driver_exception(self):
+        """A failing native transfer must not poison later Dolphin frames."""
+        from anything_plays.libretro_gpu_egl import (
+            GL_PACK_ALIGNMENT, GL_READ_FRAMEBUFFER_BINDING,
+        )
+        host = EGLFrameHost.__new__(EGLFrameHost)
+        host.owner = threading.get_ident()
+        host.width, host.height, host.fbo = 4, 4, 19
+        state = {"read_fbo": 28, "pack": 8}
+        def gl(name, _result, _arguments):
+            def call(*args):
+                if name == "glGetError":
+                    return 0
+                if name == "glGetIntegerv":
+                    C.cast(args[1], C.POINTER(C.c_int))[0] = (
+                        state["read_fbo"]
+                        if args[0] == GL_READ_FRAMEBUFFER_BINDING
+                        else state["pack"]
+                    )
+                if name == "glBindFramebuffer":
+                    state["read_fbo"] = args[1]
+                if name == "glPixelStorei":
+                    self.assertEqual(args[0], GL_PACK_ALIGNMENT)
+                    state["pack"] = args[1]
+                if name == "glReadPixels":
+                    self.assertEqual(state, {"read_fbo": 19, "pack": 1})
+                    raise OSError("native GL transfer interrupted")
+            return call
+        host._gl = gl
+        with self.assertRaisesRegex(OSError, "native GL transfer interrupted"):
+            host.read_frame(4, 4)
+        self.assertEqual(state, {"read_fbo": 28, "pack": 8})
+
     def test_selects_proven_egl_for_linux(self):
         with patch("anything_plays.libretro_gpu_portable.sys.platform", "linux"):
             self.assertIs(choose_gamecube_gpu_host(), EGLFrameHost)
