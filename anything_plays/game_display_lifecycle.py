@@ -31,6 +31,19 @@ def clear_game_video(app):
     app._stream_canvas_item = None
     app._stream_photo = None
 
+    # The OBS compositor holds a second fitted PIL image for each source.
+    # Evict ONLY the old game's source and resized copy right now; a live
+    # camera cache stays usable during a game-only ROM transition.
+    cache = getattr(app, "_stream_resize_cache", None)
+    if cache is not None:
+        try:
+            cache.clear("GAME")
+        except Exception:
+            # A third-party cache failure must not block stopping the ROM.
+            # Dropping the entire cache also drops any retained game pixels;
+            # the independent live camera snapshot is still preserved.
+            app._stream_resize_cache = None
+
     # Clear all three independently. A destroyed main canvas must not prevent
     # revoking OBS pixels, and an unresponsive OBS surface must not prevent
     # a fresh ROM from using the primary canvas. Do not expose driver paths

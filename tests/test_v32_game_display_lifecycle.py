@@ -211,6 +211,43 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNone(app._stream_game_frame)
         app.game_canvas.delete.assert_called_once_with("all")
 
+    def test_rom_cleanup_evicts_only_old_game_resize_cache_pixels(self):
+        """No hidden PIL cache keeps private ROM frames after game unload."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = VideoHost()
+        cache = StreamPanelResizeCache()
+        game = Image.new("RGB", (24, 18), "#b50018")
+        camera = Image.new("RGB", (24, 18), "#0bb59c")
+        cache.contained("GAME", game, (0, 0, 72, 48))
+        cache.contained("CAMERA", camera, (0, 0, 72, 48))
+        self.assertEqual(set(cache._entries), {"GAME", "CAMERA"})
+        app._stream_resize_cache = cache
+
+        clear_game_video(app)
+        self.assertIs(app._stream_resize_cache, cache)
+        self.assertNotIn("GAME", cache._entries)
+        self.assertIn("CAMERA", cache._entries)
+        self.assertIs(cache._entries["CAMERA"][0], camera)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+
+    def test_faulty_resize_cache_drops_all_entries_but_preserves_live_camera(self):
+        """A misbehaving optional cache must not retain old game pixels."""
+        app = VideoHost()
+        live_camera = app._stream_camera_frame
+        app._stream_resize_cache = Mock()
+        app._stream_resize_cache.clear.side_effect = RuntimeError(
+            "driver private path /home/user/rom-name"
+        )
+        clear_game_video(app)
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIs(app._stream_camera_frame, live_camera)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+        app._stream_canvas.delete.assert_called_once_with("all")
+
     def test_destroyed_main_canvas_does_not_leave_private_stream_frame(self):
         """Main Tk destruction must not stop clearing OBS and other views."""
         import tkinter as tk

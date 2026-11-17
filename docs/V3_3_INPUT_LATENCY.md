@@ -115,8 +115,11 @@ still require physical-device QA.
 The same fail-closed policy now applies to the **game** framebuffer on
 ROM replacement or unload: native pixels are revoked under the emulator
 lock, then all in-memory primary, Game-only, and OBS Stream Output game
-images/serials are retired **before any Tk widget deletion**. Each of the
-three optional canvas deletes and the decorative bezel are independent.
+images/serials are retired **before any Tk widget deletion**. The OBS
+compositor's separate fitted **GAME** resize-cache entry is evicted at the
+same time without disturbing the still-live **CAMERA** cache; if a custom
+cache fails, the entire optional resize cache is discarded instead. Each
+of the three optional canvas deletes and the decorative bezel are independent.
 Even if a destroyed main canvas or a native widget wrapper raises, other
 views are cleared and a replacement ROM can start without keeping the
 previous game's cached pixels. The live webcam Stream snapshot remains
