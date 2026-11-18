@@ -336,6 +336,18 @@ class CoreSession:
                 select_device(0, 1)
                 select_device(1, 1)  # Player 2: RETRO_DEVICE_JOYPAD
 
+    def _save_failure_warning(self, safe_gamecube_message, legacy_prefix, exc):
+        """Give GameCube fixed, path-free warnings for native save failures.
+
+        ROM/save paths and device information often appear in OSError text.
+        The app's GUI may display save_warning, so never stringify external
+        filesystem exceptions for GameCube. Legacy console wording remains
+        unchanged for compatibility.
+        """
+        if self.system == "gamecube":
+            return safe_gamecube_message
+        return legacy_prefix + str(exc)[:140]
+
     def persist_game_progress(self):
         """Persist battery SRAM AND safe NGP recovery without killing gameplay."""
         written = False
@@ -343,15 +355,21 @@ class CoreSession:
             try:
                 written = bool(self.save_ram.persist())
             except (OSError, ValueError, MemoryError) as exc:
-                self.emulator.save_warning = (
-                    "Battery save failed; game is still running: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube battery save unavailable; game is still running. "
+                    "Check free disk space and save-folder permissions.",
+                    "Battery save failed; game is still running: ",
+                    exc,
                 )
         if self.recovery_state is not None:
             try:
                 written = bool(self.recovery_state.persist()) or written
             except (OSError, ValueError, RuntimeError, MemoryError) as exc:
-                self.emulator.save_warning = (
-                    "Recovery save failed; game is still running: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube recovery save unavailable; game is still running. "
+                    "Check free disk space and save-folder permissions.",
+                    "Recovery save failed; game is still running: ",
+                    exc,
                 )
         return written
 
@@ -396,8 +414,11 @@ class CoreSession:
             except (OSError, ValueError, MemoryError) as exc:
                 # Continue gameplay even when an existing .sav is corrupt
                 # or on disconnected storage. Warn instead of crashing.
-                self.emulator.save_warning = (
-                    "Could not restore saved game: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube saved game could not be restored; gameplay "
+                    "continues. Check the save folder and available storage.",
+                    "Could not restore saved game: ",
+                    exc,
                 )
             if self.system in ("ngp", "ngpc") and self.enable_state_resume:
                 # The core's own .flash read occurs inside _load_game.

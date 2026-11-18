@@ -167,6 +167,22 @@ normal success, and idempotent teardown on both platform backends.
 The tests establish handle ownership and cleanup, not actual Dolphin
 graphics compatibility.
 
+## Path-free GameCube save and restore warnings
+
+GameCube's UI-visible `save_warning` previously copied up to 140
+characters from an external save or restore exception, including local
+ROM filenames, private account folders or native memory-card paths.
+The worker now uses fixed, actionable GameCube-only warnings when
+battery SRAM, optional recovery data or startup save restoration fails.
+Gameplay continues, and the normal atomic save implementation is
+unchanged. Other console warning wording remains compatible.
+
+Five no-device regression tests cover periodic SRAM failure, a failed
+recovery write after a successful SRAM save, an exception with a broken
+`__str__` method, unchanged GBA warnings, and the actual
+`CoreSession.run()` startup restore path with a mocked Libretro core.
+These do not verify physical storage or GameCube saves in a real game.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
