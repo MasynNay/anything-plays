@@ -83,7 +83,13 @@ class PortableGLFrameHost(EGLFrameHost):
             )
             self._init_framebuffer()
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except Exception:
+                # glcontext/driver teardown must not replace the real
+                # startup failure. The context handle is also reset by
+                # close() even when its native __exit__ hook fails.
+                pass
             raise
 
     def get_proc_address(self, symbol):
@@ -131,8 +137,11 @@ class PortableGLFrameHost(EGLFrameHost):
                             self._gl(symbol, None, [
                                 C.c_int, C.POINTER(C.c_uint)
                             ])(1, C.byref(C.c_uint(identifier)))
-                        except (RuntimeError, ValueError):
-                            # No GL calls after the native context is lost.
+                        except Exception:
+                            # GL deletion can fail with an arbitrary native
+                            # driver exception (including OSError). Try to
+                            # release remaining objects and always leave
+                            # the context through its glcontext exit hook.
                             pass
         finally:
             try:

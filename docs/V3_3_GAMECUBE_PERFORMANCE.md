@@ -102,6 +102,21 @@ Six GPU-free regression tests invoke the real `ctypes` callback types
 under working, failing and invalid-pointer conditions. This does not
 replace a physical GameCube GPU, sound, controller or OBS test.
 
+## Windows/macOS graphics-context teardown after startup errors
+
+Windows WGL and macOS CGL use a portable `glcontext` GPU host.
+If context startup or FBO initialization fails, teardown can itself
+raise from the native context `__exit__` hook or a GL resource deletion.
+The 3.3 candidate now preserves the **original startup failure** even
+when teardown raises, attempts to delete every allocated framebuffer,
+texture and renderbuffer despite individual native `OSError` or driver
+exceptions, and releases/reset its context reference.
+
+Three deterministic mock-host tests cover failure during OpenGL version
+lookup with a broken native close hook, FBO startup with failing deletion
+of the first allocated GL object, and a context that refuses to enter.
+They verify error precedence and lifecycle—not GameCube GPU compatibility.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
