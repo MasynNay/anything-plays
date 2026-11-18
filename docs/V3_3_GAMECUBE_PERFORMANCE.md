@@ -149,6 +149,24 @@ handshakes, rejected native callback pointer state and malformed version
 strings. They prevent overstating compatibility but do not certify a
 real graphics driver or retail GameCube game.
 
+## Partial OpenGL framebuffer allocation teardown
+
+The shared EGL/WGL/CGL GameCube framebuffer setup previously saved
+FBO, color texture and depth/stencil renderbuffer handles only after
+`GL_FRAMEBUFFER_COMPLETE`. If a native GL call failed mid-allocation,
+the constructor invoked platform-specific teardown, but the host had
+recorded **zero** owned objects and could leak live GL resources. The
+shared allocator now records each successful native object ID
+immediately. A subsequent setup failure or incomplete framebuffer can
+release all previously allocated objects in both Linux EGL and the
+Windows/macOS portable host, without losing the original failure.
+
+GPU-free fault-injection tests cover interruptions after FBO creation,
+texture upload, renderbuffer allocation, incomplete framebuffer status,
+normal success, and idempotent teardown on both platform backends.
+The tests establish handle ownership and cleanup, not actual Dolphin
+graphics compatibility.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,

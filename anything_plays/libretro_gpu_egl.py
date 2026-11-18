@@ -231,8 +231,14 @@ class EGLFrameHost:
         self._check_thread()
         fbo, tex, depth = UI(), UI(), UI()
         self._gl("glGenFramebuffers", None, [I, C.POINTER(UI)])(1, C.byref(fbo))
+        # Take ownership immediately after each successful allocation.
+        # If a later GL call fails, __init__ invokes close(), which must
+        # know every resource that has already been created. Delaying all
+        # three assignments until FRAMEBUFFER_COMPLETE leaked partial FBOs.
+        self.fbo = fbo.value
         self._gl("glBindFramebuffer", None, [UI, UI])(GL_FRAMEBUFFER, fbo)
         self._gl("glGenTextures", None, [I, C.POINTER(UI)])(1, C.byref(tex))
+        self.color_tex = tex.value
         self._gl("glBindTexture", None, [UI, UI])(GL_TEXTURE_2D, tex)
         self._gl("glTexParameteri", None, [UI, UI, I])(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         self._gl("glTexParameteri", None, [UI, UI, I])(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -243,6 +249,7 @@ class EGLFrameHost:
             GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0
         )
         self._gl("glGenRenderbuffers", None, [I, C.POINTER(UI)])(1, C.byref(depth))
+        self.depth_stencil = depth.value
         self._gl("glBindRenderbuffer", None, [UI, UI])(GL_RENDERBUFFER, depth)
         self._gl("glRenderbufferStorage", None, [UI, UI, I, I])(
             GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, self.width, self.height
@@ -253,7 +260,8 @@ class EGLFrameHost:
         status = self._gl("glCheckFramebufferStatus", UI, [UI])(GL_FRAMEBUFFER)
         if status != GL_FRAMEBUFFER_COMPLETE:
             raise RuntimeError("Offscreen GameCube framebuffer incomplete: " + hex(status))
-        self.fbo, self.color_tex, self.depth_stencil = fbo.value, tex.value, depth.value
+        # The three handles have already been recorded, including in the
+        # failed/incomplete FBO paths, so teardown always has ownership.
 
     def accept_core_render(self, address):
         self._check_thread()
