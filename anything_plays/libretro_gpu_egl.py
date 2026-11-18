@@ -99,11 +99,19 @@ class EGLFrameHost:
         self.core_destroy = None
         self._fbo_callback = GET_FBO(lambda: self.fbo)
         self._proc_callback = GET_PROC(self.get_proc_address)
-        self._init_egl()
         try:
+            # EGL can fail after allocating a display, pbuffer or context.
+            # Teardown must run for *either* context setup or FBO failure,
+            # otherwise a failed GameCube boot retains native GPU handles.
+            self._init_egl()
             self._init_framebuffer()
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except Exception:
+                # Never replace the original initialization error with a
+                # secondary cleanup error from a failing graphics driver.
+                pass
             raise
 
     def _check_thread(self):
@@ -335,32 +343,54 @@ class EGLFrameHost:
         return arr[::-1].copy() if flip_vertical else arr.copy()
 
     def close(self):
+        """Release even partially initialized EGL resources, once.
+
+        EGL initialization may fail after a display or surface exists but
+        before an OpenGL context becomes current. The failed driver must not
+        mask the originating exception or leave a surface/display behind.
+        """
         self._check_thread()
-        if self.context and self.display:
-            try:
-                if self.fbo:
-                    self._gl("glDeleteFramebuffers", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.fbo))
-                    )
-                if self.color_tex:
-                    self._gl("glDeleteTextures", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.color_tex))
-                    )
-                if self.depth_stencil:
-                    self._gl("glDeleteRenderbuffers", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.depth_stencil))
-                    )
-            finally:
-                self._eglfunc["eglMakeCurrent"](self.display, None, None, None)
-                self._eglfunc["eglDestroyContext"](self.display, self.context)
-                self._eglfunc["eglDestroySurface"](self.display, self.surface)
-        if self.display:
-            self._eglfunc["eglTerminate"](self.display)
+        display, surface, context = self.display, self.surface, self.context
         self.display = self.surface = self.context = None
-        self.fbo = self.color_tex = self.depth_stencil = 0
+
+        def best_effort_egl(name, *args):
+            fn = self._eglfunc.get(name)
+            if fn is not None:
+                try:
+                    fn(*args)
+                except Exception:
+                    # A destroyed context may reject cleanup operations.
+                    # Continue releasing the other independently owned
+                    # native handles; never publish vendor exception text.
+                    pass
+
+        try:
+            if display and context:
+                for attr, symbol in (
+                    ("fbo", "glDeleteFramebuffers"),
+                    ("color_tex", "glDeleteTextures"),
+                    ("depth_stencil", "glDeleteRenderbuffers"),
+                ):
+                    identifier = getattr(self, attr, 0)
+                    if identifier:
+                        try:
+                            self._gl(symbol, None, [
+                                C.c_int, C.POINTER(C.c_uint)
+                            ])(1, C.byref(C.c_uint(identifier)))
+                        except Exception:
+                            # Do not abandon the EGL context on a GL driver
+                            # failure while removing an optional FBO.
+                            pass
+                best_effort_egl("eglMakeCurrent", display, None, None, None)
+                best_effort_egl("eglDestroyContext", display, context)
+            # A pbuffer may exist even when eglCreateContext failed.
+            if display and surface:
+                best_effort_egl("eglDestroySurface", display, surface)
+            if display:
+                best_effort_egl("eglTerminate", display)
+        finally:
+            self.fbo = self.color_tex = self.depth_stencil = 0
+            self.core_reset = self.core_destroy = None
 
     def __enter__(self):
         return self

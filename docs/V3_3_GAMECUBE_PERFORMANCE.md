@@ -49,6 +49,22 @@ retain their existing error formatting.
 This is a privacy and error-recovery boundary: it does not certify
 GameCube playback or replace live GPU and speaker tests.
 
+## EGL partial initialization cleanup (Linux)
+
+An EGL display and pbuffer can be created before the OpenGL context or
+framebuffer is ready. On a failed GameCube startup, the EGL backend now
+attempts cleanup even when `eglInitialize`/`eglCreateContext`/
+`eglMakeCurrent` or the FBO setup fails. It destroys a partial pbuffer
+separately from an optional context, terminates the display and resets
+its native handles. Cleanup is idempotent and continues after individual
+native cleanup failures without masking the original startup failure.
+
+Five fake-driver tests cover display-only startup failure, surface without
+context, full context startup failure, driver error during teardown, and
+a failed framebuffer setup that still releases native GL/EGL objects.
+These are isolated resource-lifecycle tests, not proof of real GameCube
+hardware compatibility.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
