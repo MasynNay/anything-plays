@@ -423,7 +423,7 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertIsNone(emu.last_error)
 
     def test_real_core_failure_is_not_masked_by_failed_shutdown_metrics(self):
-        """Preserve a native error, never replace it with a driver report."""
+        """Keep the core failure category, never display raw native text."""
         from anything_plays.gba_emulator import Emulator
 
         emu = Emulator()
@@ -437,8 +437,12 @@ class NativeLoopTimingTests(unittest.TestCase):
         with patch("anything_plays.gamecube_gpu.GameCubeHardwareSession",
                    return_value=bad):
             emu._run()
-        self.assertEqual(emu.last_error, "RuntimeError: Native emulator stopped")
+        self.assertEqual(
+            emu.last_error, "GameCube native playback failed (RuntimeError)."
+        )
         self.assertEqual(emu.error, emu.last_error)
+        self.assertNotIn("Native emulator stopped", emu.error)
+        self.assertNotIn("/synthetic/", emu.error)
         self.assertNotIn("XYZSECRET", emu.error)
         self.assertNotIn("/Users/", emu.error)
         self.assertIsNone(emu._gamecube_last_performance)
