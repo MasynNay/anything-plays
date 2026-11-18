@@ -97,8 +97,8 @@ class EGLFrameHost:
         self.depth_stencil = 0
         self.core_reset = None
         self.core_destroy = None
-        self._fbo_callback = GET_FBO(lambda: self.fbo)
-        self._proc_callback = GET_PROC(self.get_proc_address)
+        self._fbo_callback = GET_FBO(self._native_get_framebuffer)
+        self._proc_callback = GET_PROC(self._native_get_proc_address)
         try:
             # EGL can fail after allocating a display, pbuffer or context.
             # Teardown must run for *either* context setup or FBO failure,
@@ -117,6 +117,42 @@ class EGLFrameHost:
     def _check_thread(self):
         if threading.get_ident() != self.owner:
             raise RuntimeError("OpenGL context accessed from a different thread")
+
+    def _native_get_framebuffer(self):
+        """Return only a valid GL framebuffer ID to the Libretro C callback.
+
+        A native core can call this while a GPU context is being torn down.
+        Never let a missing driver-owned attribute or invalid ID unwind
+        through CFUNCTYPE (which would leave an undefined C return value).
+        """
+        try:
+            self._check_thread()
+            framebuffer = self.fbo
+            if type(framebuffer) is int and 0 < framebuffer <= 0xFFFFFFFF:
+                return framebuffer
+        except BaseException:
+            # This method is ONLY passed to a native C callback.
+            pass
+        return 0
+
+    def _native_get_proc_address(self, symbol):
+        """Return a function pointer or NULL without escaping into C.
+
+        get_proc_address is also used directly by our Python GL loader,
+        where exceptions must remain actionable. Only the Libretro callback
+        boundary isolates arbitrary native driver/proc-loader failures.
+        """
+        try:
+            self._check_thread()
+            address = self.get_proc_address(symbol)
+            if (type(address) is int and 0 < address
+                    <= (1 << (8 * C.sizeof(C.c_void_p))) - 1):
+                return address
+        except BaseException:
+            # CFUNCTYPE swallows Python exceptions and may otherwise expose
+            # an indeterminate native pointer. NULL explicitly means absent.
+            pass
+        return None
 
     def _ef(self, name, restype, argtypes):
         fn = getattr(self.egl, name)

@@ -38,8 +38,8 @@ class PortableGLFrameHost(EGLFrameHost):
         self.last_gl_error = 0
         self.context = None
         self._entered = False
-        self._fbo_callback = GET_FBO(lambda: self.fbo)
-        self._proc_callback = GET_PROC(self.get_proc_address)
+        self._fbo_callback = GET_FBO(self._native_get_framebuffer)
+        self._proc_callback = GET_PROC(self._native_get_proc_address)
         if backend is None:
             try:
                 import glcontext

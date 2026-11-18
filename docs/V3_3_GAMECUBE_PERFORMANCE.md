@@ -82,6 +82,26 @@ failure, non-3.3 and non-buildbot inputs, HTTP errors and archive size,
 and the release-only offline-core requirement. This is installer CI
 robustness, **not** real device or core-rights certification.
 
+## Native GL pointer callbacks fail safely
+
+The Libretro Dolphin GPU bridge passes two `ctypes.CFUNCTYPE`
+callbacks into a native core: `get_proc_address` and
+`get_current_framebuffer`. An unexpected EGL/WGL/CGL driver exception
+during either callback previously could unwind through `ctypes` and
+leave the native core with an undefined function-pointer return value.
+
+Both Linux EGL and the Windows/macOS portable GPU host now use the same
+guarded callback methods. The proc callback returns an actual valid
+positive native pointer or **NULL**; the framebuffer callback returns a
+valid GL framebuffer ID or **zero**. They reject invalid values and
+cross-thread access, without copying driver exception messages to
+diagnostics. The normal Python GL loader still raises actionable errors
+during startup instead of hiding them.
+
+Six GPU-free regression tests invoke the real `ctypes` callback types
+under working, failing and invalid-pointer conditions. This does not
+replace a physical GameCube GPU, sound, controller or OBS test.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
