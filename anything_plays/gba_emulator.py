@@ -498,15 +498,20 @@ def safe_gamecube_worker_error(exc):
 
     # Preserve only internal fixed, actionable categories. Never reproduce
     # a substring from the incoming exception in the displayed result.
-    message = str(exc) if type(exc) is RuntimeError else ""
+    try:
+        message = str(exc) if type(exc) is RuntimeError else ""
+    except Exception:
+        # Even an exception's __str__ can be an untrusted native wrapper.
+        # Error reporting must never replace the worker's original failure.
+        message = ""
     if message == "GPU hardware context negotiation failed":
         return "GameCube GPU hardware context negotiation failed."
     if message.startswith("GPU readback failed ("):
         import re
         if re.fullmatch(
-            r"GPU readback failed \\((RuntimeError|ValueError|OSError|TypeError|"
+            r"GPU readback failed \((RuntimeError|ValueError|OSError|TypeError|"
             r"OverflowError|MemoryError|AttributeError|IndexError|KeyError|"
-            r"AssertionError|UnexpectedError)\\)", message
+            r"AssertionError|UnexpectedError)\)", message
         ):
             return "GameCube " + message + "."
     if message.startswith("GameCube needs a graphics driver supporting OpenGL"):

@@ -71,6 +71,15 @@ class GameCubeWorkerErrorPrivacyTests(unittest.TestCase):
             "GameCube could not initialize the accelerated GPU context.",
         )
 
+    def test_untrusted_runtimeerror_stringification_failure_is_safe(self):
+        class BrokenDriverRuntimeError(RuntimeError):
+            def __str__(self):
+                raise OSError("secret driver path /home/private/game.iso")
+        self.assertEqual(
+            safe_gamecube_worker_error(BrokenDriverRuntimeError()),
+            "GameCube native playback failed (UnexpectedError).",
+        )
+
     def test_actual_emulator_worker_discards_private_driver_message(self):
         emu = Emulator()
         emu.system = "gamecube"
