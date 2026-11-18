@@ -480,6 +480,45 @@ class CoreSession:
                 self.native.close()
 
 
+def safe_gamecube_worker_error(exc):
+    """Fixed, path-free GameCube worker failure for a user-visible status.
+
+    Native OpenGL, SDL, Dolphin and C extension exceptions may contain ROM
+    filenames, GPU identifiers or arbitrary driver paths. The worker's
+    public error must never copy that untrusted text, even if a native
+    launch fails before GameCubeHardwareSession was constructed.
+    """
+    category = type(exc).__name__
+    if category not in (
+        "RuntimeError", "OSError", "ValueError", "TypeError",
+        "MemoryError", "ImportError", "FileNotFoundError",
+        "AttributeError", "OverflowError",
+    ):
+        category = "UnexpectedError"
+
+    # Preserve only internal fixed, actionable categories. Never reproduce
+    # a substring from the incoming exception in the displayed result.
+    message = str(exc) if type(exc) is RuntimeError else ""
+    if message == "GPU hardware context negotiation failed":
+        return "GameCube GPU hardware context negotiation failed."
+    if message.startswith("GPU readback failed ("):
+        import re
+        if re.fullmatch(
+            r"GPU readback failed \\((RuntimeError|ValueError|OSError|TypeError|"
+            r"OverflowError|MemoryError|AttributeError|IndexError|KeyError|"
+            r"AssertionError|UnexpectedError)\\)", message
+        ):
+            return "GameCube " + message + "."
+    if message.startswith("GameCube needs a graphics driver supporting OpenGL"):
+        return (
+            "GameCube needs a GPU driver with OpenGL 3.3 or newer. "
+            "Install or update the graphics driver and restart Anything Plays."
+        )
+    if message == "Dolphin did not register a supported accelerated render context":
+        return "GameCube could not initialize the accelerated GPU context."
+    return "GameCube native playback failed (" + category + ")."
+
+
 class Emulator:
     """Thread-safe facade used by the Tkinter application."""
 
@@ -674,7 +713,11 @@ class Emulator:
             else:
                 CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
-            self.last_error = f"{type(exc).__name__}: {exc}"
+            self.last_error = (
+                safe_gamecube_worker_error(exc)
+                if self.system == "gamecube"
+                else f"{type(exc).__name__}: {exc}"
+            )
             self.error = self.last_error
         finally:
             # All session paths, including errors BEFORE running=True,

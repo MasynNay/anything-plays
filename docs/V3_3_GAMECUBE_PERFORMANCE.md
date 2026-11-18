@@ -34,6 +34,21 @@ Synthetic tests exercise 10,000 repeated native-pointer requests, a
 late rejection and a null callback. They cannot substitute for a real
 GameCube GPU/driver endurance run.
 
+## Safe GameCube native startup and teardown errors
+
+The GameCube worker now produces **fixed, path-free error statuses** for
+driver, GPU-context, native-core and ROM startup failures. Previously the
+general emulator worker included `str(exception)` in the user-facing
+status, which on some third-party driver failures can contain private
+ROM paths, device IDs or local account folders. GameCube preserves a
+fixed actionable OpenGL 3.3 driver-upgrade suggestion, internal GPU
+readback/negotiation categories and a generic exception-class fallback.
+It never copies arbitrary external exception text. Other console workers
+retain their existing error formatting.
+
+This is a privacy and error-recovery boundary: it does not certify
+GameCube playback or replace live GPU and speaker tests.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
