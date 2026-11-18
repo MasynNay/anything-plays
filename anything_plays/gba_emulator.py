@@ -499,7 +499,7 @@ def safe_gamecube_worker_error(exc):
     # Preserve only internal fixed, actionable categories. Never reproduce
     # a substring from the incoming exception in the displayed result.
     try:
-        message = str(exc) if type(exc) is RuntimeError else ""
+        message = str(exc) if isinstance(exc, RuntimeError) else ""
     except Exception:
         # Even an exception's __str__ can be an untrusted native wrapper.
         # Error reporting must never replace the worker's original failure.
