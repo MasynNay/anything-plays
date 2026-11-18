@@ -20,6 +20,9 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
         instance = klass.__new__(klass)
         instance.owner = threading.get_ident()
         instance.fbo = 37
+        instance.context = object()
+        if klass is PortableGLFrameHost:
+            instance._entered = True
         instance.get_proc_address = Mock(return_value=0x123456)
         instance._fbo_callback = GET_FBO(instance._native_get_framebuffer)
         instance._proc_callback = GET_PROC(instance._native_get_proc_address)
@@ -76,6 +79,65 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                 host = self.host(EGLFrameHost)
                 host.fbo = invalid
                 self.assertEqual(host._fbo_callback(), 0)
+
+    def test_destroyed_context_cannot_publish_stale_fbo_or_proc_address(self):
+        for klass in (EGLFrameHost, PortableGLFrameHost):
+            with self.subTest(host=klass.__name__):
+                host = self.host(klass)
+                self.assertEqual(host._fbo_callback(), 37)
+                self.assertEqual(host._proc_callback(b"glClear"), 0x123456)
+                host.get_proc_address.reset_mock()
+                host.context = None
+                # Deliberately leave a stale nonzero FBO to prove the
+                # callback refuses it independently of native ID cleanup.
+                self.assertEqual(host.fbo, 37)
+                self.assertEqual(host._fbo_callback(), 0)
+                self.assertIsNone(host._proc_callback(b"glClear"))
+                host.get_proc_address.assert_not_called()
+
+    def test_unentered_portable_context_cannot_publish_callback_pointers(self):
+        host = self.host(PortableGLFrameHost)
+        host._entered = False
+        self.assertEqual(host._fbo_callback(), 0)
+        self.assertIsNone(host._proc_callback(b"glClear"))
+        host.get_proc_address.assert_not_called()
+
+    def test_actual_close_revokes_callbacks_on_both_gpu_backends(self):
+        class NativeCtx:
+            def __init__(self):
+                self.exits = 0
+
+            def __exit__(self, *_args):
+                self.exits += 1
+
+        for klass in (EGLFrameHost, PortableGLFrameHost):
+            with self.subTest(host=klass.__name__):
+                host = self.host(klass)
+                host.color_tex = 0
+                host.depth_stencil = 0
+                host.fbo = 0  # Avoid real GL deletion in no-GPU regression.
+                if klass is EGLFrameHost:
+                    host.display = 10
+                    host.surface = 11
+                    host._eglfunc = {
+                        symbol: lambda *args: None
+                        for symbol in (
+                            "eglMakeCurrent", "eglDestroyContext",
+                            "eglDestroySurface", "eglTerminate"
+                        )
+                    }
+                else:
+                    context = NativeCtx()
+                    host.context = context
+                host.close()
+                self.assertIsNone(host.context)
+                self.assertEqual(host._fbo_callback(), 0)
+                self.assertIsNone(host._proc_callback(b"glClear"))
+                host.get_proc_address.assert_not_called()
+                if klass is PortableGLFrameHost:
+                    self.assertEqual(context.exits, 1)
+                host.close()  # Repeated teardown must remain idempotent.
+
 
     def test_gl_python_loader_keeps_its_normal_error_visibility(self):
         # Exception isolation must happen at the native callback only.

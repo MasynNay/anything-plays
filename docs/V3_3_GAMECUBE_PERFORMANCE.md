@@ -183,6 +183,23 @@ recovery write after a successful SRAM save, an exception with a broken
 `CoreSession.run()` startup restore path with a mocked Libretro core.
 These do not verify physical storage or GameCube saves in a real game.
 
+## Invalidate native GameCube GL callbacks after graphics teardown
+
+Dolphin's Libretro core receives `ctypes` callbacks that can outlive the
+EGL/WGL/CGL context on a native error or delayed callback. The 3.3 native
+framebuffer and OpenGL function-pointer callbacks now verify the GPU
+context remains alive before handing out **any** framebuffer ID or
+attempting a driver function lookup. A closed EGL context, a closed
+portable context, or a portable context that never finished entering
+returns **zero/NULL**, even if a stale framebuffer ID is still retained
+by a third-party object. The direct Python GL loader retains its
+existing error handling for real startup diagnostics.
+
+Three additional GPU-free regression cases exercise callbacks after
+context invalidation, before the portable context is entered, and after
+calling the real `close()` method on both hosts. They verify callback
+lifetime, not retail GameCube performance or physical hardware behavior.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,

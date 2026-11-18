@@ -128,6 +128,12 @@ class EGLFrameHost:
         """
         try:
             self._check_thread()
+            # The native core can retain CFUNCTYPE pointers after close().
+            # Never advertise a stale FBO while its EGL/CGL/WGL context is
+            # gone, or before glcontext.__enter__ has succeeded.
+            if (not getattr(self, "context", None)
+                    or not getattr(self, "_entered", True)):
+                return 0
             framebuffer = self.fbo
             if type(framebuffer) is int and 0 < framebuffer <= 0xFFFFFFFF:
                 return framebuffer
@@ -145,6 +151,12 @@ class EGLFrameHost:
         """
         try:
             self._check_thread()
+            # An obsolete native callback must return NULL *without even
+            # calling into the driver's proc loader*. Driver entry points
+            # may no longer be valid after the context was destroyed.
+            if (not getattr(self, "context", None)
+                    or not getattr(self, "_entered", True)):
+                return None
             address = self.get_proc_address(symbol)
             if (type(address) is int and 0 < address
                     <= (1 << (8 * C.sizeof(C.c_void_p))) - 1):
