@@ -65,6 +65,23 @@ a failed framebuffer setup that still releases native GL/EGL objects.
 These are isolated resource-lifecycle tests, not proof of real GameCube
 hardware compatibility.
 
+## Private 3.3 core fetch resilience for macOS QA
+
+The four-platform private 3.3 installer workflow downloads the mGBA
+minimal-core build from Libretro's nightly buildbot before staging the
+checksum-verified full native QA package. When a hosted macOS runner
+temporarily cannot resolve the buildbot DNS name, only the explicit
+**unreleased 3.3 minimal-core QA** lane retries the exact same HTTPS URL
+at most two additional times with bounded 2- and 4-second delays.
+Missing (HTTP 404/403) or oversized archives still fail immediately.
+No mirror, fallback library, network allowance for public release,
+hash-check bypass or stable-build change is introduced.
+
+Deterministic regression tests cover successful DNS retry, persistent
+failure, non-3.3 and non-buildbot inputs, HTTP errors and archive size,
+and the release-only offline-core requirement. This is installer CI
+robustness, **not** real device or core-rights certification.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
