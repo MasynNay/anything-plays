@@ -29,6 +29,17 @@ NORMAL_DEVICE_RATES = frozenset((
 ))
 
 
+def _audio_diagnostic(message):
+    """Best-effort fixed text; a closed stderr must not stop emulation."""
+    try:
+        print(message, file=sys.stderr)
+    except Exception:
+        # Frozen GUI launchers, closed pipes and sandboxed audio sessions may
+        # have no writable stderr. Audio failure is already recorded in the
+        # app status; the optional diagnostic must never become fatal.
+        pass
+
+
 class AudioSink:
     """Keep the core's audio callbacks independent from the output device."""
 
@@ -191,9 +202,17 @@ class AudioSink:
         # PortAudio's output-underflow flag detects device scheduling
         # problems independently of our own empty PCM queue. In particular,
         # a healthy queue can still underrun at the speaker interface.
-        if status is not None and getattr(status, "output_underflow", False):
-            self.output_device_underflow_callbacks += 1
+        # Always initialize the speaker buffer before observing optional
+        # third-party PortAudio status objects. A malformed status getter
+        # must not crash the realtime callback or leave old output samples.
         outdata.fill(0)
+        try:
+            if status is not None and getattr(status, "output_underflow", False):
+                self.output_device_underflow_callbacks += 1
+        except Exception:
+            # Only the optional device-underflow counter is unavailable.
+            # Continue delivering the same PCM; never expose driver text.
+            pass
         written = 0
         while written < frames:
             if self.position >= len(self.pending):
@@ -241,7 +260,7 @@ class AudioSink:
             return
         if sd is None:
             self.output_error = "PortAudio or the audio backend is unavailable"
-            print("Audio unavailable: " + self.output_error, file=sys.stderr)
+            _audio_diagnostic("Audio unavailable: " + self.output_error)
             return
 
         source = int(round(sample_rate))
@@ -295,7 +314,7 @@ class AudioSink:
         # Retain just the fixed error class for actionable troubleshooting.
         reason = type(error).__name__ if error is not None else "UnknownError"
         self.output_error = "No usable audio output device (" + reason + ")"
-        print("Audio output unavailable (" + reason + ")", file=sys.stderr)
+        _audio_diagnostic("Audio output unavailable (" + reason + ")")
         self.close()
 
     def close(self):
@@ -305,11 +324,17 @@ class AudioSink:
         if stream is not None:
             try:
                 stream.stop()
+            except Exception as exc:
+                # stop() can fail after a USB output is unplugged. Still
+                # attempt close() so the host releases its device handle.
+                _audio_diagnostic(
+                    "Could not stop audio output (" + type(exc).__name__ + ")"
+                )
+            try:
                 stream.close()
             except Exception as exc:
-                # Teardown errors can contain the same private PortAudio
-                # device details as startup failures. Close best-effort.
-                print(
-                    "Could not close audio output ("
-                    + type(exc).__name__ + ")", file=sys.stderr
+                # A separate close failure must not block core shutdown or
+                # copy device names/paths from the platform exception.
+                _audio_diagnostic(
+                    "Could not close audio output (" + type(exc).__name__ + ")"
                 )

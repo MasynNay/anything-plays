@@ -117,6 +117,21 @@ lookup with a broken native close hook, FBO startup with failing deletion
 of the first allocated GL object, and a context that refuses to enter.
 They verify error precedence and lifecycle—not GameCube GPU compatibility.
 
+## Audio-device shutdown and reconnect resilience
+
+The existing PortAudio output stream is shared by GameCube and all
+other Libretro cores. If `stream.stop()` raises while the user unplugs
+a USB audio device, we now **still call `stream.close()`** to release
+its handle. Optional output-device diagnostics cannot crash gameplay
+if the frozen launcher closed stderr, and bad PortAudio underflow-status
+properties no longer abort the realtime PCM callback. Audio frame
+ordering, gain, resampling and device-selection policies are unchanged.
+
+Seven isolated regression tests cover stop/close faults, closed stderr,
+no-speaker silent emulation, failed output initialization, malformed
+PortAudio callback status and normal underflow telemetry. These tests
+cannot substitute for listening to game audio on real speakers.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,
