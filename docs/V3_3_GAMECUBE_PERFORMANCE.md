@@ -132,6 +132,23 @@ no-speaker silent emulation, failed output initialization, malformed
 PortAudio callback status and normal underflow telemetry. These tests
 cannot substitute for listening to game audio on real speakers.
 
+## Linux EGL advertises only the OpenGL version it actually owns
+
+An EGL context requested with a **minimum** OpenGL 3.3 version can be
+created at 3.3, 4.1, 4.5 or another supported driver version. Previously
+the Linux GameCube host could claim support for *any* Dolphin request
+through 4.5, even when the driver's actual `GL_VERSION` was only 3.3.
+The 3.3 candidate now parses the real context version (ignoring normal
+driver suffixes) and rejects a Dolphin GL request above that version,
+without writing function pointers into the rejected Libretro callback.
+The pre-existing maximum request of GL 4.5 is unchanged. Portable
+Windows/macOS already performed an equivalent context-version check.
+
+Six GPU-free tests verify GL 3.3, 4.1, 4.5 and 4.6 contexts, accepted
+handshakes, rejected native callback pointer state and malformed version
+strings. They prevent overstating compatibility but do not certify a
+real graphics driver or retail GameCube game.
+
 ## Reproduce a local session
 
 1. Build/run the 3.3 development app on the target host. Record the OS, CPU,

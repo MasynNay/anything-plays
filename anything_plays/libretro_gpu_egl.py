@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ctypes as C
 import os
+import re
 import sys
 import threading
 
@@ -260,6 +261,17 @@ class EGLFrameHost:
             return False
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents
         if req.context_type != 3 or (req.version_major, req.version_minor) > (4, 5):
+            return False
+        # An EGL 3.3 minimum-version request does NOT prove that a driver
+        # delivered OpenGL 4.5. Never hand a Dolphin core a GL context
+        # lower than the version it explicitly requested: calling newer
+        # entry points on older native GPU drivers can crash the process.
+        # GL_VERSION permits vendor/build suffixes such as "3.3 Mesa 24".
+        version = re.match(r"^\s*(\d+)\.(\d+)", getattr(self, "opengl_version", ""))
+        if version is None:
+            return False
+        supported = (int(version.group(1)), int(version.group(2)))
+        if (req.version_major, req.version_minor) > supported:
             return False
         if not req.context_reset:
             return False
