@@ -20,6 +20,16 @@ A broken or closed local stdout stream is also ignored for this optional
 logging: neither an accepted nor a rejected GPU request may raise merely
 because its diagnostic print failed during the native Libretro callback.
 
+If the native GL host itself raises while negotiating a hardware context,
+the callback now returns a normal rejected result, sets the session Stop
+signal, and preserves a fixed safe error category. Native driver messages,
+paths and exception types are never copied to the app-facing negotiation
+error. An ordinary `False` return (unsupported context) remains a normal
+rejection without an invented fatal driver failure. Regression tests cover
+three native host exception types, ordinary rejection and existing-error
+precedence. This is callback-safety work, not proof of physical GPU
+compatibility.
+
 Synthetic tests exercise 10,000 repeated native-pointer requests, a
 late rejection and a null callback. They cannot substitute for a real
 GameCube GPU/driver endurance run.

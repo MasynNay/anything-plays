@@ -4,7 +4,9 @@ These tests use an actual ctypes render request but no Dolphin core, ROM,
 GPU, camera, controller or sound card.
 """
 import ctypes as C
+import threading
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from anything_plays.gamecube_gpu import (
@@ -19,6 +21,8 @@ class GameCubeNegotiationBoundsTests(unittest.TestCase):
         session = object.__new__(GameCubeHardwareSession)
         session.hardware_requests = []
         session.hardware_negotiations_total = 0
+        session.opengl_error = None
+        session.emulator = SimpleNamespace(stop_event=threading.Event())
         session.host = Mock()
         session.host.accept_core_render.return_value = True
         return session
@@ -104,6 +108,65 @@ class GameCubeNegotiationBoundsTests(unittest.TestCase):
         self.assertEqual(session.hardware_negotiations_total,
                          MAX_GPU_NEGOTIATION_RECORDS + 1)
         self.assertEqual(len(session.hardware_requests), MAX_GPU_NEGOTIATION_RECORDS)
+
+    def test_gpu_host_exception_rejects_and_stops_without_driver_text(self):
+        """Driver/proc failures cannot escape native ctypes callbacks."""
+        for failure in (
+            OSError("PRIVATE GPU DRIVER /home/user/driver-token"),
+            RuntimeError("PRIVATE WGL 33 vendor serial"),
+            AttributeError("PRIVATE proc-loader identifier"),
+        ):
+            with self.subTest(error=type(failure).__name__):
+                session = self.make_session()
+                callback = HardwareRenderCallback()
+                callback.context_type = 3
+                callback.version_major = 3
+                callback.version_minor = 3
+                callback.context_reset = 123
+                session.host.accept_core_render.side_effect = failure
+                with patch("builtins.print") as logging:
+                    self.assertFalse(
+                        session.environment(14, C.addressof(callback))
+                    )
+                self.assertTrue(session.emulator.stop_event.is_set())
+                self.assertEqual(
+                    session.opengl_error, "GPU hardware context negotiation failed"
+                )
+                self.assertEqual(session.hardware_negotiations_total, 1)
+                self.assertEqual(len(session.hardware_requests), 1)
+                self.assertFalse(session.hardware_requests[0]["granted"])
+                self.assertEqual(session.host.accept_core_render.call_count, 1)
+                logging.assert_called_once()
+                self.assertNotIn("PRIVATE", repr(session.hardware_requests))
+                self.assertNotIn("PRIVATE", session.opengl_error)
+
+    def test_native_context_rejection_without_driver_error_is_not_fatal(self):
+        session = self.make_session()
+        callback = HardwareRenderCallback()
+        callback.context_type = 3
+        callback.version_major = 3
+        callback.version_minor = 3
+        callback.context_reset = 123
+        session.host.accept_core_render.return_value = False
+        with patch("builtins.print"):
+            self.assertFalse(session.environment(14, C.addressof(callback)))
+        self.assertIsNone(session.opengl_error)
+        self.assertFalse(session.emulator.stop_event.is_set())
+        self.assertFalse(session.hardware_requests[-1]["granted"])
+
+    def test_preserves_existing_graphics_failure_category_on_native_exception(self):
+        session = self.make_session()
+        session.opengl_error = "GPU readback failed (OSError)"
+        session.host.accept_core_render.side_effect = OSError("PRIVATE /dev/nvidia0")
+        callback = HardwareRenderCallback()
+        callback.context_type = 3
+        callback.version_major = 3
+        callback.version_minor = 3
+        callback.context_reset = 123
+        with patch("builtins.print"):
+            self.assertFalse(session.environment(14, C.addressof(callback)))
+        self.assertEqual(session.opengl_error, "GPU readback failed (OSError)")
+        self.assertTrue(session.emulator.stop_event.is_set())
 
     def test_no_callback_pointer_does_not_grow_handshake_history(self):
         session = self.make_session()

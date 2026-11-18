@@ -111,9 +111,22 @@ class GameCubeHardwareSession(CoreSession):
                 if len(self.hardware_requests) == MAX_GPU_NEGOTIATION_RECORDS:
                     del self.hardware_requests[0]
                 self.hardware_requests.append(request)
-            accepted = bool(
-                self.host is not None and self.host.accept_core_render(data)
-            )
+            try:
+                accepted = bool(
+                    self.host is not None and self.host.accept_core_render(data)
+                )
+            except Exception:
+                # The native Libretro environment callback is implemented
+                # through ctypes. A broken GPU driver/proc loader must never
+                # raise through that callback (where Python exceptions are
+                # otherwise ignored and the native core sees undefined
+                # negotiation results). Reject and stop this failed context.
+                # Do not include native driver strings, device paths or
+                # exception types in the app-facing error.
+                accepted = False
+                if self.opengl_error is None:
+                    self.opengl_error = "GPU hardware context negotiation failed"
+                self.emulator.stop_event.set()
             if request is not None:
                 request["granted"] = accepted
                 # The first few requests are useful in crash logs (not
