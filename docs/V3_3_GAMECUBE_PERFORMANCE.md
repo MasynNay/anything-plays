@@ -614,3 +614,21 @@ check real synthesized stereo frames through the PortAudio callback, and
 verify that all rejected devices close cleanly. This proves the source
 fallback contracts, **not** real speaker recovery, physical sound quality,
 GameCube synchronization, or public 3.3 release readiness.
+
+
+## Reject invalid Libretro audio sample rates before PortAudio startup
+
+A damaged or partially initialized native core can report a nonfinite
+AVInfo sample rate. Python numeric comparisons alone do not reject NaN,
+which previously reached `round()` and raised during the emulator's
+startup. `AudioSink.start()` now accepts finite numeric rates in the
+existing 8,000–192,000 Hz range, including normal NumPy numeric scalars,
+but rejects NaN, infinity, out-of-range values, booleans and malformed
+objects **before querying or opening the output device**. Invalid rates
+produce the same fixed, path-free warning and let native gameplay
+continue without an audio stream, rather than crashing startup.
+
+GPU-free regression tests cover malformed native timing values and real
+synthetic PCM delivery with a finite fractional NumPy rate. This proves
+source-code failure handling, not real GameCube speaker output or audio
+synchronization. Physical tests remain required before release.

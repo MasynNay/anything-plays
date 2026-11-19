@@ -198,6 +198,53 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         self.assertEqual(audio.chunks.qsize(), 1)
         audio.close()
 
+
+    def test_nonfinite_native_sample_rates_fail_closed_before_audio_device_io(self):
+        backend = Mock()
+        invalid_rates = (
+            float("nan"), float("inf"), float("-inf"),
+            np.float64("nan"), np.float32("inf"),
+            None, True, False, np.bool_(True), "48000",
+            {}, [], object(), 0, -1, 7999.9, 192000.1,
+            10 ** 1000,
+        )
+        with patch("anything_plays.libretro_audio.sd", backend):
+            for rate in invalid_rates:
+                with self.subTest(rate_type=type(rate).__name__,
+                                  rate_repr=str(rate)[:30]):
+                    audio = AudioSink()
+                    audio.start(rate)
+                    self.assertEqual(
+                        audio.output_error,
+                        "Emulator reported an invalid sample rate",
+                    )
+                    self.assertFalse(audio.output_active)
+                    self.assertIsNone(audio.stream)
+                    # Even a damaged native clock must not block gameplay.
+                    audio.push(np.array([[17, -17]], dtype=np.int16))
+                    self.assertEqual(audio.chunks.qsize(), 1)
+                    audio.close()
+        backend.query_devices.assert_not_called()
+        backend.OutputStream.assert_not_called()
+
+    def test_valid_finite_numpy_core_rate_still_starts_and_delivers_pcm(self):
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000.0}
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio = AudioSink()
+            audio.start(np.float64(48000.25))
+        self.assertTrue(audio.output_active)
+        self.assertIsNone(audio.output_error)
+        self.assertEqual(audio.source_sample_rate, 48000)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertIsNone(audio._resample_step)
+        backend.OutputStream.assert_called_once()
+        audio.push(np.array([[1200, -1200], [600, -600]], dtype=np.int16))
+        out = np.zeros((2, 2), dtype=np.int16)
+        audio.callback(out, 2, None, None)
+        self.assertEqual(out.tolist(), [[1200, -1200], [600, -600]])
+        audio.close()
+
     def test_portaudio_status_property_error_does_not_interrupt_pcm(self):
         class BrokenStatus:
             @property

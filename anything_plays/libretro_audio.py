@@ -255,7 +255,23 @@ class AudioSink:
     def start(self, sample_rate):
         self.output_error = None
         self.output_active = False
-        if not (8_000 <= sample_rate <= 192_000):
+        # Libretro's AVInfo supplies a floating-point native sample rate.
+        # A broken core can report NaN/Inf or an out-of-range rate. Merely
+        # comparing a NaN against numeric bounds returns False on both sides;
+        # round(NaN) then raises and can abort game startup. Fail silently
+        # and visibly before calling PortAudio or touching any device.
+        try:
+            if (isinstance(sample_rate, (bool, np.bool_))
+                    or not isinstance(sample_rate, (
+                        int, float, np.integer, np.floating
+                    ))):
+                raise ValueError("not a numeric sample rate")
+            numeric_rate = float(sample_rate)
+            if (not np.isfinite(numeric_rate)
+                    or not 8_000 <= numeric_rate <= 192_000):
+                raise ValueError("invalid numeric sample rate")
+            source = int(round(numeric_rate))
+        except (TypeError, ValueError, OverflowError):
             self.output_error = "Emulator reported an invalid sample rate"
             return
         if sd is None:
@@ -263,7 +279,6 @@ class AudioSink:
             _audio_diagnostic("Audio unavailable: " + self.output_error)
             return
 
-        source = int(round(sample_rate))
         # Prefer the actual output device's existing sample rate for unusual
         # Libretro values (notably 131072 Hz from GB/GBC). If unavailable,
         # 48000 is widely supported; only fall back if native rate fails.
