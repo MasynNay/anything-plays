@@ -727,3 +727,25 @@ PortAudio callback, underrun and queue-drop counters are unchanged.
 Tests cover mixed single/batch source audio, silent-source detection,
 preloaded PCM resampled across failed-device retries, malformed callbacks
 and privacy. **A real speaker and GameCube A/V sync test is still necessary.**
+
+
+## Immediate preview refresh when increasing GameCube's 20/30/60 FPS cap
+
+Switching from a slower GameCube preview target to a faster one previously
+reset the displayed cadence diagnostics, but the GPU readback still used
+the prior slower cap's last-copy deadline. For example, a switch from
+**Performance (20 FPS)** to **Quality (60 FPS)** could retain a nearly
+50 ms waiting interval even though the requested new budget was about
+16.7 ms. The 3.3 native video callback now makes the *next* GL preview copy
+eligible immediately **only on an actual upshift**. Subsequent readbacks
+return to the normal new-mode cadence.
+
+A downshift (60→20 or 60→30) still respects the longer GPU-copy
+interval, avoiding an unnecessary synchronous `glReadPixels` stall as
+the user switches toward a performance-friendly mode. Legacy/malformed
+preferences are normalized rather than treated as extra rate changes.
+Existing GameCube preview statistics reset per selected mode. Native
+Dolphin `retro_run`, P1/P2 controls, audio, and independent OBS-facing
+15/24/30 FPS Stream Mode output are untouched. Synthetic RGB-host tests
+verify upshift, downshift, and malformed mode behavior, **not** real
+GPU throughput or physical OBS-recorded FPS.
