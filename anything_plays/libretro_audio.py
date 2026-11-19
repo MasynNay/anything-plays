@@ -279,7 +279,12 @@ class AudioSink:
         if preferred not in NORMAL_DEVICE_RATES:
             preferred = 48000
         primary = source if source in NORMAL_DEVICE_RATES else preferred
-        attempts = (primary,) if primary == preferred else (primary, preferred)
+        # Device metadata can be stale after HDMI/USB audio switches. Some
+        # drivers also reject their advertised default. Try both standard
+        # stereo rates as final fallbacks before giving up on real output.
+        # Keep this finite and ordered: never create more than four streams,
+        # and only resample after a candidate actually starts successfully.
+        attempts = tuple(dict.fromkeys((primary, preferred, 48000, 44100)))
         error = None
         for rate in attempts:
             candidate = None

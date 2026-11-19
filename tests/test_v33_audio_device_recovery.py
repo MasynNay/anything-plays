@@ -94,6 +94,110 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         self.assertEqual(audio.chunks.qsize(), 1)
         audio.close()
 
+
+    def test_wrong_48k_device_default_recovers_at_44k1_with_real_pcm(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000.0}
+        streams = {}
+        attempts = []
+
+        def create_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            if samplerate == 48000:
+                stream.start.side_effect = OSError(
+                    "PRIVATE HDMI driver /Users/owner/speaker-serial"
+                )
+            streams[samplerate] = stream
+            return stream
+
+        backend.OutputStream.side_effect = create_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertTrue(audio.output_active)
+        self.assertIsNone(audio.output_error)
+        self.assertEqual(attempts, [48000, 44100])
+        streams[48000].close.assert_called_once_with()
+        self.assertIs(audio.stream, streams[44100])
+        self.assertEqual(audio.source_sample_rate, 48000)
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 48000 / 44100)
+        audio.push(np.tile(np.array([[1200, -1200]], dtype=np.int16),
+                           (4800, 1)))
+        output = np.zeros((4000, 2), dtype=np.int16)
+        audio.callback(output, 4000, None, None)
+        self.assertTrue(np.all(output[:, 0] == 1200))
+        self.assertTrue(np.all(output[:, 1] == -1200))
+        self.assertEqual(audio.delivery_snapshot()[
+            "audio_output_underrun_frames"], 0)
+        audio.close()
+        streams[44100].stop.assert_called_once_with()
+        streams[44100].close.assert_called_once_with()
+
+    def test_wrong_44k1_default_recovers_at_48k_and_keeps_pcm(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 44100.0}
+        streams = {}
+        attempts = []
+
+        def create_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            if samplerate == 44100:
+                stream.start.side_effect = RuntimeError(
+                    "PRIVATE old speaker /dev/audio-device"
+                )
+            streams[samplerate] = stream
+            return stream
+
+        backend.OutputStream.side_effect = create_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(44100)
+        self.assertEqual(attempts, [44100, 48000])
+        self.assertTrue(audio.output_active)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertAlmostEqual(audio._resample_step, 44100 / 48000)
+        streams[44100].close.assert_called_once_with()
+        audio.push(np.tile(np.array([[600, -600]], dtype=np.int16),
+                           (4410, 1)))
+        output = np.zeros((4000, 2), dtype=np.int16)
+        audio.callback(output, 4000, None, None)
+        self.assertTrue(np.all(output[:, 0] == 600))
+        self.assertTrue(np.all(output[:, 1] == -600))
+        audio.close()
+
+    def test_all_standard_rate_failures_stop_attempts_and_allow_silent_game(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts = []
+        streams = []
+
+        def failing_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            stream.start.side_effect = OSError("PRIVATE serial /home/audio")
+            streams.append(stream)
+            return stream
+
+        backend.OutputStream.side_effect = failing_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(len(streams), 2)
+        for stream in streams:
+            stream.close.assert_called_once_with()
+        self.assertFalse(audio.output_active)
+        self.assertIsNone(audio.stream)
+        self.assertEqual(audio.output_error,
+                         "No usable audio output device (OSError)")
+        self.assertNotIn("PRIVATE", audio.output_error)
+        audio.push(np.array([[7, -7]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 1)
+        audio.close()
+
     def test_portaudio_status_property_error_does_not_interrupt_pcm(self):
         class BrokenStatus:
             @property

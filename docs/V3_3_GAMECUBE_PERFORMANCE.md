@@ -595,3 +595,22 @@ independent redistribution clearance or acceptable controller latency.
 GameCube GPU/audio/save and physical OBS/camera testing are still
 required for a public v3.3 stable release.
 
+
+
+## Bounded audio device rate fallback after a rejected default
+
+Windows, Linux and macOS PortAudio devices sometimes reject the rate
+advertised by their current output-device metadata, particularly after a
+USB/HDMI output switch. Audio startup now tries the normal native source
+rate and device-preferred rate first, then at most the remaining common
+48,000 Hz and 44,100 Hz rates. The attempt list is deduplicated and
+bounded to four candidates, so unavailable audio still fails promptly
+and gameplay proceeds silently without forwarding private driver text.
+
+A successful fallback uses the existing phase-continuous, bounded PCM
+resampler when the output rate differs from the native source. GPU-free
+regressions force both 48 kHz to 44.1 kHz and 44.1 kHz to 48 kHz fallback,
+check real synthesized stereo frames through the PortAudio callback, and
+verify that all rejected devices close cleanly. This proves the source
+fallback contracts, **not** real speaker recovery, physical sound quality,
+GameCube synchronization, or public 3.3 release readiness.
