@@ -251,6 +251,55 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                     self.assertFalse(unentered.get_current_framebuffer)
                     self.assertFalse(unentered.get_proc_address)
 
+    def test_native_core_lifecycle_never_calls_stale_c_pointers(self):
+        # These are real ABI-compatible ctypes function pointers, but they
+        # only increment local counters; no Dolphin core or GPU is needed.
+        reset_calls, destroy_calls = [], []
+        reset_cb = C.CFUNCTYPE(None)(lambda: reset_calls.append(1))
+        destroy_cb = C.CFUNCTYPE(None)(lambda: destroy_calls.append(1))
+        reset_ptr = C.cast(reset_cb, C.c_void_p).value
+        destroy_ptr = C.cast(destroy_cb, C.c_void_p).value
+
+        for klass in (EGLFrameHost, PortableGLFrameHost):
+            with self.subTest(host=klass.__name__):
+                host = self.host(klass)
+                host.core_reset = reset_ptr
+                host.core_destroy = destroy_ptr
+                before_reset = len(reset_calls)
+                before_destroy = len(destroy_calls)
+                host.reset_core()
+                host.destroy_core()
+                self.assertEqual(len(reset_calls), before_reset + 1)
+                self.assertEqual(len(destroy_calls), before_destroy + 1)
+                host.destroy_core()
+                self.assertEqual(len(destroy_calls), before_destroy + 1)
+
+                # An EGL handle that never became current, or portable
+                # driver exit already in progress, is not a live host.
+                host.core_destroy = destroy_ptr
+                host._entered = False
+                with self.assertRaisesRegex(
+                    RuntimeError, "supported hardware context"
+                ):
+                    host.reset_core()
+                host.destroy_core()
+                self.assertIsNone(host.core_destroy)
+                self.assertEqual(len(reset_calls), before_reset + 1)
+                self.assertEqual(len(destroy_calls), before_destroy + 1)
+
+                # A destroyed GL context may still leave cached C pointers.
+                host._entered = True
+                host.context = None
+                host.core_destroy = destroy_ptr
+                with self.assertRaisesRegex(
+                    RuntimeError, "supported hardware context"
+                ):
+                    host.reset_core()
+                host.destroy_core()
+                self.assertIsNone(host.core_destroy)
+                self.assertEqual(len(reset_calls), before_reset + 1)
+                self.assertEqual(len(destroy_calls), before_destroy + 1)
+
     def test_gl_python_loader_keeps_its_normal_error_visibility(self):
         # Exception isolation must happen at the native callback only.
         # Python startup/driver debugging still gets the actual exception.

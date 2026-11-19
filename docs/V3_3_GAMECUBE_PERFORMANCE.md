@@ -199,6 +199,22 @@ EGL version fixtures now explicitly model an existing graphics context.
 This is lifecycle safety, not measured GPU throughput or physical
 GameCube compatibility.
 
+## Guard native Dolphin reset/destroy pointers against dead contexts
+
+After Libretro has negotiated a GameCube GPU context, Dolphin retains
+native C function pointers for `context_reset` and `context_destroy`.
+Those direct calls now require the EGL/WGL/CGL context to be live and
+entered, just as framebuffer/proc callbacks do. Reset raises the
+existing fixed, actionable hardware-context error instead of invoking
+a stale address; destroy retires its pointer without invoking native
+code after entry failure or GPU teardown. Normal entered-context
+callbacks still execute once and destructor calls remain idempotent.
+
+A GPU-free test uses real `ctypes.CFUNCTYPE` addresses for both host
+classes and checks live reset/destroy followed by skipped operations
+after a lost or unentered context. This is a deterministic lifecycle
+safety gate, not real GameCube gameplay, audio, or GPU compatibility.
+
 ## Revoke portable GPU callbacks before native shutdown
 
 The Windows/macOS WGL/CGL host now marks a context unentered at the very

@@ -312,14 +312,22 @@ class EGLFrameHost:
 
     def reset_core(self):
         self._check_thread()
-        if not self.core_reset:
+        # The native reset callback can execute GL entry points. A valid
+        # pointer from an earlier negotiation is not enough: failed context
+        # entry or an already closed host must never invoke stale Dolphin C.
+        if (not getattr(self, "context", None)
+                or not getattr(self, "_entered", True)
+                or not self.core_reset):
             raise RuntimeError("Dolphin did not negotiate a supported hardware context")
         C.CFUNCTYPE(None)(self.core_reset)()
 
     def destroy_core(self):
         self._check_thread()
-        if self.core_destroy:
-            cb, self.core_destroy = self.core_destroy, None
+        # Retire the pointer even if its GPU context has already gone away.
+        # Native cleanup is only safe while the context is still current.
+        cb, self.core_destroy = self.core_destroy, None
+        if (cb and getattr(self, "context", None)
+                and getattr(self, "_entered", True)):
             C.CFUNCTYPE(None)(cb)()
 
     def read_frame(self, width, height, flip_vertical=True):
