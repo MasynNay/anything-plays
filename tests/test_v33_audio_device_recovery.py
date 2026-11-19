@@ -318,6 +318,104 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         np.testing.assert_array_equal(raw, [[21, -21], [32, -32]])
         audio.close()
 
+
+    def test_rejected_native_rate_after_partial_callback_recovers_full_pcm(self):
+        # A driver may call back before start() returns and then reject
+        # its rate. The next 44.1k device must receive the ORIGINAL
+        # preloaded PCM rather than the partly consumed 48k playback.
+        audio = AudioSink()
+        audio.push(np.tile(np.array([[1100, -1100]], dtype=np.int16),
+                           (2048, 1)))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts, closed, first_attempt, successful = [], [], [], []
+
+        class Stream:
+            def __init__(self, rate, callback):
+                self.rate = rate
+                self.callback = callback
+
+            def start(self):
+                frames = 300
+                out = np.full((frames, 2), -999, dtype=np.int16)
+                if self.rate == 48000:
+                    self.callback(
+                        out, frames, None,
+                        SimpleNamespace(output_underflow=True),
+                    )
+                    first_attempt.append(out.copy())
+                    raise OSError("PRIVATE device /Users/person/usb")
+                self.callback(out, frames, None, None)
+                successful.append(out.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                closed.append(self.rate)
+
+        def output_stream(*, samplerate, callback, **kwargs):
+            attempts.append(samplerate)
+            return Stream(samplerate, callback)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(closed, [48000])
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 48000 / 44100)
+        np.testing.assert_array_equal(
+            first_attempt[0], np.tile([1100, -1100], (300, 1))
+        )
+        np.testing.assert_array_equal(
+            successful[0], np.tile([1100, -1100], (300, 1))
+        )
+        metrics = audio.delivery_snapshot()
+        self.assertEqual(metrics["audio_output_callback_calls"], 1)
+        self.assertEqual(metrics["audio_output_requested_frames"], 300)
+        self.assertEqual(metrics["audio_output_device_underflow_callbacks"], 0)
+        self.assertEqual(metrics["audio_output_underrun_frames"], 0)
+        self.assertEqual(metrics["audio_queue_dropped_frames"], 0)
+        audio.close()
+        self.assertEqual(closed, [48000, 44100])
+
+    def test_failed_native_rate_preserves_partially_pending_source_audio(self):
+        # Retrying an already populated sink must not lose its current
+        # partially read chunk or change its original playback position.
+        audio = AudioSink()
+        audio.push(np.array([[11, -11], [22, -22], [33, -33],
+                             [44, -44]], dtype=np.int16))
+        pre = np.zeros((1, 2), dtype=np.int16)
+        audio.callback(pre, 1, None, None)
+        self.assertEqual(pre.tolist(), [[11, -11]])
+        self.assertEqual(audio.position, 1)
+        original_pending = audio.pending
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+
+        class FailingStream:
+            def start(self):
+                out = np.zeros((2, 2), dtype=np.int16)
+                audio.callback(out, 2, None, None)
+                raise OSError("PRIVATE /dev/usb-audio")
+            def close(self):
+                pass
+
+        backend.OutputStream.side_effect = lambda **_kwargs: FailingStream()
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(
+            audio.output_error, "No usable audio output device (OSError)"
+        )
+        self.assertIs(audio.pending, original_pending)
+        self.assertEqual(audio.position, 1)
+        out = np.zeros((3, 2), dtype=np.int16)
+        audio.callback(out, 3, None, None)
+        self.assertEqual(out.tolist(), [[22, -22], [33, -33], [44, -44]])
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        audio.close()
+
     def test_nonfinite_native_sample_rates_fail_closed_before_audio_device_io(self):
         backend = Mock()
         invalid_rates = (

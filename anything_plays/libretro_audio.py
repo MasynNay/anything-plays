@@ -306,35 +306,47 @@ class AudioSink:
         error = None
         for rate in attempts:
             candidate = None
-            source_chunks = None
+            # A driver can invoke an output callback from start() and then
+            # reject the stream. Snapshot ALL source-rate playback state,
+            # not only queued PCM: an attempted callback advances pending
+            # and position even if native stream startup later fails.
+            source_chunks = self.chunks
+            source_pending, source_position = self.pending, self.position
             prior_dropped = self.queue_dropped_frames
+            prior_callbacks = (
+                self.output_callback_calls,
+                self.output_callback_requested_frames,
+                self.output_underrun_frames,
+                self.output_device_underflow_callbacks,
+            )
             try:
                 candidate = sd.OutputStream(
                     samplerate=rate, channels=2, dtype="int16",
                     blocksize=1024, callback=self.callback,
                 )
-                if rate != source:
-                    # OutputStream.start() can invoke the PortAudio callback
-                    # synchronously. Prepare the native startup PCM BEFORE
-                    # starting the device, otherwise those first buffers play
-                    # at the WRONG rate, even though later batches resample.
-                    # Stage from a bounded snapshot and retain the original
-                    # source PCM for any failed candidate/retry.
-                    source_chunks = self.chunks
-                    self.chunks = Queue(maxsize=32)
-                    self._resample_step = numeric_rate / rate
-                    self._resample_next = 0.0
-                    self._resample_consumed = 0
-                    self._resample_tail = None
-                    for old in list(source_chunks.queue):
-                        self.push(old)
+                # Every candidate (including the unchanged native rate)
+                # reads a separate bounded queue. A rejected stream may
+                # consume its copy, but never the source needed for retry.
+                self.chunks = Queue(maxsize=32)
+                self.pending = np.empty((0, 2), dtype=np.int16)
+                self.position = 0
+                self._resample_step = (
+                    numeric_rate / rate if rate != source else None
+                )
+                self._resample_next = 0.0
+                self._resample_consumed = 0
+                self._resample_tail = None
+                if source_position < len(source_pending):
+                    self.push(source_pending[source_position:])
+                for old in list(source_chunks.queue):
+                    self.push(old)
+                # The first PortAudio callback may be synchronous. The
+                # correct resampled PCM and phase must already be ready.
                 candidate.start()
                 self.stream = candidate
                 self.output_active = True
                 self.source_sample_rate = source
                 self.output_sample_rate = rate
-                if rate == source:
-                    self._resample_step = None
                 return
             except Exception as exc:
                 error = exc
@@ -343,15 +355,22 @@ class AudioSink:
                         candidate.close()
                     except Exception:
                         pass
-                if source_chunks is not None:
-                    # A rejected start must not change the original PCM,
-                    # phase or dropped-frame diagnostics for the next rate.
-                    self.chunks = source_chunks
-                    self.queue_dropped_frames = prior_dropped
-                    self._resample_step = None
-                    self._resample_next = 0.0
-                    self._resample_consumed = 0
-                    self._resample_tail = None
+                # Never leak played, partially consumed or differently
+                # resampled PCM into the next candidate. Its stream may
+                # have started a callback just before reporting failure.
+                self.chunks = source_chunks
+                self.pending, self.position = source_pending, source_position
+                self.queue_dropped_frames = prior_dropped
+                (
+                    self.output_callback_calls,
+                    self.output_callback_requested_frames,
+                    self.output_underrun_frames,
+                    self.output_device_underflow_callbacks,
+                ) = prior_callbacks
+                self._resample_step = None
+                self._resample_next = 0.0
+                self._resample_consumed = 0
+                self._resample_tail = None
         # OS PortAudio failures may include a device name, home directory,
         # USB identifier or driver path. The UI, stderr and diagnostic
         # reports must never forward that untrusted platform exception text.

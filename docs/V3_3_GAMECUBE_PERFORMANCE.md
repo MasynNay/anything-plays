@@ -659,3 +659,28 @@ GPU-free regressions force a synchronous audio callback inside device
 verify exact synthesized stereo samples at the first output callback,
 source buffer restoration and continued native streaming. These tests do
 **not** constitute physical speaker or synchronized GameCube audio testing.
+
+
+## Isolate attempted PortAudio startup callbacks from PCM retry state
+
+A failed PortAudio `OutputStream.start()` can invoke an output callback
+before returning an error. The prior startup-buffer fix kept a separate
+source queue only when the requested output rate differed. If the failing
+candidate used the native source rate, the callback could consume original
+startup PCM; for either rate, it could leave `pending` and `position`
+pointing into an abandoned output buffer and contaminate the next retry.
+
+Each rate candidate now consumes a **separate bounded staging queue** and
+starts with an independent, correctly resampled pending buffer. The original
+native queue, pending fragment and playback position remain available until
+an output stream succeeds. A failed candidate restores all source state,
+including any attempted output-callback counters and dropped-frame count;
+all preloaded audio is still resampled before the first callback when needed.
+No audio content or driver messages are added to diagnostics.
+
+New device-free tests force an output callback to consume initial samples
+and then reject a 48-kHz device; the 44.1-kHz fallback must reproduce the
+**full** original synthesized stereo PCM and count only the successful
+candidate's callback. A separate test checks preservation of a partially
+consumed original pending buffer when all device starts fail. Physical
+speaker playback and long-session A/V synchronization remain unverified.
