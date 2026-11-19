@@ -95,6 +95,25 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                 self.assertIsNone(host._proc_callback(b"glClear"))
                 host.get_proc_address.assert_not_called()
 
+    def test_egl_context_handle_without_make_current_cannot_negotiate(self):
+        host = self.host(EGLFrameHost)
+        host._entered = False
+        host.opengl_version = "4.5 Mesa"
+        host.core_reset = host.core_destroy = None
+        self.assertEqual(host._fbo_callback(), 0)
+        self.assertIsNone(host._proc_callback(b"glClear"))
+        host.get_proc_address.assert_not_called()
+
+        request = HardwareRenderCallback()
+        request.context_type = 3
+        request.version_major = 3
+        request.version_minor = 3
+        request.context_reset = 123
+        self.assertFalse(host.accept_core_render(C.addressof(request)))
+        self.assertFalse(request.get_current_framebuffer)
+        self.assertFalse(request.get_proc_address)
+        self.assertIsNone(host.core_reset)
+
     def test_unentered_portable_context_cannot_publish_callback_pointers(self):
         host = self.host(PortableGLFrameHost)
         host._entered = False
@@ -131,6 +150,7 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                     host.context = context
                 host.close()
                 self.assertIsNone(host.context)
+                self.assertFalse(host._entered)
                 self.assertEqual(host._fbo_callback(), 0)
                 self.assertIsNone(host._proc_callback(b"glClear"))
                 host.get_proc_address.assert_not_called()

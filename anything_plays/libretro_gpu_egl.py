@@ -93,6 +93,9 @@ class EGLFrameHost:
         self.display = None
         self.surface = None
         self.context = None
+        # EGL allocates a context handle before eglMakeCurrent succeeds.
+        # A handle alone must not authorize native GPU callbacks.
+        self._entered = False
         self.fbo = 0
         self.color_tex = 0
         self.depth_stencil = 0
@@ -216,6 +219,7 @@ class EGLFrameHost:
             raise RuntimeError("Could not create offscreen OpenGL core context")
         if not self._eglfunc["eglMakeCurrent"](self.display, self.surface, self.surface, self.context):
             raise RuntimeError("Could not make offscreen OpenGL context current")
+        self._entered = True
         get_string = self._gl("glGetString", C.c_char_p, [UI])
         version = get_string(GL_VERSION)
         if not version:
@@ -424,7 +428,11 @@ class EGLFrameHost:
         """
         self._check_thread()
         display, surface, context = self.display, self.surface, self.context
+        entered = getattr(self, "_entered", True)
+        # Revoke callbacks synchronously, before any potentially slow native
+        # cleanup; later callbacks must not advertise the released context.
         self.display = self.surface = self.context = None
+        self._entered = False
 
         def best_effort_egl(name, *args):
             fn = self._eglfunc.get(name)
@@ -438,7 +446,10 @@ class EGLFrameHost:
                     pass
 
         try:
-            if display and context:
+            # GL delete functions require an entered/current context. A
+            # partially initialized EGL handle still needs EGL cleanup,
+            # but must never invoke GL driver entry points.
+            if display and context and entered:
                 for attr, symbol in (
                     ("fbo", "glDeleteFramebuffers"),
                     ("color_tex", "glDeleteTextures"),
@@ -454,6 +465,7 @@ class EGLFrameHost:
                             # Do not abandon the EGL context on a GL driver
                             # failure while removing an optional FBO.
                             pass
+            if display and context:
                 best_effort_egl("eglMakeCurrent", display, None, None, None)
                 best_effort_egl("eglDestroyContext", display, context)
             # A pbuffer may exist even when eglCreateContext failed.

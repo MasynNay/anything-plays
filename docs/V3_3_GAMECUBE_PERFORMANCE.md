@@ -199,6 +199,23 @@ EGL version fixtures now explicitly model an existing graphics context.
 This is lifecycle safety, not measured GPU throughput or physical
 GameCube compatibility.
 
+## Require a current EGL context before exposing GPU callbacks
+
+On Linux, EGL can return a nonzero context handle before
+`eglMakeCurrent` actually succeeds. The native callback and
+hardware-negotiation guards now use the same explicit `_entered` state
+as WGL/CGL: they return zero/NULL or reject negotiation until EGL
+successfully makes the context current. Shutdown revokes that state
+*before* native teardown begins.
+
+If EGL creation succeeded but `eglMakeCurrent` failed, cleanup still
+destroys the context, surface and display, but skips all OpenGL object
+deletions because no current context exists to safely run them.
+GPU-free regressions check an unentered handle, a rejected Libretro
+handshake, teardown without GL calls, and regular entered-context
+resource cleanup. These are native lifecycle checks, not physical
+GameCube GPU performance measurements.
+
 ## Invalidate native GameCube GL callbacks after graphics teardown
 
 Dolphin's Libretro core receives `ctypes` callbacks that can outlive the

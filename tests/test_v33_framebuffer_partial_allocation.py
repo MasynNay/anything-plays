@@ -38,6 +38,7 @@ class FramebufferAllocationCleanupTests(unittest.TestCase):
         else:
             context = None
             host.context = 42
+            host._entered = True
             host.surface = 41
             host.display = 40
             host._eglfunc = {

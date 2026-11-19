@@ -32,6 +32,9 @@ class EGLPartialInitCleanupTests(unittest.TestCase):
             host.display = 10
             host.surface = 20 if surface else None
             host.context = 30 if context else None
+            # The framebuffer stage can only be reached after a successful
+            # eglMakeCurrent. Earlier synthetic failures are unentered.
+            host._entered = bool(context and in_framebuffer)
             host._eglfunc.update(hooks)
             if not in_framebuffer:
                 raise RuntimeError("original EGL setup failure")
@@ -65,6 +68,7 @@ class EGLPartialInitCleanupTests(unittest.TestCase):
         self.assertIsNone(host.display)
         self.assertIsNone(host.surface)
         self.assertIsNone(host.context)
+        self.assertFalse(host._entered)
         self.assertEqual((host.fbo, host.color_tex, host.depth_stencil),
                          (0, 0, 0))
         self.assertIsNone(host.core_reset)
@@ -100,6 +104,35 @@ class EGLPartialInitCleanupTests(unittest.TestCase):
             ["eglMakeCurrent", "eglDestroyContext",
              "eglDestroySurface", "eglTerminate"],
         )
+
+    def test_unentered_egl_context_skips_gl_calls_but_releases_egl(self):
+        host = EGLFrameHost.__new__(EGLFrameHost)
+        host.owner = threading.get_ident()
+        host.display, host.surface, host.context = 10, 20, 30
+        host._entered = False  # eglMakeCurrent failed after context creation.
+        # Deliberately model corrupt/stale IDs: none can trigger GL calls
+        # without an entered context.
+        host.fbo, host.color_tex, host.depth_stencil = 7, 8, 9
+        host.core_reset, host.core_destroy = 123, 456
+        events = []
+        host._eglfunc = self.make_hooks(events)
+        host._gl = Mock()
+        host.close()
+        host._gl.assert_not_called()
+        self.assertEqual(
+            [name for name, _args in events],
+            ["eglMakeCurrent", "eglDestroyContext",
+             "eglDestroySurface", "eglTerminate"],
+        )
+        self.assertIsNone(host.context)
+        self.assertFalse(host._entered)
+        self.assertEqual((host.fbo, host.color_tex, host.depth_stencil),
+                         (0, 0, 0))
+        self.assertIsNone(host.core_reset)
+        self.assertIsNone(host.core_destroy)
+        before = len(events)
+        host.close()
+        self.assertEqual(len(events), before)
 
     def test_framebuffer_init_failure_still_destroys_all_resources(self):
         self.assertEqual(
