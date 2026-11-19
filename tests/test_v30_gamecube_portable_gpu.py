@@ -264,6 +264,10 @@ class PortableGameCubeHostTests(TestCase):
     def test_macos_open_gl_41_rejects_45_dolphin_request(self):
         host = PortableGLFrameHost.__new__(PortableGLFrameHost)
         host.owner = threading.get_ident()
+        # Test the version ceiling with a real-lifetime equivalent context;
+        # rejecting a missing context would hide a broken version check.
+        host.context = object()
+        host._entered = True
         host.opengl_version = "4.1 INTEL-17"
         req = HardwareRenderCallback()
         req.context_type = 3
@@ -276,6 +280,11 @@ class PortableGameCubeHostTests(TestCase):
         from anything_plays.libretro_gpu_egl import GET_FBO, GET_PROC
         host = PortableGLFrameHost.__new__(PortableGLFrameHost)
         host.owner = threading.get_ident()
+        # Native startup has already entered CGL when Dolphin negotiates.
+        # This fixture predates the 3.3 context-lifetime guard and must
+        # reproduce a *live* portable context to exercise GL 3.3 acceptance.
+        host.context = object()
+        host._entered = True
         host.opengl_version = "4.1 Metal - 90.0"
         host.fbo = 32
         host._fbo_callback = GET_FBO(lambda: host.fbo)
