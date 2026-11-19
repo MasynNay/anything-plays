@@ -199,6 +199,125 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         audio.close()
 
 
+
+    def test_preloaded_native_pcm_resamples_before_first_device_callback(self):
+        # 131072 Hz Libretro audio can be queued during retro_init. The
+        # OutputStream.start() callback must not consume it as 48kHz PCM.
+        audio = AudioSink()
+        for _ in range(300):
+            audio.sample(1350, -1350)
+        self.assertEqual(audio._single_count, 44)
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        observed = []
+
+        class Stream:
+            def start(self):
+                first = np.full((100, 2), -999, dtype=np.int16)
+                audio.callback(first, 100, None, None)
+                observed.append(first.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        backend.OutputStream.side_effect = lambda **kwargs: Stream()
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertTrue(audio.output_active)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertEqual(audio._single_count, 0)
+        self.assertEqual(len(observed), 1)
+        np.testing.assert_array_equal(
+            observed[0], np.tile([1350, -1350], (100, 1))
+        )
+        self.assertEqual(
+            audio.delivery_snapshot()["audio_output_underrun_frames"], 0
+        )
+        audio.close()
+
+    def test_failed_resampling_start_restores_source_pcm_for_second_rate(self):
+        # A rejected 48kHz stream cannot double-resample or consume the
+        # source queue needed by a later 44.1kHz device.
+        audio = AudioSink()
+        audio.push(np.tile(np.array([[900, -900]], dtype=np.int16),
+                           (1024, 1)))
+        original_frames = sum(len(x) for x in list(audio.chunks.queue))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts, discarded, observed = [], [], []
+
+        class Stream:
+            def __init__(self, rate, callback):
+                self.rate = rate
+                self.callback = callback
+
+            def start(self):
+                if self.rate == 48000:
+                    raise OSError("PRIVATE rejected audio /Users/owner")
+                out = np.full((300, 2), -999, dtype=np.int16)
+                self.callback(out, 300, None, None)
+                observed.append(out.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                discarded.append(self.rate)
+
+        def output_stream(*, samplerate, callback, **kwargs):
+            attempts.append(samplerate)
+            return Stream(samplerate, callback)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(discarded, [48000])
+        self.assertEqual(original_frames, 1024)
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 131072 / 44100)
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        np.testing.assert_array_equal(
+            observed[0], np.tile([900, -900], (300, 1))
+        )
+        audio.close()
+        self.assertEqual(discarded, [48000, 44100])
+
+    def test_all_rejected_rates_preserve_native_startup_buffer(self):
+        audio = AudioSink()
+        audio.push(np.array([[21, -21], [32, -32]], dtype=np.int16))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        rejected = []
+
+        class Stream:
+            def __init__(self, rate):
+                self.rate = rate
+
+            def start(self):
+                raise OSError("PRIVATE speaker /dev/private-audio")
+
+            def close(self):
+                rejected.append(self.rate)
+
+        backend.OutputStream.side_effect = (
+            lambda *, samplerate, **kwargs: Stream(samplerate)
+        )
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertEqual(rejected, [48000, 44100])
+        self.assertEqual(audio.output_error,
+                         "No usable audio output device (OSError)")
+        self.assertFalse(audio.output_active)
+        self.assertIsNone(audio._resample_step)
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        raw = np.concatenate(list(audio.chunks.queue))
+        np.testing.assert_array_equal(raw, [[21, -21], [32, -32]])
+        audio.close()
+
     def test_nonfinite_native_sample_rates_fail_closed_before_audio_device_io(self):
         backend = Mock()
         invalid_rates = (

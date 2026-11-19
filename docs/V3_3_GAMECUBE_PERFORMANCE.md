@@ -632,3 +632,30 @@ GPU-free regression tests cover malformed native timing values and real
 synthetic PCM delivery with a finite fractional NumPy rate. This proves
 source-code failure handling, not real GameCube speaker output or audio
 synchronization. Physical tests remain required before release.
+
+
+## Correct preloaded startup PCM when PortAudio changes sample rate
+
+Some native Libretro cores generate initial audio during `retro_init` or
+`retro_load_game`, before Anything Plays opens PortAudio. Those queued
+samples are still at the **native source rate**. Previously, when the device
+opened at another rate (notably 131,072 Hz GB/GBC audio on a 48-kHz output),
+the first output callback could play that buffered audio without resampling:
+a short burst of wrong-speed audio despite later batches being correct.
+
+Audio startup now flushes any partial single-sample block and prepares a
+bounded, **resampled copy of already buffered PCM before** invoking
+`OutputStream.start()`. The fractional phase carries forward into all later
+Libretro audio callbacks. If a device candidate fails, the original raw
+startup queue and its drop count are restored before trying a different
+output rate, rather than double-resampling or losing the only source copy.
+No PCM, frame history, device name or driver exception text is retained in
+the diagnostic report, and the prebuffer remains bounded to the existing
+32-slot audio queue. The change applies to any Libretro system that requires
+output sample-rate conversion.
+
+GPU-free regressions force a synchronous audio callback inside device
+`start()`, both failed-first-rate recovery and all-rate failure. They
+verify exact synthesized stereo samples at the first output callback,
+source buffer restoration and continued native streaming. These tests do
+**not** constitute physical speaker or synchronized GameCube audio testing.

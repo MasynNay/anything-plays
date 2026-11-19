@@ -297,28 +297,43 @@ class AudioSink:
         # Device metadata can be stale after HDMI/USB audio switches. Some
         # drivers also reject their advertised default. Try both standard
         # stereo rates as final fallbacks before giving up on real output.
-        # Keep this finite and ordered: never create more than four streams,
-        # and only resample after a candidate actually starts successfully.
+        # Keep this finite and ordered: never create more than four streams.
         attempts = tuple(dict.fromkeys((primary, preferred, 48000, 44100)))
+        # Libretro may emit samples during retro_init/load_game BEFORE audio
+        # starts. Flush the partial single-sample block into the source-rate
+        # queue too; otherwise it misses startup resampling.
+        self._flush_single_samples()
         error = None
         for rate in attempts:
             candidate = None
+            source_chunks = None
+            prior_dropped = self.queue_dropped_frames
             try:
                 candidate = sd.OutputStream(
                     samplerate=rate, channels=2, dtype="int16",
                     blocksize=1024, callback=self.callback,
                 )
+                if rate != source:
+                    # OutputStream.start() can invoke the PortAudio callback
+                    # synchronously. Prepare the native startup PCM BEFORE
+                    # starting the device, otherwise those first buffers play
+                    # at the WRONG rate, even though later batches resample.
+                    # Stage from a bounded snapshot and retain the original
+                    # source PCM for any failed candidate/retry.
+                    source_chunks = self.chunks
+                    self.chunks = Queue(maxsize=32)
+                    self._resample_step = numeric_rate / rate
+                    self._resample_next = 0.0
+                    self._resample_consumed = 0
+                    self._resample_tail = None
+                    for old in list(source_chunks.queue):
+                        self.push(old)
                 candidate.start()
                 self.stream = candidate
                 self.output_active = True
                 self.source_sample_rate = source
                 self.output_sample_rate = rate
-                if rate != source:
-                    self._resample_step = float(sample_rate) / rate
-                    self._resample_next = 0.0
-                    self._resample_consumed = 0
-                    self._resample_tail = None
-                else:
+                if rate == source:
                     self._resample_step = None
                 return
             except Exception as exc:
@@ -328,6 +343,15 @@ class AudioSink:
                         candidate.close()
                     except Exception:
                         pass
+                if source_chunks is not None:
+                    # A rejected start must not change the original PCM,
+                    # phase or dropped-frame diagnostics for the next rate.
+                    self.chunks = source_chunks
+                    self.queue_dropped_frames = prior_dropped
+                    self._resample_step = None
+                    self._resample_next = 0.0
+                    self._resample_consumed = 0
+                    self._resample_tail = None
         # OS PortAudio failures may include a device name, home directory,
         # USB identifier or driver path. The UI, stderr and diagnostic
         # reports must never forward that untrusted platform exception text.
