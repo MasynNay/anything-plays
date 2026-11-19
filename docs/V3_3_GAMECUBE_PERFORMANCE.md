@@ -705,3 +705,25 @@ malformed driver/plugin data is never serialized into a diagnostic clipboard.
 GPU-free tests verify all the reported states and redaction. This remains
 a software-observability improvement, **not** proof of audible GameCube
 playback, physical sound quality, or synchronized A/V.
+
+
+## Native PCM production versus output-device delivery
+
+GameCube's live and final **Check my setup** report now retains two more
+strictly aggregate source counters: the number of stereo PCM frames
+actually submitted via first-party Libretro sample/batch callbacks and
+the number of their nonzero 16-bit channel values. If a core sends only
+zero-valued PCM, the report says so. A device can also remain unopened
+while the native core generates nonzero audio, which is now visible
+without suggesting that any physical sound was played. An opened PortAudio
+stream with callbacks is likewise still **speaker unverified**.
+
+The source counts are updated only when Libretro enters the audio sink;
+the existing per-device staging queue, fallback rate negotiation, retry
+and resampler do not re-count samples. The counters use constant memory,
+never retain audio, channel values, waveforms, timestamps or driver IDs,
+and reject malformed values before copying reports. The existing separate
+PortAudio callback, underrun and queue-drop counters are unchanged.
+Tests cover mixed single/batch source audio, silent-source detection,
+preloaded PCM resampled across failed-device retries, malformed callbacks
+and privacy. **A real speaker and GameCube A/V sync test is still necessary.**

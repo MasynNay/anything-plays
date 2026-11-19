@@ -557,6 +557,132 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         self.assertNotIn("PRIVATE", json.dumps(report))
         self.assertNotIn("PRIVATE", str(lines))
 
+
+    def test_native_pcm_counts_are_not_duplicated_by_resampling_retries(self):
+        import ctypes as C
+        audio = AudioSink()
+        # Three single-sample callbacks; the final block is not yet flushed.
+        audio.sample(100, 0)
+        audio.sample(0, -200)
+        audio.sample(0, 0)
+        samples = (C.c_int16 * 8)(0, 0, 11, -12, 0, 0, 9, 0)
+        pointer = C.cast(samples, C.c_void_p)
+        self.assertEqual(audio.batch(pointer, 4), 4)
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 7,
+            "audio_core_nonzero_channel_values": 5,
+        })
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempted_rates = []
+
+        class Stream:
+            def __init__(self, rate):
+                self.rate = rate
+
+            def start(self):
+                if self.rate == 48000:
+                    raise OSError("PRIVATE /Users/owner/hdmi-audio")
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        def output_stream(*, samplerate, **kwargs):
+            attempted_rates.append(samplerate)
+            return Stream(samplerate)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertTrue(audio.output_active)
+        self.assertEqual(attempted_rates, [48000, 44100])
+        # Staging at 48k and restaging at 44.1k cannot count as core PCM.
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 7,
+            "audio_core_nonzero_channel_values": 5,
+        })
+        audio.close()
+        self.assertEqual(audio.native_pcm_snapshot()[
+            "audio_core_pcm_frames"], 7)
+
+    def test_gamecube_source_pcm_diagnostics_distinguish_silence_from_output(self):
+        import ctypes as C
+        import json
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import PreviewCadenceTracker
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+        audio = AudioSink()
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._preview_cadence = PreviewCadenceTracker()
+
+        def inspect():
+            report = session.performance_snapshot()
+            return report["metrics"], _gamecube_performance_summary_lines(
+                report
+            )[-1]
+
+        metrics, line = inspect()
+        self.assertIn("core PCM not observed", line)
+        self.assertEqual(metrics["audio_core_pcm_frames"], 0)
+        self.assertIn("no output stream opened", line)
+
+        audio.sample(0, 0)
+        data = (C.c_int16 * 4)(0, 0, 0, 0)
+        audio.batch(C.cast(data, C.c_void_p), 2)
+        metrics, line = inspect()
+        self.assertEqual(metrics["audio_core_pcm_frames"], 3)
+        self.assertEqual(metrics["audio_core_nonzero_channel_values"], 0)
+        self.assertIn("core generated 3 silent PCM frames", line)
+
+        audio.sample(-10, 20)
+        metrics, line = inspect()
+        self.assertEqual(metrics["audio_core_pcm_frames"], 4)
+        self.assertEqual(metrics["audio_core_nonzero_channel_values"], 2)
+        self.assertIn("2 nonzero channel values", line)
+        self.assertIn("speaker unverified", line)
+        self.assertIn("no output stream opened", line)
+        self.assertNotIn("speaker verified", line)
+
+        # Malicious/invalid instrumentation cannot enter the copied report.
+        audio.native_pcm_frames = "/Users/private/games/a.iso"
+        audio.native_nonzero_sample_values = object()
+        metrics, line = inspect()
+        self.assertNotIn("audio_core_pcm_frames", metrics)
+        self.assertNotIn("audio_core_nonzero_channel_values", metrics)
+        self.assertNotIn("private", json.dumps(metrics))
+        self.assertNotIn("private", line)
+        audio.native_pcm_frames = True
+        audio.native_nonzero_sample_values = 0
+        self.assertEqual(audio.native_pcm_snapshot(), {})
+
+    def test_invalid_native_batch_does_not_count_pcm_frames(self):
+        import ctypes as C
+        from anything_plays.libretro_audio import MAX_AUDIO_BATCH_FRAMES
+        audio = AudioSink()
+        self.assertEqual(
+            audio.batch(C.c_void_p(1), MAX_AUDIO_BATCH_FRAMES + 1), 0
+        )
+        self.assertEqual(audio.batch(C.c_void_p(), 10), 10)
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 0,
+            "audio_core_nonzero_channel_values": 0,
+        })
+
     def test_portaudio_status_property_error_does_not_interrupt_pcm(self):
         class BrokenStatus:
             @property

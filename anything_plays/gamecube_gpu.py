@@ -21,6 +21,7 @@ import time
 import math
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
+from anything_plays.libretro_audio import AudioSink
 from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
 from anything_plays.gamecube_preview import (
     should_capture, preview_fps, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
@@ -328,6 +329,11 @@ class GameCubeHardwareSession(CoreSession):
             else ReadbackTimingHistogram().snapshot()
         )
         metrics.update(self.audio.delivery_snapshot())
+        # Count native-generated samples only through the first-party
+        # Libretro audio callbacks. Staged/resampled output copies are NOT
+        # new native audio and PortAudio output is NOT speaker evidence.
+        if type(self.audio) is AudioSink:
+            metrics.update(self.audio.native_pcm_snapshot())
         # Do not conflate a zero-underrun counter with actual speaker
         # output. The stream may have failed to open, or merely be waiting
         # for its first PortAudio callback. Preserve these two safe booleans

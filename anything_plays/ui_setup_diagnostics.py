@@ -264,6 +264,26 @@ def _gamecube_performance_summary_lines(performance):
             audio_status += (
                 f" · native {native_rate} Hz → output {output_rate} Hz"
             )
+    # Source PCM is distinct from PortAudio callbacks: a core can emit
+    # silence into a functioning stream, or produce nonzero PCM while the
+    # output device is missing. Neither case proves audible speakers.
+    source_frames = m.get("audio_core_pcm_frames")
+    nonzero_values = m.get("audio_core_nonzero_channel_values")
+    if (type(source_frames) is int and type(nonzero_values) is int
+            and source_frames >= 0
+            and 0 <= nonzero_values <= 2 * source_frames):
+        if not source_frames:
+            audio_status += " · core PCM not observed"
+        elif not nonzero_values:
+            audio_status += (
+                f" · core generated {source_frames} silent PCM frames"
+            )
+        else:
+            audio_status += (
+                f" · core generated {source_frames} PCM frames, "
+                f"{nonzero_values} nonzero channel values "
+                "(speaker unverified)"
+            )
     return (
         (native_line if native_line is not None else
          f"Native frames: {completed} · timed {valid_samples} of {completed} · "

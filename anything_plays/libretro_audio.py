@@ -63,6 +63,11 @@ class AudioSink:
         self.output_underrun_frames = 0
         self.output_device_underflow_callbacks = 0
         self.queue_dropped_frames = 0
+        # Source telemetry is counted ONLY at genuine Libretro sample/batch
+        # ingress, never in push(): startup resampling, failed device retry,
+        # and queue repacking all reuse push() and must not double count.
+        self.native_pcm_frames = 0
+        self.native_nonzero_sample_values = 0
         # AudioSink by itself is a transparent PCM sink for native testing.
         # CoreSession explicitly applies the user's 35% default or saved gain
         # before playback, leaving existing raw audio contracts unchanged.
@@ -166,6 +171,10 @@ class AudioSink:
     def sample(self, left, right):
         """Buffer single-sample callbacks without per-sample allocations."""
         self._single_samples[self._single_count] = (left, right)
+        # A stereo PCM frame is two int16 channel values. Count values,
+        # not audio volume or samples delivered to a physical speaker.
+        self.native_pcm_frames += 1
+        self.native_nonzero_sample_values += int(left != 0) + int(right != 0)
         self._single_count += 1
         if self._single_count == SAMPLE_BLOCK_FRAMES:
             self._flush_single_samples()
@@ -182,6 +191,10 @@ class AudioSink:
             samples = np.ctypeslib.as_array(
                 C.cast(pointer, C.POINTER(C.c_int16)), shape=(count * 2,)
             )
+            # Native-owned PCM is valid only during this callback. Count
+            # before the existing bounded copy; never keep waveform data.
+            self.native_pcm_frames += count
+            self.native_nonzero_sample_values += int(np.count_nonzero(samples))
             self.push(samples.reshape(-1, 2))
         return count
 
@@ -242,6 +255,23 @@ class AudioSink:
             written += count
             self.position += count
         self.output_underrun_frames += max(0, frames - written)
+
+    def native_pcm_snapshot(self):
+        """Allowlisted source-generated PCM counts, never waveform/device data.
+
+        No callback history, buffer bytes, ROM names or channel samples are
+        retained. Reject corrupted/plugin-mutated metrics rather than
+        including arbitrary objects in a user-copyable diagnostics report.
+        """
+        frames = self.native_pcm_frames
+        nonzero = self.native_nonzero_sample_values
+        if (type(frames) is not int or type(nonzero) is not int
+                or frames < 0 or not 0 <= nonzero <= 2 * frames):
+            return {}
+        return {
+            "audio_core_pcm_frames": frames,
+            "audio_core_nonzero_channel_values": nonzero,
+        }
 
     def delivery_snapshot(self):
         """Aggregate callback/queue telemetry, not verified speaker output."""
