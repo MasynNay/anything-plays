@@ -236,6 +236,34 @@ def _gamecube_performance_summary_lines(performance):
             f"{m['gpu_readback_share_of_native_run'] * 100:.1f}% "
             "of native execution time (included, not additive)"
         )
+    # Output status is explicitly different from underrun counters: a
+    # silent/no-device session can have perfectly zero device underflows.
+    # Older stored reports omit these fields; keep their original summary.
+    audio_status = ""
+    active = m.get("audio_stream_active")
+    started = m.get("audio_stream_started_during_session")
+    if type(active) is bool and type(started) is bool:
+        callbacks = m.get("audio_output_callback_calls", 0)
+        if active and started:
+            audio_status = (
+                " · output stream open, callbacks observed (speaker unverified)"
+                if type(callbacks) is int and callbacks > 0
+                else " · output stream open, awaiting audio callback"
+            )
+        elif started:
+            audio_status = " · output stream closed (opened during session)"
+        else:
+            audio_status = " · no output stream opened (silent playback)"
+        native_rate, output_rate = (
+            m.get("audio_native_rate_hz"), m.get("audio_output_rate_hz")
+        )
+        if (started and type(native_rate) is int
+                and type(output_rate) is int
+                and 8_000 <= native_rate <= 192_000
+                and 8_000 <= output_rate <= 192_000):
+            audio_status += (
+                f" · native {native_rate} Hz → output {output_rate} Hz"
+            )
     return (
         (native_line if native_line is not None else
          f"Native frames: {completed} · timed {valid_samples} of {completed} · "
@@ -254,7 +282,8 @@ def _gamecube_performance_summary_lines(performance):
         f"Audio: {m['audio_output_device_underflow_callbacks']} device "
         f"underflow callbacks · {m['audio_output_underrun_frames']} "
         f"application underrun frames · "
-        f"{m['audio_queue_dropped_frames']} queue-dropped frames",
+        f"{m['audio_queue_dropped_frames']} queue-dropped frames"
+        f"{audio_status}",
     )
 
 

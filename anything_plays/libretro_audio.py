@@ -50,6 +50,9 @@ class AudioSink:
         self.stream = None
         self.output_error = None
         self.output_active = False
+        # Lifetime evidence survives close() for the final GameCube report.
+        # "No underflows" without a stream is not evidence of audible audio.
+        self.output_ever_started = False
         self.source_sample_rate = None
         self.output_sample_rate = None
         # Bounded-size, aggregate diagnostics only. PCM generation is not
@@ -345,6 +348,7 @@ class AudioSink:
                 candidate.start()
                 self.stream = candidate
                 self.output_active = True
+                self.output_ever_started = True
                 self.source_sample_rate = source
                 self.output_sample_rate = rate
                 return

@@ -462,6 +462,101 @@ class AudioDeviceRecoveryTests(unittest.TestCase):
         self.assertEqual(out.tolist(), [[1200, -1200], [600, -600]])
         audio.close()
 
+
+    def test_gamecube_setup_reports_device_status_without_claiming_sound(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import (
+            ReadbackTimingHistogram, PreviewCadenceTracker,
+        )
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+
+        audio = AudioSink()
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._readback_histogram = ReadbackTimingHistogram()
+        session._preview_cadence = PreviewCadenceTracker()
+
+        def get_audio_line():
+            report = session.performance_snapshot()
+            return (
+                report["metrics"],
+                _gamecube_performance_summary_lines(report)[-1],
+            )
+
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], False)
+        self.assertIs(metrics["audio_stream_started_during_session"], False)
+        self.assertIn("no output stream opened", line)
+        self.assertNotIn("native", line)
+
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], True)
+        self.assertIs(metrics["audio_stream_started_during_session"], True)
+        self.assertEqual(metrics["audio_native_rate_hz"], 131072)
+        self.assertEqual(metrics["audio_output_rate_hz"], 48000)
+        self.assertIn("awaiting audio callback", line)
+        self.assertIn("native 131072 Hz", line)
+        self.assertIn("output 48000 Hz", line)
+        audio.push(np.full((400, 2), (400, -400), dtype=np.int16))
+        out = np.zeros((100, 2), dtype=np.int16)
+        audio.callback(out, 100, None, None)
+        metrics, line = get_audio_line()
+        self.assertIn("callbacks observed (speaker unverified)", line)
+        self.assertEqual(metrics["audio_output_callback_calls"], 1)
+        audio.close()
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], False)
+        self.assertIs(metrics["audio_stream_started_during_session"], True)
+        self.assertIn("closed (opened during session)", line)
+        self.assertNotIn("speaker verified", line)
+
+    def test_gamecube_audio_status_does_not_serialize_driver_objects(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import PreviewCadenceTracker
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+        import json
+
+        audio = AudioSink()
+        audio.output_active = "PRIVATE driver /home/owner"
+        audio.output_ever_started = object()
+        audio.source_sample_rate = "PRIVATE vendor path"
+        audio.output_sample_rate = 48000
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._preview_cadence = PreviewCadenceTracker()
+        report = session.performance_snapshot()
+        lines = _gamecube_performance_summary_lines(report)
+        self.assertNotIn("audio_stream_active", report["metrics"])
+        self.assertNotIn("audio_native_rate_hz", report["metrics"])
+        self.assertNotIn("PRIVATE", json.dumps(report))
+        self.assertNotIn("PRIVATE", str(lines))
+
     def test_portaudio_status_property_error_does_not_interrupt_pcm(self):
         class BrokenStatus:
             @property

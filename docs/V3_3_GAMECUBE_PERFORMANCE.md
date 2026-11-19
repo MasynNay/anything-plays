@@ -684,3 +684,24 @@ and then reject a 48-kHz device; the 44.1-kHz fallback must reproduce the
 candidate's callback. A separate test checks preservation of a partially
 consumed original pending buffer when all device starts fail. Physical
 speaker playback and long-session A/V synchronization remain unverified.
+
+
+## Distinguish a configured audio stream from real speaker playback
+
+A GameCube session with no usable PortAudio output device can show **zero**
+underflows and dropped frames simply because the audio callback never ran.
+Those counters do not mean the speakers are working. The live and final
+**Check my setup** GameCube report now distinguishes four cases: no output
+stream ever opened (silent), stream open but awaiting its first callback,
+stream open with callbacks observed (**speaker still unverified**), and
+stream closed after it was previously opened. Safe, integer-only native
+and output sample rates are shown for successful starts so that 131,072 Hz
+GB/GBC or 48,000→44,100 Hz fallback can be inspected without recording
+speaker identity or paths.
+
+These optional fields are backwards-compatible with older reports. Only
+exact built-in primitive booleans and bounded integer rates are included:
+malformed driver/plugin data is never serialized into a diagnostic clipboard.
+GPU-free tests verify all the reported states and redaction. This remains
+a software-observability improvement, **not** proof of audible GameCube
+playback, physical sound quality, or synchronized A/V.

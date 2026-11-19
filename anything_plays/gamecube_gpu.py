@@ -328,6 +328,22 @@ class GameCubeHardwareSession(CoreSession):
             else ReadbackTimingHistogram().snapshot()
         )
         metrics.update(self.audio.delivery_snapshot())
+        # Do not conflate a zero-underrun counter with actual speaker
+        # output. The stream may have failed to open, or merely be waiting
+        # for its first PortAudio callback. Preserve these two safe booleans
+        # and allowlisted sample rates for live and final local setup checks.
+        audio_active = getattr(self.audio, "output_active", None)
+        audio_started = getattr(self.audio, "output_ever_started", None)
+        if type(audio_active) is bool and type(audio_started) is bool:
+            metrics["audio_stream_active"] = audio_active
+            metrics["audio_stream_started_during_session"] = audio_started
+            for attr, key in (
+                ("source_sample_rate", "audio_native_rate_hz"),
+                ("output_sample_rate", "audio_output_rate_hz"),
+            ):
+                rate = getattr(self.audio, attr, None)
+                if type(rate) is int and 8_000 <= rate <= 192_000:
+                    metrics[key] = rate
         tracker = getattr(self, "_preview_cadence", None)
         metrics.update(
             tracker.snapshot() if tracker is not None
