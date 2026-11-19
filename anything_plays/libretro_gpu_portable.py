@@ -127,8 +127,14 @@ class PortableGLFrameHost(EGLFrameHost):
         context = self.context
         if context is None:
             return
+        entered = self._entered
+        # Native CFUNCTYPE pointers may survive until the core unloads.
+        # Revoke them BEFORE calling GL deletion/driver teardown, which
+        # can invoke callbacks synchronously while the context still exists.
+        # Keep context alive for our direct Python GL deletion loader.
+        self._entered = False
         try:
-            if self._entered:
+            if entered:
                 for attr, symbol in (
                     ("fbo", "glDeleteFramebuffers"),
                     ("color_tex", "glDeleteTextures"),
@@ -148,7 +154,7 @@ class PortableGLFrameHost(EGLFrameHost):
                             pass
         finally:
             try:
-                if self._entered:
+                if entered:
                     context.__exit__(None, None, None)
             finally:
                 self.context = None

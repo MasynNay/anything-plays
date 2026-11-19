@@ -199,6 +199,23 @@ EGL version fixtures now explicitly model an existing graphics context.
 This is lifecycle safety, not measured GPU throughput or physical
 GameCube compatibility.
 
+## Revoke portable GPU callbacks before native shutdown
+
+The Windows/macOS WGL/CGL host now marks a context unentered at the very
+start of `close()`, before any GL framebuffer/texture/renderbuffer
+deletion or the native `glcontext.__exit__` call. Libretro's previously
+registered framebuffer/proc callbacks and late hardware-render requests
+therefore return zero/NULL or reject negotiation throughout native
+driver cleanup, not only after it finishes. The direct Python GL loader
+can still use the retained context to delete the owned resources.
+Idempotent teardown and error cleanup preserve their existing behavior.
+
+A GPU-free test invokes the actual ctypes callbacks and a new hardware
+negotiation inside **every** synthetic GL deletion and again during
+context exit, verifying no stale ID/proc is exposed even while cleanup
+is active. This is lifecycle safety rather than physical GameCube
+rendering or 30-minute gameplay certification.
+
 ## Require a current EGL context before exposing GPU callbacks
 
 On Linux, EGL can return a nonzero context handle before

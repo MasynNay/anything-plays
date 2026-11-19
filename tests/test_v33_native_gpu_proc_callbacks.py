@@ -159,6 +159,63 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                 host.close()  # Repeated teardown must remain idempotent.
 
 
+    def test_portable_close_revokes_callbacks_before_native_deletion(self):
+        class NativeCtx:
+            def __init__(self):
+                self.exits = 0
+
+            def __exit__(self, *_args):
+                self.exits += 1
+                # Driver teardown can synchronously invoke a retained C
+                # callback. Neither pointer can outlive the begun close.
+                self.assert_callbacks_revoked()
+
+        host = self.host(PortableGLFrameHost)
+        host.opengl_version = "4.1 Metal"
+        host.color_tex = 43
+        host.depth_stencil = 44
+        host.core_reset = host.core_destroy = 1234
+        ctx = NativeCtx()
+        host.context = ctx
+        request = HardwareRenderCallback()
+        request.context_type = 3
+        request.version_major = 3
+        request.version_minor = 3
+        request.context_reset = 1234
+        deletes = []
+
+        def callbacks_revoked():
+            self.assertFalse(host._entered)
+            self.assertEqual(host._fbo_callback(), 0)
+            self.assertIsNone(host._proc_callback(b"glClear"))
+            self.assertFalse(host.accept_core_render(C.addressof(request)))
+            self.assertFalse(request.get_current_framebuffer)
+            host.get_proc_address.assert_not_called()
+
+        ctx.assert_callbacks_revoked = callbacks_revoked
+
+        def gl(name, _return_type, _arguments):
+            def delete(_count, _identifier):
+                callbacks_revoked()
+                deletes.append(name)
+            return delete
+
+        host._gl = gl
+        host.close()
+        self.assertEqual(
+            deletes,
+            ["glDeleteFramebuffers", "glDeleteTextures",
+             "glDeleteRenderbuffers"],
+        )
+        self.assertEqual(ctx.exits, 1)
+        self.assertIsNone(host.context)
+        self.assertEqual((host.fbo, host.color_tex, host.depth_stencil),
+                         (0, 0, 0))
+        self.assertIsNone(host.core_reset)
+        self.assertIsNone(host.core_destroy)
+        host.close()
+        self.assertEqual(ctx.exits, 1)
+
     def test_native_negotiation_rejects_closed_and_unentered_contexts(self):
         def request():
             callback = HardwareRenderCallback()
