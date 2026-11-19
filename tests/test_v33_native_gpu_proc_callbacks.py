@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from anything_plays.libretro_gpu_egl import (
-    EGLFrameHost, GET_FBO, GET_PROC,
+    EGLFrameHost, GET_FBO, GET_PROC, HardwareRenderCallback,
 )
 from anything_plays.libretro_gpu_portable import PortableGLFrameHost
 
@@ -138,6 +138,41 @@ class NativeGPUCallbackSafetyTests(unittest.TestCase):
                     self.assertEqual(context.exits, 1)
                 host.close()  # Repeated teardown must remain idempotent.
 
+
+    def test_native_negotiation_rejects_closed_and_unentered_contexts(self):
+        def request():
+            callback = HardwareRenderCallback()
+            callback.context_type = 3
+            callback.version_major = 3
+            callback.version_minor = 3
+            callback.context_reset = 1234
+            callback.context_destroy = 5678
+            return callback
+
+        for klass in (EGLFrameHost, PortableGLFrameHost):
+            with self.subTest(host=klass.__name__):
+                host = self.host(klass)
+                host.opengl_version = "4.1 (Core Profile)"
+                host.core_reset = host.core_destroy = None
+                initial = request()
+                self.assertTrue(host.accept_core_render(C.addressof(initial)))
+                self.assertTrue(initial.get_current_framebuffer)
+                self.assertTrue(initial.get_proc_address)
+
+                # A new native callback request must not reuse the earlier
+                # accepted result once the driver-owned context disappears.
+                host.context = None
+                closed = request()
+                self.assertFalse(host.accept_core_render(C.addressof(closed)))
+                self.assertFalse(closed.get_current_framebuffer)
+                self.assertFalse(closed.get_proc_address)
+                if klass is PortableGLFrameHost:
+                    host.context = object()
+                    host._entered = False
+                    unentered = request()
+                    self.assertFalse(host.accept_core_render(C.addressof(unentered)))
+                    self.assertFalse(unentered.get_current_framebuffer)
+                    self.assertFalse(unentered.get_proc_address)
 
     def test_gl_python_loader_keeps_its_normal_error_visibility(self):
         # Exception isolation must happen at the native callback only.

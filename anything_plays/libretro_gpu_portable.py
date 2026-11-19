@@ -102,7 +102,10 @@ class PortableGLFrameHost(EGLFrameHost):
 
     def accept_core_render(self, address):
         self._check_thread()
-        if not address:
+        # Parsing a stored GL_VERSION is not evidence that the context is
+        # still alive. Reject late or premature native handshakes up front.
+        if (not getattr(self, "context", None)
+                or not self._entered or not address):
             return False
         from anything_plays.libretro_gpu_egl import HardwareRenderCallback
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents

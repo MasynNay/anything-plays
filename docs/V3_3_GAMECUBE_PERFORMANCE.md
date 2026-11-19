@@ -183,6 +183,22 @@ recovery write after a successful SRAM save, an exception with a broken
 `CoreSession.run()` startup restore path with a mocked Libretro core.
 These do not verify physical storage or GameCube saves in a real game.
 
+## Refuse native GameCube hardware negotiation without a live GPU context
+
+The native callback bridge already returns zero/NULL after GPU teardown.
+The Libretro hardware-context *negotiation itself* now also fails closed
+when the EGL/WGL/CGL context has been destroyed, or when a portable
+context was created but never successfully entered. The former
+OpenGL-version string cannot approve an unusable context. A rejected
+request receives no framebuffer/proc callback pointers, while a live
+compatible context can still negotiate normally.
+
+GPU-free ctypes tests cover successful negotiation, a subsequent
+closed-context request and a not-yet-entered portable host. The Linux
+EGL version fixtures now explicitly model an existing graphics context.
+This is lifecycle safety, not measured GPU throughput or physical
+GameCube compatibility.
+
 ## Invalidate native GameCube GL callbacks after graphics teardown
 
 Dolphin's Libretro core receives `ctypes` callbacks that can outlive the

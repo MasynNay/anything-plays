@@ -277,7 +277,12 @@ class EGLFrameHost:
 
     def accept_core_render(self, address):
         self._check_thread()
-        if not address:
+        # A late native negotiation can arrive after GPU teardown, or before
+        # glcontext has entered its Windows/macOS context. Never hand Dolphin
+        # callback pointers for a context that is no longer usable.
+        if (not getattr(self, "context", None)
+                or not getattr(self, "_entered", True)
+                or not address):
             return False
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents
         if req.context_type != 3 or (req.version_major, req.version_minor) > (4, 5):

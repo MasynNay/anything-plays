@@ -17,6 +17,9 @@ class EGLContextVersionNegotiationTests(unittest.TestCase):
         host = EGLFrameHost.__new__(EGLFrameHost)
         host.owner = threading.get_ident()
         host.opengl_version = version
+        # Real EGL startup owns a current context before native negotiation.
+        # The synthetic host must model that lifetime, not a never-created GPU.
+        host.context = object()
         host.fbo = 79
         host.core_reset = None
         host.core_destroy = None
