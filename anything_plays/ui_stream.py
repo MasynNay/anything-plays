@@ -1057,6 +1057,14 @@ class StreamMixin:
         cadence = getattr(self, "_stream_cadence", None)
         if getattr(self, "_stream_output_window", None) is None or cadence is None:
             return None
+        try:
+            cadence_stats = cadence.snapshot()
+        except Exception:
+            # Only the live OBS image matters here. A failed optional
+            # diagnostic read is not a reason to close or blank the window.
+            return None
+        if type(cadence_stats) is not dict:
+            return None
         cache = getattr(self, "_stream_resize_cache", None)
         cache_stats = {}
         # Diagnostics must not invoke untrusted native/custom cache hooks or
@@ -1073,7 +1081,7 @@ class StreamMixin:
             "version": 1,
             "scope": "tk_refresh_and_changed_image_publications_not_obs_fps",
             "metrics": {
-                **cadence.snapshot(),
+                **cadence_stats,
                 **cache_stats,
                 "stream_stale_camera_clears": getattr(
                     self, "_stream_stale_camera_clears", 0
@@ -1169,24 +1177,37 @@ class StreamMixin:
         interval = round(1000 / int(mode.split()[0]))
         started = stream_optional_perf_clock()
         try:
-            if started is None:
-                raise RuntimeError("Stream composition timer unavailable")
+            # Composition is real work; its optional profiling clock is
+            # not a dependency for the OBS picture. An invalid/absent clock
+            # leaves the requested refresh interval in place, rather than
+            # blanking otherwise valid frames or inventing a render cost.
             published = self._render_stream_frame() is True
             if self._stream_output_window is not output:
                 return
             finished = stream_optional_perf_clock()
             if self._stream_output_window is not output:
                 return
-            if finished is None or finished < started:
-                raise RuntimeError("Stream composition timer unavailable")
-            elapsed = finished - started
-            interval = stream_render_delay_ms(interval, elapsed)
+            elapsed = None
+            clock_valid = (
+                finished is not None
+                and (started is None or finished >= started)
+            )
+            if started is not None and clock_valid:
+                elapsed = finished - started
+                interval = stream_render_delay_ms(interval, elapsed)
             cadence = getattr(self, "_stream_cadence", None)
-            if cadence is not None:
-                cadence.record_tick(
-                    finished, mode, published=published,
-                    render_seconds=elapsed,
-                )
+            if cadence is not None and clock_valid:
+                try:
+                    cadence.record_tick(
+                        finished, mode, published=published,
+                        render_seconds=elapsed,
+                    )
+                except Exception:
+                    # Timing observation is not an OBS render failure.
+                    # Discard only the broken collector for THIS window.
+                    if (self._stream_output_window is output
+                            and self._stream_cadence is cadence):
+                        self._stream_cadence = None
             if self._stream_output_window is not output:
                 return
             if published and getattr(self, "_stream_recovery_pending", False):
@@ -1206,17 +1227,26 @@ class StreamMixin:
                 return
             cadence = getattr(self, "_stream_cadence", None)
             if cadence is not None:
-                finished = stream_optional_perf_clock()
-                if finished is None:
-                    cadence.record_failed_without_clock(mode)
-                else:
-                    measured = (
-                        finished - started
-                        if started is not None and finished >= started else None
-                    )
-                    cadence.record_tick(
-                        finished, mode, failed=True, render_seconds=measured,
-                    )
+                try:
+                    finished = stream_optional_perf_clock()
+                    if finished is None:
+                        cadence.record_failed_without_clock(mode)
+                    else:
+                        measured = (
+                            finished - started
+                            if started is not None and finished >= started else None
+                        )
+                        cadence.record_tick(
+                            finished, mode, failed=True, render_seconds=measured,
+                        )
+                except Exception:
+                    # Even the error-path counter is optional. Always reach
+                    # the real compositor's privacy blank and retry policy.
+                    if (self._stream_output_window is output
+                            and self._stream_cadence is cadence):
+                        self._stream_cadence = None
+            if self._stream_output_window is not output:
+                return
             # Session-wide fault evidence survives output-rate switches.
             self._stream_session_faults = (
                 getattr(self, "_stream_session_faults", 0) + 1

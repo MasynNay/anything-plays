@@ -489,3 +489,28 @@ recovery and memory-growth regressions remain failures.
 The new proof is still synthetic; real webcam privacy, OBS capture frames,
 game controllers, audio, GameCube GPU throughput and the effect of actual
 USB disconnects must be independently verified on owner hardware.
+
+
+## Keep the OBS output alive when optional timing instrumentation fails
+
+A missing, reversed or broken optional performance clock is not evidence
+that Stream Mode's Tk image composition failed. The 3.3 timer now renders
+the window normally at the selected 15/24/30 FPS refresh interval when
+optional start/finish timing is unavailable, omitting the cost sample
+instead of blanking a valid capture, reporting a false stream failure or
+switching to the one-second compositor-error retry. A valid finish-only
+clock can still record the tick without inventing render duration.
+
+An exception raised by a cadence collector after valid composition also
+disables only that optional collector for the active capture window; it
+never removes the published picture. Conversely, a **real** compositor
+exception still blanks the potentially stale/private OBS picture, counts
+the session fault and schedules the bounded retry even if its optional
+failure counter also throws. Failed or malformed diagnostic snapshots
+return unavailable data without touching the live window.
+
+The prior synthetic clock-failure contract test is updated and five
+focused callback tests cover the new separation. Native gameplay,
+webcam tracking/P1/P2, audio, stream layouts and 3.2.0 stable installers
+are unchanged. None of these simulated tests certifies OBS encoder FPS,
+physical camera liveness or actual GameCube GPU/speaker performance.

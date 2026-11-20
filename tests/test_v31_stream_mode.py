@@ -153,7 +153,7 @@ class StreamModeContracts(unittest.TestCase):
             app._stream_cadence.snapshot()["stream_published_images"], 1
         )
 
-    def test_stream_faulty_perf_clock_keeps_backoff_and_cadence_honest(self):
+    def test_stream_faulty_perf_clock_preserves_valid_capture_and_cadence_honesty(self):
         from unittest.mock import Mock, patch
 
         class Harness(StreamMixin):
@@ -166,17 +166,19 @@ class StreamModeContracts(unittest.TestCase):
         app.root = Mock()
         app._stream_cadence = StreamCadenceTracker()
         app._stream_canvas = Mock()
-        app._stream_photo = object()
+        prior_photo = object()
+        app._stream_photo = prior_photo
         app._stream_canvas_item = 3
         app._render_stream_frame = Mock(return_value=True)
         with patch("anything_plays.ui_stream.time.perf_counter",
                    side_effect=RuntimeError("secret driver /Users/private")):
             app._stream_render_tick()
-        app._render_stream_frame.assert_not_called()
-        app._stream_canvas.delete.assert_called_once_with("all")
-        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        app._render_stream_frame.assert_called_once()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertIs(app._stream_photo, prior_photo)
+        app.root.after.assert_called_once_with(42, app._stream_render_tick)
         self.assertEqual(
-            app._stream_cadence.snapshot()["stream_failed_ticks"], 1
+            app._stream_cadence.snapshot()["stream_failed_ticks"], 0
         )
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_render_samples"], 0
@@ -184,11 +186,12 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_published_images"], 0
         )
+        self.assertEqual(getattr(app, "_stream_session_faults", 0), 0)
         app.root.after.reset_mock()
         with patch("anything_plays.ui_stream.time.perf_counter",
                    side_effect=(20.0, 20.01)):
             app._stream_render_tick()
-        app._render_stream_frame.assert_called_once()
+        self.assertEqual(app._render_stream_frame.call_count, 2)
         app.root.after.assert_called_once_with(32, app._stream_render_tick)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_published_images"], 1
