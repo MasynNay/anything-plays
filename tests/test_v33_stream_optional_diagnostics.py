@@ -100,5 +100,81 @@ class StreamOptionalDiagnosticsTests(unittest.TestCase):
         app._stream_canvas.delete.assert_not_called()
 
 
+    def test_first_party_snapshot_extra_private_fields_are_not_in_setup_report(self):
+        app = self.make_app()
+        original = app._stream_cadence.snapshot()
+        original["PRIVATE /Users/person/ROMs"] = "webcam-device-serial"
+        app._stream_cadence.snapshot = Mock(return_value=original)
+        result = app.stream_performance_snapshot()
+        self.assertEqual(result["metrics"]["stream_target_refresh_fps"], 0)
+        self.assertEqual(result["metrics"]["stream_failed_ticks"], 0)
+        self.assertNotIn("PRIVATE", str(result))
+        self.assertNotIn("webcam-device-serial", str(result))
+
+    def test_bad_timing_counters_do_not_crash_or_leak_into_setup(self):
+        app = self.make_app()
+        valid = app._stream_cadence.snapshot()
+        for key, bad in (
+            ("stream_observed_refresh_fps", "/home/user/secret.rom"),
+            ("stream_render_max_ms", float("nan")),
+            ("stream_refresh_intervals", True),
+            ("stream_failed_ticks", -1),
+            ("stream_render_p95_bucket_code", 999),
+            ("stream_published_images", 10**1000),
+        ):
+            with self.subTest(key=key):
+                invalid = dict(valid)
+                invalid[key] = bad
+                app._stream_cadence.snapshot = Mock(return_value=invalid)
+                self.assertIsNone(app.stream_performance_snapshot())
+                self.assertIsNotNone(app._stream_photo)
+                app._stream_canvas.delete.assert_not_called()
+        app._stream_cadence.snapshot = Mock(return_value={"secret": "serial"})
+        self.assertIsNone(app.stream_performance_snapshot())
+
+    def test_only_builtin_cadence_collector_may_generate_setup_report(self):
+        app = self.make_app()
+        hostile = Mock()
+        hostile.snapshot.side_effect = RuntimeError("PRIVATE driver /dev/video0")
+        app._stream_cadence = hostile
+        self.assertIsNone(app.stream_performance_snapshot())
+        hostile.snapshot.assert_not_called()
+
+    def test_builtin_resize_cache_snapshot_strips_private_and_invalid_fields(self):
+        from anything_plays.ui_stream import StreamPanelResizeCache
+        app = self.make_app()
+        app._stream_resize_cache = StreamPanelResizeCache()
+        app._stream_resize_cache.snapshot = Mock(return_value={
+            "stream_resize_cache_hits": 3,
+            "stream_resize_cache_misses": 2,
+            "PRIVATE /dev/video0": "serial",
+        })
+        report = app.stream_performance_snapshot()
+        m = report["metrics"]
+        self.assertEqual(m["stream_resize_cache_hits"], 3)
+        self.assertEqual(m["stream_resize_cache_misses"], 2)
+        self.assertNotIn("PRIVATE", str(report))
+        app._stream_resize_cache.snapshot = Mock(return_value={
+            "stream_resize_cache_hits": "private user path",
+            "stream_resize_cache_misses": 2,
+        })
+        self.assertNotIn(
+            "stream_resize_cache_hits",
+            app.stream_performance_snapshot()["metrics"],
+        )
+
+    def test_session_counters_are_validated_before_setup_displays_them(self):
+        app = self.make_app()
+        app._stream_session_faults = "private /Users/customer"
+        app._stream_session_recoveries = -1
+        app._stream_stale_camera_clears = True
+        app._stream_recovery_pending = "private camera device"
+        metrics = app.stream_performance_snapshot()["metrics"]
+        self.assertNotIn("stream_session_faults", metrics)
+        self.assertNotIn("stream_session_recoveries", metrics)
+        self.assertNotIn("stream_stale_camera_clears", metrics)
+        self.assertNotIn("stream_recovery_pending", metrics)
+        self.assertNotIn("private", str(metrics))
+
 if __name__ == "__main__":
     unittest.main()

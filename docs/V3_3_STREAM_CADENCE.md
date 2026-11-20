@@ -514,3 +514,27 @@ focused callback tests cover the new separation. Native gameplay,
 webcam tracking/P1/P2, audio, stream layouts and 3.2.0 stable installers
 are unchanged. None of these simulated tests certifies OBS encoder FPS,
 physical camera liveness or actual GameCube GPU/speaker performance.
+
+
+## Validate Stream Mode counters before the setup panel formats them
+
+The 3.3 **Check my setup** window and manual clipboard export both read
+the current Stream Mode snapshot. The clipboard already had a scalar
+allowlist, but the setup panel used the raw snapshot first: a corrupted
+or extension-mutated cadence counter could insert private text, produce a
+formatting error, or claim performance from missing measurements.
+
+The snapshot now requires the complete set of numeric counters from the
+**exact first-party cadence collector**, validates each type and range,
+and copies only the expected fields. A malformed, missing, huge,
+nonfinite or injected counter makes the optional cadence report
+**unavailable**, not zero or healthy. Additional fields never reach the
+setup UI. The two built-in resize-cache counts and session-wide fault
+and recovery counts are validated separately; a broken cache observer
+cannot suppress otherwise valid cadence diagnostics. The live OBS
+picture is unaffected by diagnostic failures.
+
+Five synthetic tests exercise private-field injection, invalid timing
+and percentile values, foreign collectors, malformed cache statistics
+and damaged session counters. Physical OBS encoder, camera, controller,
+GameCube GPU/audio and upgrade/rollback acceptance remain outstanding.

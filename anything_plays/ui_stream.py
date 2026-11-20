@@ -1055,27 +1055,82 @@ class StreamMixin:
     def stream_performance_snapshot(self):
         """Only current active Stream Mode, no camera frames or Tk details."""
         cadence = getattr(self, "_stream_cadence", None)
-        if getattr(self, "_stream_output_window", None) is None or cadence is None:
+        if (getattr(self, "_stream_output_window", None) is None
+                or type(cadence) is not StreamCadenceTracker):
             return None
         try:
-            cadence_stats = cadence.snapshot()
+            observed = cadence.snapshot()
         except Exception:
-            # Only the live OBS image matters here. A failed optional
-            # diagnostic read is not a reason to close or blank the window.
+            # This report is optional: malformed timing never blanks OBS.
             return None
-        if type(cadence_stats) is not dict:
+        if type(observed) is not dict:
             return None
+
+        # Check my setup consumes this report *before* the clipboard's
+        # separate allowlist. Never let a broken injected snapshot add
+        # private fields, crash its numeric formatter or fabricate a
+        # healthy performance reading from missing counters.
+        required = StreamCadenceTracker().snapshot()
+        cadence_stats = {}
+        for key, default in required.items():
+            value = observed.get(key)
+            if type(default) is int:
+                if type(value) is not int:
+                    return None
+                if key == "stream_target_refresh_fps":
+                    if value not in (0, 15, 24, 30):
+                        return None
+                elif key == "stream_render_p95_bucket_code":
+                    if not -1 <= value <= len(_STREAM_RENDER_BIN_UPPER_MS):
+                        return None
+                elif not 0 <= value <= (2**63 - 1):
+                    return None
+            elif type(value) not in (int, float):
+                return None
+            else:
+                try:
+                    if not math.isfinite(value) or not 0 <= value <= 1e12:
+                        return None
+                except (OverflowError, ValueError, TypeError):
+                    return None
+            cadence_stats[key] = value
+
         cache = getattr(self, "_stream_resize_cache", None)
         cache_stats = {}
-        # Diagnostics must not invoke untrusted native/custom cache hooks or
-        # include arbitrary plugin data. Only the first-party bounded cache
-        # may supply its two aggregate hit/miss counters; if it breaks,
-        # the useful Stream cadence data still remains available.
+        # The real fitted-image cache is best-effort, and may have been
+        # replaced during teardown. Only its two known nonnegative integer
+        # counters may appear in a GUI-visible or copied report.
         if type(cache) is StreamPanelResizeCache:
             try:
-                cache_stats = cache.snapshot()
+                candidate = cache.snapshot()
+                names = (
+                    "stream_resize_cache_hits", "stream_resize_cache_misses",
+                )
+                if (type(candidate) is dict
+                        and all(type(candidate.get(name)) is int
+                                and 0 <= candidate[name] <= (2**63 - 1)
+                                for name in names)):
+                    cache_stats = {name: candidate[name] for name in names}
             except Exception:
-                cache_stats = {}
+                pass
+        session_stats = {}
+        for attr, key in (
+            ("_stream_stale_camera_clears", "stream_stale_camera_clears"),
+            ("_stream_session_faults", "stream_session_faults"),
+            ("_stream_session_recoveries", "stream_session_recoveries"),
+        ):
+            try:
+                value = getattr(self, attr, 0)
+            except Exception:
+                continue
+            if type(value) is int and 0 <= value <= (2**63 - 1):
+                session_stats[key] = value
+        try:
+            pending = getattr(self, "_stream_recovery_pending", False)
+        except Exception:
+            pending = None
+        if type(pending) is bool:
+            session_stats["stream_recovery_pending"] = pending
         return {
             "format": "anything-plays-stream-cadence",
             "version": 1,
@@ -1083,18 +1138,7 @@ class StreamMixin:
             "metrics": {
                 **cadence_stats,
                 **cache_stats,
-                "stream_stale_camera_clears": getattr(
-                    self, "_stream_stale_camera_clears", 0
-                ),
-                "stream_session_faults": getattr(
-                    self, "_stream_session_faults", 0
-                ),
-                "stream_session_recoveries": getattr(
-                    self, "_stream_session_recoveries", 0
-                ),
-                "stream_recovery_pending": bool(getattr(
-                    self, "_stream_recovery_pending", False
-                )),
+                **session_stats,
             },
         }
 
