@@ -123,6 +123,90 @@ class CameraShutdownTests(unittest.TestCase):
         app.stop_camera()
         old_capture.release.assert_called_once()
 
+    def test_unexpected_extension_release_and_destroyed_tk_canvas_still_stop(self):
+        import tkinter as tk
+
+        class NativeReleaseFailure(Exception):
+            pass
+
+        app = self.app()
+        app._active_camera_name = "USB camera 0"
+        capture = app.cap
+        capture.release.side_effect = NativeReleaseFailure(
+            "private native USB serial /Users/tester"
+        )
+        app.canvas.delete.side_effect = tk.TclError(
+            "invalid command name .camera"
+        )
+        app.camera_bezel.set_active.side_effect = RuntimeError(
+            "bezel already destroyed"
+        )
+        app.status.set.side_effect = OSError("status variable gone")
+
+        # All independent stages run despite native/GUI failures.
+        app.stop_camera()
+        app.stop_controls.assert_called_once()
+        capture.release.assert_called_once()
+        self.assertIsNone(app._active_camera_name)
+        self.assertIsNone(app.cap)
+        self.assertIsNone(app.frame)
+        self.assertIsNone(app.camera_photo)
+        self.assertIsNone(app._camera_canvas_item)
+        app.canvas.delete.assert_called_once_with("all")
+        app.stream_clear_camera.assert_called_once()
+        app.camera_bezel.set_active.assert_called_once_with(False)
+        app.status.set.assert_called_once_with("Camera stopped")
+        # A second Stop may not re-release a detached native handle.
+        app.stop_camera()
+        capture.release.assert_called_once()
+
+    def test_damaged_controls_and_calibration_enforce_native_disarm(self):
+        import tkinter as tk
+
+        app = self.app()
+        app.armed = True
+        app._pending_object_controls = True
+        app.emu = Mock()
+        app.external_input = Mock()
+        app.stop_controls.side_effect = tk.TclError(
+            "private destroyed buttons /Users/tester"
+        )
+        app.calibration_camera_changed = Mock(
+            side_effect=OSError("calibration dialog removed")
+        )
+        app.cancel_camera_reconnect = Mock(
+            side_effect=RuntimeError("Tk root already closed")
+        )
+        app._camera_retry_generation = 3
+        app._camera_reconnect_job = "expired-job"
+        app._camera_reconnect_name = "previous USB device"
+        app._camera_reconnect_attempts = 4
+        app.stop_camera()
+        self.assertFalse(app.armed)
+        self.assertFalse(app._pending_object_controls)
+        app.emu.disarm.assert_called_once()
+        app.external_input.release_camera.assert_called_once()
+        self.assertEqual(app._camera_retry_generation, 4)
+        self.assertIsNone(app._camera_reconnect_job)
+        self.assertIsNone(app._camera_reconnect_name)
+        self.assertEqual(app._camera_reconnect_attempts, 0)
+        self.assertIsNone(app.cap)
+        app.stream_clear_camera.assert_called_once()
+
+    def test_failed_optional_stream_clear_does_not_interrupt_local_stop(self):
+        app = self.app()
+        app.stream_clear_camera.side_effect = RuntimeError(
+            "private OBS driver failed"
+        )
+        old_capture = app.cap
+        app.stop_camera()
+        old_capture.release.assert_called_once()
+        self.assertIsNone(app.cap)
+        self.assertIsNone(app.frame)
+        self.assertIsNone(app.camera_photo)
+        app.camera_bezel.set_active.assert_called_once_with(False)
+        app.status.set.assert_called_with("Camera stopped")
+
     def test_failed_native_open_never_leaves_active_bezel_or_modal_crash(self):
         app = self.app()
         app.camera_name = Mock()

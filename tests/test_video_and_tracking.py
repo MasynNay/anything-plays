@@ -11,7 +11,7 @@ from PIL import Image
 from anything_plays.libretro_video import (
     RGB1555, RGB565, XRGB8888, SOFTWARE_RGBA8888, decode_frame,
 )
-from anything_plays.tracking import locate_target, zone_at
+from anything_plays.tracking import locate_target, locate_targets, zone_at
 from anything_plays.zone_rendering import render_zone_overlay
 
 
@@ -77,6 +77,23 @@ class TrackingTests(unittest.TestCase):
         self.assertIsNotNone(contour)
         self.assertLessEqual(abs(center[0] - 50), 1)
         self.assertLessEqual(abs(center[1] - 45), 1)
+
+    def test_reused_hsv_produces_identical_targets_and_does_not_mutate_video(self):
+        frame = np.zeros((120, 180, 3), dtype=np.uint8)
+        cv2.circle(frame, (45, 60), 14, (0, 0, 255), -1)
+        cv2.circle(frame, (135, 60), 14, (0, 255, 0), -1)
+        original = frame.copy()
+        converted = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        for color, expected_x in (([255, 0, 0], 45), ([0, 255, 0], 135)):
+            with self.subTest(color=color):
+                direct = locate_targets(frame, color, 20, 55)
+                cached = locate_targets(frame, color, 20, 55, hsv=converted)
+                self.assertEqual(len(direct), 1)
+                self.assertEqual(len(cached), 1)
+                self.assertEqual(direct[0][0], cached[0][0])
+                self.assertAlmostEqual(cached[0][0][0], expected_x, delta=1)
+                self.assertTrue(np.array_equal(direct[0][1], cached[0][1]))
+        self.assertTrue(np.array_equal(frame, original))
 
     def test_disabled_zones_are_not_triggered(self):
         zones = {"A": [0, 0, .5, 1], "Shuffle": [.5, 0, 1, 1]}

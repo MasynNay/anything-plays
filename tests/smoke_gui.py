@@ -73,9 +73,21 @@ def main():
                     # pipeline, not from a second camera or emulator.
                     app.stream_camera_snapshot(np.zeros((80, 100, 3), dtype=np.uint8))
                     app._render_stream_frame()
-                    assert tuple(app._stream_canvas.find_all()) == original_stream_item
+                    # This synthetic image has no live VideoCapture behind
+                    # it. The 3.3 privacy fence correctly revokes the webcam
+                    # pixels and the *previous* OBS PhotoImage immediately,
+                    # then creates one clean waiting/game-only image. Do not
+                    # require the old canvas item to survive a revocation.
+                    revoked_stream_item = tuple(app._stream_canvas.find_all())
+                    assert len(revoked_stream_item) == 1
+                    assert revoked_stream_item != original_stream_item
+                    assert app._stream_camera_frame is None
+                    assert app._stream_photo is not None
                     app.stream_clear_camera()
                     app._render_stream_frame()
+                    # Repeated empty-camera notifications must not flicker
+                    # the newly safe output or create extra canvas items.
+                    assert tuple(app._stream_canvas.find_all()) == revoked_stream_item
                     app.close_stream_mode()
                     assert app._stream_output_window is None
                     assert app._stream_controls_window is None
@@ -332,17 +344,31 @@ def main():
                     assert app.camera_photo is None
                     assert not app.canvas.find_all()
 
+                    # These synthetic frame draws model an ACTIVE native
+                    # session. 3.3 intentionally clears pixels if the core
+                    # has finished; leaving running=False here accidentally
+                    # tests the stopped-game privacy path instead of reuse.
+                    app.emu.running = True
+                    app.emu.launching = False
                     with app.emu.lock:
                         app.emu.frame = np.zeros((180, 240, 3), dtype=np.uint8)
                         app.emu.frame_serial += 1
                     app.draw_game()
                     first_game_image = app.game_photo
+                    assert first_game_image is not None
                     for _ in range(100):
                         with app.emu.lock:
                             app.emu.frame_serial += 1
                         app.draw_game()
                     assert app.game_photo is first_game_image
                     assert len(app.game_canvas.find_all()) == 1
+                    # A core that exits on its own must now release the
+                    # native game photo and its canvas item. Verify this in
+                    # real Tk, not only in isolated/mock lifecycle tests.
+                    app.emu.running = False
+                    app.draw_game()
+                    assert app.game_photo is None
+                    assert not app.game_canvas.find_all()
                     root.after(200, app.close)
                     root.mainloop()
                     assert app._closing

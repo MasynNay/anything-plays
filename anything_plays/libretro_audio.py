@@ -29,6 +29,17 @@ NORMAL_DEVICE_RATES = frozenset((
 ))
 
 
+def _audio_diagnostic(message):
+    """Best-effort fixed text; a closed stderr must not stop emulation."""
+    try:
+        print(message, file=sys.stderr)
+    except Exception:
+        # Frozen GUI launchers, closed pipes and sandboxed audio sessions may
+        # have no writable stderr. Audio failure is already recorded in the
+        # app status; the optional diagnostic must never become fatal.
+        pass
+
+
 class AudioSink:
     """Keep the core's audio callbacks independent from the output device."""
 
@@ -39,6 +50,9 @@ class AudioSink:
         self.stream = None
         self.output_error = None
         self.output_active = False
+        # Lifetime evidence survives close() for the final GameCube report.
+        # "No underflows" without a stream is not evidence of audible audio.
+        self.output_ever_started = False
         self.source_sample_rate = None
         self.output_sample_rate = None
         # Bounded-size, aggregate diagnostics only. PCM generation is not
@@ -49,6 +63,11 @@ class AudioSink:
         self.output_underrun_frames = 0
         self.output_device_underflow_callbacks = 0
         self.queue_dropped_frames = 0
+        # Source telemetry is counted ONLY at genuine Libretro sample/batch
+        # ingress, never in push(): startup resampling, failed device retry,
+        # and queue repacking all reuse push() and must not double count.
+        self.native_pcm_frames = 0
+        self.native_nonzero_sample_values = 0
         # AudioSink by itself is a transparent PCM sink for native testing.
         # CoreSession explicitly applies the user's 35% default or saved gain
         # before playback, leaving existing raw audio contracts unchanged.
@@ -152,6 +171,10 @@ class AudioSink:
     def sample(self, left, right):
         """Buffer single-sample callbacks without per-sample allocations."""
         self._single_samples[self._single_count] = (left, right)
+        # A stereo PCM frame is two int16 channel values. Count values,
+        # not audio volume or samples delivered to a physical speaker.
+        self.native_pcm_frames += 1
+        self.native_nonzero_sample_values += int(left != 0) + int(right != 0)
         self._single_count += 1
         if self._single_count == SAMPLE_BLOCK_FRAMES:
             self._flush_single_samples()
@@ -168,6 +191,10 @@ class AudioSink:
             samples = np.ctypeslib.as_array(
                 C.cast(pointer, C.POINTER(C.c_int16)), shape=(count * 2,)
             )
+            # Native-owned PCM is valid only during this callback. Count
+            # before the existing bounded copy; never keep waveform data.
+            self.native_pcm_frames += count
+            self.native_nonzero_sample_values += int(np.count_nonzero(samples))
             self.push(samples.reshape(-1, 2))
         return count
 
@@ -191,9 +218,17 @@ class AudioSink:
         # PortAudio's output-underflow flag detects device scheduling
         # problems independently of our own empty PCM queue. In particular,
         # a healthy queue can still underrun at the speaker interface.
-        if status is not None and getattr(status, "output_underflow", False):
-            self.output_device_underflow_callbacks += 1
+        # Always initialize the speaker buffer before observing optional
+        # third-party PortAudio status objects. A malformed status getter
+        # must not crash the realtime callback or leave old output samples.
         outdata.fill(0)
+        try:
+            if status is not None and getattr(status, "output_underflow", False):
+                self.output_device_underflow_callbacks += 1
+        except Exception:
+            # Only the optional device-underflow counter is unavailable.
+            # Continue delivering the same PCM; never expose driver text.
+            pass
         written = 0
         while written < frames:
             if self.position >= len(self.pending):
@@ -221,6 +256,23 @@ class AudioSink:
             self.position += count
         self.output_underrun_frames += max(0, frames - written)
 
+    def native_pcm_snapshot(self):
+        """Allowlisted source-generated PCM counts, never waveform/device data.
+
+        No callback history, buffer bytes, ROM names or channel samples are
+        retained. Reject corrupted/plugin-mutated metrics rather than
+        including arbitrary objects in a user-copyable diagnostics report.
+        """
+        frames = self.native_pcm_frames
+        nonzero = self.native_nonzero_sample_values
+        if (type(frames) is not int or type(nonzero) is not int
+                or frames < 0 or not 0 <= nonzero <= 2 * frames):
+            return {}
+        return {
+            "audio_core_pcm_frames": frames,
+            "audio_core_nonzero_channel_values": nonzero,
+        }
+
     def delivery_snapshot(self):
         """Aggregate callback/queue telemetry, not verified speaker output."""
         return {
@@ -236,15 +288,30 @@ class AudioSink:
     def start(self, sample_rate):
         self.output_error = None
         self.output_active = False
-        if not (8_000 <= sample_rate <= 192_000):
+        # Libretro's AVInfo supplies a floating-point native sample rate.
+        # A broken core can report NaN/Inf or an out-of-range rate. Merely
+        # comparing a NaN against numeric bounds returns False on both sides;
+        # round(NaN) then raises and can abort game startup. Fail silently
+        # and visibly before calling PortAudio or touching any device.
+        try:
+            if (isinstance(sample_rate, (bool, np.bool_))
+                    or not isinstance(sample_rate, (
+                        int, float, np.integer, np.floating
+                    ))):
+                raise ValueError("not a numeric sample rate")
+            numeric_rate = float(sample_rate)
+            if (not np.isfinite(numeric_rate)
+                    or not 8_000 <= numeric_rate <= 192_000):
+                raise ValueError("invalid numeric sample rate")
+            source = int(round(numeric_rate))
+        except (TypeError, ValueError, OverflowError):
             self.output_error = "Emulator reported an invalid sample rate"
             return
         if sd is None:
             self.output_error = "PortAudio or the audio backend is unavailable"
-            print("Audio unavailable: " + self.output_error, file=sys.stderr)
+            _audio_diagnostic("Audio unavailable: " + self.output_error)
             return
 
-        source = int(round(sample_rate))
         # Prefer the actual output device's existing sample rate for unusual
         # Libretro values (notably 131072 Hz from GB/GBC). If unavailable,
         # 48000 is widely supported; only fall back if native rate fails.
@@ -260,27 +327,60 @@ class AudioSink:
         if preferred not in NORMAL_DEVICE_RATES:
             preferred = 48000
         primary = source if source in NORMAL_DEVICE_RATES else preferred
-        attempts = (primary,) if primary == preferred else (primary, preferred)
+        # Device metadata can be stale after HDMI/USB audio switches. Some
+        # drivers also reject their advertised default. Try both standard
+        # stereo rates as final fallbacks before giving up on real output.
+        # Keep this finite and ordered: never create more than four streams.
+        attempts = tuple(dict.fromkeys((primary, preferred, 48000, 44100)))
+        # Libretro may emit samples during retro_init/load_game BEFORE audio
+        # starts. Flush the partial single-sample block into the source-rate
+        # queue too; otherwise it misses startup resampling.
+        self._flush_single_samples()
         error = None
         for rate in attempts:
             candidate = None
+            # A driver can invoke an output callback from start() and then
+            # reject the stream. Snapshot ALL source-rate playback state,
+            # not only queued PCM: an attempted callback advances pending
+            # and position even if native stream startup later fails.
+            source_chunks = self.chunks
+            source_pending, source_position = self.pending, self.position
+            prior_dropped = self.queue_dropped_frames
+            prior_callbacks = (
+                self.output_callback_calls,
+                self.output_callback_requested_frames,
+                self.output_underrun_frames,
+                self.output_device_underflow_callbacks,
+            )
             try:
                 candidate = sd.OutputStream(
                     samplerate=rate, channels=2, dtype="int16",
                     blocksize=1024, callback=self.callback,
                 )
+                # Every candidate (including the unchanged native rate)
+                # reads a separate bounded queue. A rejected stream may
+                # consume its copy, but never the source needed for retry.
+                self.chunks = Queue(maxsize=32)
+                self.pending = np.empty((0, 2), dtype=np.int16)
+                self.position = 0
+                self._resample_step = (
+                    numeric_rate / rate if rate != source else None
+                )
+                self._resample_next = 0.0
+                self._resample_consumed = 0
+                self._resample_tail = None
+                if source_position < len(source_pending):
+                    self.push(source_pending[source_position:])
+                for old in list(source_chunks.queue):
+                    self.push(old)
+                # The first PortAudio callback may be synchronous. The
+                # correct resampled PCM and phase must already be ready.
                 candidate.start()
                 self.stream = candidate
                 self.output_active = True
+                self.output_ever_started = True
                 self.source_sample_rate = source
                 self.output_sample_rate = rate
-                if rate != source:
-                    self._resample_step = float(sample_rate) / rate
-                    self._resample_next = 0.0
-                    self._resample_consumed = 0
-                    self._resample_tail = None
-                else:
-                    self._resample_step = None
                 return
             except Exception as exc:
                 error = exc
@@ -289,8 +389,29 @@ class AudioSink:
                         candidate.close()
                     except Exception:
                         pass
-        self.output_error = "No usable audio output device: " + str(error)[:110]
-        print("Audio output unavailable: " + str(error), file=sys.stderr)
+                # Never leak played, partially consumed or differently
+                # resampled PCM into the next candidate. Its stream may
+                # have started a callback just before reporting failure.
+                self.chunks = source_chunks
+                self.pending, self.position = source_pending, source_position
+                self.queue_dropped_frames = prior_dropped
+                (
+                    self.output_callback_calls,
+                    self.output_callback_requested_frames,
+                    self.output_underrun_frames,
+                    self.output_device_underflow_callbacks,
+                ) = prior_callbacks
+                self._resample_step = None
+                self._resample_next = 0.0
+                self._resample_consumed = 0
+                self._resample_tail = None
+        # OS PortAudio failures may include a device name, home directory,
+        # USB identifier or driver path. The UI, stderr and diagnostic
+        # reports must never forward that untrusted platform exception text.
+        # Retain just the fixed error class for actionable troubleshooting.
+        reason = type(error).__name__ if error is not None else "UnknownError"
+        self.output_error = "No usable audio output device (" + reason + ")"
+        _audio_diagnostic("Audio output unavailable (" + reason + ")")
         self.close()
 
     def close(self):
@@ -300,6 +421,17 @@ class AudioSink:
         if stream is not None:
             try:
                 stream.stop()
+            except Exception as exc:
+                # stop() can fail after a USB output is unplugged. Still
+                # attempt close() so the host releases its device handle.
+                _audio_diagnostic(
+                    "Could not stop audio output (" + type(exc).__name__ + ")"
+                )
+            try:
                 stream.close()
             except Exception as exc:
-                print(f"Could not close audio output: {exc}", file=sys.stderr)
+                # A separate close failure must not block core shutdown or
+                # copy device names/paths from the platform exception.
+                _audio_diagnostic(
+                    "Could not close audio output (" + type(exc).__name__ + ")"
+                )

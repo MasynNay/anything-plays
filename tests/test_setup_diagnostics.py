@@ -223,6 +223,247 @@ class SnapshotPrivacyTests(unittest.TestCase):
         ):
             self.assertNotIn(private, encoded)
 
+    def test_stream_mode_aggregate_report_is_private_and_distinguishes_static_frames(self):
+        from anything_plays.ui_stream import StreamCadenceTracker, StreamMixin
+        from anything_plays.ui_setup_diagnostics import (
+            _snapshot, _stream_cadence_summary_lines,
+        )
+
+        class StreamHarness(PrivateApp, StreamMixin):
+            pass
+
+        app = StreamHarness("/home/private/secret-emulator.so")
+        app._stream_output_window = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.record_tick(
+            1.0, "24 FPS", published=True, render_seconds=0.012
+        )
+        app._stream_cadence.record_tick(
+            1.04, "24 FPS", published=False, render_seconds=0.055
+        )
+        report = _snapshot(app)
+        self.assertIn("stream_cadence", report)
+        lines = _stream_cadence_summary_lines(report["stream_cadence"])
+        self.assertEqual(len(lines), 6)
+        self.assertIn("Source resize cache: not measured", lines[4])
+        self.assertIn("Session compositor recovery: 0 faults", lines[5])
+        self.assertIn("0 recoveries", lines[5])
+        self.assertIn("ready", lines[5])
+        self.assertIn("Requested Stream Mode refresh: 24 FPS", lines[0])
+        self.assertIn("observed Tk tick 25.0 FPS", lines[0])
+        self.assertIn("waiting for two changed images", lines[1])
+        self.assertIn("1 unchanged ticks", lines[1])
+        self.assertIn("Stream composition: P95 50–67 ms", lines[3])
+        self.assertIn("1 over-budget of 2 measured ticks", lines[3])
+        self.assertEqual(
+            report["stream_cadence"]["metrics"]["stream_render_samples"], 2
+        )
+        # A real active Stream Mode supplies only aggregate hit/miss counts.
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+        cache = StreamPanelResizeCache()
+        pixels = Image.new("RGB", (32, 24), "#112233")
+        cache.contained("CAMERA", pixels, (0, 0, 160, 120))
+        cache.contained("CAMERA", pixels, (0, 0, 160, 120))
+        app._stream_resize_cache = cache
+        report = _snapshot(app)
+        metrics = report["stream_cadence"]["metrics"]
+        self.assertEqual(metrics["stream_resize_cache_hits"], 1)
+        self.assertEqual(metrics["stream_resize_cache_misses"], 1)
+        self.assertIn(
+            "1 reused · 1 resized",
+            _stream_cadence_summary_lines(report["stream_cadence"])[4],
+        )
+        self.assertNotIn("112233", json.dumps(report))
+        self.assertNotIn("/home/private", json.dumps(report))
+        # Old reports remain legible without the new timing fields.
+        old = {"metrics": {
+            key: value for key, value in report["stream_cadence"]["metrics"].items()
+            if not key.startswith("stream_render_")
+        }}
+        self.assertIn(
+            "P95 not sampled", _stream_cadence_summary_lines(old)[3]
+        )
+        old["metrics"].pop("stream_session_faults", None)
+        old["metrics"].pop("stream_session_recoveries", None)
+        old["metrics"].pop("stream_recovery_pending", None)
+        self.assertEqual(len(_stream_cadence_summary_lines(old)), 5)
+        app._stream_output_window = None
+        self.assertNotIn("stream_cadence", _snapshot(app))
+
+    def test_input_timing_display_has_three_stage_ranges_or_no_samples(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _input_timing_summary_lines
+
+        inputs = InputBuffer()
+        inputs.enable_latency_probe(clock=iter((10.013, 10.040)).__next__)
+        empty = _input_timing_summary_lines(inputs.latency_snapshot())
+        self.assertEqual(len(empty), 1)
+        self.assertIn("No software input samples", empty[0])
+        self.assertNotIn("None ms", empty[0])
+
+        inputs.set_camera_buttons(["A"], sample_started_at=10.0)
+        inputs.before_frame(armed=True)
+        lines = _input_timing_summary_lines(inputs.latency_snapshot())
+        self.assertEqual(len(lines), 3)
+        self.assertIn("Tracking", lines[0])
+        self.assertIn("input buffer", lines[0])
+        self.assertIn("native frame", lines[1])
+        self.assertIn("Combined software", lines[2])
+        self.assertIn("P50 33-50 ms", lines[2])
+        self.assertIn("P95 33-50 ms", lines[2])
+
+    def test_opt_in_timing_report_contains_only_bounded_aggregate_buckets(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp("/home/alex/secret/core.so")
+        inputs = InputBuffer()
+        app.emu.inputs = inputs
+        self.assertNotIn("input_latency", _snapshot(app))
+        inputs.enable_latency_probe(clock=iter((10.013, 10.040)).__next__)
+        inputs.set_camera_buttons(["A"], ["B"], sample_started_at=10.0)
+        inputs.before_frame(armed=True)
+        report = _snapshot(app)
+        timing = report["input_latency"]
+        self.assertTrue(timing["enabled"])
+        self.assertEqual(timing["samples"], 1)
+        self.assertEqual(
+            timing["stages"]["tracking_to_native"]["p95_bucket_ms"],
+            "33-50",
+        )
+        encoded = json.dumps(report)
+        for private in (
+            "/home/alex", "secret", "Office Webcam",
+            "Bluetooth Serial", "camera_frame", "ROM",
+        ):
+            self.assertNotIn(private, encoded)
+        # A public aggregate count named discarded_pending is expected;
+        # only the internal raw pending timestamp must be absent.
+        self.assertNotIn("_pending", timing)
+        self.assertEqual(timing["discarded_pending"], 0)
+        self.assertNotIn("10.013", encoded)
+        self.assertNotIn("10.040", encoded)
+        inputs.disable_latency_probe()
+        stopped = _snapshot(app)["input_latency"]
+        self.assertFalse(stopped["enabled"])
+        self.assertEqual(stopped["samples"], 1)
+
+    def test_embedded_gamecube_shows_safe_live_performance_only(self):
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines, _snapshot,
+        )
+
+        session = object.__new__(GameCubeHardwareSession)
+        session.native_run_timing = GameCubeNativeTiming()
+        session.native_run_timing.record_completed_run()
+        session.native_run_timing.record_native_run(.05)
+        session.gpu_readback_seconds = .002
+        session.gpu_readback_max_seconds = .002
+        session.gpu_readback_calls = 1
+        session.hardware_frames = 1
+        session.preview_readback_skips = 0
+        from unittest.mock import Mock
+        session.audio = Mock(delivery_snapshot=Mock(return_value={
+            "audio_output_callback_calls": 10,
+            "audio_output_requested_frames": 1000,
+            "audio_output_underrun_frames": 80,
+            "audio_output_device_underflow_callbacks": 2,
+            "audio_queue_dropped_frames": 0,
+        }))
+        session.rom = "/home/private/secret-disc.iso"
+        session.host = Mock(serial_number="private-GPU-1234")
+
+        app = PrivateApp("/home/private/secret-core.so")
+        app.system_key = FakeSetting("gamecube")
+        emu = object.__new__(Emulator)
+        emu.system = "gamecube"
+        emu.core_path = None
+        emu.find_system_core = lambda: None
+        emu._gamecube_session = session
+        emu._gamecube_last_performance = None
+        app.emu = emu
+        report = _snapshot(app)
+        performance = report["gamecube_performance"]
+        lines = _gamecube_performance_summary_lines(performance)
+        self.assertEqual(len(lines), 5)
+        self.assertIn("Native frames: 1", lines[0])
+        self.assertIn("timed 1 of 1", lines[0])
+        self.assertIn("P95 33–50 ms", lines[0])
+        # Previously saved 3.2/early 3.3 snapshots remain readable.
+        code = performance["metrics"].pop("native_run_p95_bucket_code")
+        legacy = _gamecube_performance_summary_lines(performance)
+        self.assertIn("P95 not sampled", legacy[0])
+        performance["metrics"]["native_run_p95_bucket_code"] = code
+        # Older session reports may not carry the new readback clock fields.
+        timed = performance["metrics"].pop("gpu_readback_timing_samples")
+        faults = performance["metrics"].pop("gamecube_preview_clock_failures")
+        previous = _gamecube_performance_summary_lines(performance)
+        self.assertNotIn("invalid clock reads", previous[1])
+        performance["metrics"]["gpu_readback_timing_samples"] = timed
+        performance["metrics"]["gamecube_preview_clock_failures"] = faults
+        self.assertIn("GPU readback", lines[1])
+        self.assertIn("timed 0 of 1 captures", lines[1])
+        self.assertIn("0 invalid clock reads", lines[1])
+        self.assertIn("share unavailable", lines[1])
+        self.assertIn("maximum unmeasured", lines[1])
+        # Coverage can be incomplete even when both GL readbacks publish.
+        performance["metrics"]["gpu_readback_timing_samples"] = 1
+        performance["metrics"]["gpu_readback_calls"] = 2
+        partial = _gamecube_performance_summary_lines(performance)
+        self.assertIn("partial timing", partial[1])
+        self.assertIn("at least", partial[1])
+        performance["metrics"]["gpu_readback_calls"] = 1
+        complete = _gamecube_performance_summary_lines(performance)
+        self.assertIn("included, not additive", complete[1])
+        self.assertNotIn("share unavailable", complete[1])
+        performance["metrics"]["gpu_readback_timing_samples"] = 0
+        self.assertIn("Preview captures", lines[2])
+        self.assertIn("waiting for two published preview images", lines[2])
+        self.assertNotIn("observed 0.0 FPS", lines[2])
+        self.assertIn("Late deadlines", lines[3])
+        self.assertIn("Audio", lines[4])
+        text = json.dumps(report)
+        for private in ("secret-disc.iso", "secret-core.so", "private-GPU",
+                        "/home/", "serial_number", "rom_path"):
+            self.assertNotIn(private, text)
+        performance["metrics"].update({
+            "gamecube_preview_target_fps": 30,
+            "gamecube_preview_observed_capture_fps": 28.57,
+            "gamecube_preview_cadence_intervals": 2,
+            "gamecube_preview_max_interval_ms": 35.0,
+        })
+        measured = _gamecube_performance_summary_lines(performance)
+        self.assertIn("target 30 FPS", measured[2])
+        self.assertIn("observed 28.57 FPS", measured[2])
+        emu._gamecube_session = None
+        emu._gamecube_last_performance = performance
+        self.assertEqual(_snapshot(app)["gamecube_performance"], performance)
+        app.system_key = FakeSetting("gba")
+        self.assertNotIn("gamecube_performance", _snapshot(app))
+
+    def test_refresh_error_message_never_echoes_private_driver_details(self):
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_refresh_failure_message,
+        )
+        import tkinter as tk
+
+        for failure in (
+            ValueError("ROM /home/owner/private/game.iso could not be opened"),
+            tk.TclError("Private Webcam USB serial 45345 not found"),
+            OSError("Driver /Users/person/Library/secret-device.dat"),
+        ):
+            with self.subTest(error=type(failure).__name__):
+                message = _safe_refresh_failure_message(failure)
+                self.assertIn("Unable to check current setup", message)
+                for private in ("/home/", "/Users/", "USB serial",
+                                "game.iso", "secret-device", "45345"):
+                    self.assertNotIn(private, message)
+                self.assertLess(len(message), 140)
+
     def test_bad_camera_driver_does_not_break_report(self):
         from anything_plays.ui_setup_diagnostics import _snapshot
 
@@ -236,6 +477,168 @@ class SnapshotPrivacyTests(unittest.TestCase):
         )
         self.assertNotIn("/home/alex", json.dumps(report))
 
+
+    def test_optional_input_probe_exception_keeps_base_checks_available(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.emu.inputs = InputBuffer()
+        app.emu.inputs.latency_snapshot = lambda: (_ for _ in ()).throw(
+            OSError("PRIVATE webcam path /home/operator/serial")
+        )
+        report = _snapshot(app)
+        self.assertEqual(set(report), {
+            "format", "version", "console", "checks"
+        })
+        self.assertIn("running", report["checks"]["camera"]["status"])
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_stream_subclass_cannot_override_first_party_safe_snapshot(self):
+        from anything_plays.ui_stream import StreamCadenceTracker, StreamMixin
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        class StreamHarness(PrivateApp, StreamMixin):
+            def stream_performance_snapshot(self):
+                raise RuntimeError("PRIVATE /Users/owner/camera-device")
+
+        app = StreamHarness(None)
+        app._stream_output_window = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.record_tick(1.0, "24 FPS", published=True)
+        report = _snapshot(app)
+        self.assertIn("checks", report)
+        self.assertIn("stream_cadence", report)
+        self.assertEqual(
+            report["stream_cadence"]["metrics"]["stream_target_refresh_fps"],
+            24,
+        )
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_optional_gamecube_probe_exception_does_not_hide_base_checks(self):
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.system_key = FakeSetting("gamecube")
+        emu = object.__new__(Emulator)
+        emu.system = "gamecube"
+        emu.core_path = None
+        emu.find_system_core = lambda: None
+        emu.gamecube_performance_snapshot = lambda: (_ for _ in ()).throw(
+            RuntimeError("PRIVATE GPU /Users/owner/games/secret.iso")
+        )
+        app.emu = emu
+        report = _snapshot(app)
+        self.assertIn("checks", report)
+        self.assertNotIn("gamecube_performance", report)
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_input_probe_rejects_private_extensions_and_malformed_buckets(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        inputs = InputBuffer()
+        inputs.enable_latency_probe()
+        app.emu.inputs = inputs
+        normal = inputs.latency_snapshot()
+        injected = {
+            **normal,
+            "PRIVATE /dev/video0": "user camera serial",
+            "stages": {**normal["stages"], "PRIVATE ROM": "/home/owner/game"},
+        }
+        inputs.latency_snapshot = lambda: injected
+        report = _snapshot(app)
+        self.assertIn("input_latency", report)
+        self.assertNotIn("PRIVATE", json.dumps(report))
+        self.assertNotIn("/home/owner", json.dumps(report))
+        injected["samples"] = "private /home/device"
+        self.assertNotIn("input_latency", _snapshot(app))
+        injected["samples"] = 0
+        injected["stages"]["tracking_to_dispatch"] = {
+            "p50_bucket_ms": "PRIVATE camera", "p95_bucket_ms": None
+        }
+        self.assertNotIn("input_latency", _snapshot(app))
+
+    def test_gamecube_probe_rejects_private_keys_bad_numbers_and_missing_fields(self):
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_gamecube_performance_report,
+        )
+
+        numeric = GameCubeNativeTiming().snapshot()
+        numeric.update({
+            "gpu_readback_calls": 3, "gpu_readback_max_ms": 3.5,
+            "gamecube_preview_target_fps": 30,
+            "gamecube_preview_observed_capture_fps": 28.5,
+            "gamecube_preview_cadence_intervals": 2,
+            "gamecube_preview_max_interval_ms": 35.0,
+            "audio_output_device_underflow_callbacks": 0,
+            "audio_output_underrun_frames": 0,
+            "audio_queue_dropped_frames": 0,
+            "PRIVATE /Users/owner/video-device": "serial-name",
+        })
+        candidate = {
+            "format": "anything-plays-gamecube-performance",
+            "version": 1,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": numeric,
+            "PRIVATE ROM": "/home/user/secret.iso",
+        }
+        safe = _safe_gamecube_performance_report(candidate)
+        self.assertIsNotNone(safe)
+        self.assertNotIn("PRIVATE", json.dumps(safe))
+        self.assertNotIn("/home/", json.dumps(safe))
+        for field, bad in (
+            ("native_run_calls", "private home directory"),
+            ("gpu_readback_share_of_native_run", float("nan")),
+            ("gamecube_preview_target_fps", True),
+            ("audio_queue_dropped_frames", -1),
+        ):
+            with self.subTest(field=field):
+                invalid = {**candidate, "metrics": {**numeric, field: bad}}
+                self.assertIsNone(_safe_gamecube_performance_report(invalid))
+        incomplete = {**candidate, "metrics": {"native_run_calls": 0}}
+        self.assertIsNone(_safe_gamecube_performance_report(incomplete))
+
+
+    def test_input_timing_invalid_container_cannot_crash_optional_validation(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.emu.inputs = InputBuffer()
+        app.emu.inputs.enable_latency_probe()
+        normal = app.emu.inputs.latency_snapshot()
+        for bad in ([], {}, ["private"], {"ROM": "/Users/owner"}):
+            with self.subTest(value=repr(bad)):
+                data = {
+                    **normal,
+                    "stages": {
+                        **normal["stages"],
+                        "tracking_to_native": {
+                            "p50_bucket_ms": bad,
+                            "p95_bucket_ms": None,
+                        },
+                    },
+                }
+                app.emu.inputs.latency_snapshot = lambda data=data: data
+                result = _snapshot(app)
+                self.assertIn("checks", result)
+                self.assertNotIn("input_latency", result)
+                self.assertNotIn("/Users/owner", json.dumps(result))
+
+    def test_gamecube_boolean_schema_version_is_not_accepted_as_version_one(self):
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_gamecube_performance_report,
+        )
+        self.assertIsNone(_safe_gamecube_performance_report({
+            "format": "anything-plays-gamecube-performance",
+            "version": True,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": {},
+        }))
 
 if __name__ == "__main__":
     unittest.main()

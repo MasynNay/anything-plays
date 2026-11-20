@@ -7,6 +7,7 @@ released and continue to work when object controls are disarmed.
 from queue import Empty, Full, Queue
 from threading import Lock
 
+from anything_plays.input_latency import InputLatencyProbe
 from anything_plays.remote_retropad import N64_AXES, N64_DIGITAL, desired_state
 from anything_plays.gamecube_software import GAMECUBE_INPUT, gamecube_state
 
@@ -79,10 +80,47 @@ class InputBuffer:
         # snapshots. Two fish in two zones are pressed in the SAME emulated
         # frame; missing fish are released on the next camera update.
         self._camera_held = {0: set(), 1: set()}
+        # Stop advances this token under state_lock. Work computed by the
+        # prior camera tick must never be inserted after a Stop/restart.
+        self._camera_generation = 0
+        # Constant-memory, local-only evidence of rejected late input.
+        self._late_camera_updates_dropped = 0
         # N64 and GameCube may poll many analogue inputs per frame. Cache
         # each port's full state exactly once per emulation step.
         self._n64_state = {}
         self._p2_analog = {}
+        # Explicit opt-in; default gameplay has no timing-clock calls.
+        self.latency_probe = None
+        self._latency_enabled = False
+
+    def camera_generation(self):
+        """Capture the input generation before checking the facade's armed flag."""
+        with self.state_lock:
+            return self._camera_generation
+
+    def enable_latency_probe(self, *, clock=None):
+        """Start fresh local software-stage measurements; no image data."""
+        with self.state_lock:
+            self.latency_probe = InputLatencyProbe(clock=clock)
+            self._late_camera_updates_dropped = 0
+            self._latency_enabled = True
+
+    def disable_latency_probe(self):
+        """Stop sampling, but keep aggregate results for optional copying."""
+        with self.state_lock:
+            self._latency_enabled = False
+            if self.latency_probe is not None:
+                self.latency_probe.discard()
+
+    def latency_snapshot(self):
+        with self.state_lock:
+            if self.latency_probe is None:
+                return None
+            return {
+                **self.latency_probe.snapshot(),
+                "late_camera_updates_dropped": self._late_camera_updates_dropped,
+                "enabled": self._latency_enabled,
+            }
 
     def id_for(self, button):
         if self.system == "n64":
@@ -93,30 +131,64 @@ class InputBuffer:
             return NEO_GEO_POCKET_IDS.get(button)
         return (GENESIS_IDS if self.system == "genesis" else IDS).get(button)
 
-    def queue_press(self, button, frames, port=0):
-        """Queue bounded camera pulses; simultaneous presses support P1/P2."""
-        button_id = self.id_for(button)
-        if button_id is None or port not in (0, 1):
-            return
-        duration = max(1, min(60, int(frames)))
+    def queue_press(self, button, frames, port=0, *, generation=None):
+        """Queue bounded P1/P2 pulses, never reviving an expired camera tick."""
+        # Tk settings can be corrupt or change during a live session.
+        # Invalid frames/ports must not crash the camera processing loop or
+        # invent a button press. Valid legacy durations still clamp to 1..60.
+        if type(button) is not str or type(port) is not int or port not in (0, 1):
+            return False
+        if type(frames) not in (int, float, str):
+            return False
         try:
-            # Preserve the existing two-item queue format for player one.
-            self.commands.put_nowait(
-                (button_id, duration) if port == 0
-                else (button_id, duration, 1)
-            )
-        except Full:
-            pass
+            duration = max(1, min(60, int(frames)))
+        except (ValueError, TypeError, OverflowError):
+            return False
+        button_id = self.id_for(button)
+        if button_id is None:
+            return False
+        with self.state_lock:
+            if generation is not None and (
+                    type(generation) is not int
+                    or generation != self._camera_generation):
+                self._late_camera_updates_dropped += 1
+                return False
+            try:
+                # Preserve the existing two-item queue format for P1.
+                # Queue/disarm are serialized; an old camera observation
+                # cannot sneak into the next session after its Stop.
+                self.commands.put_nowait(
+                    (button_id, duration) if port == 0
+                    else (button_id, duration, 1)
+                )
+                return True
+            except Full:
+                return False
 
-    def set_camera_buttons(self, player_one=(), player_two=()):
-        """Set the latest held buttons from all tracked fish, atomically."""
+    def set_camera_buttons(self, player_one=(), player_two=(),
+                           *, sample_started_at=None, generation=None):
+        """Set both players' held buttons; optionally time their delivery."""
         one = {identity for button in tuple(player_one)[:32]
                if (identity := self.id_for(button)) is not None}
         two = {identity for button in tuple(player_two)[:32]
                if (identity := self.id_for(button)) is not None}
         with self.state_lock:
+            if generation is not None and (
+                    type(generation) is not int
+                    or generation != self._camera_generation):
+                self._late_camera_updates_dropped += 1
+                return
             self._camera_held[0] = one
             self._camera_held[1] = two
+            if self._latency_enabled:
+                if sample_started_at is not None:
+                    self.latency_probe.published(sample_started_at)
+                else:
+                    # A newer camera snapshot with a missing/failed probe
+                    # clock still updates live P1/P2 inputs. Invalidate the
+                    # previous pending timing observation so the next native
+                    # frame cannot attribute *new* buttons to *old* pixels.
+                    self.latency_probe.discard()
 
     def set_manual(self, button, down):
         if self.id_for(button) is None:
@@ -146,6 +218,7 @@ class InputBuffer:
         # Clear queued presses under the same lock as before_frame: a pending
         # camera command cannot be applied AFTER the user presses Stop.
         with self.state_lock:
+            self._camera_generation += 1
             self.remaining.clear()
             self.remaining_p2.clear()
             self.pressed.clear()
@@ -154,6 +227,8 @@ class InputBuffer:
             self._camera_held[1].clear()
             self._n64_state.clear()
             self._p2_analog.clear()
+            if self.latency_probe is not None:
+                self.latency_probe.discard()
             while True:
                 try:
                     self.commands.get_nowait()
@@ -181,6 +256,11 @@ class InputBuffer:
                 self.pressed_p2.clear()
                 self.pressed_p2.update(self.remaining_p2)
                 self.pressed_p2.update(self._camera_held[1])
+                # Consume the timestamp *under the same lock* as the
+                # button snapshot, or a later Tk frame could be falsely
+                # attributed to the earlier native emulation step.
+                if self._latency_enabled:
+                    self.latency_probe.consumed()
         with self.manual_lock:
             manual = {self.id_for(name) for name in self.manual_buttons | self.gamepad_buttons}
         with self.state_lock:

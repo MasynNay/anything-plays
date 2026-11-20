@@ -10,6 +10,7 @@ camera input; manual controls operate independently.
 """
 
 import ctypes as C
+import math
 import os
 from pathlib import Path
 import sys
@@ -44,6 +45,23 @@ from anything_plays.systems import SYSTEMS
 # memory allocation. GameCube/other disc systems must use full-path loading,
 # not silently copy entire disc images into the application's heap.
 MAX_IN_MEMORY_ROM_BYTES = 256 * 1024 * 1024
+
+
+def _optional_gamecube_perf_clock():
+    """Read optional native A/V timing without ever breaking retro_run().
+
+    The clock is diagnostic, not part of Dolphin's actual frame scheduler.
+    Broken platform clocks, injected native extensions and nonfinite values
+    must discard just that sample, never the emulated frame or its audio.
+    Other consoles do not call this optional helper.
+    """
+    try:
+        tick = time.perf_counter()
+        if type(tick) in (int, float) and math.isfinite(tick) and tick >= 0:
+            return tick
+    except Exception:
+        pass
+    return None
 
 
 class NativeCore:
@@ -226,13 +244,25 @@ class CoreSession:
         return False
 
     def video(self, data, width, height, pitch):
-        """Copy a core-owned video frame before the native callback returns."""
+        """Copy native video only while this emulator session is active.
+
+        A software core can finish a callback after Stop was requested. The
+        expensive frame decode is skipped when Stop is already visible; the
+        final stop check is inside the same lock as the UI/frame publication
+        so a late callback cannot restore pixels after the Stop path clears
+        its frame. The hardware GameCube callback has an equivalent guard.
+        """
+        stop = getattr(self.emulator, "stop_event", None)
+        if isinstance(stop, threading.Event) and stop.is_set():
+            return
         try:
             frame = decode_frame(data, width, height, pitch, self.pixel_format)
         except (ValueError, OverflowError):
             return
         if frame is not None:
             with self.emulator.lock:
+                if isinstance(stop, threading.Event) and stop.is_set():
+                    return
                 self.emulator.frame = frame
                 self.emulator.frame_serial += 1
 
@@ -306,6 +336,18 @@ class CoreSession:
                 select_device(0, 1)
                 select_device(1, 1)  # Player 2: RETRO_DEVICE_JOYPAD
 
+    def _save_failure_warning(self, safe_gamecube_message, legacy_prefix, exc):
+        """Give GameCube fixed, path-free warnings for native save failures.
+
+        ROM/save paths and device information often appear in OSError text.
+        The app's GUI may display save_warning, so never stringify external
+        filesystem exceptions for GameCube. Legacy console wording remains
+        unchanged for compatibility.
+        """
+        if self.system == "gamecube":
+            return safe_gamecube_message
+        return legacy_prefix + str(exc)[:140]
+
     def persist_game_progress(self):
         """Persist battery SRAM AND safe NGP recovery without killing gameplay."""
         written = False
@@ -313,15 +355,21 @@ class CoreSession:
             try:
                 written = bool(self.save_ram.persist())
             except (OSError, ValueError, MemoryError) as exc:
-                self.emulator.save_warning = (
-                    "Battery save failed; game is still running: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube battery save unavailable; game is still running. "
+                    "Check free disk space and save-folder permissions.",
+                    "Battery save failed; game is still running: ",
+                    exc,
                 )
         if self.recovery_state is not None:
             try:
                 written = bool(self.recovery_state.persist()) or written
             except (OSError, ValueError, RuntimeError, MemoryError) as exc:
-                self.emulator.save_warning = (
-                    "Recovery save failed; game is still running: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube recovery save unavailable; game is still running. "
+                    "Check free disk space and save-folder permissions.",
+                    "Recovery save failed; game is still running: ",
+                    exc,
                 )
         return written
 
@@ -366,8 +414,11 @@ class CoreSession:
             except (OSError, ValueError, MemoryError) as exc:
                 # Continue gameplay even when an existing .sav is corrupt
                 # or on disconnected storage. Warn instead of crashing.
-                self.emulator.save_warning = (
-                    "Could not restore saved game: " + str(exc)[:140]
+                self.emulator.save_warning = self._save_failure_warning(
+                    "GameCube saved game could not be restored; gameplay "
+                    "continues. Check the save folder and available storage.",
+                    "Could not restore saved game: ",
+                    exc,
                 )
             if self.system in ("ngp", "ngpc") and self.enable_state_resume:
                 # The core's own .flash read occurs inside _load_game.
@@ -401,12 +452,21 @@ class CoreSession:
                 gamecube_timing.reported_core_fps = frames_per_second
             while not self.emulator.stop_event.is_set():
                 self.emulator.inputs.before_frame(self.emulator.armed)
-                native_start = time.perf_counter() if gamecube_timing else None
+                native_start = (
+                    _optional_gamecube_perf_clock()
+                    if gamecube_timing is not None else None
+                )
                 self.native.run()
-                if gamecube_timing:
-                    gamecube_timing.record_native_run(
-                        time.perf_counter() - native_start
-                    )
+                if gamecube_timing is not None:
+                    # A successful native frame counts even with a missing
+                    # or reversed diagnostic timer. This is NOT rendered FPS.
+                    gamecube_timing.record_completed_run()
+                if native_start is not None:
+                    native_end = _optional_gamecube_perf_clock()
+                    if native_end is not None and native_end >= native_start:
+                        gamecube_timing.record_native_run(
+                            native_end - native_start
+                        )
                 self.emulator.inputs.after_frame()
                 frame_number += 1
                 if frame_number % 300 == 0:
@@ -421,12 +481,15 @@ class CoreSession:
                         -remaining, resynchronized=remaining < -0.25
                     )
                 if remaining > 0:
-                    wait_start = time.perf_counter() if gamecube_timing else None
+                    wait_start = (
+                        _optional_gamecube_perf_clock()
+                        if gamecube_timing is not None else None
+                    )
                     self.emulator.stop_event.wait(remaining)
-                    if gamecube_timing:
-                        gamecube_timing.record_wait(
-                            time.perf_counter() - wait_start
-                        )
+                    if wait_start is not None:
+                        wait_end = _optional_gamecube_perf_clock()
+                        if wait_end is not None and wait_end >= wait_start:
+                            gamecube_timing.record_wait(wait_end - wait_start)
                 elif remaining < -0.25:
                     next_frame = time.monotonic()
             self.persist_game_progress()
@@ -436,6 +499,50 @@ class CoreSession:
             self.audio.close()
             if self.native is not None:
                 self.native.close()
+
+
+def safe_gamecube_worker_error(exc):
+    """Fixed, path-free GameCube worker failure for a user-visible status.
+
+    Native OpenGL, SDL, Dolphin and C extension exceptions may contain ROM
+    filenames, GPU identifiers or arbitrary driver paths. The worker's
+    public error must never copy that untrusted text, even if a native
+    launch fails before GameCubeHardwareSession was constructed.
+    """
+    category = type(exc).__name__
+    if category not in (
+        "RuntimeError", "OSError", "ValueError", "TypeError",
+        "MemoryError", "ImportError", "FileNotFoundError",
+        "AttributeError", "OverflowError",
+    ):
+        category = "UnexpectedError"
+
+    # Preserve only internal fixed, actionable categories. Never reproduce
+    # a substring from the incoming exception in the displayed result.
+    try:
+        message = str(exc) if isinstance(exc, RuntimeError) else ""
+    except Exception:
+        # Even an exception's __str__ can be an untrusted native wrapper.
+        # Error reporting must never replace the worker's original failure.
+        message = ""
+    if message == "GPU hardware context negotiation failed":
+        return "GameCube GPU hardware context negotiation failed."
+    if message.startswith("GPU readback failed ("):
+        import re
+        if re.fullmatch(
+            r"GPU readback failed \((RuntimeError|ValueError|OSError|TypeError|"
+            r"OverflowError|MemoryError|AttributeError|IndexError|KeyError|"
+            r"AssertionError|UnexpectedError)\)", message
+        ):
+            return "GameCube " + message + "."
+    if message.startswith("GameCube needs a graphics driver supporting OpenGL"):
+        return (
+            "GameCube needs a GPU driver with OpenGL 3.3 or newer. "
+            "Install or update the graphics driver and restart Anything Plays."
+        )
+    if message == "Dolphin did not register a supported accelerated render context":
+        return "GameCube could not initialize the accelerated GPU context."
+    return "GameCube native playback failed (" + category + ")."
 
 
 class Emulator:
@@ -459,8 +566,15 @@ class Emulator:
         self.resume_info = None
         self.volume = 0.35
         self.audio_sink = None
+        # Retain only a small, path-free aggregate after Dolphin exits;
+        # never retain its native CoreSession/GL host or ROM by reference.
+        self._gamecube_session = None
+        self._gamecube_last_performance = None
         self.frame = None
-        self.frame_serial = 0  # Monotonic per-session video revision for Tk.
+        self.frame_serial = 0  # Monotonic video revision for Tk.
+        # Distinguish an ordinary new image from a Stop/ROM restart that
+        # occurs while Stream Mode composes its old native snapshot.
+        self.session_generation = 0
         self.lock = threading.Lock()
         self.system = "gba"
         self.core_path = find_core(self.system)
@@ -489,12 +603,29 @@ class Emulator:
         self.save_warning = None
         self.audio_warning = None
         self.resume_info = None
+        self._gamecube_last_performance = None
         self.stop_event.clear()
         with self.lock:
             self.frame = None
             self.frame_serial += 1
+            self.session_generation += 1
         self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
         self.thread.start()
+
+    def gamecube_performance_snapshot(self):
+        """Return local GameCube metrics, never native session or device data."""
+        if self.system != "gamecube":
+            return None
+        session = self._gamecube_session
+        if session is not None:
+            try:
+                return session.performance_snapshot()
+            except Exception:
+                # Setup diagnostics are optional. A failing native audio or
+                # GPU counter must not interrupt a running game or expose
+                # driver/device details through the Check my setup dialog.
+                return self._gamecube_last_performance
+        return self._gamecube_last_performance
 
     def set_volume(self, level):
         """Adjust only this application's audio, including active games."""
@@ -509,14 +640,32 @@ class Emulator:
         if sink is not None:
             sink.set_volume(volume)
 
-    def set_camera_buttons(self, player_one=(), player_two=()):
-        """Publish one atomic camera snapshot, with independent P1/P2 holds."""
+    def set_camera_buttons(self, player_one=(), player_two=(),
+                           *, sample_started_at=None, generation=None):
+        """Publish an atomic P1/P2 snapshot from its original camera frame."""
+        # The real camera pipeline provides a token from frame START. Older
+        # API callers still sample generation before checking armed state.
+        if generation is None:
+            generation = self.inputs.camera_generation()
         if self.running and self.armed:
-            self.inputs.set_camera_buttons(player_one, player_two)
+            if sample_started_at is None:
+                self.inputs.set_camera_buttons(
+                    player_one, player_two, generation=generation
+                )
+            else:
+                self.inputs.set_camera_buttons(
+                    player_one, player_two, sample_started_at=sample_started_at,
+                    generation=generation,
+                )
 
-    def press(self, button, frames=8, port=0):
-        if self.running and self.armed and self.inputs.id_for(button) is not None:
-            self.inputs.queue_press(button, frames, port=port)
+    def press(self, button, frames=8, port=0, *, generation=None):
+        if generation is None:
+            generation = self.inputs.camera_generation()
+        if self.running and self.armed:
+            return self.inputs.queue_press(
+                button, frames, port=port, generation=generation
+            )
+        return False
 
     def set_manual(self, button, down):
         self.inputs.set_manual(button, down)
@@ -559,7 +708,28 @@ class Emulator:
                 # Offscreen accelerated rendering, not Dolphin's slow/crashing
                 # CPU-only software renderer, owns game frames.
                 from anything_plays.gamecube_gpu import GameCubeHardwareSession
-                GameCubeHardwareSession(self, self.rom, self.core_path).run()
+                session = GameCubeHardwareSession(
+                    self, self.rom, self.core_path
+                )
+                self._gamecube_session = session
+                try:
+                    session.run()
+                finally:
+                    # Snapshot after native teardown, then drop the entire
+                    # session: no GL contexts, ROM references, audio frames or
+                    # ctypes callbacks remain reachable through diagnostics.
+                    try:
+                        self._gamecube_last_performance = (
+                            session.performance_snapshot()
+                        )
+                    except Exception:
+                        # Shutdown metrics are optional; failure must not
+                        # overwrite the real CoreSession exit result, or turn
+                        # a clean Stop into an emulator error. Never surface
+                        # untrusted native driver exception text as a report.
+                        self._gamecube_last_performance = None
+                    finally:
+                        self._gamecube_session = None
             elif self.system == "n64" and sys.platform == "darwin":
                 # A second native N64 init freezes the same-process core on
                 # macOS; direct dlclose even segfaults inside dyld. Spawn a
@@ -569,7 +739,11 @@ class Emulator:
             else:
                 CoreSession(self, self.system, self.rom, self.core_path).run()
         except Exception as exc:
-            self.last_error = f"{type(exc).__name__}: {exc}"
+            self.last_error = (
+                safe_gamecube_worker_error(exc)
+                if self.system == "gamecube"
+                else f"{type(exc).__name__}: {exc}"
+            )
             self.error = self.last_error
         finally:
             # All session paths, including errors BEFORE running=True,

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ctypes as C
 import os
+import re
 import sys
 import threading
 
@@ -34,6 +35,12 @@ GL_TEXTURE_MAG_FILTER = 0x2800
 GL_LINEAR = 0x2601
 GL_DEPTH24_STENCIL8 = 0x88F0
 GL_PACK_ALIGNMENT = 0x0D05
+GL_PACK_ROW_LENGTH = 0x0D02
+GL_PACK_SKIP_ROWS = 0x0D04
+GL_PACK_SKIP_PIXELS = 0x0D06
+GL_PIXEL_PACK_BUFFER = 0x88EB
+GL_PIXEL_PACK_BUFFER_BINDING = 0x88ED
+GL_READ_BUFFER = 0x0C02
 GL_VERSION = 0x1F02
 GL_RENDERER = 0x1F01
 GL_VENDOR = 0x1F00
@@ -86,23 +93,82 @@ class EGLFrameHost:
         self.display = None
         self.surface = None
         self.context = None
+        # EGL allocates a context handle before eglMakeCurrent succeeds.
+        # A handle alone must not authorize native GPU callbacks.
+        self._entered = False
         self.fbo = 0
         self.color_tex = 0
         self.depth_stencil = 0
         self.core_reset = None
         self.core_destroy = None
-        self._fbo_callback = GET_FBO(lambda: self.fbo)
-        self._proc_callback = GET_PROC(self.get_proc_address)
-        self._init_egl()
+        self._fbo_callback = GET_FBO(self._native_get_framebuffer)
+        self._proc_callback = GET_PROC(self._native_get_proc_address)
         try:
+            # EGL can fail after allocating a display, pbuffer or context.
+            # Teardown must run for *either* context setup or FBO failure,
+            # otherwise a failed GameCube boot retains native GPU handles.
+            self._init_egl()
             self._init_framebuffer()
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except Exception:
+                # Never replace the original initialization error with a
+                # secondary cleanup error from a failing graphics driver.
+                pass
             raise
 
     def _check_thread(self):
         if threading.get_ident() != self.owner:
             raise RuntimeError("OpenGL context accessed from a different thread")
+
+    def _native_get_framebuffer(self):
+        """Return only a valid GL framebuffer ID to the Libretro C callback.
+
+        A native core can call this while a GPU context is being torn down.
+        Never let a missing driver-owned attribute or invalid ID unwind
+        through CFUNCTYPE (which would leave an undefined C return value).
+        """
+        try:
+            self._check_thread()
+            # The native core can retain CFUNCTYPE pointers after close().
+            # Never advertise a stale FBO while its EGL/CGL/WGL context is
+            # gone, or before glcontext.__enter__ has succeeded.
+            if (not getattr(self, "context", None)
+                    or not getattr(self, "_entered", True)):
+                return 0
+            framebuffer = self.fbo
+            if type(framebuffer) is int and 0 < framebuffer <= 0xFFFFFFFF:
+                return framebuffer
+        except BaseException:
+            # This method is ONLY passed to a native C callback.
+            pass
+        return 0
+
+    def _native_get_proc_address(self, symbol):
+        """Return a function pointer or NULL without escaping into C.
+
+        get_proc_address is also used directly by our Python GL loader,
+        where exceptions must remain actionable. Only the Libretro callback
+        boundary isolates arbitrary native driver/proc-loader failures.
+        """
+        try:
+            self._check_thread()
+            # An obsolete native callback must return NULL *without even
+            # calling into the driver's proc loader*. Driver entry points
+            # may no longer be valid after the context was destroyed.
+            if (not getattr(self, "context", None)
+                    or not getattr(self, "_entered", True)):
+                return None
+            address = self.get_proc_address(symbol)
+            if (type(address) is int and 0 < address
+                    <= (1 << (8 * C.sizeof(C.c_void_p))) - 1):
+                return address
+        except BaseException:
+            # CFUNCTYPE swallows Python exceptions and may otherwise expose
+            # an indeterminate native pointer. NULL explicitly means absent.
+            pass
+        return None
 
     def _ef(self, name, restype, argtypes):
         fn = getattr(self.egl, name)
@@ -153,6 +219,7 @@ class EGLFrameHost:
             raise RuntimeError("Could not create offscreen OpenGL core context")
         if not self._eglfunc["eglMakeCurrent"](self.display, self.surface, self.surface, self.context):
             raise RuntimeError("Could not make offscreen OpenGL context current")
+        self._entered = True
         get_string = self._gl("glGetString", C.c_char_p, [UI])
         version = get_string(GL_VERSION)
         if not version:
@@ -180,8 +247,14 @@ class EGLFrameHost:
         self._check_thread()
         fbo, tex, depth = UI(), UI(), UI()
         self._gl("glGenFramebuffers", None, [I, C.POINTER(UI)])(1, C.byref(fbo))
+        # Take ownership immediately after each successful allocation.
+        # If a later GL call fails, __init__ invokes close(), which must
+        # know every resource that has already been created. Delaying all
+        # three assignments until FRAMEBUFFER_COMPLETE leaked partial FBOs.
+        self.fbo = fbo.value
         self._gl("glBindFramebuffer", None, [UI, UI])(GL_FRAMEBUFFER, fbo)
         self._gl("glGenTextures", None, [I, C.POINTER(UI)])(1, C.byref(tex))
+        self.color_tex = tex.value
         self._gl("glBindTexture", None, [UI, UI])(GL_TEXTURE_2D, tex)
         self._gl("glTexParameteri", None, [UI, UI, I])(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         self._gl("glTexParameteri", None, [UI, UI, I])(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -192,6 +265,7 @@ class EGLFrameHost:
             GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0
         )
         self._gl("glGenRenderbuffers", None, [I, C.POINTER(UI)])(1, C.byref(depth))
+        self.depth_stencil = depth.value
         self._gl("glBindRenderbuffer", None, [UI, UI])(GL_RENDERBUFFER, depth)
         self._gl("glRenderbufferStorage", None, [UI, UI, I, I])(
             GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, self.width, self.height
@@ -202,14 +276,31 @@ class EGLFrameHost:
         status = self._gl("glCheckFramebufferStatus", UI, [UI])(GL_FRAMEBUFFER)
         if status != GL_FRAMEBUFFER_COMPLETE:
             raise RuntimeError("Offscreen GameCube framebuffer incomplete: " + hex(status))
-        self.fbo, self.color_tex, self.depth_stencil = fbo.value, tex.value, depth.value
+        # The three handles have already been recorded, including in the
+        # failed/incomplete FBO paths, so teardown always has ownership.
 
     def accept_core_render(self, address):
         self._check_thread()
-        if not address:
+        # A late native negotiation can arrive after GPU teardown, or before
+        # glcontext has entered its Windows/macOS context. Never hand Dolphin
+        # callback pointers for a context that is no longer usable.
+        if (not getattr(self, "context", None)
+                or not getattr(self, "_entered", True)
+                or not address):
             return False
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents
         if req.context_type != 3 or (req.version_major, req.version_minor) > (4, 5):
+            return False
+        # An EGL 3.3 minimum-version request does NOT prove that a driver
+        # delivered OpenGL 4.5. Never hand a Dolphin core a GL context
+        # lower than the version it explicitly requested: calling newer
+        # entry points on older native GPU drivers can crash the process.
+        # GL_VERSION permits vendor/build suffixes such as "3.3 Mesa 24".
+        version = re.match(r"^\s*(\d+)\.(\d+)", getattr(self, "opengl_version", ""))
+        if version is None:
+            return False
+        supported = (int(version.group(1)), int(version.group(2)))
+        if (req.version_major, req.version_minor) > supported:
             return False
         if not req.context_reset:
             return False
@@ -221,14 +312,22 @@ class EGLFrameHost:
 
     def reset_core(self):
         self._check_thread()
-        if not self.core_reset:
+        # The native reset callback can execute GL entry points. A valid
+        # pointer from an earlier negotiation is not enough: failed context
+        # entry or an already closed host must never invoke stale Dolphin C.
+        if (not getattr(self, "context", None)
+                or not getattr(self, "_entered", True)
+                or not self.core_reset):
             raise RuntimeError("Dolphin did not negotiate a supported hardware context")
         C.CFUNCTYPE(None)(self.core_reset)()
 
     def destroy_core(self):
         self._check_thread()
-        if self.core_destroy:
-            cb, self.core_destroy = self.core_destroy, None
+        # Retire the pointer even if its GPU context has already gone away.
+        # Native cleanup is only safe while the context is still current.
+        cb, self.core_destroy = self.core_destroy, None
+        if (cb and getattr(self, "context", None)
+                and getattr(self, "_entered", True)):
             C.CFUNCTYPE(None)(cb)()
 
     def read_frame(self, width, height, flip_vertical=True):
@@ -248,25 +347,76 @@ class EGLFrameHost:
             self.last_gl_error = 1
             raise RuntimeError("GPU readback OpenGL error")
 
+        # Native Dolphin can leave a pixel pack buffer or a nondefault
+        # row length/skip offset bound when its video callback fires.
+        # glReadPixels treats a pointer as a PBO offset in that case, and
+        # row/skip state can write beyond our exact w*h*4 client buffer.
+        # Isolate ALL pack layout needed for this tightly packed RGBA copy;
+        # restore native GL state even after a failed transfer.
+        get_int = self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])
         old_read = C.c_int()
-        self._gl("glGetIntegerv", None, [C.c_uint, C.c_void_p])(
-            GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read)
+        get_int(GL_READ_FRAMEBUFFER_BINDING, C.byref(old_read))
+        old_pbo = C.c_int()
+        get_int(GL_PIXEL_PACK_BUFFER_BINDING, C.byref(old_pbo))
+        pack_state = (
+            (GL_PACK_ALIGNMENT, C.c_int(4), 1),
+            (GL_PACK_ROW_LENGTH, C.c_int(0), 0),
+            (GL_PACK_SKIP_ROWS, C.c_int(0), 0),
+            (GL_PACK_SKIP_PIXELS, C.c_int(0), 0),
         )
-        self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
-            GL_READ_FRAMEBUFFER, self.fbo
+        for pname, previous, _desired in pack_state:
+            get_int(pname, C.byref(previous))
+
+        bind_read = self._gl(
+            "glBindFramebuffer", None, [C.c_uint, C.c_uint]
         )
-        self._gl("glReadBuffer", None, [C.c_uint])(GL_COLOR_ATTACHMENT0)
-        self._gl("glPixelStorei", None, [C.c_uint, C.c_int])(GL_PACK_ALIGNMENT, 1)
+        bind_pack = self._gl(
+            "glBindBuffer", None, [C.c_uint, C.c_uint]
+        )
+        pixel_store = self._gl(
+            "glPixelStorei", None, [C.c_uint, C.c_int]
+        )
+        read_buffer = self._gl("glReadBuffer", None, [C.c_uint])
+        read_pixels = self._gl(
+            "glReadPixels", None,
+            [C.c_int, C.c_int, C.c_int, C.c_int,
+             C.c_uint, C.c_uint, C.c_void_p],
+        )
+        # Allocate native transfer storage before mutating GL state.
         image = (C.c_ubyte * (w * h * 4))()
+        # Read-buffer selection belongs to the FBO, not the global pack
+        # state. Query it only AFTER binding our FBO; restore it before
+        # returning to the previously active native read framebuffer.
+        old_read_buffer = C.c_int(GL_COLOR_ATTACHMENT0)
+        read_buffer_known = False
         try:
-            self._gl("glReadPixels", None, [C.c_int, C.c_int, C.c_int, C.c_int,
-                                          C.c_uint, C.c_uint, C.c_void_p])(
-                0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image
-            )
+            bind_read(GL_READ_FRAMEBUFFER, self.fbo)
+            get_int(GL_READ_BUFFER, C.byref(old_read_buffer))
+            read_buffer_known = True
+            if old_read_buffer.value != GL_COLOR_ATTACHMENT0:
+                read_buffer(GL_COLOR_ATTACHMENT0)
+            if old_pbo.value:
+                bind_pack(GL_PIXEL_PACK_BUFFER, 0)
+            for pname, previous, desired in pack_state:
+                if previous.value != desired:
+                    pixel_store(pname, desired)
+            read_pixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image)
         finally:
-            self._gl("glBindFramebuffer", None, [C.c_uint, C.c_uint])(
-                GL_READ_FRAMEBUFFER, old_read.value
-            )
+            try:
+                for pname, previous, desired in pack_state:
+                    if previous.value != desired:
+                        pixel_store(pname, previous.value)
+            finally:
+                try:
+                    if old_pbo.value:
+                        bind_pack(GL_PIXEL_PACK_BUFFER, old_pbo.value)
+                finally:
+                    try:
+                        if (read_buffer_known
+                                and old_read_buffer.value != GL_COLOR_ATTACHMENT0):
+                            read_buffer(old_read_buffer.value)
+                    finally:
+                        bind_read(GL_READ_FRAMEBUFFER, old_read.value)
         self.last_gl_error = get_error()
         if self.last_gl_error:
             # glReadPixels can fail without raising a Python exception. The
@@ -278,32 +428,62 @@ class EGLFrameHost:
         return arr[::-1].copy() if flip_vertical else arr.copy()
 
     def close(self):
+        """Release even partially initialized EGL resources, once.
+
+        EGL initialization may fail after a display or surface exists but
+        before an OpenGL context becomes current. The failed driver must not
+        mask the originating exception or leave a surface/display behind.
+        """
         self._check_thread()
-        if self.context and self.display:
-            try:
-                if self.fbo:
-                    self._gl("glDeleteFramebuffers", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.fbo))
-                    )
-                if self.color_tex:
-                    self._gl("glDeleteTextures", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.color_tex))
-                    )
-                if self.depth_stencil:
-                    self._gl("glDeleteRenderbuffers", None,
-                             [C.c_int, C.POINTER(C.c_uint)])(
-                        1, C.byref(C.c_uint(self.depth_stencil))
-                    )
-            finally:
-                self._eglfunc["eglMakeCurrent"](self.display, None, None, None)
-                self._eglfunc["eglDestroyContext"](self.display, self.context)
-                self._eglfunc["eglDestroySurface"](self.display, self.surface)
-        if self.display:
-            self._eglfunc["eglTerminate"](self.display)
+        display, surface, context = self.display, self.surface, self.context
+        entered = getattr(self, "_entered", True)
+        # Revoke callbacks synchronously, before any potentially slow native
+        # cleanup; later callbacks must not advertise the released context.
         self.display = self.surface = self.context = None
-        self.fbo = self.color_tex = self.depth_stencil = 0
+        self._entered = False
+
+        def best_effort_egl(name, *args):
+            fn = self._eglfunc.get(name)
+            if fn is not None:
+                try:
+                    fn(*args)
+                except Exception:
+                    # A destroyed context may reject cleanup operations.
+                    # Continue releasing the other independently owned
+                    # native handles; never publish vendor exception text.
+                    pass
+
+        try:
+            # GL delete functions require an entered/current context. A
+            # partially initialized EGL handle still needs EGL cleanup,
+            # but must never invoke GL driver entry points.
+            if display and context and entered:
+                for attr, symbol in (
+                    ("fbo", "glDeleteFramebuffers"),
+                    ("color_tex", "glDeleteTextures"),
+                    ("depth_stencil", "glDeleteRenderbuffers"),
+                ):
+                    identifier = getattr(self, attr, 0)
+                    if identifier:
+                        try:
+                            self._gl(symbol, None, [
+                                C.c_int, C.POINTER(C.c_uint)
+                            ])(1, C.byref(C.c_uint(identifier)))
+                        except Exception:
+                            # Do not abandon the EGL context on a GL driver
+                            # failure while removing an optional FBO.
+                            pass
+            if display and context:
+                best_effort_egl("eglMakeCurrent", display, None, None, None)
+                best_effort_egl("eglDestroyContext", display, context)
+            # A pbuffer may exist even when eglCreateContext failed.
+            if display and surface:
+                best_effort_egl("eglDestroySurface", display, surface)
+            if display:
+                best_effort_egl("eglTerminate", display)
+        finally:
+            self.fbo = self.color_tex = self.depth_stencil = 0
+            self.core_reset = self.core_destroy = None
 
     def __enter__(self):
         return self

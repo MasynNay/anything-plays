@@ -17,10 +17,12 @@ import os
 import json
 import platform
 import re
+import socket
 import subprocess
+import time
 from pathlib import Path
 import sys
-from urllib import request
+from urllib import request, error as url_error
 import zipfile
 
 BUILD_BOT = "https://buildbot.libretro.com/nightly"
@@ -309,8 +311,36 @@ def _read_core_archive(url, filename):
         download = request.Request(
             url, headers={"User-Agent": "AnythingPlays-build/2.0.0"}
         )
-        with request.urlopen(download, timeout=45) as response:
-            data = response.read(MAX_ARCHIVE_SIZE + 1)
+        # Private 3.3 QA alone may retry a transient nightly-buildbot
+        # network/DNS failure. Release builds still require preserved
+        # offline ZIPs and retain their strict SHA-256 provenance lock.
+        # No mirrors, insecure protocols or fallback to unrelated cores.
+        private_candidate = (
+            os.environ.get("AP_V33_CANDIDATE") == "1"
+            and os.environ.get("AP_V30_MINIMAL_CORE_BUILD") == "1"
+            and release_mode == "0"
+            and url.startswith(BUILD_BOT + "/")
+        )
+        attempts = 3 if private_candidate else 1
+        for attempt in range(attempts):
+            try:
+                with request.urlopen(download, timeout=45) as response:
+                    data = response.read(MAX_ARCHIVE_SIZE + 1)
+                break
+            except url_error.HTTPError:
+                # A persistent missing/forbidden archive is not a DNS
+                # outage. Never retry or silently change the source URL.
+                raise
+            except (url_error.URLError, socket.timeout, TimeoutError) as exc:
+                if isinstance(exc, url_error.URLError):
+                    transient = isinstance(exc.reason, (OSError, TimeoutError))
+                else:
+                    transient = True
+                if not transient or attempt + 1 == attempts:
+                    raise
+                # Bound the retry delay; recheck the *same* HTTPS request
+                # and verify its complete archive after one successful read.
+                time.sleep(2 * (attempt + 1))
 
     if len(data) > MAX_ARCHIVE_SIZE:
         raise ValueError("Core archive exceeds 30 MB")

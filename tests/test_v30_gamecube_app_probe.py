@@ -16,7 +16,10 @@ class ProductionGameCubeProbeTests(TestCase):
         diagnostic = (root / "tools/probe_gamecube_app.py").read_text("utf-8")
         self.assertIn("gpu_readback_seconds", production)
         self.assertIn("gpu_readback_max_seconds", production)
-        self.assertIn("time.perf_counter()", production)
+        # Native callback clocks are now guarded before entering ctypes;
+        # requiring an unguarded direct call would regress safety.
+        self.assertIn("self._optional_clock(time.perf_counter)", production)
+        self.assertIn("self.gpu_readback_timing_samples", production)
         for field in ("gpu_readback_calls", "gpu_readback_total_seconds",
                       "gpu_readback_mean_ms", "gpu_readback_max_ms",
                       "gpu_readback_fraction_elapsed"):

@@ -13,16 +13,20 @@ from anything_plays.system_profiles import DISABLED_MAPPING
 MAX_TRACKED_OBJECTS = 16
 
 
-def locate_targets(frame, rgb, tolerance, min_area, *, max_targets=MAX_TRACKED_OBJECTS):
+def locate_targets(frame, rgb, tolerance, min_area, *,
+                   max_targets=MAX_TRACKED_OBJECTS, hsv=None):
     """Find multiple *independent* matching fish, not only the largest one.
 
     Each connected color component is a separate fish. Sort by area so noise
     cannot flood the input buffer; cap tracking to 16 objects per color.
     Coordinates and contour data belong to the supplied, unmodified frame.
-    Hue distance wraps safely around red's HSV boundary.
+    Hue distance wraps safely around red's HSV boundary. An optional
+    precomputed HSV frame lets dual-color tracking reuse one BGR conversion;
+    the single-color and legacy callers retain identical behavior.
     """
     limit = max(1, min(MAX_TRACKED_OBJECTS, int(max_targets)))
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    if hsv is None:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     target = cv2.cvtColor(np.uint8([[rgb]]), cv2.COLOR_RGB2HSV)[0, 0]
     hue, saturation, value = (int(channel) for channel in target)
     hue_image = hsv[:, :, 0].astype(np.int16)

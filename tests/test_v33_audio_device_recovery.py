@@ -1,0 +1,713 @@
+"""3.3 PortAudio shutdown/recovery: no device, speakers or ROM needed."""
+import io
+import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+import numpy as np
+
+from anything_plays.libretro_audio import AudioSink
+
+
+class AudioDeviceRecoveryTests(unittest.TestCase):
+    def test_stop_failure_still_closes_native_output_stream(self):
+        audio = AudioSink()
+        stream = Mock()
+        stream.stop.side_effect = OSError("PRIVATE audio serial /dev/dri/secret")
+        audio.stream = stream
+        log = io.StringIO()
+        with patch("anything_plays.libretro_audio.sys.stderr", log):
+            audio.close()
+        stream.stop.assert_called_once_with()
+        stream.close.assert_called_once_with()
+        self.assertIsNone(audio.stream)
+        self.assertFalse(audio.output_active)
+        self.assertIn("Could not stop audio output (OSError)", log.getvalue())
+        self.assertNotIn("PRIVATE", log.getvalue())
+        audio.close()
+        stream.stop.assert_called_once_with()
+        stream.close.assert_called_once_with()
+
+    def test_both_stop_and_close_failures_are_nonfatal(self):
+        audio = AudioSink()
+        stream = Mock()
+        stream.stop.side_effect = RuntimeError("private speaker token")
+        stream.close.side_effect = OSError("private output path /Users/owner")
+        audio.stream = stream
+        log = io.StringIO()
+        with patch("anything_plays.libretro_audio.sys.stderr", log):
+            audio.close()
+        stream.close.assert_called_once_with()
+        self.assertIn("Could not stop audio output (RuntimeError)", log.getvalue())
+        self.assertIn("Could not close audio output (OSError)", log.getvalue())
+        self.assertNotIn("private", log.getvalue())
+        self.assertNotIn("/Users/", log.getvalue())
+        self.assertIsNone(audio.stream)
+
+    def test_closed_stderr_never_masks_portaudio_teardown_error(self):
+        audio = AudioSink()
+        stream = Mock()
+        stream.stop.side_effect = OSError("private stop failure")
+        stream.close.side_effect = OSError("private close failure")
+        audio.stream = stream
+        closed = io.StringIO()
+        closed.close()
+        with patch("anything_plays.libretro_audio.sys.stderr", closed):
+            audio.close()
+        stream.stop.assert_called_once()
+        stream.close.assert_called_once()
+        self.assertIsNone(audio.stream)
+
+    def test_missing_backend_still_allows_silent_gameplay_with_closed_stderr(self):
+        audio = AudioSink()
+        closed = io.StringIO()
+        closed.close()
+        with (
+            patch("anything_plays.libretro_audio.sd", None),
+            patch("anything_plays.libretro_audio.sys.stderr", closed),
+        ):
+            audio.start(48000)
+        self.assertFalse(audio.output_active)
+        self.assertIn("audio backend", audio.output_error)
+        audio.push(np.array([[17, -17]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 1)
+        audio.close()
+
+    def test_failed_output_device_reports_status_with_closed_stderr(self):
+        audio = AudioSink()
+        device = Mock()
+        device.query_devices.return_value = {"default_samplerate": 48000}
+        device.OutputStream.side_effect = OSError(
+            "PRIVATE unplugged speaker /home/owner/audio"
+        )
+        closed = io.StringIO()
+        closed.close()
+        with (
+            patch("anything_plays.libretro_audio.sd", device),
+            patch("anything_plays.libretro_audio.sys.stderr", closed),
+        ):
+            audio.start(48000)
+        self.assertFalse(audio.output_active)
+        self.assertEqual(audio.output_error, "No usable audio output device (OSError)")
+        self.assertIsNone(audio.stream)
+        audio.push(np.array([[30, 50]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 1)
+        audio.close()
+
+
+    def test_wrong_48k_device_default_recovers_at_44k1_with_real_pcm(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000.0}
+        streams = {}
+        attempts = []
+
+        def create_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            if samplerate == 48000:
+                stream.start.side_effect = OSError(
+                    "PRIVATE HDMI driver /Users/owner/speaker-serial"
+                )
+            streams[samplerate] = stream
+            return stream
+
+        backend.OutputStream.side_effect = create_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertTrue(audio.output_active)
+        self.assertIsNone(audio.output_error)
+        self.assertEqual(attempts, [48000, 44100])
+        streams[48000].close.assert_called_once_with()
+        self.assertIs(audio.stream, streams[44100])
+        self.assertEqual(audio.source_sample_rate, 48000)
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 48000 / 44100)
+        audio.push(np.tile(np.array([[1200, -1200]], dtype=np.int16),
+                           (4800, 1)))
+        output = np.zeros((4000, 2), dtype=np.int16)
+        audio.callback(output, 4000, None, None)
+        self.assertTrue(np.all(output[:, 0] == 1200))
+        self.assertTrue(np.all(output[:, 1] == -1200))
+        self.assertEqual(audio.delivery_snapshot()[
+            "audio_output_underrun_frames"], 0)
+        audio.close()
+        streams[44100].stop.assert_called_once_with()
+        streams[44100].close.assert_called_once_with()
+
+    def test_wrong_44k1_default_recovers_at_48k_and_keeps_pcm(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 44100.0}
+        streams = {}
+        attempts = []
+
+        def create_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            if samplerate == 44100:
+                stream.start.side_effect = RuntimeError(
+                    "PRIVATE old speaker /dev/audio-device"
+                )
+            streams[samplerate] = stream
+            return stream
+
+        backend.OutputStream.side_effect = create_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(44100)
+        self.assertEqual(attempts, [44100, 48000])
+        self.assertTrue(audio.output_active)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertAlmostEqual(audio._resample_step, 44100 / 48000)
+        streams[44100].close.assert_called_once_with()
+        audio.push(np.tile(np.array([[600, -600]], dtype=np.int16),
+                           (4410, 1)))
+        output = np.zeros((4000, 2), dtype=np.int16)
+        audio.callback(output, 4000, None, None)
+        self.assertTrue(np.all(output[:, 0] == 600))
+        self.assertTrue(np.all(output[:, 1] == -600))
+        audio.close()
+
+    def test_all_standard_rate_failures_stop_attempts_and_allow_silent_game(self):
+        audio = AudioSink()
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts = []
+        streams = []
+
+        def failing_stream(*, samplerate, **kwargs):
+            attempts.append(samplerate)
+            stream = Mock()
+            stream.start.side_effect = OSError("PRIVATE serial /home/audio")
+            streams.append(stream)
+            return stream
+
+        backend.OutputStream.side_effect = failing_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(len(streams), 2)
+        for stream in streams:
+            stream.close.assert_called_once_with()
+        self.assertFalse(audio.output_active)
+        self.assertIsNone(audio.stream)
+        self.assertEqual(audio.output_error,
+                         "No usable audio output device (OSError)")
+        self.assertNotIn("PRIVATE", audio.output_error)
+        audio.push(np.array([[7, -7]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 1)
+        audio.close()
+
+
+
+    def test_preloaded_native_pcm_resamples_before_first_device_callback(self):
+        # 131072 Hz Libretro audio can be queued during retro_init. The
+        # OutputStream.start() callback must not consume it as 48kHz PCM.
+        audio = AudioSink()
+        for _ in range(300):
+            audio.sample(1350, -1350)
+        self.assertEqual(audio._single_count, 44)
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        observed = []
+
+        class Stream:
+            def start(self):
+                first = np.full((100, 2), -999, dtype=np.int16)
+                audio.callback(first, 100, None, None)
+                observed.append(first.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        backend.OutputStream.side_effect = lambda **kwargs: Stream()
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertTrue(audio.output_active)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertEqual(audio._single_count, 0)
+        self.assertEqual(len(observed), 1)
+        np.testing.assert_array_equal(
+            observed[0], np.tile([1350, -1350], (100, 1))
+        )
+        self.assertEqual(
+            audio.delivery_snapshot()["audio_output_underrun_frames"], 0
+        )
+        audio.close()
+
+    def test_failed_resampling_start_restores_source_pcm_for_second_rate(self):
+        # A rejected 48kHz stream cannot double-resample or consume the
+        # source queue needed by a later 44.1kHz device.
+        audio = AudioSink()
+        audio.push(np.tile(np.array([[900, -900]], dtype=np.int16),
+                           (1024, 1)))
+        original_frames = sum(len(x) for x in list(audio.chunks.queue))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts, discarded, observed = [], [], []
+
+        class Stream:
+            def __init__(self, rate, callback):
+                self.rate = rate
+                self.callback = callback
+
+            def start(self):
+                if self.rate == 48000:
+                    raise OSError("PRIVATE rejected audio /Users/owner")
+                out = np.full((300, 2), -999, dtype=np.int16)
+                self.callback(out, 300, None, None)
+                observed.append(out.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                discarded.append(self.rate)
+
+        def output_stream(*, samplerate, callback, **kwargs):
+            attempts.append(samplerate)
+            return Stream(samplerate, callback)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(discarded, [48000])
+        self.assertEqual(original_frames, 1024)
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 131072 / 44100)
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        np.testing.assert_array_equal(
+            observed[0], np.tile([900, -900], (300, 1))
+        )
+        audio.close()
+        self.assertEqual(discarded, [48000, 44100])
+
+    def test_all_rejected_rates_preserve_native_startup_buffer(self):
+        audio = AudioSink()
+        audio.push(np.array([[21, -21], [32, -32]], dtype=np.int16))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        rejected = []
+
+        class Stream:
+            def __init__(self, rate):
+                self.rate = rate
+
+            def start(self):
+                raise OSError("PRIVATE speaker /dev/private-audio")
+
+            def close(self):
+                rejected.append(self.rate)
+
+        backend.OutputStream.side_effect = (
+            lambda *, samplerate, **kwargs: Stream(samplerate)
+        )
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertEqual(rejected, [48000, 44100])
+        self.assertEqual(audio.output_error,
+                         "No usable audio output device (OSError)")
+        self.assertFalse(audio.output_active)
+        self.assertIsNone(audio._resample_step)
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        raw = np.concatenate(list(audio.chunks.queue))
+        np.testing.assert_array_equal(raw, [[21, -21], [32, -32]])
+        audio.close()
+
+
+    def test_rejected_native_rate_after_partial_callback_recovers_full_pcm(self):
+        # A driver may call back before start() returns and then reject
+        # its rate. The next 44.1k device must receive the ORIGINAL
+        # preloaded PCM rather than the partly consumed 48k playback.
+        audio = AudioSink()
+        audio.push(np.tile(np.array([[1100, -1100]], dtype=np.int16),
+                           (2048, 1)))
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempts, closed, first_attempt, successful = [], [], [], []
+
+        class Stream:
+            def __init__(self, rate, callback):
+                self.rate = rate
+                self.callback = callback
+
+            def start(self):
+                frames = 300
+                out = np.full((frames, 2), -999, dtype=np.int16)
+                if self.rate == 48000:
+                    self.callback(
+                        out, frames, None,
+                        SimpleNamespace(output_underflow=True),
+                    )
+                    first_attempt.append(out.copy())
+                    raise OSError("PRIVATE device /Users/person/usb")
+                self.callback(out, frames, None, None)
+                successful.append(out.copy())
+
+            def stop(self):
+                pass
+
+            def close(self):
+                closed.append(self.rate)
+
+        def output_stream(*, samplerate, callback, **kwargs):
+            attempts.append(samplerate)
+            return Stream(samplerate, callback)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(attempts, [48000, 44100])
+        self.assertEqual(closed, [48000])
+        self.assertEqual(audio.output_sample_rate, 44100)
+        self.assertAlmostEqual(audio._resample_step, 48000 / 44100)
+        np.testing.assert_array_equal(
+            first_attempt[0], np.tile([1100, -1100], (300, 1))
+        )
+        np.testing.assert_array_equal(
+            successful[0], np.tile([1100, -1100], (300, 1))
+        )
+        metrics = audio.delivery_snapshot()
+        self.assertEqual(metrics["audio_output_callback_calls"], 1)
+        self.assertEqual(metrics["audio_output_requested_frames"], 300)
+        self.assertEqual(metrics["audio_output_device_underflow_callbacks"], 0)
+        self.assertEqual(metrics["audio_output_underrun_frames"], 0)
+        self.assertEqual(metrics["audio_queue_dropped_frames"], 0)
+        audio.close()
+        self.assertEqual(closed, [48000, 44100])
+
+    def test_failed_native_rate_preserves_partially_pending_source_audio(self):
+        # Retrying an already populated sink must not lose its current
+        # partially read chunk or change its original playback position.
+        audio = AudioSink()
+        audio.push(np.array([[11, -11], [22, -22], [33, -33],
+                             [44, -44]], dtype=np.int16))
+        pre = np.zeros((1, 2), dtype=np.int16)
+        audio.callback(pre, 1, None, None)
+        self.assertEqual(pre.tolist(), [[11, -11]])
+        self.assertEqual(audio.position, 1)
+        original_pending = audio.pending
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+
+        class FailingStream:
+            def start(self):
+                out = np.zeros((2, 2), dtype=np.int16)
+                audio.callback(out, 2, None, None)
+                raise OSError("PRIVATE /dev/usb-audio")
+            def close(self):
+                pass
+
+        backend.OutputStream.side_effect = lambda **_kwargs: FailingStream()
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(48000)
+        self.assertEqual(
+            audio.output_error, "No usable audio output device (OSError)"
+        )
+        self.assertIs(audio.pending, original_pending)
+        self.assertEqual(audio.position, 1)
+        out = np.zeros((3, 2), dtype=np.int16)
+        audio.callback(out, 3, None, None)
+        self.assertEqual(out.tolist(), [[22, -22], [33, -33], [44, -44]])
+        self.assertEqual(audio.queue_dropped_frames, 0)
+        audio.close()
+
+    def test_nonfinite_native_sample_rates_fail_closed_before_audio_device_io(self):
+        backend = Mock()
+        invalid_rates = (
+            float("nan"), float("inf"), float("-inf"),
+            np.float64("nan"), np.float32("inf"),
+            None, True, False, np.bool_(True), "48000",
+            {}, [], object(), 0, -1, 7999.9, 192000.1,
+            10 ** 1000,
+        )
+        with patch("anything_plays.libretro_audio.sd", backend):
+            for rate in invalid_rates:
+                with self.subTest(rate_type=type(rate).__name__,
+                                  rate_repr=str(rate)[:30]):
+                    audio = AudioSink()
+                    audio.start(rate)
+                    self.assertEqual(
+                        audio.output_error,
+                        "Emulator reported an invalid sample rate",
+                    )
+                    self.assertFalse(audio.output_active)
+                    self.assertIsNone(audio.stream)
+                    # Even a damaged native clock must not block gameplay.
+                    audio.push(np.array([[17, -17]], dtype=np.int16))
+                    self.assertEqual(audio.chunks.qsize(), 1)
+                    audio.close()
+        backend.query_devices.assert_not_called()
+        backend.OutputStream.assert_not_called()
+
+    def test_valid_finite_numpy_core_rate_still_starts_and_delivers_pcm(self):
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000.0}
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio = AudioSink()
+            audio.start(np.float64(48000.25))
+        self.assertTrue(audio.output_active)
+        self.assertIsNone(audio.output_error)
+        self.assertEqual(audio.source_sample_rate, 48000)
+        self.assertEqual(audio.output_sample_rate, 48000)
+        self.assertIsNone(audio._resample_step)
+        backend.OutputStream.assert_called_once()
+        audio.push(np.array([[1200, -1200], [600, -600]], dtype=np.int16))
+        out = np.zeros((2, 2), dtype=np.int16)
+        audio.callback(out, 2, None, None)
+        self.assertEqual(out.tolist(), [[1200, -1200], [600, -600]])
+        audio.close()
+
+
+    def test_gamecube_setup_reports_device_status_without_claiming_sound(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import (
+            ReadbackTimingHistogram, PreviewCadenceTracker,
+        )
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+
+        audio = AudioSink()
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._readback_histogram = ReadbackTimingHistogram()
+        session._preview_cadence = PreviewCadenceTracker()
+
+        def get_audio_line():
+            report = session.performance_snapshot()
+            return (
+                report["metrics"],
+                _gamecube_performance_summary_lines(report)[-1],
+            )
+
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], False)
+        self.assertIs(metrics["audio_stream_started_during_session"], False)
+        self.assertIn("no output stream opened", line)
+        self.assertNotIn("native", line)
+
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], True)
+        self.assertIs(metrics["audio_stream_started_during_session"], True)
+        self.assertEqual(metrics["audio_native_rate_hz"], 131072)
+        self.assertEqual(metrics["audio_output_rate_hz"], 48000)
+        self.assertIn("awaiting audio callback", line)
+        self.assertIn("native 131072 Hz", line)
+        self.assertIn("output 48000 Hz", line)
+        audio.push(np.full((400, 2), (400, -400), dtype=np.int16))
+        out = np.zeros((100, 2), dtype=np.int16)
+        audio.callback(out, 100, None, None)
+        metrics, line = get_audio_line()
+        self.assertIn("callbacks observed (speaker unverified)", line)
+        self.assertEqual(metrics["audio_output_callback_calls"], 1)
+        audio.close()
+        metrics, line = get_audio_line()
+        self.assertIs(metrics["audio_stream_active"], False)
+        self.assertIs(metrics["audio_stream_started_during_session"], True)
+        self.assertIn("closed (opened during session)", line)
+        self.assertNotIn("speaker verified", line)
+
+    def test_gamecube_audio_status_does_not_serialize_driver_objects(self):
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import PreviewCadenceTracker
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+        import json
+
+        audio = AudioSink()
+        audio.output_active = "PRIVATE driver /home/owner"
+        audio.output_ever_started = object()
+        audio.source_sample_rate = "PRIVATE vendor path"
+        audio.output_sample_rate = 48000
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._preview_cadence = PreviewCadenceTracker()
+        report = session.performance_snapshot()
+        lines = _gamecube_performance_summary_lines(report)
+        self.assertNotIn("audio_stream_active", report["metrics"])
+        self.assertNotIn("audio_native_rate_hz", report["metrics"])
+        self.assertNotIn("PRIVATE", json.dumps(report))
+        self.assertNotIn("PRIVATE", str(lines))
+
+
+    def test_native_pcm_counts_are_not_duplicated_by_resampling_retries(self):
+        import ctypes as C
+        audio = AudioSink()
+        # Three single-sample callbacks; the final block is not yet flushed.
+        audio.sample(100, 0)
+        audio.sample(0, -200)
+        audio.sample(0, 0)
+        samples = (C.c_int16 * 8)(0, 0, 11, -12, 0, 0, 9, 0)
+        pointer = C.cast(samples, C.c_void_p)
+        self.assertEqual(audio.batch(pointer, 4), 4)
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 7,
+            "audio_core_nonzero_channel_values": 5,
+        })
+        backend = Mock()
+        backend.query_devices.return_value = {"default_samplerate": 48000}
+        attempted_rates = []
+
+        class Stream:
+            def __init__(self, rate):
+                self.rate = rate
+
+            def start(self):
+                if self.rate == 48000:
+                    raise OSError("PRIVATE /Users/owner/hdmi-audio")
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        def output_stream(*, samplerate, **kwargs):
+            attempted_rates.append(samplerate)
+            return Stream(samplerate)
+
+        backend.OutputStream.side_effect = output_stream
+        with patch("anything_plays.libretro_audio.sd", backend):
+            audio.start(131072)
+        self.assertTrue(audio.output_active)
+        self.assertEqual(attempted_rates, [48000, 44100])
+        # Staging at 48k and restaging at 44.1k cannot count as core PCM.
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 7,
+            "audio_core_nonzero_channel_values": 5,
+        })
+        audio.close()
+        self.assertEqual(audio.native_pcm_snapshot()[
+            "audio_core_pcm_frames"], 7)
+
+    def test_gamecube_source_pcm_diagnostics_distinguish_silence_from_output(self):
+        import ctypes as C
+        import json
+        from anything_plays.gamecube_gpu import GameCubeHardwareSession
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.gamecube_preview import PreviewCadenceTracker
+        from anything_plays.ui_setup_diagnostics import (
+            _gamecube_performance_summary_lines,
+        )
+        audio = AudioSink()
+        session = object.__new__(GameCubeHardwareSession)
+        session.audio = audio
+        session.native_run_timing = GameCubeNativeTiming()
+        session.gpu_readback_seconds = 0.0
+        session.gpu_readback_max_seconds = 0.0
+        session.gpu_readback_calls = 0
+        session.gpu_readback_timing_samples = 0
+        session.preview_clock_failures = 0
+        session.hardware_frames = 0
+        session.preview_readback_skips = 0
+        session._preview_cadence = PreviewCadenceTracker()
+
+        def inspect():
+            report = session.performance_snapshot()
+            return report["metrics"], _gamecube_performance_summary_lines(
+                report
+            )[-1]
+
+        metrics, line = inspect()
+        self.assertIn("core PCM not observed", line)
+        self.assertEqual(metrics["audio_core_pcm_frames"], 0)
+        self.assertIn("no output stream opened", line)
+
+        audio.sample(0, 0)
+        data = (C.c_int16 * 4)(0, 0, 0, 0)
+        audio.batch(C.cast(data, C.c_void_p), 2)
+        metrics, line = inspect()
+        self.assertEqual(metrics["audio_core_pcm_frames"], 3)
+        self.assertEqual(metrics["audio_core_nonzero_channel_values"], 0)
+        self.assertIn("core generated 3 silent PCM frames", line)
+
+        audio.sample(-10, 20)
+        metrics, line = inspect()
+        self.assertEqual(metrics["audio_core_pcm_frames"], 4)
+        self.assertEqual(metrics["audio_core_nonzero_channel_values"], 2)
+        self.assertIn("2 nonzero channel values", line)
+        self.assertIn("speaker unverified", line)
+        self.assertIn("no output stream opened", line)
+        self.assertNotIn("speaker verified", line)
+
+        # Malicious/invalid instrumentation cannot enter the copied report.
+        audio.native_pcm_frames = "/Users/private/games/a.iso"
+        audio.native_nonzero_sample_values = object()
+        metrics, line = inspect()
+        self.assertNotIn("audio_core_pcm_frames", metrics)
+        self.assertNotIn("audio_core_nonzero_channel_values", metrics)
+        self.assertNotIn("private", json.dumps(metrics))
+        self.assertNotIn("private", line)
+        audio.native_pcm_frames = True
+        audio.native_nonzero_sample_values = 0
+        self.assertEqual(audio.native_pcm_snapshot(), {})
+
+    def test_invalid_native_batch_does_not_count_pcm_frames(self):
+        import ctypes as C
+        from anything_plays.libretro_audio import MAX_AUDIO_BATCH_FRAMES
+        audio = AudioSink()
+        self.assertEqual(
+            audio.batch(C.c_void_p(1), MAX_AUDIO_BATCH_FRAMES + 1), 0
+        )
+        self.assertEqual(audio.batch(C.c_void_p(), 10), 10)
+        self.assertEqual(audio.native_pcm_snapshot(), {
+            "audio_core_pcm_frames": 0,
+            "audio_core_nonzero_channel_values": 0,
+        })
+
+    def test_portaudio_status_property_error_does_not_interrupt_pcm(self):
+        class BrokenStatus:
+            @property
+            def output_underflow(self):
+                raise OSError("PRIVATE driver property /Users/owner")
+        audio = AudioSink()
+        audio.push(np.array([[100, -100], [50, 25]], dtype=np.int16))
+        out = np.full((3, 2), 999, dtype=np.int16)
+        audio.callback(out, 3, None, BrokenStatus())
+        self.assertEqual(out.tolist(), [[100, -100], [50, 25], [0, 0]])
+        metrics = audio.delivery_snapshot()
+        self.assertEqual(metrics["audio_output_callback_calls"], 1)
+        self.assertEqual(metrics["audio_output_requested_frames"], 3)
+        self.assertEqual(metrics["audio_output_underrun_frames"], 1)
+        self.assertEqual(metrics["audio_output_device_underflow_callbacks"], 0)
+
+    def test_successful_native_underflow_status_still_counted(self):
+        audio = AudioSink()
+        out = np.full((1, 2), 77, dtype=np.int16)
+        audio.callback(out, 1, None, SimpleNamespace(output_underflow=True))
+        self.assertEqual(out.tolist(), [[0, 0]])
+        self.assertEqual(
+            audio.delivery_snapshot()["audio_output_device_underflow_callbacks"], 1
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

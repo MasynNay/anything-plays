@@ -107,7 +107,7 @@ def prepare_test_preferences(home=None, *, channel=None):
     identity = make_identity(channel)  # Reject unknown channels; isolate 3.0.
     root = home / ".config"
     _checked_directory(root)
-    if channel == "v32_preview":
+    if channel in ("v32_preview", "v33_candidate"):
         # An unreleased development preview must never read/copy settings
         # from stable, 3.0, 3.1, 3.1.1 or any prior RC installation.
         destination = root / identity["settings_namespace"]
