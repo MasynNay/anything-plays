@@ -175,23 +175,26 @@ class GameCubeHardwareSession(CoreSession):
             )
             tracker = getattr(self, "_preview_cadence", None)
             if tracker is not None:
-                # An FPS upshift should not inherit the older, slower
-                # start-to-start copy deadline. Keep the previous readback
-                # *completion* and duration, however: an over-budget GPU
-                # stall still needs its new-rate post-completion cooldown.
-                # Otherwise 20->60 after a 75ms glReadPixels could trigger
-                # another expensive GPU sync just milliseconds later.
-                # Downshifts continue to honor their new slower interval.
-                previous_mode = tracker.mode
-                tracker.reset_for(mode)
-                if (previous_mode is not None
-                        and tracker.mode != previous_mode
-                        and preview_fps(tracker.mode)
-                        > preview_fps(previous_mode)):
-                    # Only release the start-based mode deadline. Preserve
-                    # the slow-readback completion fence to protect native
-                    # Dolphin frame pacing on underpowered GPUs.
-                    self._last_preview_capture = None
+                try:
+                    # An FPS upshift should not inherit the older, slower
+                    # start-to-start copy deadline. Keep the previous
+                    # readback *completion* and duration, however: an
+                    # over-budget GPU stall still needs its post-completion
+                    # cooldown. Downshifts honor their slower interval.
+                    previous_mode = tracker.mode
+                    tracker.reset_for(mode)
+                    if (previous_mode is not None
+                            and tracker.mode != previous_mode
+                            and preview_fps(tracker.mode)
+                            > preview_fps(previous_mode)):
+                        self._last_preview_capture = None
+                except Exception:
+                    # This is only a bounded FPS diagnostic. A broken
+                    # injected/extension timing collector must not unwind
+                    # Dolphin's ctypes video callback or stop the game.
+                    # Disable this session's damaged collector and continue
+                    # using the normal GPU readback throttle.
+                    self._preview_cadence = None
             if now is None:
                 # Invalid timing is neither a deliberately skipped GL
                 # readback nor a native emulation frame failure.
@@ -270,7 +273,13 @@ class GameCubeHardwareSession(CoreSession):
                 )
                 hist = getattr(self, "_readback_histogram", None)
                 if hist is not None:
-                    hist.record(duration)
+                    try:
+                        hist.record(duration)
+                    except Exception:
+                        # Histogram observation is optional. Never drop
+                        # valid GPU pixels or abort native retro_run() due
+                        # to a broken timing/extension object.
+                        self._readback_histogram = None
             else:
                 self.preview_clock_failures = (
                     getattr(self, "preview_clock_failures", 0) + 1
@@ -308,7 +317,12 @@ class GameCubeHardwareSession(CoreSession):
                 )
             tracker = getattr(self, "_preview_cadence", None)
             if tracker is not None:
-                tracker.record_published(publication_time, mode)
+                try:
+                    tracker.record_published(publication_time, mode)
+                except Exception:
+                    # The image has already been published safely. Optional
+                    # diagnostics must never reclassify it as a GPU error.
+                    self._preview_cadence = None
             return
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
@@ -338,10 +352,25 @@ class GameCubeHardwareSession(CoreSession):
             "gamecube_preview_readback_skips": self.preview_readback_skips,
         })
         hist = getattr(self, "_readback_histogram", None)
-        metrics.update(
-            hist.snapshot() if hist is not None
-            else ReadbackTimingHistogram().snapshot()
-        )
+        # A third-party diagnostic implementation can raise or return
+        # unexpected/private data. Only the exact first-party bounded
+        # histogram is allowed to populate a copied setup report.
+        readback_metrics = ReadbackTimingHistogram().snapshot()
+        if type(hist) is ReadbackTimingHistogram:
+            try:
+                observed = hist.snapshot()
+                if (type(observed) is dict
+                        and all(type(observed.get(k)) is int
+                                for k in readback_metrics)
+                        and -1 <= observed["gpu_readback_p95_bucket_code"] <= 8
+                        and observed["gpu_readback_over_16ms"] >= 0
+                        and observed["gpu_readback_over_33ms"] >= 0):
+                    readback_metrics = {
+                        k: observed[k] for k in readback_metrics
+                    }
+            except Exception:
+                pass
+        metrics.update(readback_metrics)
         metrics.update(self.audio.delivery_snapshot())
         # Count native-generated samples only through the first-party
         # Libretro audio callbacks. Staged/resampled output copies are NOT
@@ -365,10 +394,29 @@ class GameCubeHardwareSession(CoreSession):
                 if type(rate) is int and 8_000 <= rate <= 192_000:
                     metrics[key] = rate
         tracker = getattr(self, "_preview_cadence", None)
-        metrics.update(
-            tracker.snapshot() if tracker is not None
-            else PreviewCadenceTracker().snapshot()
-        )
+        cadence_metrics = PreviewCadenceTracker().snapshot()
+        if type(tracker) is PreviewCadenceTracker:
+            try:
+                observed = tracker.snapshot()
+                if (type(observed) is dict
+                        and type(observed.get("gamecube_preview_target_fps"))
+                        is int
+                        and observed["gamecube_preview_target_fps"] in
+                        (0, 20, 30, 60)
+                        and all(type(observed.get(k)) in (int, float)
+                                and math.isfinite(observed[k])
+                                and observed[k] >= 0
+                                for k in (
+                                    "gamecube_preview_observed_capture_fps",
+                                    "gamecube_preview_cadence_intervals",
+                                    "gamecube_preview_max_interval_ms",
+                                ))):
+                    cadence_metrics = {
+                        k: observed[k] for k in cadence_metrics
+                    }
+            except Exception:
+                pass
+        metrics.update(cadence_metrics)
         return {
             "format": "anything-plays-gamecube-performance",
             "version": 1,

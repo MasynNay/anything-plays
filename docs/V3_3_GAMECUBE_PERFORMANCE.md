@@ -765,3 +765,25 @@ as the GPU cooldown allows. Downshifts and normal preview cadence remain
 unchanged. Synthetic tests cover a 75ms readback followed by a 20→60 FPS
 upshift at +7ms after publication and a successful next copy at +25ms.
 This is GPU callback-level logic validation, not measured physical FPS.
+
+
+## Treat GameCube preview timing as optional, even when collectors fail
+
+A damaged or extension-instrumented GameCube GPU readback histogram or
+preview cadence tracker must never raise through Dolphin's native
+`ctypes` video callback. A failed mode-reset or publication observation
+now disables only that optional collector and continues the same GL
+readback, native pixel publication and later gameplay. A histogram
+observation failure likewise cannot turn a valid GPU frame into an
+OpenGL error or force the game to stop. The native event loop, PortAudio
+and inputs are unchanged.
+
+The local/copyable performance snapshot falls back to empty first-party
+P95/cadence counters if one of those optional collectors throws or provides
+malformed data. Only the allowlisted numeric metrics from the exact built-in
+collector can enter the report; unexpected driver strings or plugin-added
+fields are omitted. Five GPU-free tests cover failed mode-reset, histogram
+observation, post-publication observation, private snapshot fields and
+malformed numeric values. **Unavailable timing is not proof of healthy
+hardware**; the 30-minute real GameCube/OBS/speaker acceptance gate is
+unchanged.
