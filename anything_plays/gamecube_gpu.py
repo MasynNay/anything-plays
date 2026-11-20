@@ -87,6 +87,10 @@ class GameCubeHardwareSession(CoreSession):
         self._last_preview_capture = None
         self._last_preview_publication = None
         self._last_preview_readback_duration = 0.0
+        # Emergency preview pacing when the native monotonic clock fails.
+        # -1: first missing reading; 0..stride-1: bounded callback phase.
+        # Never use these copies as evidence of measured preview FPS.
+        self._clockless_preview_phase = -1
         self._preview_cadence = PreviewCadenceTracker()
         self.raw_video_callbacks = 0
         self.null_video_callbacks = 0
@@ -196,30 +200,50 @@ class GameCubeHardwareSession(CoreSession):
                     # using the normal GPU readback throttle.
                     self._preview_cadence = None
             if now is None:
-                # Invalid timing is neither a deliberately skipped GL
-                # readback nor a native emulation frame failure.
                 self.preview_clock_failures = (
                     getattr(self, "preview_clock_failures", 0) + 1
                 )
-                return
-            # Keep normal fast GPU copies on the target start-to-start
-            # cadence. Only an *over-budget* previous readback adds a short
-            # recovery interval from completion; otherwise even a healthy
-            # 60 FPS / 4ms GPU would be needlessly reduced to ~30 FPS.
-            interval = 1.0 / preview_fps(mode) - 0.001
-            previous_slow = (
-                getattr(self, "_last_preview_readback_duration", 0.0)
-                >= interval
-            )
-            previous_publication = getattr(
-                self, "_last_preview_publication", None
-            )
-            if (not should_capture(self._last_preview_capture, now, mode)
-                    or (previous_slow and not should_capture(
-                        previous_publication, now, mode
-                    ))):
-                self.preview_readback_skips += 1
-                return
+                # One transient bad clock read keeps the historical safe
+                # skip behavior. But a prolonged clock outage must not
+                # freeze GameCube's *visible* last frame indefinitely
+                # while native retro_run/audio/input keep progressing.
+                #
+                # Use a conservative, constant-memory callback-count
+                # throttle (nominal 120-callback budget), NEVER fabricated
+                # timestamps or FPS. Its absolute cadence cannot be
+                # guaranteed without a working clock, so physical GPU/OBS
+                # measurements remain unavailable during this fallback.
+                phase = getattr(self, "_clockless_preview_phase", -1)
+                if type(phase) is not int or phase < -1:
+                    phase = -1
+                if phase == -1:
+                    self._clockless_preview_phase = 0
+                    return
+                fps = preview_fps(mode)
+                stride = max(2, (120 + fps - 1) // fps)
+                self._clockless_preview_phase = (phase + 1) % stride
+                if phase != 0:
+                    self.preview_readback_skips += 1
+                    return
+            else:
+                self._clockless_preview_phase = -1
+                # Keep normal fast GPU copies on the target start-to-start
+                # cadence. Only an *over-budget* previous readback adds a
+                # short recovery interval from completion.
+                interval = 1.0 / preview_fps(mode) - 0.001
+                previous_slow = (
+                    getattr(self, "_last_preview_readback_duration", 0.0)
+                    >= interval
+                )
+                previous_publication = getattr(
+                    self, "_last_preview_publication", None
+                )
+                if (not should_capture(self._last_preview_capture, now, mode)
+                        or (previous_slow and not should_capture(
+                            previous_publication, now, mode
+                        ))):
+                    self.preview_readback_skips += 1
+                    return
             begun = self._optional_clock(time.perf_counter)
             try:
                 rgb = self.host.read_frame(width, height)
@@ -299,8 +323,11 @@ class GameCubeHardwareSession(CoreSession):
             # from publication, so a slow readback cannot trigger an
             # immediate second GPU stall. This changes preview copies only.
             self._last_preview_capture = now
-            publication_time = self._optional_clock(time.monotonic)
-            if publication_time is None or publication_time < now:
+            publication_time = (
+                self._optional_clock(time.monotonic) if now is not None
+                else None
+            )
+            if now is None or publication_time is None or publication_time < now:
                 self.preview_clock_failures = (
                     getattr(self, "preview_clock_failures", 0) + 1
                 )

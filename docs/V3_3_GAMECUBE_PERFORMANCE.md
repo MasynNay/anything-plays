@@ -824,3 +824,30 @@ Valid built-in first-party reports continue to display as before.
 These checks are synthetic and cannot establish audible speaker output,
 GPU compatibility or actual Dolphin game stability. Physical acceptance
 and native core provenance/license review are still release gates.
+
+
+## A sustained preview-clock outage no longer leaves the game picture frozen
+
+In 3.3, a *single* invalid GameCube preview monotonic-clock reading
+continues to skip that extra GPU copy. Previously, **every** subsequent
+bad clock reading also skipped the readback indefinitely, leaving a
+possibly frozen game picture even while the native Libretro game and
+audio kept executing.
+
+After the first failed reading, the preview now falls back to a
+conservative fixed-size **native-video-callback counter**. It samples
+at most one frame per 6 callbacks in Performance (20 FPS), one per
+4 in Balanced (30 FPS), or one per 2 in Quality (60 FPS). These are
+**callback ratios**, *not* timed or guaranteed playback/OBS FPS: there
+is no valid clock with which to determine actual elapsed time, frame
+rate, readback cost or physical display latency. The fallback never
+skips Dolphin's real `retro_run()` or changes controls/audio. It
+returns immediately to normal monotonic throttle on the first valid
+clock reading; only genuinely timed publications contribute to the
+observed preview cadence. A delayed GPU result is still rejected after
+Stop, and malformed GL pixels still trigger the usual safe native Stop.
+
+Four synthetic tests cover prolonged clock errors, healthy-clock
+recovery without fake FPS intervals, Stop during readback, and
+malformed GPU frame handling. Actual GameCube hardware, 30-minute
+playback, OBS and speaker acceptance remain required before release.

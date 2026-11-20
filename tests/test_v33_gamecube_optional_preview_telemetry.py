@@ -240,5 +240,97 @@ class OptionalPreviewTelemetryIsolationTests(unittest.TestCase):
         self.assertNotIn("PRIVATE", str(report))
         self.assertIn("Audio:", _gamecube_performance_summary_lines(report)[-1])
 
+
+    def test_sustained_monotonic_outage_uses_conservative_preview_fallback(self):
+        """Bad clocks may degrade preview, not freeze it for a whole session."""
+        s, rgb = session_with_fake_gpu()
+        # One isolated bad clock skips as before. For the 30 FPS option,
+        # sustained outages then copy one in four native video callbacks,
+        # without claiming a 30 FPS measurement or restarting Dolphin.
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=OSError("PRIVATE /home/user/GPU-serial")),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  return_value=50.0),
+        ):
+            for _ in range(10):
+                s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(s.host.read_frame.call_count, 3)
+        self.assertEqual(s.emulator.frame_serial, 3)
+        self.assertIs(s.emulator.frame, rgb)
+        self.assertEqual(s.hardware_frames, 3)
+        self.assertEqual(s.preview_readback_skips, 6)
+        self.assertGreaterEqual(s.preview_clock_failures, 10)
+        self.assertEqual(s._clockless_preview_phase, 1)
+        self.assertIsNone(s._last_preview_capture)
+        self.assertEqual(
+            s.performance_snapshot()["metrics"][
+                "gamecube_preview_cadence_intervals"
+            ], 0,
+        )
+        self.assertFalse(s.emulator.stop_event.is_set())
+        self.assertIsNone(s.opengl_error)
+
+    def test_preview_clock_recovery_resumes_real_timing_without_fake_intervals(self):
+        s, _ = session_with_fake_gpu()
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=OSError("PRIVATE /dev/gpu")),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  return_value=100.0),
+        ):
+            for _ in range(6):
+                s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(s.hardware_frames, 2)
+        # On first valid time reading, leave emergency callback cadence
+        # immediately. Two valid publications are required to measure FPS.
+        video_at(s, 20.0, 20.004)
+        self.assertEqual(s.hardware_frames, 3)
+        self.assertEqual(s._clockless_preview_phase, -1)
+        self.assertEqual(s._preview_cadence.published, 1)
+        self.assertEqual(s._preview_cadence.intervals, 0)
+        video_at(s, 20.009, 20.010)
+        self.assertEqual(s.hardware_frames, 3)
+        video_at(s, 20.040, 20.044)
+        self.assertEqual(s.hardware_frames, 4)
+        self.assertEqual(s._preview_cadence.intervals, 1)
+        self.assertFalse(s.emulator.stop_event.is_set())
+
+    def test_clockless_fallback_honors_native_stop_during_gl_readback(self):
+        s, rgb = session_with_fake_gpu()
+        def stop_during_readback(_width, _height):
+            s.emulator.stop_event.set()
+            return rgb
+        s.host.read_frame.side_effect = stop_during_readback
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=RuntimeError("PRIVATE driver")),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  return_value=99.0),
+        ):
+            s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+            s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertEqual(s.host.read_frame.call_count, 1)
+        self.assertIsNone(s.emulator.frame)
+        self.assertEqual(s.emulator.frame_serial, 0)
+        self.assertEqual(s.hardware_frames, 0)
+        self.assertTrue(s.emulator.stop_event.is_set())
+
+    def test_bad_gpu_shape_during_clock_outage_still_fails_closed(self):
+        s, _ = session_with_fake_gpu()
+        s.host.read_frame.return_value = np.zeros((8, 8, 4), dtype=np.uint8)
+        with (
+            patch("anything_plays.gamecube_gpu.time.monotonic",
+                  side_effect=RuntimeError("PRIVATE camera & GPU")),
+            patch("anything_plays.gamecube_gpu.time.perf_counter",
+                  return_value=99.0),
+        ):
+            s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+            s.video(RETRO_HW_FRAME_BUFFER_VALID, 8, 8, 32)
+        self.assertTrue(s.emulator.stop_event.is_set())
+        self.assertEqual(s.emulator.frame_serial, 0)
+        self.assertIn("GPU readback failed", s.opengl_error)
+        self.assertNotIn("PRIVATE", s.opengl_error)
+
 if __name__ == "__main__":
     unittest.main()
