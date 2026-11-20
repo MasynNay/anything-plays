@@ -371,18 +371,59 @@ class GameCubeHardwareSession(CoreSession):
             except Exception:
                 pass
         metrics.update(readback_metrics)
-        metrics.update(self.audio.delivery_snapshot())
-        # Count native-generated samples only through the first-party
-        # Libretro audio callbacks. Staged/resampled output copies are NOT
-        # new native audio and PortAudio output is NOT speaker evidence.
+        # Output-driver diagnostics are optional, not a gameplay failure
+        # and not permission for extension-provided text or device paths to
+        # enter a copyable report. An incomplete snapshot is UNKNOWN, not
+        # evidence of zero underruns.
+        delivery_keys = (
+            "audio_output_callback_calls",
+            "audio_output_requested_frames",
+            "audio_output_underrun_frames",
+            "audio_output_device_underflow_callbacks",
+            "audio_queue_dropped_frames",
+        )
+        try:
+            delivery = self.audio.delivery_snapshot()
+        except Exception:
+            delivery = None
+        delivery_available = (
+            type(delivery) is dict
+            and all(type(delivery.get(key)) is int and delivery[key] >= 0
+                    for key in delivery_keys)
+        )
+        metrics.update({
+            key: delivery[key] if delivery_available else 0
+            for key in delivery_keys
+        })
+        metrics["audio_delivery_measurements_available"] = delivery_available
+
+        # Only the first-party PCM sink may report native-generated sample
+        # aggregates. A damaged observer must never break Check my setup.
         if type(self.audio) is AudioSink:
-            metrics.update(self.audio.native_pcm_snapshot())
+            try:
+                pcm = self.audio.native_pcm_snapshot()
+                frames = pcm.get("audio_core_pcm_frames")
+                nonzero = pcm.get("audio_core_nonzero_channel_values")
+                if (type(pcm) is dict and type(frames) is int
+                        and type(nonzero) is int and frames >= 0
+                        and 0 <= nonzero <= 2 * frames):
+                    metrics.update({
+                        "audio_core_pcm_frames": frames,
+                        "audio_core_nonzero_channel_values": nonzero,
+                    })
+            except Exception:
+                pass
         # Do not conflate a zero-underrun counter with actual speaker
         # output. The stream may have failed to open, or merely be waiting
         # for its first PortAudio callback. Preserve these two safe booleans
         # and allowlisted sample rates for live and final local setup checks.
-        audio_active = getattr(self.audio, "output_active", None)
-        audio_started = getattr(self.audio, "output_ever_started", None)
+        try:
+            audio_active = getattr(self.audio, "output_active", None)
+            audio_started = getattr(self.audio, "output_ever_started", None)
+        except Exception:
+            # Audio-driver properties can fail on device disconnect; this
+            # optional display cannot interrupt an otherwise live game.
+            audio_active = audio_started = None
         if type(audio_active) is bool and type(audio_started) is bool:
             metrics["audio_stream_active"] = audio_active
             metrics["audio_stream_started_during_session"] = audio_started
@@ -390,7 +431,10 @@ class GameCubeHardwareSession(CoreSession):
                 ("source_sample_rate", "audio_native_rate_hz"),
                 ("output_sample_rate", "audio_output_rate_hz"),
             ):
-                rate = getattr(self.audio, attr, None)
+                try:
+                    rate = getattr(self.audio, attr, None)
+                except Exception:
+                    continue
                 if type(rate) is int and 8_000 <= rate <= 192_000:
                     metrics[key] = rate
         tracker = getattr(self, "_preview_cadence", None)

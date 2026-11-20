@@ -284,6 +284,18 @@ def _gamecube_performance_summary_lines(performance):
                 f"{nonzero_values} nonzero channel values "
                 "(speaker unverified)"
             )
+    if m.get("audio_delivery_measurements_available", True) is False:
+        audio_line = (
+            "Audio: output callback/queue measurements unavailable "
+            "(speaker unverified)"
+        )
+    else:
+        audio_line = (
+            f"Audio: {m['audio_output_device_underflow_callbacks']} device "
+            f"underflow callbacks · {m['audio_output_underrun_frames']} "
+            f"application underrun frames · "
+            f"{m['audio_queue_dropped_frames']} queue-dropped frames"
+        )
     return (
         (native_line if native_line is not None else
          f"Native frames: {completed} · timed {valid_samples} of {completed} · "
@@ -299,11 +311,7 @@ def _gamecube_performance_summary_lines(performance):
         f"Late deadlines (>5 ms): {m['scheduler_late_frames']} · "
         f"resynchronizations: {m['scheduler_resyncs']} · "
         f"maximum lateness {m['scheduler_late_max_ms']} ms",
-        f"Audio: {m['audio_output_device_underflow_callbacks']} device "
-        f"underflow callbacks · {m['audio_output_underrun_frames']} "
-        f"application underrun frames · "
-        f"{m['audio_queue_dropped_frames']} queue-dropped frames"
-        f"{audio_status}",
+        f"{audio_line}{audio_status}",
     )
 
 

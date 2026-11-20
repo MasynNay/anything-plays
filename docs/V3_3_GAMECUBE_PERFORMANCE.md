@@ -787,3 +787,23 @@ observation, post-publication observation, private snapshot fields and
 malformed numeric values. **Unavailable timing is not proof of healthy
 hardware**; the 30-minute real GameCube/OBS/speaker acceptance gate is
 unchanged.
+
+
+## Isolate GameCube output-audio diagnostics from unplugged devices
+
+The 3.3 GameCube setup report now treats PortAudio callback/queue counters
+as optional, allowlisted data. If a disconnected driver or injected observer
+throws, returns a non-dictionary, omits counters or supplies private text or
+invalid/negative values, the report records
+`audio_delivery_measurements_available=false`. The setup panel explicitly
+states that **output callback/queue measurements are unavailable** rather
+than advertising false zero underruns. Extra device, path or plugin keys are
+never copied, even when all five legitimate counters are present.
+
+The same optional boundary covers first-party native PCM observation and
+output-status/sample-rate property failures. GPU video, native emulation,
+PortAudio output and the existing default audio path are not altered.
+Four isolated tests exercise failed and malformed audio measurements,
+private fields, damaged native PCM observers and driver properties.
+These tests cannot confirm speaker playback. Physical 30-minute GameCube
+audio, webcam, controllers and installed-host approval remain release gates.
