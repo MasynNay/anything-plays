@@ -749,3 +749,19 @@ Dolphin `retro_run`, P1/P2 controls, audio, and independent OBS-facing
 15/24/30 FPS Stream Mode output are untouched. Synthetic RGB-host tests
 verify upshift, downshift, and malformed mode behavior, **not** real
 GPU throughput or physical OBS-recorded FPS.
+
+
+### Preserve the slow-GPU cooldown when increasing preview FPS
+
+An immediate 20→60 FPS mode switch should never force back-to-back blocking
+GPU readbacks if the preceding `glReadPixels` was already unusually slow.
+The mode handoff now clears **only** the previous lower-FPS start deadline,
+while retaining the previous readback completion time and duration. A quick
+prior GPU copy allows immediate refreshed output; an over-budget prior copy
+instead waits for the **new target's shorter post-completion interval**
+before attempting another sync. This protects native Dolphin emulation from
+repeat GPU stalls while honoring the newly selected preview setting as soon
+as the GPU cooldown allows. Downshifts and normal preview cadence remain
+unchanged. Synthetic tests cover a 75ms readback followed by a 20→60 FPS
+upshift at +7ms after publication and a successful next copy at +25ms.
+This is GPU callback-level logic validation, not measured physical FPS.

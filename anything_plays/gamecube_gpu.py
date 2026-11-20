@@ -175,21 +175,23 @@ class GameCubeHardwareSession(CoreSession):
             )
             tracker = getattr(self, "_preview_cadence", None)
             if tracker is not None:
-                # A higher selected preview FPS should not inherit the old
-                # *slower* mode's capture deadline. Make the next native
-                # video callback eligible for one fresh GL preview while
-                # keeping 20/30/60 mode changes separate in the report.
-                # Downshifts still honor the longer 20/30 FPS throttle so
-                # switching to Performance cannot trigger an extra GPU stall.
+                # An FPS upshift should not inherit the older, slower
+                # start-to-start copy deadline. Keep the previous readback
+                # *completion* and duration, however: an over-budget GPU
+                # stall still needs its new-rate post-completion cooldown.
+                # Otherwise 20->60 after a 75ms glReadPixels could trigger
+                # another expensive GPU sync just milliseconds later.
+                # Downshifts continue to honor their new slower interval.
                 previous_mode = tracker.mode
                 tracker.reset_for(mode)
                 if (previous_mode is not None
                         and tracker.mode != previous_mode
                         and preview_fps(tracker.mode)
                         > preview_fps(previous_mode)):
+                    # Only release the start-based mode deadline. Preserve
+                    # the slow-readback completion fence to protect native
+                    # Dolphin frame pacing on underpowered GPUs.
                     self._last_preview_capture = None
-                    self._last_preview_publication = None
-                    self._last_preview_readback_duration = 0.0
             if now is None:
                 # Invalid timing is neither a deliberately skipped GL
                 # readback nor a native emulation frame failure.

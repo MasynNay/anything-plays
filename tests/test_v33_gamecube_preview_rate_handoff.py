@@ -81,6 +81,38 @@ class PreviewRateHandoffTests(unittest.TestCase):
         self.assertEqual(session.raw_video_callbacks, 4)
         self.assertFalse(session.emulator.stop_event.is_set())
 
+    def test_upshift_after_slow_gpu_readback_honors_completion_cooldown(self):
+        session = fake_session()
+        # A 75ms synchronous readback already exceeds both 20 FPS and
+        # 60 FPS budgets. Do not issue a second GL sync only 7ms later.
+        native_video(session, 40.0, 40.075)
+        self.assertEqual(session.host.read_frame.call_count, 1)
+        self.assertAlmostEqual(session._last_preview_readback_duration, 0.075)
+
+        session.emulator.gamecube_preview_mode = "Quality (60 FPS)"
+        native_video(session, 40.082)
+        self.assertEqual(session.host.read_frame.call_count, 1)
+        self.assertEqual(session.preview_readback_skips, 1)
+        self.assertEqual(session._preview_cadence.snapshot()[
+            "gamecube_preview_target_fps"], 60)
+        self.assertEqual(session._preview_cadence.snapshot()[
+            "gamecube_preview_cadence_intervals"], 0)
+        self.assertEqual(session.emulator.frame_serial, 1)
+
+        # The faster selected rate's 16.7ms completion interval is enough;
+        # the older 20 FPS start-based limit must not remain in force.
+        native_video(session, 40.100, 40.104)
+        self.assertEqual(session.host.read_frame.call_count, 2)
+        self.assertEqual(session.hardware_frames, 2)
+        self.assertEqual(session.emulator.frame_serial, 2)
+        self.assertEqual(session._last_preview_capture, 40.100)
+        self.assertFalse(session.emulator.stop_event.is_set())
+
+        # A normal quick follow-up still obeys the selected 60 FPS cap.
+        native_video(session, 40.110)
+        self.assertEqual(session.host.read_frame.call_count, 2)
+        self.assertEqual(session.preview_readback_skips, 2)
+
     def test_downshift_60_to_20_does_not_force_unneeded_gpu_copy(self):
         session = fake_session("Quality (60 FPS)")
         native_video(session, 20.0, 20.004)
