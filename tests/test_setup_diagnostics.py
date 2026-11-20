@@ -478,5 +478,123 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertNotIn("/home/alex", json.dumps(report))
 
 
+    def test_optional_input_probe_exception_keeps_base_checks_available(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.emu.inputs = InputBuffer()
+        app.emu.inputs.latency_snapshot = lambda: (_ for _ in ()).throw(
+            OSError("PRIVATE webcam path /home/operator/serial")
+        )
+        report = _snapshot(app)
+        self.assertEqual(set(report), {
+            "format", "version", "console", "checks"
+        })
+        self.assertIn("running", report["checks"]["camera"]["status"])
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_optional_stream_probe_exception_keeps_original_checks(self):
+        from anything_plays.ui_stream import StreamMixin
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        class StreamHarness(PrivateApp, StreamMixin):
+            def stream_performance_snapshot(self):
+                raise RuntimeError("PRIVATE /Users/owner/camera-device")
+
+        app = StreamHarness(None)
+        report = _snapshot(app)
+        self.assertIn("checks", report)
+        self.assertNotIn("stream_cadence", report)
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_optional_gamecube_probe_exception_does_not_hide_base_checks(self):
+        from anything_plays.gba_emulator import Emulator
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.system_key = FakeSetting("gamecube")
+        emu = object.__new__(Emulator)
+        emu.system = "gamecube"
+        emu.core_path = None
+        emu.find_system_core = lambda: None
+        emu.gamecube_performance_snapshot = lambda: (_ for _ in ()).throw(
+            RuntimeError("PRIVATE GPU /Users/owner/games/secret.iso")
+        )
+        app.emu = emu
+        report = _snapshot(app)
+        self.assertIn("checks", report)
+        self.assertNotIn("gamecube_performance", report)
+        self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_input_probe_rejects_private_extensions_and_malformed_buckets(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        inputs = InputBuffer()
+        inputs.enable_latency_probe()
+        app.emu.inputs = inputs
+        normal = inputs.latency_snapshot()
+        injected = {
+            **normal,
+            "PRIVATE /dev/video0": "user camera serial",
+            "stages": {**normal["stages"], "PRIVATE ROM": "/home/owner/game"},
+        }
+        inputs.latency_snapshot = lambda: injected
+        report = _snapshot(app)
+        self.assertIn("input_latency", report)
+        self.assertNotIn("PRIVATE", json.dumps(report))
+        self.assertNotIn("/home/owner", json.dumps(report))
+        injected["samples"] = "private /home/device"
+        self.assertNotIn("input_latency", _snapshot(app))
+        injected["samples"] = 0
+        injected["stages"]["tracking_to_dispatch"] = {
+            "p50_bucket_ms": "PRIVATE camera", "p95_bucket_ms": None
+        }
+        self.assertNotIn("input_latency", _snapshot(app))
+
+    def test_gamecube_probe_rejects_private_keys_bad_numbers_and_missing_fields(self):
+        from anything_plays.gamecube_native_timing import GameCubeNativeTiming
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_gamecube_performance_report,
+        )
+
+        numeric = GameCubeNativeTiming().snapshot()
+        numeric.update({
+            "gpu_readback_calls": 3, "gpu_readback_max_ms": 3.5,
+            "gamecube_preview_target_fps": 30,
+            "gamecube_preview_observed_capture_fps": 28.5,
+            "gamecube_preview_cadence_intervals": 2,
+            "gamecube_preview_max_interval_ms": 35.0,
+            "audio_output_device_underflow_callbacks": 0,
+            "audio_output_underrun_frames": 0,
+            "audio_queue_dropped_frames": 0,
+            "PRIVATE /Users/owner/video-device": "serial-name",
+        })
+        candidate = {
+            "format": "anything-plays-gamecube-performance",
+            "version": 1,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": numeric,
+            "PRIVATE ROM": "/home/user/secret.iso",
+        }
+        safe = _safe_gamecube_performance_report(candidate)
+        self.assertIsNotNone(safe)
+        self.assertNotIn("PRIVATE", json.dumps(safe))
+        self.assertNotIn("/home/", json.dumps(safe))
+        for field, bad in (
+            ("native_run_calls", "private home directory"),
+            ("gpu_readback_share_of_native_run", float("nan")),
+            ("gamecube_preview_target_fps", True),
+            ("audio_queue_dropped_frames", -1),
+        ):
+            with self.subTest(field=field):
+                invalid = {**candidate, "metrics": {**numeric, field: bad}}
+                self.assertIsNone(_safe_gamecube_performance_report(invalid))
+        incomplete = {**candidate, "metrics": {"native_run_calls": 0}}
+        self.assertIsNone(_safe_gamecube_performance_report(incomplete))
+
+
 if __name__ == "__main__":
     unittest.main()

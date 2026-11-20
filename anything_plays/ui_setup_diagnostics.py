@@ -5,6 +5,7 @@ emulators, downloads assets, changes gamepad mappings or sends diagnostics.
 """
 
 import json
+import math
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -23,6 +24,164 @@ def _safe_refresh_failure_message(_error):
         "Unable to check current setup. Check device connection "
         "and choose Refresh again."
     )
+
+
+
+# Setup's JSON and Tk labels consume these optional snapshots directly.
+# Validate at this boundary too; the collector's own safeguards alone
+# cannot protect against a damaged in-memory probe or subclass override.
+_INPUT_BUCKET_LABELS = frozenset((
+    "0-2", "2-5", "5-10", "10-20", "20-33", "33-50",
+    "50-75", "75-100", "100-150", "150-250", "250-500", ">500",
+))
+_INPUT_STAGE_NAMES = (
+    "tracking_to_dispatch", "dispatch_to_native", "tracking_to_native",
+)
+
+
+def _safe_input_timing_report(value):
+    """Copy only complete, bounded first-party aggregate input observations."""
+    if (type(value) is not dict
+            or value.get("scope") != "software_input_snapshot_not_physical_latency"
+            or type(value.get("enabled")) is not bool
+            or type(value.get("stages")) is not dict):
+        return None
+    counts = {}
+    for key in ("samples", "superseded", "discarded_pending",
+                "clock_discontinuities", "late_camera_updates_dropped"):
+        number = value.get(key, 0 if key == "late_camera_updates_dropped" else None)
+        if type(number) is not int or not 0 <= number <= (2**63 - 1):
+            return None
+        counts[key] = number
+    stages = {}
+    for stage in _INPUT_STAGE_NAMES:
+        entry = value["stages"].get(stage)
+        if type(entry) is not dict:
+            return None
+        ranges = {}
+        for percentile in ("p50_bucket_ms", "p95_bucket_ms"):
+            bucket = entry.get(percentile)
+            if (bucket not in _INPUT_BUCKET_LABELS
+                    and not (counts["samples"] == 0 and bucket is None)):
+                return None
+            ranges[percentile] = bucket
+        stages[stage] = ranges
+    return {
+        "scope": "software_input_snapshot_not_physical_latency",
+        **counts,
+        "stages": stages,
+        "enabled": value["enabled"],
+    }
+
+
+# These are names from the built-in native-timing, GPU preview, and
+# PortAudio aggregate collectors. Unknown extension keys are never copied
+# into a user-visible setup report or clipboard.
+_GC_INTEGER_METRICS = frozenset((
+    "native_completed_frames", "native_run_calls",
+    "native_run_p95_bucket_code", "native_run_over_16ms",
+    "native_run_over_50ms", "native_run_over_100ms",
+    "scheduler_late_frames", "scheduler_resyncs", "scheduler_wait_calls",
+    "gpu_readback_calls", "gpu_readback_timing_samples",
+    "gamecube_preview_clock_failures", "gamecube_hardware_frames",
+    "gamecube_preview_readback_skips", "gpu_readback_p95_bucket_code",
+    "gpu_readback_over_16ms", "gpu_readback_over_33ms",
+    "audio_output_callback_calls", "audio_output_requested_frames",
+    "audio_output_underrun_frames",
+    "audio_output_device_underflow_callbacks", "audio_queue_dropped_frames",
+    "audio_core_pcm_frames", "audio_core_nonzero_channel_values",
+    "audio_native_rate_hz", "audio_output_rate_hz",
+    "gamecube_preview_target_fps", "gamecube_preview_cadence_intervals",
+))
+_GC_REAL_METRICS = frozenset((
+    "native_reported_core_fps", "native_run_mean_ms",
+    "native_run_max_ms", "native_run_total_seconds",
+    "native_run_non_readback_mean_ms", "gpu_readback_share_of_native_run",
+    "scheduler_late_total_seconds", "scheduler_late_max_ms",
+    "scheduler_wait_total_seconds", "gpu_readback_max_ms",
+    "gamecube_preview_observed_capture_fps",
+    "gamecube_preview_max_interval_ms",
+))
+_GC_BOOLEAN_METRICS = frozenset((
+    "audio_delivery_measurements_available", "audio_stream_active",
+    "audio_stream_started_during_session",
+))
+_GC_REQUIRED = frozenset((
+    "native_run_calls", "native_run_mean_ms", "native_run_max_ms",
+    "gpu_readback_calls", "gpu_readback_max_ms",
+    "gpu_readback_share_of_native_run",
+    "gamecube_preview_target_fps",
+    "gamecube_preview_observed_capture_fps",
+    "gamecube_preview_cadence_intervals",
+    "gamecube_preview_max_interval_ms", "scheduler_late_frames",
+    "scheduler_resyncs", "scheduler_late_max_ms",
+    "audio_output_device_underflow_callbacks",
+    "audio_output_underrun_frames", "audio_queue_dropped_frames",
+))
+
+
+def _safe_gamecube_performance_report(value):
+    """Only valid scalar GameCube A/V metrics, never device/driver strings."""
+    if (type(value) is not dict
+            or value.get("format") != "anything-plays-gamecube-performance"
+            or value.get("version") != 1
+            or value.get("scope") !=
+            "aggregate_native_av_not_physical_hardware_certification"
+            or type(value.get("metrics")) is not dict):
+        return None
+    observed = value["metrics"]
+    safe = {}
+    for key in _GC_INTEGER_METRICS:
+        if key not in observed:
+            continue
+        number = observed[key]
+        if type(number) is not int:
+            return None
+        if key in ("native_run_p95_bucket_code", "gpu_readback_p95_bucket_code"):
+            valid = -1 <= number <= 8
+        elif key == "gamecube_preview_target_fps":
+            valid = number in (0, 20, 30, 60)
+        elif key in ("audio_native_rate_hz", "audio_output_rate_hz"):
+            valid = 8000 <= number <= 192000
+        else:
+            valid = 0 <= number <= (2**63 - 1)
+        if not valid:
+            return None
+        safe[key] = number
+    for key in _GC_REAL_METRICS:
+        if key not in observed:
+            continue
+        number = observed[key]
+        if type(number) not in (int, float):
+            return None
+        try:
+            valid = math.isfinite(number) and 0 <= number <= 1e12
+        except (OverflowError, TypeError, ValueError):
+            valid = False
+        if key == "gpu_readback_share_of_native_run":
+            valid = valid and number <= 1
+        if not valid:
+            return None
+        safe[key] = number
+    for key in _GC_BOOLEAN_METRICS:
+        if key in observed:
+            if type(observed[key]) is not bool:
+                return None
+            safe[key] = observed[key]
+    if not _GC_REQUIRED.issubset(safe):
+        # Never format an incomplete legacy/custom report as healthy A/V.
+        return None
+    frames = safe.get("audio_core_pcm_frames")
+    nonzero = safe.get("audio_core_nonzero_channel_values")
+    if (frames is not None and nonzero is not None
+            and nonzero > 2 * frames):
+        return None
+    return {
+        "format": "anything-plays-gamecube-performance",
+        "version": 1,
+        "scope": "aggregate_native_av_not_physical_hardware_certification",
+        "metrics": safe,
+    }
 
 
 def _snapshot(app):
@@ -70,21 +229,30 @@ def _snapshot(app):
     # histogram implementation. Never copy arbitrary device or plugin data.
     inputs = getattr(app.emu, "inputs", None)
     if isinstance(inputs, InputBuffer):
-        timing = inputs.latency_snapshot()
+        try:
+            timing = _safe_input_timing_report(inputs.latency_snapshot())
+        except Exception:
+            timing = None
         if timing is not None:
             report["input_latency"] = timing
-    # Accept only our built-in emulator class; a third-party integration
-    # cannot inject arbitrary paths, devices, or private driver strings.
+    # Every optional probe fails independently of the camera/controller/
+    # core checks, and only known numeric values reach the local clipboard.
     if (isinstance(app.emu, Emulator)
             and app.system_key.get() == "gamecube"
             and bool(app.uses_embedded_emulator())):
-        performance = app.emu.gamecube_performance_snapshot()
+        try:
+            performance = _safe_gamecube_performance_report(
+                app.emu.gamecube_performance_snapshot()
+            )
+        except Exception:
+            performance = None
         if performance is not None:
             report["gamecube_performance"] = performance
-    # Stream Mode owns a single Tk output; only its first-party mixin can
-    # provide an allowlisted, in-memory count for the current window.
     if isinstance(app, StreamMixin):
-        stream = app.stream_performance_snapshot()
+        try:
+            stream = app.stream_performance_snapshot()
+        except Exception:
+            stream = None
         if stream is not None:
             report["stream_cadence"] = stream
     return report

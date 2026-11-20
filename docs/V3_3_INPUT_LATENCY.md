@@ -210,3 +210,18 @@ buttons, memory growth, game crashes or timestamp leak. For a true
 camera-to-screen latency result, use an external high-speed camera or another
 independent instrument synchronizing the physical object movement and display;
 do not label these software timings as a physical latency result.
+
+
+## Diagnostic observer failures are not camera or controller failures
+
+The 3.3 setup snapshot now reads optional opt-in input-latency,
+GameCube and Stream Mode probes independently. If any observer raises a
+native extension/Tk error, the standard camera/core/controller/input-path
+checks remain available; no exception, ROM path or device string is
+included in the copied report. Input timing values are validated
+against the fixed first-party stage/range schema, with missing or corrupt
+measurements treated as unavailable instead of healthy zero samples.
+This does not reset the live input state or disarm P1/P2.
+Source tests inject observer exceptions, private extra fields, missing
+counters and malformed percentile labels. Physical camera-to-native
+response and real controller release still require hardware QA.

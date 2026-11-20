@@ -807,3 +807,20 @@ Four isolated tests exercise failed and malformed audio measurements,
 private fields, damaged native PCM observers and driver properties.
 These tests cannot confirm speaker playback. Physical 30-minute GameCube
 audio, webcam, controllers and installed-host approval remain release gates.
+
+
+## Corrupt optional setup counters do not disable basic device checks
+
+The GameCube A/V setup report is now independently isolated from camera,
+core and controller checks. A failed native performance observer or a
+partial/corrupt legacy snapshot omits the GameCube performance section
+rather than crashing Check my setup or claiming an unmeasured metric is
+zero. Before display or clipboard copy, the UI copies only recognized
+finite scalar metrics and trusted boolean stream status, rejecting
+unexpected text, device identifiers, private source paths, malformed
+P95 codes, impossible preview targets and missing required fields.
+Valid built-in first-party reports continue to display as before.
+
+These checks are synthetic and cannot establish audible speaker output,
+GPU compatibility or actual Dolphin game stability. Physical acceptance
+and native core provenance/license review are still release gates.
