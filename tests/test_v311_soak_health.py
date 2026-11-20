@@ -3,6 +3,7 @@ import unittest
 
 from anything_plays.soak_health import (
     completion_failures, stream_target_is_valid,
+    stream_canvas_sample_failures,
 )
 
 
@@ -20,6 +21,56 @@ class SoakWatchdogTests(unittest.TestCase):
                 self.assertFalse(stream_target_is_valid(invalid))
                 self.assertFalse(stream_target_is_valid(
                     invalid, stress_stream=True
+                ))
+
+    def test_canvas_sampling_allows_only_bounded_privacy_blank_with_recovery(self):
+        # Reproduced from the failed 1,800-second real Tk evidence:
+        # samples at 482.89s and 1475.17s were within ~1.2 seconds of
+        # deliberate camera revocation, and the following 5-second samples
+        # confirmed the output was repainted, with no actual Tk errors.
+        samples = [
+            {"seconds": 477.88, "stream_items": 1,
+             "stream_recent_privacy_clear": False},
+            {"seconds": 482.89, "stream_items": 0,
+             "stream_recent_privacy_clear": True},
+            {"seconds": 487.91, "stream_items": 1,
+             "stream_recent_privacy_clear": False},
+            {"seconds": 1475.17, "stream_items": 0,
+             "stream_recent_privacy_clear": True},
+            {"seconds": 1480.18, "stream_items": 1,
+             "stream_recent_privacy_clear": False},
+        ]
+        self.assertEqual(stream_canvas_sample_failures(
+            samples, 15, stress_stream=True
+        ), [])
+        self.assertTrue(stream_canvas_sample_failures(
+            samples, 15, stress_stream=False
+        ))
+
+    def test_canvas_sampling_rejects_missing_unexplained_or_persistent_image(self):
+        a = {"seconds": 20.0, "stream_items": 1,
+             "stream_recent_privacy_clear": False}
+        blank = {"seconds": 25.0, "stream_items": 0,
+                 "stream_recent_privacy_clear": True}
+        recovered = {"seconds": 30.0, "stream_items": 1,
+                     "stream_recent_privacy_clear": False}
+        self.assertEqual(stream_canvas_sample_failures(
+            [a, blank, recovered], 15, stress_stream=True
+        ), [])
+        for broken in (
+            [a, blank],  # no later independent proof
+            [a, blank, blank],  # remains blank
+            [a, blank, {"seconds": 40.0, "stream_items": 1}],  # too late
+            [a, {"seconds": 25.0, "stream_items": 0,
+                 "stream_recent_privacy_clear": False}, recovered],
+            [a, {"seconds": 25.0, "stream_items": 2,
+                 "stream_recent_privacy_clear": True}, recovered],
+            [a, {"seconds": 25.0, "stream_items": True,
+                 "stream_recent_privacy_clear": True}, recovered],
+        ):
+            with self.subTest(samples=broken):
+                self.assertTrue(stream_canvas_sample_failures(
+                    broken, 15, stress_stream=True
                 ))
 
     def test_completed_session_with_samples_and_no_callback_error_passes(self):

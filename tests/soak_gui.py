@@ -27,6 +27,7 @@ import numpy as np
 from app import App
 from anything_plays.soak_health import (
     completion_failures, stream_target_is_valid,
+    stream_canvas_sample_failures,
 )
 
 
@@ -136,6 +137,9 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             stream_stress_cycles = 0
             stream_controls_updates = 0
             stream_camera_clears = 0
+            last_stream_privacy_clear_at = None
+            stream_privacy_clear_checks = 0
+            stream_privacy_clear_failures = 0
             stream_fault_injected = False
             stream_fault_blanked = False
             stream_fault_counted = False
@@ -152,7 +156,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 manipulated, as users do during long OBS sessions.
                 """
                 nonlocal stream_stress_cycles, stream_camera_clears
-                nonlocal stream_controls_updates
+                nonlocal stream_controls_updates, last_stream_privacy_clear_at
+                nonlocal stream_privacy_clear_checks, stream_privacy_clear_failures
                 if app._closing or not enable_stream:
                     return
                 index = stream_stress_cycles
@@ -192,8 +197,30 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 if index % 4 == 0:
                     # Simulate a preview reset, not an actual webcam unplug.
                     # The very next source frame should publish a fresh image.
+                    # Privacy revocation deliberately removes OBS-facing
+                    # camera pixels. A resource sample during the short
+                    # blank is not a leak; an output that does not recover
+                    # within 2.5 seconds IS a regression.
+                    last_stream_privacy_clear_at = time.monotonic()
                     app.stream_clear_camera()
                     stream_camera_clears += 1
+
+                    def verify_privacy_clear_recovered():
+                        nonlocal stream_privacy_clear_checks
+                        nonlocal stream_privacy_clear_failures
+                        if app._closing:
+                            return
+                        stream_privacy_clear_checks += 1
+                        canvas = getattr(app, "_stream_canvas", None)
+                        if (canvas is None
+                                or len(canvas.find_all()) != 1
+                                or getattr(app, "_stream_photo", None) is None):
+                            stream_privacy_clear_failures += 1
+                            failures.append(
+                                "Stream output failed to recompose after privacy clear"
+                            )
+                            app.close()
+                    root.after(2500, verify_privacy_clear_recovered)
                 stream_stress_cycles += 1
                 root.after(8000, stress_stream_transitions)
 
@@ -291,14 +318,25 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
                 resized_panels = (
                     len(panel_cache._entries) if panel_cache is not None else 0
                 )
+                observed = time.monotonic()
+                recent_privacy_clear = (
+                    stress_stream and stream_items == 0
+                    and getattr(app, "_stream_photo", None) is None
+                    and not getattr(app, "_stream_recovery_pending", False)
+                    and last_stream_privacy_clear_at is not None
+                    and 0 <= observed - last_stream_privacy_clear_at <= 2.0
+                )
                 sample_data = {
-                    "seconds": round(time.monotonic() - started, 2),
+                    "seconds": round(observed - started, 2),
                     "rss_mb": rss_megabytes(),
                     "python_heap_mb": round(current / (1024 * 1024), 2),
                     "python_peak_mb": round(peak / (1024 * 1024), 2),
                     "camera_items": items_camera,
                     "game_items": items_game,
                     "stream_items": stream_items,
+                    # A boolean QA-only reason; no webcam images or
+                    # camera-reset timestamps are stored in the receipt.
+                    "stream_recent_privacy_clear": bool(recent_privacy_clear),
                     "stream_resize_cache_items": resized_panels,
                     "stream_refresh_intervals": stream_metrics.get(
                         "stream_refresh_intervals", 0
@@ -362,6 +400,8 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             report["stream_stress_cycles"] = stream_stress_cycles
             report["stream_controls_updates"] = stream_controls_updates
             report["stream_forced_preview_clears"] = stream_camera_clears
+            report["stream_privacy_clear_checks"] = stream_privacy_clear_checks
+            report["stream_privacy_clear_failures"] = stream_privacy_clear_failures
             report["stream_fault_injected"] = stream_fault_injected
             report["stream_fault_blanked"] = stream_fault_blanked
             report["stream_fault_counted"] = stream_fault_counted
@@ -395,10 +435,22 @@ def soak(seconds, max_growth_mb, report_path, *, enable_gamepad=False,
             )
         if summary.get("stream_failed_ticks", 0):
             failures.append("Stream Mode output encountered failed Tk ticks")
-        if any(s["stream_items"] != 1 for s in samples
-               if s["seconds"] >= warmup):
-            failures.append("Stream output canvas did not stay at one item")
+        failures.extend(stream_canvas_sample_failures(
+            samples, warmup, stress_stream=stress_stream
+        ))
+        report["stream_transient_privacy_blanks"] = sum(
+            s["stream_items"] == 0
+            and s["stream_recent_privacy_clear"] is True
+            and s["seconds"] >= warmup
+            for s in samples
+        )
         if stress_stream:
+            if (report.get("stream_privacy_clear_failures", 0)
+                    or report.get("stream_privacy_clear_checks", 0)
+                    < report.get("stream_forced_preview_clears", 0) - 1):
+                failures.append(
+                    "Stream privacy-clear output recovery was not verified"
+                )
             # Stress must actually exercise transitions; a green idle soak
             # with a broken timer is not representative of long streaming.
             expected = max(1, (seconds - 10) // 8)

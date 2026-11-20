@@ -459,3 +459,33 @@ frame delivery if that is the goal. Repeat 30-minute runs with resizing,
 source disconnect/reconnect and stream close/reopen. Hosted synthetic Tk CI
 and timer statistics alone cannot certify physical camera/display latency,
 Dolphin GameCube FPS or stable long-term streaming on the user's machine.
+
+
+## 30-minute synthetic soak: intentional camera privacy blanks versus leaks
+
+The exact-head November 19 run of the manual 1,800-second synthetic Tk
+endurance test finished its complete duration with 98,371 synthetic game
+frames, 225 settings-transition cycles, successful compositor fault recovery,
+no Tk callback exceptions and only 11.47 MB resident-memory growth. It
+**correctly failed its old canvas-visibility assertion** because two
+5-second resource samples captured the deliberately empty canvas shortly
+after a forced webcam-preview privacy clear (at 482.89s and 1475.17s).
+Both were immediately after real rate/layout/geometry control transitions;
+the following 5-second samples showed one published canvas image again.
+The empty frames did not indicate growing canvas item counts.
+
+The stream compositor must *blank* its old OBS-facing image when revoking
+cached private camera pixels. Changing that privacy behavior merely to
+satisfy a test would be incorrect. The synthetic test now records a
+boolean-only grace marker when a sample occurs within two seconds of an
+**actual** forced camera clear. It accepts at most that transient zero-item
+sample and requires the next independent resource observation to show
+**exactly one** image within 7.5 seconds. An additional Tk callback verifies
+republication within **2.5 seconds after each forced clear**, failing the
+run immediately if the canvas stays blank. Missing/unexplained blank
+samples, extra items, broken callbacks, stalled transitions, failed fault
+recovery and memory-growth regressions remain failures.
+
+The new proof is still synthetic; real webcam privacy, OBS capture frames,
+game controllers, audio, GameCube GPU throughput and the effect of actual
+USB disconnects must be independently verified on owner hardware.
