@@ -494,8 +494,8 @@ class SnapshotPrivacyTests(unittest.TestCase):
         self.assertIn("running", report["checks"]["camera"]["status"])
         self.assertNotIn("PRIVATE", json.dumps(report))
 
-    def test_optional_stream_probe_exception_keeps_original_checks(self):
-        from anything_plays.ui_stream import StreamMixin
+    def test_stream_subclass_cannot_override_first_party_safe_snapshot(self):
+        from anything_plays.ui_stream import StreamCadenceTracker, StreamMixin
         from anything_plays.ui_setup_diagnostics import _snapshot
 
         class StreamHarness(PrivateApp, StreamMixin):
@@ -503,9 +503,16 @@ class SnapshotPrivacyTests(unittest.TestCase):
                 raise RuntimeError("PRIVATE /Users/owner/camera-device")
 
         app = StreamHarness(None)
+        app._stream_output_window = object()
+        app._stream_cadence = StreamCadenceTracker()
+        app._stream_cadence.record_tick(1.0, "24 FPS", published=True)
         report = _snapshot(app)
         self.assertIn("checks", report)
-        self.assertNotIn("stream_cadence", report)
+        self.assertIn("stream_cadence", report)
+        self.assertEqual(
+            report["stream_cadence"]["metrics"]["stream_target_refresh_fps"],
+            24,
+        )
         self.assertNotIn("PRIVATE", json.dumps(report))
 
     def test_optional_gamecube_probe_exception_does_not_hide_base_checks(self):
@@ -595,6 +602,43 @@ class SnapshotPrivacyTests(unittest.TestCase):
         incomplete = {**candidate, "metrics": {"native_run_calls": 0}}
         self.assertIsNone(_safe_gamecube_performance_report(incomplete))
 
+
+    def test_input_timing_invalid_container_cannot_crash_optional_validation(self):
+        from anything_plays.libretro_input import InputBuffer
+        from anything_plays.ui_setup_diagnostics import _snapshot
+
+        app = PrivateApp(None)
+        app.emu.inputs = InputBuffer()
+        app.emu.inputs.enable_latency_probe()
+        normal = app.emu.inputs.latency_snapshot()
+        for bad in ([], {}, ["private"], {"ROM": "/Users/owner"}):
+            with self.subTest(value=repr(bad)):
+                data = {
+                    **normal,
+                    "stages": {
+                        **normal["stages"],
+                        "tracking_to_native": {
+                            "p50_bucket_ms": bad,
+                            "p95_bucket_ms": None,
+                        },
+                    },
+                }
+                app.emu.inputs.latency_snapshot = lambda data=data: data
+                result = _snapshot(app)
+                self.assertIn("checks", result)
+                self.assertNotIn("input_latency", result)
+                self.assertNotIn("/Users/owner", json.dumps(result))
+
+    def test_gamecube_boolean_schema_version_is_not_accepted_as_version_one(self):
+        from anything_plays.ui_setup_diagnostics import (
+            _safe_gamecube_performance_report,
+        )
+        self.assertIsNone(_safe_gamecube_performance_report({
+            "format": "anything-plays-gamecube-performance",
+            "version": True,
+            "scope": "aggregate_native_av_not_physical_hardware_certification",
+            "metrics": {},
+        }))
 
 if __name__ == "__main__":
     unittest.main()

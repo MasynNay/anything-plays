@@ -61,8 +61,12 @@ def _safe_input_timing_report(value):
         ranges = {}
         for percentile in ("p50_bucket_ms", "p95_bucket_ms"):
             bucket = entry.get(percentile)
-            if (bucket not in _INPUT_BUCKET_LABELS
-                    and not (counts["samples"] == 0 and bucket is None)):
+            if bucket is None:
+                if counts["samples"] != 0:
+                    return None
+            elif type(bucket) is not str or bucket not in _INPUT_BUCKET_LABELS:
+                # A malformed extension value (e.g. list/dict) must not
+                # throw from the optional setup-report validator.
                 return None
             ranges[percentile] = bucket
         stages[stage] = ranges
@@ -124,7 +128,8 @@ def _safe_gamecube_performance_report(value):
     """Only valid scalar GameCube A/V metrics, never device/driver strings."""
     if (type(value) is not dict
             or value.get("format") != "anything-plays-gamecube-performance"
-            or value.get("version") != 1
+            or type(value.get("version")) is not int
+            or value["version"] != 1
             or value.get("scope") !=
             "aggregate_native_av_not_physical_hardware_certification"
             or type(value.get("metrics")) is not dict):
@@ -250,7 +255,10 @@ def _snapshot(app):
             report["gamecube_performance"] = performance
     if isinstance(app, StreamMixin):
         try:
-            stream = app.stream_performance_snapshot()
+            # Do not dispatch to an extension/subclass override: even a
+            # well-formed-looking custom report might contain camera paths
+            # or values the setup window would mistake for real cadence.
+            stream = StreamMixin.stream_performance_snapshot(app)
         except Exception:
             stream = None
         if stream is not None:
@@ -610,9 +618,10 @@ def show_setup_diagnostics(app):
     def refresh():
         try:
             report = _snapshot(app)
-        except (ValueError, tk.TclError) as exc:
-            # Driver and Tcl exception text may contain local device/path
-            # details; the displayed failure is intentionally fixed.
+        except Exception as exc:
+            # Native extensions, platform drivers and destroyed Tk wrappers
+            # may raise errors beyond ValueError/TclError. Always show the
+            # same private-data-free message instead of crashing the dialog.
             status.set(_safe_refresh_failure_message(exc))
             return
         snapshot["value"] = report
@@ -713,14 +722,16 @@ def show_setup_diagnostics(app):
         # Copy a fresh, allowlisted snapshot rather than stale state.
         try:
             report = _snapshot(app)
-        except (ValueError, tk.TclError):
+        except Exception:
             status.set("Cannot copy setup checks until they can be refreshed.")
             return
         try:
             app.root.clipboard_clear()
             app.root.clipboard_append(json.dumps(report, indent=2) + "\n")
             app.root.update_idletasks()
-        except (OSError, RuntimeError, tk.TclError):
+        except Exception:
+            # A native clipboard adapter can raise an arbitrary exception.
+            # Never include that text in the user-facing error dialog.
             messagebox.showerror(
                 "Setup checks", "The safe report could not be copied.",
                 parent=window,

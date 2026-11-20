@@ -538,3 +538,20 @@ Five synthetic tests exercise private-field injection, invalid timing
 and percentile values, foreign collectors, malformed cache statistics
 and damaged session counters. Physical OBS encoder, camera, controller,
 GameCube GPU/audio and upgrade/rollback acceptance remain outstanding.
+
+
+## Setup snapshot is never delegated to an unvalidated Stream subclass
+
+For the 3.3 Check my setup panel, Stream Mode metrics are now taken
+directly from the original bounded first-party `StreamMixin` snapshot,
+rather than dispatching to a subclass override that could return private
+paths or fabricated numerical values. The collector still has to be
+the exact original `StreamCadenceTracker` and pass the earlier schema
+checks. A failed snapshot simply omits the optional cadence section;
+basic camera/core/controller checks stay usable.
+
+The wider setup UI also handles arbitrary native driver or clipboard
+exceptions with a fixed redacted error message. Malformed list/dict
+input-latency bucket values cannot throw during validation. These are
+synthetic fault-injection guarantees; actual OBS capture and physical
+hardware acceptance remain open.
