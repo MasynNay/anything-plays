@@ -1,6 +1,6 @@
-"""Private full-native 3.2 STABLE-UPGRADE Mac DMG from 3.2.0 cores.
+"""Private full-native 3.3 STABLE-UPGRADE Mac DMG from 3.2.0 cores.
 
-The exact-head 3.2 one-core SAME-INSTALL identity is checked before
+The exact-head 3.3 one-core SAME-INSTALL identity is checked before
 inserting checksum-verified published 3.2.0 native libraries. Output
 must never be uploaded or installed outside disposable runner QA.
 No distribution, notarization, real-game or hardware approval is implied.
@@ -165,7 +165,7 @@ def assemble(arch, stable, preview, sums, receipt, revision, output):
             if full_inventory(target_cores) != original_record:
                 raise ValueError("Copied Mac source-built core bytes changed")
             if not (target_notices/"python-distribution-notices").is_dir():
-                raise ValueError("Current 3.2 Python/SDL runtime notices are missing")
+                raise ValueError("Current 3.3 Python/SDL runtime notices are missing")
             verify_identity(app)
         # Re-sign the changed app's resource seal. This is ad-hoc only;
         # neither a Developer ID signature nor notarization is claimed.
@@ -178,7 +178,7 @@ def assemble(arch, stable, preview, sums, receipt, revision, output):
             raise ValueError("Signing changed source-reviewed Mac emulator bytes")
         output.mkdir(parents=True, exist_ok=False)
         full = output/full_name
-        create_disk_image(app, full, volume_name="Anything Plays 3.2 Private Upgrade QA")
+        create_disk_image(app, full, volume_name="Anything Plays 3.3")
         with mount(full, root/"installed"):
             mounted = root/"installed/AnythingPlays31.app"
             if not mounted.is_dir():
@@ -189,7 +189,7 @@ def assemble(arch, stable, preview, sums, receipt, revision, output):
             if full_inventory(mounted/"Contents/Resources/cores") != original_record:
                 raise ValueError("Mounted full Mac DMG changed original native core bytes")
             if not (mounted/"Contents/MacOS/AnythingPlays").is_file():
-                raise ValueError("Mounted 3.2 Mac app is missing its executable")
+                raise ValueError("Mounted 3.3 Mac app is missing its executable")
         record = {
             "schema_version": 1,
             "status": STATUS,
