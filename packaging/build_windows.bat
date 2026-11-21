@@ -152,6 +152,26 @@ if "%AP_V33_CANDIDATE%"=="1" (
   if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
   set "VERSION=3.3.0-qa1"
 )
+REM Version-correct, stable-install-identity 3.3 source QA. Not public.
+if "%AP_V33_STABLE_CANDIDATE%"=="1" (
+  if "%AP_V31_PREVIEW%"=="1" exit /b 1
+  if "%AP_V31_RC%"=="1" exit /b 1
+  if "%AP_V31_RC2%"=="1" exit /b 1
+  if "%AP_V31_FINAL_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V311_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V311_STABLE_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V32_PREVIEW_BUILD%"=="1" exit /b 1
+  if "%AP_V32_STABLE_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V33_CANDIDATE%"=="1" exit /b 1
+  if "%AP_RELEASE_BUILD%"=="1" exit /b 1
+  if "%AP_V30_APPROVED_RELEASE%"=="1" exit /b 1
+  if "%AP_V30_STABLE_CANDIDATE%"=="1" exit /b 1
+  if "%AP_V30_TEST_CORES%"=="1" exit /b 1
+  if "%AP_V30_GPL_TRIAL%"=="1" exit /b 1
+  if "%AP_V30_TIA_TRIAL%"=="1" exit /b 1
+  if not "%AP_V30_MINIMAL_CORE_BUILD%"=="1" exit /b 1
+  set "VERSION=3.3.0"
+)
 set "AP_FULL_CORE_BUILD=0"
 if "%AP_V30_TEST_CORES%"=="1" set "AP_FULL_CORE_BUILD=1"
 if "%AP_V30_APPROVED_RELEASE%"=="1" set "AP_FULL_CORE_BUILD=1"
@@ -200,6 +220,7 @@ if "%AP_V311_STABLE_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_
 if "%AP_V32_PREVIEW_BUILD%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if "%AP_V32_STABLE_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if "%AP_V33_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
+if "%AP_V33_STABLE_CANDIDATE%"=="1" set "V31_IDENTITY_ARG=--add-data build\v31_build_identity.json;assets"
 if defined V31_IDENTITY_ARG (
   .build-venv\Scripts\python.exe -m tools.write_v31_identity build\v31_build_identity.json
   if errorlevel 1 exit /b 1
@@ -370,7 +391,9 @@ if not defined ISCC (
   echo App folder: dist\AnythingPlays
   exit /b 2
 )
-if "%AP_V33_CANDIDATE%"=="1" (
+if "%AP_V33_STABLE_CANDIDATE%"=="1" (
+  "%ISCC%" /DV33StableQABuild=1 /DAppVersion=%VERSION% packaging\installer.iss
+) else if "%AP_V33_CANDIDATE%"=="1" (
   "%ISCC%" /DV33CandidateBuild=1 /DAppVersion=%VERSION% packaging\installer.iss
 ) else if "%AP_V32_PREVIEW_BUILD%"=="1" (
   "%ISCC%" /DV32PreviewBuild=1 /DAppVersion=%VERSION% packaging\installer.iss

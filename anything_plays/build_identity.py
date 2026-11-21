@@ -61,6 +61,15 @@ IDENTITIES = {
         "settings_namespace": "anything-plays-33-candidate",
         "public_release_approved": False,
     },
+    # Version-correct 3.2.0 -> 3.3.0 stable-upgrade QA identity.
+    # Build flags alone never authorize a public release.
+    "v33_stable_candidate": {
+        "version": "3.3.0",
+        "channel": "v33_stable_candidate",
+        "title": "Anything Plays 3.3",
+        "settings_namespace": "anything-plays-31",
+        "public_release_approved": False,
+    },
     # Private source-only candidate for an actual 3.1.1 -> 3.2.0 upgrade.
     # It deliberately reuses the stable 3.1.x namespace, so testing MUST
     # happen under disposable CI homes, never in the user's live install.

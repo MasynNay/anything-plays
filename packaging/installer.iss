@@ -1,4 +1,6 @@
-#ifdef V33CandidateBuild
+#ifdef V33StableQABuild
+  #define AppName "Anything Plays 3.3"
+#elif defined(V33CandidateBuild)
   #define AppName "Anything Plays 3.3 Private QA"
 #elif defined(V32UpgradeQABuild)
   #define AppName "Anything Plays 3.2"
@@ -23,7 +25,9 @@
   #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-#ifdef V33CandidateBuild
+#ifdef V33StableQABuild
+AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
+#elif defined(V33CandidateBuild)
 AppId={{4B38792D-4E9F-42A7-A14F-9B46D04B3303}
 #elif defined(V32UpgradeQABuild)
 AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
@@ -47,7 +51,10 @@ AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-#ifdef V33CandidateBuild
+#ifdef V33StableQABuild
+DefaultDirName={autopf}\Anything Plays 3.1
+DefaultGroupName=Anything Plays 3.1
+#elif defined(V33CandidateBuild)
 DefaultDirName={autopf}\Anything Plays 3.3 Private QA
 DefaultGroupName=Anything Plays 3.3 Private QA
 #elif defined(V32UpgradeQABuild)
@@ -80,7 +87,7 @@ DefaultGroupName=Anything Plays 3.0 Preview
 #endif
 DisableProgramGroupPage=yes
 OutputDir=..\release
-#ifdef V32UpgradeQABuild
+#if defined(V32UpgradeQABuild) || defined(V33StableQABuild)
 OutputBaseFilename=AnythingPlaysSetup-{#AppVersion}-PRIVATE-UPGRADE-QA
 #else
 OutputBaseFilename=AnythingPlaysSetup-{#AppVersion}
@@ -99,7 +106,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-#ifdef V33CandidateBuild
+#ifdef V33StableQABuild
+Name: "{group}\Anything Plays 3.3"; Filename: "{app}\AnythingPlays.exe"
+Name: "{autodesktop}\Anything Plays 3.3"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
+#elif defined(V33CandidateBuild)
 Name: "{group}\Anything Plays 3.3 Private QA"; Filename: "{app}\AnythingPlays.exe"
 Name: "{autodesktop}\Anything Plays 3.3 Private QA"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 #elif defined(V32UpgradeQABuild)

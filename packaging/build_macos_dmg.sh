@@ -211,6 +211,25 @@ if [[ "${AP_V33_CANDIDATE:-0}" == "1" ]]; then
     *) echo "Unsupported 3.3 candidate architecture" >&2; exit 1 ;;
   esac
 fi
+# Same app/bundle identity as the published 3.2 stable line.
+# Source-stage QA only; no automatic distribution or user-profile install.
+if [[ "${AP_V33_STABLE_CANDIDATE:-0}" == "1" ]]; then
+  for forbidden in AP_V31_PREVIEW AP_V31_RC AP_V31_RC2 \
+      AP_V31_FINAL_CANDIDATE AP_V311_CANDIDATE AP_V311_STABLE_CANDIDATE \
+      AP_V32_PREVIEW_BUILD AP_V32_STABLE_CANDIDATE AP_V33_CANDIDATE \
+      AP_RELEASE_BUILD AP_V30_APPROVED_RELEASE AP_V30_STABLE_CANDIDATE \
+      AP_V30_TEST_CORES AP_V30_GPL_TRIAL AP_V30_TIA_TRIAL; do
+    [[ "${!forbidden:-0}" != "1" ]] || exit 1
+  done
+  [[ "${AP_V30_MINIMAL_CORE_BUILD:-0}" == "1" ]] || exit 1
+  BUNDLE_FILE="AnythingPlays31.app"
+  DMG_VOLUME="Anything Plays 3.3 Private Upgrade QA"
+  case "$(uname -m)" in
+    arm64) DMG_NAME="AnythingPlays-3.3.0-UPGRADE-QA-macos-arm64.dmg" ;;
+    x86_64) DMG_NAME="AnythingPlays-3.3.0-UPGRADE-QA-macos-x64.dmg" ;;
+    *) exit 1 ;;
+  esac
+fi
 APP_BUNDLE="dist/$BUNDLE_FILE"
 # Prefer modern Homebrew Python/Tk on Apple Silicon; avoid system Tk 8.5.
 if [[ -x /opt/homebrew/bin/python3.13 ]]; then
@@ -246,7 +265,7 @@ fi
 # is treated as unset. Positional arguments expand safely to zero arguments.
 # These arguments are only consumed by this PyInstaller invocation.
 set --
-if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" || "${AP_V32_STABLE_CANDIDATE:-0}" == "1" || "${AP_V33_CANDIDATE:-0}" == "1" ]]; then
+if [[ "${AP_V31_PREVIEW:-0}" == "1" || "${AP_V31_RC:-0}" == "1" || "${AP_V31_RC2:-0}" == "1" || "${AP_V31_FINAL_CANDIDATE:-0}" == "1" || "${AP_V311_CANDIDATE:-0}" == "1" || "${AP_V311_STABLE_CANDIDATE:-0}" == "1" || "${AP_V32_PREVIEW_BUILD:-0}" == "1" || "${AP_V32_STABLE_CANDIDATE:-0}" == "1" || "${AP_V33_CANDIDATE:-0}" == "1" || "${AP_V33_STABLE_CANDIDATE:-0}" == "1" ]]; then
   .build-venv/bin/python -m tools.write_v31_identity build/v31_build_identity.json
   set -- --add-data "build/v31_build_identity.json:assets"
 fi
@@ -321,7 +340,14 @@ if [[ "$AP_V30_PRODUCTION" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.0.0" "$PLIST"
   /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays" "$PLIST" || true
 else
-  if [[ "${AP_V33_CANDIDATE:-0}" == "1" ]]; then
+  if [[ "${AP_V33_STABLE_CANDIDATE:-0}" == "1" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.release31" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.3.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.3.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 3.3.0" "$PLIST" ||
+      /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 3.3.0" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Anything Plays 3.3" "$PLIST" || true
+  elif [[ "${AP_V33_CANDIDATE:-0}" == "1" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anythingplays.privateqa33" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 3.3.0" "$PLIST" ||
       /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 3.3.0" "$PLIST"
