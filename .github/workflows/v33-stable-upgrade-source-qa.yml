@@ -162,7 +162,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           src=Path("packaging/installer.iss").read_text()
-          assert "#ifdef V33StableQABuild" in src
+          assert "defined(V33StableQABuild) || defined(V33StableFinalBuild)" in src
           assert "AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}" in src
           print("3.3 source QA selects the prior 3.2 stable Inno AppId")
           PY
@@ -184,7 +184,17 @@ jobs:
             --pattern "$name" --dir published-v32
           gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
             --pattern SHA256SUMS.txt --dir published-v32
-          (cd published-v32 && grep -F "  $name" SHA256SUMS.txt | sha256sum --check --status)
+          python - "$name" <<'PY'
+          import hashlib,sys
+          from pathlib import Path
+          name=sys.argv[1]
+          original=Path("published-v32")/name
+          sums=(Path("published-v32")/"SHA256SUMS.txt").read_text().splitlines()
+          matching=[line for line in sums if line.endswith("  "+name)]
+          assert len(matching)==1 and original.is_file()
+          assert hashlib.sha256(original.read_bytes()).hexdigest()+"  "+name==matching[0]
+          print("Published stable 3.2 baseline matches original SHA256:", name)
+          PY
       - name: Reassemble Linux 11-core stable upgrade in disposable CI root
         if: matrix.target == 'linux-x64'
         shell: bash
