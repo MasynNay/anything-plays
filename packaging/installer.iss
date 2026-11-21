@@ -1,4 +1,4 @@
-#ifdef V33StableQABuild
+#if defined(V33StableQABuild) || defined(V33StableFinalBuild)
   #define AppName "Anything Plays 3.3"
 #elif defined(V33CandidateBuild)
   #define AppName "Anything Plays 3.3 Private QA"
@@ -25,7 +25,7 @@
   #define AppVersion "3.0.0-alpha.1"
 #endif
 [Setup]
-#ifdef V33StableQABuild
+#if defined(V33StableQABuild) || defined(V33StableFinalBuild)
 AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}
 #elif defined(V33CandidateBuild)
 AppId={{4B38792D-4E9F-42A7-A14F-9B46D04B3303}
@@ -51,7 +51,7 @@ AppId={{AADD80D2-54CD-4FD9-BB42-A669D15C8B45}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Anything Plays
-#ifdef V33StableQABuild
+#if defined(V33StableQABuild) || defined(V33StableFinalBuild)
 DefaultDirName={autopf}\Anything Plays 3.1
 DefaultGroupName=Anything Plays 3.1
 #elif defined(V33CandidateBuild)
@@ -106,7 +106,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "..\dist\AnythingPlays\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-#ifdef V33StableQABuild
+#if defined(V33StableQABuild) || defined(V33StableFinalBuild)
 Name: "{group}\Anything Plays 3.3"; Filename: "{app}\AnythingPlays.exe"
 Name: "{autodesktop}\Anything Plays 3.3"; Filename: "{app}\AnythingPlays.exe"; Tasks: desktopicon
 #elif defined(V33CandidateBuild)

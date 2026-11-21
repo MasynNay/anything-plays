@@ -38,8 +38,9 @@ class StableV33IdentityTests(unittest.TestCase):
 
     def test_both_platforms_keep_original_installer_identity(self):
         win = (ROOT / "packaging" / "installer.iss").read_text("utf-8")
-        self.assertIn("#ifdef V33StableQABuild", win)
+        self.assertIn("defined(V33StableFinalBuild)", win)
         self.assertIn("AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}", win)
+        self.assertIn("defined(V33StableQABuild) || defined(V33StableFinalBuild)", win)
         self.assertIn("AnythingPlaysSetup-{#AppVersion}-PRIVATE-UPGRADE-QA", win)
         mac = (ROOT / "packaging" / "build_macos_dmg.sh").read_text("utf-8")
         self.assertIn('BUNDLE_FILE="AnythingPlays31.app"', mac)

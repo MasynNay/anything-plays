@@ -47,7 +47,7 @@ def names(arch):
     return (
         f"AnythingPlays-3.2.0-macos-{arch}.dmg",
         NAMES[f"macos-{arch}"],
-        f"AnythingPlays-3.3.0-fullupgradeqa1-macos-{arch}.dmg",
+        f"AnythingPlays-3.3.0-macos-{arch}.dmg",
     )
 
 

@@ -25,7 +25,7 @@ from tools.verify_v33_stable_upgrade_source import (
 
 BASELINE = "anything-plays-31_3.2.0_amd64.deb"
 SOURCE = NAMES["linux-x64"]
-FULL = "anything-plays-31_3.3.0~fullupgradeqa1_amd64.deb"
+FULL = "anything-plays-31_3.3.0_amd64.deb"
 STATUS = "PRIVATE_3_3_FULL_CORE_STABLE_LINUX_UPGRADE_QA_NOT_RELEASE"
 
 
@@ -118,7 +118,7 @@ def assemble(stable, source, checksums, receipt, sha, output):
                 or "Package: anything-plays-31\n" not in info):
             raise ValueError("Private source app is not an upgrade of stable 3.2.0")
         control.write_text(info.replace(
-            old_version, "Version: 3.3.0~fullupgradeqa1\n"
+            old_version, "Version: 3.3.0\n"
         ), "utf-8")
         output.mkdir(parents=True, exist_ok=False)
         installer = output / FULL
@@ -133,7 +133,7 @@ def assemble(stable, source, checksums, receipt, sha, output):
         if full_inventory(installed / "cores") != original:
             raise ValueError("Repacked installed full-native core bytes changed")
         for field, value in (("Package", "anything-plays-31"),
-                             ("Version", "3.3.0~fullupgradeqa1")):
+                             ("Version", "3.3.0")):
             found = subprocess.check_output(
                 ["dpkg-deb", "-f", str(installer), field],
                 text=True, timeout=25,

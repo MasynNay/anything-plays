@@ -24,7 +24,7 @@ from tools.verify_v33_stable_upgrade_source import NAMES, verify as verify_sourc
 
 BASELINE = "AnythingPlaysSetup-3.2.0.exe"
 SOURCE = NAMES["windows-x64"]
-FULL = "AnythingPlaysSetup-3.3.0-fullupgradeqa1-PRIVATE-UPGRADE-QA.exe"
+FULL = "AnythingPlaysSetup-3.3.0.exe"
 STATUS = "PRIVATE_3_3_FULL_CORE_STABLE_WINDOWS_UPGRADE_QA_NOT_RELEASE"
 
 
@@ -108,9 +108,9 @@ def assemble(stable, source, checksums, receipt, sha, output):
         if full_inventory(dest/"cores") != original:
             raise ValueError("Staged Windows native source bytes changed")
         validate_staged_identity(dest, channel="v33_stable_candidate")
-        version = "3.3.0-fullupgradeqa1"
+        version = "3.3.0"
         subprocess.run(
-            [iscc(), "/DV33UpgradeQABuild=1", "/DAppVersion=" + version,
+            [iscc(), "/DV33StableFinalBuild=1", "/DAppVersion=" + version,
              str(root/"packaging/installer.iss")],
             cwd=root, check=True, timeout=600,
         )
