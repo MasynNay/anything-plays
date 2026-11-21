@@ -1,4 +1,4 @@
-"""Public stable 3.1 site navigation and honest historical Stream Mode art contracts."""
+"""Public stable 3.3 site navigation and honest historical Stream Mode art contracts."""
 from html.parser import HTMLParser
 from pathlib import Path
 import unittest
@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site" / "index.html"
 STYLES = ROOT / "site" / "styles.css"
 README = ROOT / "README.md"
-TAG = "v3.2.0"
+TAG = "v3.3.0"
 
 
 class Links(HTMLParser):
@@ -24,7 +24,7 @@ class Links(HTMLParser):
 
 
 class StreamPortfolioTests(unittest.TestCase):
-    def test_primary_stable_31_and_previous_30_are_distinct(self):
+    def test_latest_stable_and_previous_release_links_are_distinct(self):
         html = SITE.read_text("utf-8")
         links = Links()
         links.feed(html)
@@ -34,11 +34,11 @@ class StreamPortfolioTests(unittest.TestCase):
         )
         self.assertEqual(
             links.links["public-previous-stable-download"],
-            "https://github.com/MasynNay/anything-plays/releases/tag/v3.1.1",
+            "https://github.com/MasynNay/anything-plays/releases/tag/v3.2.0",
         )
         self.assertNotIn("Download 3.1 RC1", html)
         self.assertIn("latest public stable", README.read_text("utf-8"))
-        self.assertIn("STABLE 3.2.0 AVAILABLE", html)
+        self.assertIn("STABLE 3.3.0 AVAILABLE", html)
 
     def test_stream_mode_is_unambiguously_an_illustration(self):
         html = SITE.read_text("utf-8")
@@ -60,7 +60,7 @@ class StreamPortfolioTests(unittest.TestCase):
         html = SITE.read_text("utf-8")
         readme = README.read_text("utf-8")
         self.assertIn("Separately licensed sources and notices accompany the release", html)
-        self.assertIn("Anything Plays 3.2.0 — public stable release", readme)
+        self.assertIn("Anything Plays 3.3.0 — public stable release", readme)
         self.assertIn("releases/tag/v3.1.1", readme)
         self.assertIn("releases/tag/v3.1.0", readme)
         self.assertIn("docs/screenshots/3.0", readme)
