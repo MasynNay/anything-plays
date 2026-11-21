@@ -65,41 +65,95 @@ class CameraMixin:
     and ``LayoutMixin.build``. They are not standalone widgets.
     """
 
+    def _retire_camera_scan(self, generation, results):
+        """End only this discovery attempt; never cancel a newer scan."""
+        if (generation != getattr(self, "_camera_scan_generation", None)
+                or results is not getattr(self, "_camera_scan_results", None)):
+            return
+        self._camera_scan_generation = generation + 1
+        self._camera_scan_results = None
+        self.camera_scanning = False
+        if not getattr(self, "_closing", False):
+            try:
+                self.status.set(
+                    "Camera search interrupted. Click Refresh cameras to retry."
+                )
+            except Exception:
+                # Closing/destroyed Tk status is not a camera failure.
+                pass
+
     def scan_cameras(self):
-        """Probe off the UI thread; consume the result on Tk's main thread."""
+        """Probe off Tk; accept only the currently owned scan's result."""
         if self.camera_scanning:
             return
         self.stop_camera()
         self.camera_scanning = True
+        generation = getattr(self, "_camera_scan_generation", 0) + 1
+        self._camera_scan_generation = generation
         self.status.set('Searching for available webcams…')
         results = Queue(maxsize=1)
         self._camera_scan_results = results
 
         def worker():
-            # Capture this scan's queue, not the mutable App reference.
-            # An old discovery thread must never send into a newer scan's
-            # queue or keep the entire interface alive after it closes.
+            # The worker owns only its queue. Late native discovery replies
+            # must never populate a newer scan, even for the same camera.
             try:
                 results.put((discover(), None))
             except Exception:
-                # Discovery backends sometimes include camera serials, user
-                # directories and driver paths in exception text. Only a
-                # boolean failure flag crosses to Tk; no raw error strings.
+                # A driver failure can contain private device names/paths.
                 results.put(([], True))
 
-        threading.Thread(target=worker, daemon=True, name='camera-discovery').start()
-        self.root.after(80, self._poll_camera_scan)
+        try:
+            threading.Thread(
+                target=worker, daemon=True, name='camera-discovery'
+            ).start()
+            self.root.after(
+                80, lambda: self._poll_camera_scan(generation, results)
+            )
+        except Exception:
+            # A destroyed Tk loop or failed native thread allocation must
+            # not strand the UI permanently in camera_scanning=True.
+            self._retire_camera_scan(generation, results)
 
-    def _poll_camera_scan(self):
-        """Keep every Tk widget update on the main event-loop thread."""
-        if self._closing:
+    def _poll_camera_scan(self, generation=None, results=None):
+        """Ignore delayed/reentrant callbacks from earlier discovery scans."""
+        if generation is None:
+            generation = getattr(self, "_camera_scan_generation", None)
+        if results is None:
+            results = getattr(self, "_camera_scan_results", None)
+        if (not getattr(self, "camera_scanning", False)
+                or generation != getattr(self, "_camera_scan_generation", None)
+                or results is not getattr(self, "_camera_scan_results", None)):
+            return
+        if getattr(self, "_closing", False):
+            self._retire_camera_scan(generation, results)
             return
         try:
-            cameras, error = self._camera_scan_results.get_nowait()
+            cameras, error = results.get_nowait()
         except Empty:
-            self.root.after(80, self._poll_camera_scan)
+            try:
+                self.root.after(
+                    80, lambda: self._poll_camera_scan(generation, results)
+                )
+            except Exception:
+                self._retire_camera_scan(generation, results)
         else:
-            self.finish_scan(cameras, error)
+            # Retire the queue before any Tk widget handlers can reenter
+            # Refresh. The new scan may start from within finish_scan().
+            self._camera_scan_results = None
+            self.camera_scanning = False
+            try:
+                self.finish_scan(cameras, error)
+            except Exception:
+                # Native/Tk wrappers may already be closing. The original
+                # camera remains stopped; no untrusted exception text leaks.
+                if not getattr(self, "_closing", False):
+                    try:
+                        self.status.set(
+                            "Camera list could not be shown. Refresh cameras."
+                        )
+                    except Exception:
+                        pass
 
     def finish_scan(self, found, error=None):
         """Refresh devices without silently switching away from a USB camera.

@@ -225,3 +225,24 @@ This does not reset the live input state or disarm P1/P2.
 Source tests inject observer exceptions, private extra fields, missing
 counters and malformed percentile labels. Physical camera-to-native
 response and real controller release still require hardware QA.
+
+
+## Async webcam discovery ownership during repeated Refresh
+
+The 3.3 webcam Refresh callback now owns a specific bounded result
+queue and generation. A late Tk timer from a previous discovery attempt
+cannot consume the newer attempt's camera list, even if a previously
+selected device has the same display name. A previous discovery worker
+can finish after its scan has been retired without switching cameras,
+changing the selected device, or touching the new queue. These changes
+apply to the camera picker, not tracking, pixel processing or controls.
+
+An exception starting the native discovery thread or scheduling the
+next Tk poll retires that scan's active state so Refresh is usable
+again; it does not report private driver paths. Closing the window
+also retires its pending scan, and an unexpected Tk list-update error
+does not leave the UI stuck in a permanent 'Searching' state. The
+camera is still disarmed during a refresh and never auto-rearms.
+Eight synthetic tests cover these callback and failure transitions.
+Real driver hangs, permissions, webcam hotplug and actual frame
+delivery still require owner hardware verification.
