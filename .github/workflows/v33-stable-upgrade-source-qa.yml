@@ -104,17 +104,18 @@ jobs:
         run: |
           choco install innosetup --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
-      - name: Create real-version mGBA source shell, without public upload
+      - name: Create Windows 3.3 stable-identity source installer
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call packaging\\build_windows.bat
+      - name: Create macOS 3.3 stable-identity source disk image
+        if: runner.os == 'macOS'
         shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cmd.exe /c packaging\\build_windows.bat
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            bash packaging/build_macos_dmg.sh
-          else
-            bash packaging/build_linux_deb.sh
-          fi
+        run: bash packaging/build_macos_dmg.sh
+      - name: Create Linux 3.3 stable-identity source package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
       - name: Verify original stable bundle identity, source SHA and one native core
         shell: bash
         run: |
