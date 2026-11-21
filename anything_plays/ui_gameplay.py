@@ -12,6 +12,18 @@ from anything_plays.systems import SYSTEMS
 from anything_plays.shortcuts import button_for_key
 
 
+_SAFE_GUI_ERROR_CLASSES = frozenset((
+    "OSError", "RuntimeError", "ValueError", "TypeError", "IndexError",
+    "AttributeError", "MemoryError", "TclError", "error",
+))
+
+
+def safe_gui_failure_class(exc):
+    """Allowlisted error category; never display exception/device text."""
+    category = type(exc).__name__
+    return category if category in _SAFE_GUI_ERROR_CLASSES else "UnexpectedError"
+
+
 class GameplayMixin:
     """Own the manual-input focus policy and the game's UI refresh cycle.
 
@@ -303,7 +315,10 @@ class GameplayMixin:
             # exception to be thrown 20 times per second indefinitely.
             if self.cap is not None:
                 self.stop_camera()
-            self.status.set('Tracking error: ' + str(exc)[:120])
+            self.status.set(
+                'Tracking error (' + safe_gui_failure_class(exc)
+                + '). Camera controls paused; check connection or permissions.'
+            )
         finally:
             if not self._closing:
                 active_camera = GameplayMixin._camera_is_open(self)
@@ -329,7 +344,10 @@ class GameplayMixin:
             self._game_render_retry_at = now + 2.0
             if now >= getattr(self, "_game_render_warning_at", 0):
                 self._game_render_warning_at = now + 30.0
-                self.game_status.set("Display error (retrying): " + str(exc)[:100])
+                self.game_status.set(
+                    "Display error (retrying: "
+                    + safe_gui_failure_class(exc) + ")."
+                )
         finally:
             if not self._closing:
                 # A 3D preview does not need 60 Tk refresh timers when
@@ -346,6 +364,25 @@ class GameplayMixin:
 
     def draw_game(self):
         """Render a fresh frame only when the game or canvas changed."""
+        # The native worker may exit on its own after an error or a core
+        # shutdown, without the user requesting Library Stop. The last
+        # PhotoImage can otherwise remain visible forever because there is
+        # no new frame serial to trigger a redraw. Fail closed for old game
+        # pixels, but never blank a still-launching core or an independent
+        # Stream Mode camera-only composition.
+        if not self.emu.running and not getattr(self.emu, "launching", False):
+            with self.emu.lock:
+                stale_native = self.emu.frame is not None
+            stale_game = (
+                stale_native
+                or getattr(self, "game_photo", None) is not None
+                or getattr(self, "_last_game_render", None) is not None
+            )
+            if stale_game:
+                from anything_plays.game_display_lifecycle import clear_game_video
+                clear_game_video(self)
+            return
+
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
         canvas_width = max(1, canvas.winfo_width())
         canvas_height = max(1, canvas.winfo_height())

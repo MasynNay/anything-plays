@@ -1,0 +1,588 @@
+name: 3.3 | Four-platform isolated owner QA installers (unreleased)
+
+# Private acceptance candidates for the exact PR head: a minimal mGBA
+# startup package and a separately staged 11-core/18-profile full-native QA
+# package. Neither is a public 3.3 installer or a stable upgrade.
+# No tags, Releases API writes, deployment credentials or automatic install.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v33-private-candidate-installers.yml'
+      - 'packaging/**'
+      - 'requirements-build.txt'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'tools/ci_use_canonical_ubuntu_mirror.sh'
+      - 'tests/test_v33_ci_apt_recovery.py'
+      - 'tools/write_v31_identity.py'
+      - 'tools/v33_candidate_verify.py'
+      - 'tools/v33_candidate_frozen_gui.py'
+      - 'tools/stage_v33_full_linux.py'
+      - 'tools/stage_v33_full_windows.py'
+      - 'tools/stage_v33_full_macos.py'
+      - 'tools/v33_full_native_link.py'
+      - 'tests/test_v33_candidate_*.py'
+      - 'tests/test_v33_full_linux_staging.py'
+      - 'tests/test_v33_full_windows_staging.py'
+      - 'tests/test_v33_full_macos_staging.py'
+      - 'tests/test_v33_full_native_link.py'
+      - 'tests/test_v33_legacy_runner_isolation.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Latest PR head wins. A SHA suffix prevented cancellation and left
+  # redundant macOS builds queued after every development commit.
+  # Exact source remains pinned by the checkout/receipt below, not this key.
+  group: v33-candidate-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  v33-private-mgba-candidate:
+    # Never build installers for an arbitrary PR, fork or release tag.
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.3-stream-render-latency') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.3-stream-render-latency') }}
+    name: Unreleased 3.3 isolated QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 115
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            installer: release/anything-plays-33-candidate_3.3.0~qa1_amd64.deb
+            bundle: dist/AnythingPlays
+          - target: windows-x64
+            runner: windows-latest
+            installer: release/AnythingPlaysSetup-3.3.0-qa1.exe
+            bundle: dist/AnythingPlays
+          - target: macos-arm64
+            runner: macos-15
+            installer: release/AnythingPlays-3.3.0-qa1-macos-arm64.dmg
+            bundle: dist/AnythingPlays33Candidate.app
+          - target: macos-x64
+            runner: macos-15-intel
+            installer: release/AnythingPlays-3.3.0-qa1-macos-x64.dmg
+            bundle: dist/AnythingPlays33Candidate.app
+    env:
+      AP_V33_CANDIDATE: "1"
+      AP_V30_MINIMAL_CORE_BUILD: "1"
+      AP_RELEASE_BUILD: "0"
+      AP_V30_APPROVED_RELEASE: "0"
+      AP_V30_STABLE_CANDIDATE: "0"
+      AP_V30_TEST_CORES: "0"
+      AP_V30_GPL_TRIAL: "0"
+      AP_V30_TIA_TRIAL: "0"
+      AP_V31_PREVIEW: "0"
+      AP_V31_RC: "0"
+      AP_V31_RC2: "0"
+      AP_V31_FINAL_CANDIDATE: "0"
+      AP_V311_CANDIDATE: "0"
+      AP_V311_STABLE_CANDIDATE: "0"
+      AP_V32_PREVIEW_BUILD: "0"
+      AP_V32_STABLE_CANDIDATE: "0"
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact reviewed source, without write credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Confirm exact SHA, exclusive identity and isolated storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v33_candidate_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_v33_candidate_verify.py' -v
+          python -m unittest discover -s tests -p 'test_v33_candidate_frozen_gui.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_linux_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_windows_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_macos_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_full_native_link.py' -v
+          python -m unittest discover -s tests -p 'test_v33_workflow_concurrency.py' -v
+          python -m unittest discover -s tests -p 'test_v33_legacy_runner_isolation.py' -v
+          python - <<'PY'
+          import os
+          from anything_plays.build_identity import make_identity
+          from tools.write_v31_identity import choose_channel
+          assert choose_channel(os.environ) == "v33_candidate"
+          identity = make_identity("v33_candidate")
+          assert identity["settings_namespace"] == "anything-plays-33-candidate"
+          assert identity["public_release_approved"] is False
+          assert os.environ["AP_RELEASE_BUILD"] == "0"
+          assert os.environ["AP_V30_MINIMAL_CORE_BUILD"] == "1"
+          print("Correct isolated 3.3 owner QA identity; stable release disabled")
+          PY
+      - name: Install Linux packaging and native runtime tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          # A hosted runner can silently omit all Ubuntu indexes while
+          # updating a separate Microsoft feed successfully. Recover only
+          # if required package metadata is missing, with signed sources.
+          # sudo clears custom runner environment by default. Pass only
+          # the two identity flags needed by the guarded recovery helper.
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_OS="$RUNNER_OS" bash tools/ci_use_canonical_ubuntu_mirror.sh --repair-missing-packages
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-tk dpkg-dev libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb xauth
+      - name: Install Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup missing" }
+      - name: Create private Linux .deb
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: bash packaging/build_linux_deb.sh
+      - name: Create private Windows .exe
+        if: matrix.target == 'windows-x64'
+        shell: cmd
+        run: call packaging\build_windows.bat
+      - name: Create private Mac .dmg
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash packaging/build_macos_dmg.sh
+      - name: Verify exact frozen identity, exclusive mGBA core and SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.v33_candidate_verify --target "${{ matrix.target }}" --bundle "${{ matrix.bundle }}" --installer "${{ matrix.installer }}" --source-sha "$QA_SOURCE_SHA" --output release/V33_CANDIDATE_QA_RECEIPT.json
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          receipt=json.loads(Path("release/V33_CANDIDATE_QA_RECEIPT.json").read_text())
+          assert receipt["public_release_approved"] is False
+          assert receipt["channel"] == "v33_candidate"
+          assert receipt["bundled_core_count"] == 1
+          assert receipt["settings_namespace"] == "anything-plays-33-candidate"
+          path=Path("release")/receipt["installer_filename"]
+          assert hashlib.sha256(path.read_bytes()).hexdigest() == receipt["installer_sha256"]
+          Path("release/SHA256SUMS.txt").write_text(receipt["installer_sha256"]+"  "+path.name+"\n")
+          PY
+      - name: Verify Linux install payload without touching the host
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG='${{ matrix.installer }}'
+          test "$(dpkg-deb -f "$PKG" Package)" = "anything-plays-33-candidate"
+          test "$(dpkg-deb -f "$PKG" Version)" = "3.3.0~qa1"
+          test "$(dpkg-deb -f "$PKG" Architecture)" = "amd64"
+          QA_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$QA_ROOT"' EXIT
+          dpkg-deb -x "$PKG" "$QA_ROOT"
+          test -x "$QA_ROOT/opt/anything-plays-33-candidate/AnythingPlays"
+          test -x "$QA_ROOT/usr/bin/anything-plays-33-candidate"
+          test -f "$QA_ROOT/usr/share/applications/anything-plays-33-candidate.desktop"
+          test ! -e "$QA_ROOT/opt/anything-plays-31"
+          test ! -e "$QA_ROOT/opt/anything-plays-32-preview"
+      - name: Launch real frozen Linux Tk candidate in disposable HOME
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$QA_ROOT"' EXIT
+          mkdir -p "$QA_ROOT/home" "$QA_ROOT/payload"
+          python -m tools.v33_candidate_frozen_gui seed --home "$QA_ROOT/home"
+          dpkg-deb -x '${{ matrix.installer }}' "$QA_ROOT/payload"
+          ENTRY="$QA_ROOT/payload/opt/anything-plays-33-candidate/AnythingPlays"
+          test -x "$ENTRY"
+          # This is the actual installed/frozen entry point, not a source
+          # import. No real webcam, ROM, controller or public HOME is read.
+          HOME="$QA_ROOT/home" \
+          XDG_CONFIG_HOME="$QA_ROOT/home/.config" \
+          XDG_STATE_HOME="$QA_ROOT/home/.local/state" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V33_GUI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA_ROOT/frozen.json" \
+          SDL_VIDEODRIVER=dummy \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+            timeout 75 xvfb-run -a -s '-screen 0 1600x900x24' \
+              "$ENTRY" --ap-v30-ui-smoke
+          python -m tools.v33_candidate_frozen_gui verify \
+            --home "$QA_ROOT/home" \
+            --report "$QA_ROOT/frozen.json" \
+            --output release/V33_FROZEN_GUI_RECEIPT.json
+          # Only aggregate booleans, no pixels or previous-user settings.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("release/V33_FROZEN_GUI_RECEIPT.json").read_text())
+          assert data["frozen_candidate_gui_started"] is True
+          assert data["synthetic_stream_window_verified"] is True
+          assert data["historical_settings_unchanged"] is True
+          assert data["public_release_approved"] is False
+          assert data["hardware_camera_tested"] is False
+          PY
+      - name: Install real Windows Inno candidate and run isolated frozen Tk UI
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $qa = Join-Path $env:RUNNER_TEMP "AP33-Frozen-$env:GITHUB_RUN_ID"
+          $homeDir = Join-Path $qa 'home'
+          $installDir = Join-Path $qa 'installed'
+          if (Test-Path $qa) { throw 'QA scratch folder must be new' }
+          New-Item -ItemType Directory -Force -Path $homeDir | Out-Null
+          $installer = (Resolve-Path '${{ matrix.installer }}').Path
+          # Use Inno itself to install the QA package to a private runner
+          # directory. Never run the build-tree exe or install into stable.
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]), Path(sys.argv[2]))" $installer $installDir
+          if ($LASTEXITCODE -ne 0) { throw 'Private Inno installation failed' }
+          $exe = Join-Path $installDir 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Private Inno executable missing' }
+          python -m tools.v33_candidate_frozen_gui seed --home $homeDir
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot seed disposable QA home' }
+          $env:USERPROFILE = $homeDir
+          $env:HOME = $homeDir
+          $env:APPDATA = Join-Path $homeDir 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
+          $env:XDG_CONFIG_HOME = Join-Path $homeDir '.config'
+          $env:AP_V30_UI_SMOKE_CHECK = '1'
+          $env:AP_V33_GUI_SMOKE_CHECK = '1'
+          $env:AP_V31_STREAM_SMOKE_CHECK = '1'
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $qa 'frozen.json'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
+          # Enforce a finite subprocess timeout, never expose native stderr
+          # or raw camera/driver paths to the public Actions job log.
+          python -c "import subprocess,sys; p=subprocess.run([sys.argv[1],'--ap-v30-ui-smoke'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=120);sys.exit(p.returncode)" $exe
+          if ($LASTEXITCODE -ne 0) { throw 'Frozen Windows 3.3 Tk smoke failed' }
+          python -m tools.v33_candidate_frozen_gui verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output (Join-Path $PWD 'release/V33_FROZEN_GUI_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Frozen Windows isolation verifier failed' }
+
+      - name: Mount genuine macOS QA DMG and launch frozen Tk Stream Output
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA="$(mktemp -d /tmp/ap33-frozen-gui.XXXXXX)"
+          MOUNT="$(mktemp -d /tmp/ap33-mounted-dmg.XXXXXX)"
+          trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rm -rf "$QA"; rmdir "$MOUNT" >/dev/null 2>&1 || true' EXIT
+          mkdir -p "$QA/home"
+          python -m tools.v33_candidate_frozen_gui seed --home "$QA/home"
+          mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" '${{ matrix.installer }}'; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$MOUNT" >/dev/null 2>&1 || true
+            sleep "$((attempt * 3))"
+          done
+          test "$mounted" = 1
+          BUNDLE="$MOUNT/AnythingPlays33Candidate.app"
+          ENTRY="$BUNDLE/Contents/MacOS/AnythingPlays"
+          test -x "$ENTRY"
+          codesign --verify --verbose=2 "$BUNDLE"
+          # The mounted signed .app itself must start; source-tree Python
+          # smoke tests or identity checks cannot substitute for this.
+          HOME="$QA/home" \
+          XDG_CONFIG_HOME="$QA/home/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V33_GUI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA/frozen.json" \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          python - "$ENTRY" <<'PY'
+          import os
+          import subprocess
+          import sys
+          process = subprocess.run(
+              [sys.argv[1], "--ap-v30-ui-smoke"],
+              env=os.environ.copy(),
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+              timeout=120,
+          )
+          if process.returncode:
+              raise SystemExit("Mounted 3.3 QA frozen Tk startup failed")
+          PY
+          python -m tools.v33_candidate_frozen_gui verify \
+            --home "$QA/home" \
+            --report "$QA/frozen.json" \
+            --output release/V33_FROZEN_GUI_RECEIPT.json
+
+
+      - name: Stage 11 original 3.2 native cores into independent full 3.3 Linux QA
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'anything-plays-31_3.2.0_amd64.deb' --dir baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          python -m tools.stage_v33_full_linux \
+            --stable baseline-v32/anything-plays-31_3.2.0_amd64.deb \
+            --candidate 'release/anything-plays-33-candidate_3.3.0~qa1_amd64.deb' \
+            --checksums baseline-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_CANDIDATE_QA_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output private-full-v33
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path("private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json")
+          r=json.loads(path.read_text(encoding="utf-8"))
+          assert r["native_core_count"] == 11
+          assert r["console_profiles"] == 18
+          assert r["source_revision"] == __import__("os").environ["QA_SOURCE_SHA"]
+          assert r["source_native_core_bytes_preserved"] is True
+          assert r["settings_namespace"] == "anything-plays-33-candidate"
+          assert r["public_release_approved"] is False
+          assert r["real_gamecube_gameplay_tested"] is False
+          assert r["redistribution_audit_complete"] is False
+          print("Full native 3.3 Linux *private* installer staged. No hardware QA/public release.")
+          PY
+      - name: Launch final 11-core Linux QA frozen application and verify stream isolation
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_ROOT="$(mktemp -d /tmp/ap33-full-linux.XXXXXX)"
+          trap 'rm -rf "$QA_ROOT"' EXIT
+          mkdir -p "$QA_ROOT/home" "$QA_ROOT/full-payload"
+          python -m tools.v33_candidate_frozen_gui seed --home "$QA_ROOT/home"
+          dpkg-deb -x 'private-full-v33/anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb' "$QA_ROOT/full-payload"
+          ENTRY="$QA_ROOT/full-payload/opt/anything-plays-33-candidate/AnythingPlays"
+          test -x "$ENTRY"
+          HOME="$QA_ROOT/home" \
+          XDG_CONFIG_HOME="$QA_ROOT/home/.config" \
+          XDG_STATE_HOME="$QA_ROOT/home/.local/state" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V33_GUI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA_ROOT/full-frozen.json" \
+          SDL_VIDEODRIVER=dummy \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+            timeout 90 xvfb-run -a -s '-screen 0 1600x900x24' \
+              "$ENTRY" --ap-v30-ui-smoke
+          python -m tools.v33_candidate_frozen_gui verify \
+            --home "$QA_ROOT/home" \
+            --report "$QA_ROOT/full-frozen.json" \
+            --output private-full-v33/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+          python -m tools.v33_full_native_link \
+            --target linux-x64 \
+            --cores "$QA_ROOT/full-payload/opt/anything-plays-33-candidate/cores" \
+            --output private-full-v33/V33_FULL_NATIVE_LINK_RECEIPT.json
+      - name: Retain full 11-core Linux owner-QA installer without publishing
+        if: matrix.target == 'linux-x64' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-linux-x64-UNRELEASED
+          path: |
+            private-full-v33/anything-plays-33-candidate_3.3.0~fullqa1_amd64.deb
+            private-full-v33/V33_FULL_NATIVE_LINUX_QA_RECEIPT.json
+            private-full-v33/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33/V33_FULL_NATIVE_LINK_RECEIPT.json
+            private-full-v33/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Stage 11 published 3.2 native cores into independent full Windows 3.3 QA
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path baseline-v32 | Out-Null
+          gh release download v3.2.0 --repo $env:GITHUB_REPOSITORY --pattern 'AnythingPlaysSetup-3.2.0.exe' --dir baseline-v32
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch published 3.2 Windows source baseline' }
+          gh release download v3.2.0 --repo $env:GITHUB_REPOSITORY --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch published 3.2 checksum manifest' }
+          python -m tools.stage_v33_full_windows `
+            --stable 'baseline-v32/AnythingPlaysSetup-3.2.0.exe' `
+            --preview 'release/AnythingPlaysSetup-3.3.0-qa1.exe' `
+            --checksums 'baseline-v32/SHA256SUMS.txt' `
+            --source-receipt 'release/V33_CANDIDATE_QA_RECEIPT.json' `
+            --source-sha $env:QA_SOURCE_SHA `
+            --output private-full-v33-windows
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to stage private 11-core 3.3 Windows QA' }
+          python -c "import json,os,pathlib; p=pathlib.Path('private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json'); r=json.loads(p.read_text()); assert r['source_revision']==os.environ['QA_SOURCE_SHA']; assert r['native_core_count']==11 and r['console_profiles']==18; assert r['native_core_bytes_preserved'] and r['settings_namespace']=='anything-plays-33-candidate'; assert r['public_release_approved'] is False and r['redistribution_audit_complete'] is False; print('Verified Windows 3.3 full-native PRIVATE QA receipt')"
+          if ($LASTEXITCODE -ne 0) { throw 'Wrong full-native Windows QA verification receipt' }
+      - name: Launch full 11-core Windows Inno candidate in isolated Tk session
+        if: matrix.target == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $qa = Join-Path $env:RUNNER_TEMP "AP33-Full-Frozen-$env:GITHUB_RUN_ID"
+          $homeDir = Join-Path $qa 'home'
+          $installDir = Join-Path $qa 'installed'
+          if (Test-Path $qa) { throw 'Full-native QA scratch must be new' }
+          New-Item -ItemType Directory -Force -Path $homeDir | Out-Null
+          $installer = (Resolve-Path 'private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe').Path
+          python -c "import sys; from pathlib import Path; from tools.assemble_v31_full_windows import unpack; unpack(Path(sys.argv[1]),Path(sys.argv[2]))" $installer $installDir
+          if ($LASTEXITCODE -ne 0) { throw 'Private full-native Inno install failed' }
+          $exe = Join-Path $installDir 'AnythingPlays.exe'
+          if (-not (Test-Path $exe)) { throw 'Full-native frozen Windows executable missing' }
+          python -m tools.v33_candidate_frozen_gui seed --home $homeDir
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot seed full-native QA home' }
+          $env:USERPROFILE = $homeDir
+          $env:HOME = $homeDir
+          $env:APPDATA = Join-Path $homeDir 'AppData/Roaming'
+          $env:LOCALAPPDATA = Join-Path $homeDir 'AppData/Local'
+          $env:XDG_CONFIG_HOME = Join-Path $homeDir '.config'
+          $env:AP_V30_UI_SMOKE_CHECK = '1'
+          $env:AP_V33_GUI_SMOKE_CHECK = '1'
+          $env:AP_V31_STREAM_SMOKE_CHECK = '1'
+          $env:AP_V30_UI_SMOKE_REPORT = Join-Path $qa 'full-frozen.json'
+          $env:SDL_AUDIODRIVER = 'dummy'
+          $env:PYGAME_HIDE_SUPPORT_PROMPT = '1'
+          python -c "import subprocess,sys; p=subprocess.run([sys.argv[1],'--ap-v30-ui-smoke'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=120);sys.exit(p.returncode)" $exe
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native frozen Windows 3.3 Tk startup failed' }
+          python -m tools.v33_candidate_frozen_gui verify --home $homeDir --report $env:AP_V30_UI_SMOKE_REPORT --output (Join-Path $PWD 'private-full-v33-windows/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows GUI isolation verifier failed' }
+          python -m tools.v33_full_native_link --target windows-x64 --cores (Join-Path $installDir 'cores') --output (Join-Path $PWD 'private-full-v33-windows/V33_FULL_NATIVE_LINK_RECEIPT.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Full-native Windows ABI linkage failed' }
+      - name: Retain full 11-core Windows owner-QA installer without publishing
+        if: matrix.target == 'windows-x64' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-windows-x64-UNRELEASED
+          path: |
+            private-full-v33-windows/AnythingPlaysSetup-3.3.0-fullqa1.exe
+            private-full-v33-windows/V33_FULL_WINDOWS_QA_RECEIPT.json
+            private-full-v33-windows/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33-windows/V33_FULL_NATIVE_LINK_RECEIPT.json
+            private-full-v33-windows/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Stage published 3.2 full-native cores into independent 3.3 macOS QA
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ARCH="${{ matrix.target }}"
+          ARCH="${ARCH#macos-}"
+          test "$ARCH" = arm64 || test "$ARCH" = x64
+          mkdir -p baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern "AnythingPlays-3.2.0-macos-$ARCH.dmg" --dir baseline-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline-v32
+          python -m tools.stage_v33_full_macos \
+            --arch "$ARCH" \
+            --stable "baseline-v32/AnythingPlays-3.2.0-macos-$ARCH.dmg" \
+            --preview "${{ matrix.installer }}" \
+            --checksums baseline-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_CANDIDATE_QA_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output private-full-v33-macos
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          r=json.loads(Path("private-full-v33-macos/V33_FULL_MACOS_QA_RECEIPT.json").read_text())
+          assert r["source_revision"] == os.environ["QA_SOURCE_SHA"]
+          assert r["target"] in ("macos-x64","macos-arm64")
+          assert r["native_core_count"] == 11 and r["console_profiles"] == 18
+          assert r["native_core_bytes_preserved"] is True
+          assert r["settings_namespace"] == "anything-plays-33-candidate"
+          assert r["adhoc_signed"] is True and r["notarized"] is False
+          assert r["public_release_approved"] is False
+          assert r["redistribution_audit_complete"] is False
+          print("Verified isolated full-native 3.3 Mac QA; no public approval")
+          PY
+      - name: Mount final full-native macOS DMG and run frozen Tk isolation smoke
+        if: matrix.target == 'macos-arm64' || matrix.target == 'macos-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA="$(mktemp -d /tmp/ap33-full-macos.XXXXXX)"
+          MOUNT="$(mktemp -d /tmp/ap33-full-dmg.XXXXXX)"
+          trap 'hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; rm -rf "$QA"; rmdir "$MOUNT" >/dev/null 2>&1 || true' EXIT
+          mkdir -p "$QA/home"
+          python -m tools.v33_candidate_frozen_gui seed --home "$QA/home"
+          ARCH="${{ matrix.target }}"
+          ARCH="${ARCH#macos-}"
+          FULL="private-full-v33-macos/AnythingPlays-3.3.0-fullqa1-macos-$ARCH.dmg"
+          mounted=0
+          for attempt in 1 2 3 4 5; do
+            if hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" "$FULL"; then
+              mounted=1
+              break
+            fi
+            hdiutil detach "$MOUNT" >/dev/null 2>&1 || true
+            sleep "$((attempt * 3))"
+          done
+          test "$mounted" = 1
+          BUNDLE="$MOUNT/AnythingPlays33Candidate.app"
+          ENTRY="$BUNDLE/Contents/MacOS/AnythingPlays"
+          test -x "$ENTRY"
+          codesign --verify --verbose=2 "$BUNDLE"
+          HOME="$QA/home" \
+          XDG_CONFIG_HOME="$QA/home/.config" \
+          AP_V30_UI_SMOKE_CHECK=1 \
+          AP_V33_GUI_SMOKE_CHECK=1 \
+          AP_V31_STREAM_SMOKE_CHECK=1 \
+          AP_V30_UI_SMOKE_REPORT="$QA/full-frozen.json" \
+          SDL_AUDIODRIVER=dummy \
+          PYGAME_HIDE_SUPPORT_PROMPT=1 \
+          python - "$ENTRY" <<'PY'
+          import os
+          import subprocess
+          import sys
+          p=subprocess.run([sys.argv[1],"--ap-v30-ui-smoke"],
+                           env=os.environ.copy(),stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL,timeout=120)
+          if p.returncode:
+              raise SystemExit("Full-native macOS frozen 3.3 Tk startup failed")
+          PY
+          python -m tools.v33_candidate_frozen_gui verify \
+            --home "$QA/home" \
+            --report "$QA/full-frozen.json" \
+            --output private-full-v33-macos/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+          python -m tools.v33_full_native_link \
+            --target "${{ matrix.target }}" \
+            --cores "$BUNDLE/Contents/Resources/cores" \
+            --output private-full-v33-macos/V33_FULL_NATIVE_LINK_RECEIPT.json
+      - name: Retain full-native signed-ad-hoc macOS QA DMG without publishing
+        if: (matrix.target == 'macos-arm64' || matrix.target == 'macos-x64') && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-FULL-NATIVE-${{ matrix.target }}-UNRELEASED
+          path: |
+            private-full-v33-macos/AnythingPlays-3.3.0-fullqa1-macos-*.dmg
+            private-full-v33-macos/V33_FULL_MACOS_QA_RECEIPT.json
+            private-full-v33-macos/V33_FULL_NATIVE_FROZEN_GUI_RECEIPT.json
+            private-full-v33-macos/V33_FULL_NATIVE_LINK_RECEIPT.json
+            private-full-v33-macos/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Retain only unreleased installer and aggregate proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-QA-${{ matrix.target }}-UNRELEASED
+          path: |
+            ${{ matrix.installer }}
+            release/V33_CANDIDATE_QA_RECEIPT.json
+            release/V33_FROZEN_GUI_RECEIPT.json
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

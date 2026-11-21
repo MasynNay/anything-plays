@@ -29,7 +29,9 @@ import zipfile
 
 from anything_plays.emulator_updates import UPSTREAM_REPOS
 from anything_plays.update_check import version_key
-from anything_plays.preview_storage import is_v32_preview, checked_preview_directory
+from anything_plays.preview_storage import (
+    is_v32_preview, is_v33_candidate, checked_preview_directory,
+)
 
 RELEASES_API = "https://api.github.com/repos/MasynNay/anything-plays/releases?per_page=30"
 RELEASE_PREFIX = "https://github.com/MasynNay/anything-plays/releases/download/"
@@ -60,7 +62,8 @@ def managed_core_root():
     # Never read or overwrite a public installation's core overlay while a
     # private 3.2 test build is running next to it. Stable paths stay byte-for-
     # byte backward compatible on every OS.
-    scope = "3.2-preview" if is_v32_preview() else "3.0"
+    scope = ("3.3-candidate" if is_v33_candidate()
+             else "3.2-preview" if is_v32_preview() else "3.0")
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local")))
         candidate = base / "AnythingPlays" / scope / "cores"
@@ -72,7 +75,7 @@ def managed_core_root():
             "XDG_DATA_HOME", str(Path.home() / ".local/share"),
         )) / "anything-plays" / scope / "cores")
     return (checked_preview_directory(candidate, scope)
-            if is_v32_preview() else candidate)
+            if is_v32_preview() or is_v33_candidate() else candidate)
 
 
 def _no_symlinks(path, parent):

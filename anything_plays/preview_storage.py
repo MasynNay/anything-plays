@@ -15,12 +15,27 @@ def is_v32_preview():
     return current_identity()["channel"] == "v32_preview"
 
 
+def is_v33_candidate():
+    """True only for the source/frozen private 3.3 acceptance candidate."""
+    return current_identity()["channel"] == "v33_candidate"
+
+
+def private_candidate_scope():
+    """Private native-core directory segment, or None for stable releases."""
+    if is_v33_candidate():
+        return "3.3-candidate"
+    if is_v32_preview():
+        return "3.2-preview"
+    return None
+
+
 def preview_system_directory(home=None):
     """A native Libretro system directory never shared with stable versions."""
     base = Path.home() if home is None else Path(home)
+    name = ("anything-plays-33-candidate" if is_v33_candidate()
+            else "anything-plays-32-preview")
     return checked_preview_directory(
-        base / ".config" / "anything-plays-32-preview" / "libretro-system",
-        "anything-plays-32-preview",
+        base / ".config" / name / "libretro-system", name,
     )
 
 

@@ -375,7 +375,12 @@ class LibraryMixin:
         self.stop_controls()
         bezel = getattr(self, "game_bezel", None)
         if bezel is not None:
-            bezel.set_active(False)
+            try:
+                bezel.set_active(False)
+            except Exception:
+                # A destroyed or customized bezel must never prevent the
+                # previous ROM from stopping and the new core from loading.
+                pass
         # Save the selected path before starting a background Libretro worker.
         # A failure in retro_init/retro_load_game can then be retried in-place.
         self.current_rom = str(path)
@@ -449,7 +454,18 @@ class LibraryMixin:
                         "_stream_game_frame", "_stream_photo",
                     )
                 )
-                if prior_render:
+                # Stream Mode also retains an independent PIL source and
+                # fitted image for GAME. They can outlive the visible photo
+                # refs when the output is blanked or a window is detached.
+                # A ROM replacement must clear those pixels before native
+                # startup even if no Tk photo is currently displayed. Do
+                # not destroy an unrelated, still-live CAMERA resize entry.
+                cache = getattr(self, "_stream_resize_cache", None)
+                entries = getattr(cache, "_entries", None)
+                prior_game_cache = (
+                    isinstance(entries, dict) and "GAME" in entries
+                )
+                if prior_render or prior_game_cache:
                     from anything_plays.game_display_lifecycle import clear_game_video
                     clear_game_video(self)
                 self.emu.start(str(path))
@@ -457,11 +473,19 @@ class LibraryMixin:
             if self.uses_embedded_emulator():
                 self.game_status.set('Starting ' + Path(path).stem)
             if bezel is not None:
-                bezel.set_active(True)
+                try:
+                    bezel.set_active(True)
+                except Exception:
+                    # Decorative failures are independent of a running game.
+                    pass
             self.show_playing_info()
         except Exception as exc:
             if bezel is not None:
-                bezel.set_active(False)
+                try:
+                    bezel.set_active(False)
+                except Exception:
+                    # Report the original launch failure, not bezel teardown.
+                    pass
             self.game_status.set(
                 "Game could not start: " + str(exc)[:220]
                 + " · Select Restart game after correcting the issue."

@@ -1,0 +1,117 @@
+name: 3.3 | Manual 30-minute Tk Stream Mode endurance (unreleased)
+
+# Opt in by adding the 'v33-long-soak' label to draft PR #246.
+# GitHub manual Actions dispatch normally requires a workflow on the default
+# branch; the label event works while 3.3 remains an unreleased draft PR.
+# No pull_request synchronize trigger: no 30-minute run on every push.
+on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Repeated opt-ins on one PR supersede stale 30-minute source revisions;
+  # checkout still validates the exact event head before any test begins.
+  group: v33-extended-tk-stream-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stream-mode-30-minute-synthetic:
+    if: ${{ (github.event_name == 'pull_request' && github.event.label.name == 'v33-long-soak' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.3-stream-render-latency') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.3-stream-render-latency') }}
+    name: Real Tk + synthetic camera and game | 1,800 seconds | Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require exact opt-in source revision
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install real Tk, SDL, OpenCV and virtual-display dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk xvfb xauth libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Prove 30-minute Tk publication, fault recovery and bounded caches
+        shell: bash
+        timeout-minutes: 38
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py --seconds 1800 --enable-stream --stress-stream \
+              --max-growth-mb 96 \
+              --report test-evidence/v33-stream-mode-1800s.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("test-evidence/v33-stream-mode-1800s.json")
+          report = json.loads(p.read_text(encoding="utf-8"))
+          assert report["passed"] is True
+          assert report["seconds_requested"] == 1800
+          assert report["elapsed_real_seconds"] >= 1800
+          assert report["stream_mode_requested"] is True
+          assert report["stream_transition_stress_requested"] is True
+          assert report["stream_stress_cycles"] >= 200
+          assert report["stream_forced_preview_clears"] >= 40
+          assert report["stream_privacy_clear_failures"] == 0
+          assert report["stream_privacy_clear_checks"] >= 40
+          assert report["stream_transient_privacy_blanks"] >= 0
+          assert report["stream_controls_updates"] >= 6 * max(
+              1, (report["seconds_requested"] - 10) // 8
+          )
+          assert report["stream_fault_injected"] is True
+          assert report["stream_fault_blanked"] is True
+          assert report["stream_fault_counted"] is True
+          assert report["stream_fault_recovered"] is True
+          assert report["stream_final"]["metrics"]["stream_session_faults"] == 1
+          assert report["stream_final"]["metrics"]["stream_session_recoveries"] == 1
+          assert report["stream_final"]["metrics"]["stream_recovery_pending"] is False
+          assert set(report["stream_rates_visited"]) == {"15 FPS", "24 FPS", "30 FPS"}
+          assert set(report["stream_layouts_visited"]) == {"DS stacked", "Side by side"}
+          assert report["real_stream_hardware_tested"] is False
+          assert report["physical_camera_tested"] is False
+          assert report["real_controller_hardware_tested"] is False
+          assert report["tk_callback_exception_count"] == 0
+          assert report["resident_growth_mb"] <= 96
+          samples = report["samples"]
+          assert len(samples) >= 250
+          assert all(s["stream_items"] <= 1 for s in samples)
+          assert all(s["stream_resize_cache_items"] <= 2 for s in samples)
+          assert all(s["pending_tk_jobs"] <= 32 for s in samples)
+          m = report["stream_final"]["metrics"]
+          assert m["stream_target_refresh_fps"] in (15, 24, 30)
+          assert m["stream_refresh_intervals"] >= 2
+          assert m["stream_published_images"] >= 2
+          assert m["stream_failed_ticks"] == 0
+          assert m["stream_resize_cache_hits"] >= 0
+          assert m["stream_resize_cache_misses"] >= 0
+          PY
+      - name: Retain aggregate-only evidence; no screenshots, core or ROM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-v33-Tk-Stream-1800second-SYNTHETIC-UNRELEASED
+          path: test-evidence/v33-stream-mode-1800s.json
+          if-no-files-found: warn
+          retention-days: 14

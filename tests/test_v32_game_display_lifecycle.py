@@ -69,6 +69,82 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNotNone(app._stream_camera_frame)
         self.assertEqual(app._stream_camera_serial, 4)
 
+    def test_native_worker_self_stop_clears_main_canvas_and_stream_pixels(self):
+        """Core exits without Library Stop; the last Tk image must disappear."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = False
+        camera = app._stream_camera_frame
+        GameplayMixin.draw_game(app)
+        self.check_cleared(app)
+        self.assertIs(app._stream_camera_frame, camera)
+        # Repeated idle ticks cannot delete the canvas or increment serial.
+        GameplayMixin.draw_game(app)
+        self.assertEqual(app.emu.frame_serial, 13)
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+
+    def test_idle_camera_only_stream_does_not_trigger_game_cleanup(self):
+        """A valid camera-only OBS photo is not a stale native game photo."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = False
+        app.emu.frame = None
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = object()  # Existing camera-only OBS composite
+        camera = app._stream_camera_frame
+        GameplayMixin.draw_game(app)
+        self.assertIsNotNone(app._stream_photo)
+        self.assertIs(app._stream_camera_frame, camera)
+        self.assertEqual(app.emu.frame_serial, 12)
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+
+    def test_game_launch_wait_does_not_clear_video_before_native_ready(self):
+        """launching=True is distinct from a worker that already exited."""
+        from anything_plays.ui_gameplay import GameplayMixin
+
+        app = VideoHost()
+        app.emu.running = False
+        app.emu.launching = True
+        app.emu.frame = None
+        app.game_photo = None
+        app._last_game_render = None
+        app._game_only_canvas.winfo_width.return_value = 320
+        app._game_only_canvas.winfo_height.return_value = 240
+        GameplayMixin.draw_game(app)
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertEqual(app.emu.frame_serial, 12)
+
+    def test_active_game_still_renders_to_the_existing_canvas(self):
+        """Automatic-exit cleanup never turns ordinary rendering off."""
+        from anything_plays.ui_gameplay import GameplayMixin
+        import numpy as np
+
+        app = VideoHost()
+        app.emu.running = True
+        app.emu.launching = False
+        app.emu.frame = np.full((12, 16, 3), 48, dtype=np.uint8)
+        app.game_photo = None
+        app._last_game_render = None
+        app._game_only_canvas.winfo_width.return_value = 320
+        app._game_only_canvas.winfo_height.return_value = 240
+        app._game_only_canvas.create_image.return_value = 17
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage") as photo:
+            GameplayMixin.draw_game(app)
+        photo.assert_called_once()
+        self.assertEqual(app._last_game_render[0], 12)
+        self.assertEqual(app._game_image_item, 17)
+        self.assertIs(app.game_photo, photo.return_value)
+        app._game_only_canvas.create_image.assert_called_once()
+
     def test_shared_cleanup_clears_every_game_surface(self):
         app = VideoHost()
         clear_game_video(app)
@@ -152,6 +228,23 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertEqual(app.emu.stop.call_count, 6)
         self.assertEqual(app._stream_canvas.delete.call_count, 6)
 
+    def test_fresh_launch_survives_destroyed_cosmetic_bezel(self):
+        """Bezel failures cannot turn a valid native launch into an error."""
+        class NativeBezelFailure(Exception):
+            pass
+
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app.game_bezel.set_active.side_effect = NativeBezelFailure("expired")
+        app.start_rom("/synthetic/new-first.gba")
+        app.emu.start.assert_called_once_with("/synthetic/new-first.gba")
+        app.show_playing_info.assert_called_once()
+        self.assertEqual(app.current_rom, "/synthetic/new-first.gba")
+        self.assertIn("Starting", app.game_status.set.call_args.args[0])
+
     def test_stable_missing_core_keeps_prior_game_intact(self):
         app = LibraryHost()
         app.emu.running = True
@@ -193,6 +286,199 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIsNone(app.emu.frame)
         self.assertIsNone(app._stream_game_frame)
         app.game_canvas.delete.assert_called_once_with("all")
+
+    def test_rom_switch_clears_hidden_game_fit_without_visible_photos(self):
+        """An OBS resize-cache-only game must not survive ROM replacement."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = LibraryHost()
+        cache = StreamPanelResizeCache()
+        old_game = Image.new("RGB", (20, 15), "#bd1932")
+        live_camera = Image.new("RGB", (20, 15), "#16ab92")
+        cache.contained("GAME", old_game, (0, 0, 90, 60))
+        cache.contained("CAMERA", live_camera, (0, 0, 90, 60))
+        self.assertEqual(set(cache._entries), {"GAME", "CAMERA"})
+
+        # Reproduce an OBS window which blanked its photo refs but still
+        # retained fitted pixels through its independent resize cache.
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app._stream_resize_cache = cache
+        original_camera = app._stream_camera_frame
+        observed = []
+
+        def start_new(path):
+            observed.append(path)
+            self.assertEqual(path, "/synthetic/new-game.gba")
+            self.assertNotIn("GAME", cache._entries)
+            self.assertIn("CAMERA", cache._entries)
+            self.assertIs(cache._entries["CAMERA"][0], live_camera)
+            self.assertIs(app._stream_camera_frame, original_camera)
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app._stream_photo)
+
+        app.emu.start.side_effect = start_new
+        app.start_rom("/synthetic/new-game.gba")
+        self.assertEqual(observed, ["/synthetic/new-game.gba"])
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertEqual(app.emu.frame_serial, 13)
+        self.assertEqual(app.current_rom, "/synthetic/new-game.gba")
+
+    def test_first_launch_with_camera_only_cache_leaves_camera_untouched(self):
+        """Camera capture alone must never trigger a game cleanup."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = LibraryHost()
+        cache = StreamPanelResizeCache()
+        live_camera = Image.new("RGB", (20, 15), "#23b79a")
+        cache.contained("CAMERA", live_camera, (0, 0, 90, 60))
+        app._stream_resize_cache = cache
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        camera = app._stream_camera_frame
+
+        app.start_rom("/synthetic/first-with-camera.gba")
+        app.emu.start.assert_called_once_with(
+            "/synthetic/first-with-camera.gba"
+        )
+        app.game_canvas.delete.assert_not_called()
+        app._stream_canvas.delete.assert_not_called()
+        self.assertEqual(set(cache._entries), {"CAMERA"})
+        self.assertIs(cache._entries["CAMERA"][0], live_camera)
+        self.assertIs(app._stream_camera_frame, camera)
+
+    def test_unrecognized_or_absent_stream_cache_does_not_block_launch(self):
+        """A third-party cache facade must not be queried for old pixels."""
+        app = LibraryHost()
+        app.game_photo = None
+        app._last_game_render = None
+        app._stream_game_frame = None
+        app._stream_photo = None
+        app._stream_resize_cache = Mock()
+        app.start_rom("/synthetic/third-party-cache.gba")
+        app.emu.start.assert_called_once_with(
+            "/synthetic/third-party-cache.gba"
+        )
+        app.game_canvas.delete.assert_not_called()
+
+    def test_rom_cleanup_evicts_only_old_game_resize_cache_pixels(self):
+        """No hidden PIL cache keeps private ROM frames after game unload."""
+        from PIL import Image
+        from anything_plays.ui_stream import StreamPanelResizeCache
+
+        app = VideoHost()
+        cache = StreamPanelResizeCache()
+        game = Image.new("RGB", (24, 18), "#b50018")
+        camera = Image.new("RGB", (24, 18), "#0bb59c")
+        cache.contained("GAME", game, (0, 0, 72, 48))
+        cache.contained("CAMERA", camera, (0, 0, 72, 48))
+        self.assertEqual(set(cache._entries), {"GAME", "CAMERA"})
+        app._stream_resize_cache = cache
+
+        clear_game_video(app)
+        self.assertIs(app._stream_resize_cache, cache)
+        self.assertNotIn("GAME", cache._entries)
+        self.assertIn("CAMERA", cache._entries)
+        self.assertIs(cache._entries["CAMERA"][0], camera)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+
+    def test_faulty_resize_cache_drops_all_entries_but_preserves_live_camera(self):
+        """A misbehaving optional cache must not retain old game pixels."""
+        app = VideoHost()
+        live_camera = app._stream_camera_frame
+        app._stream_resize_cache = Mock()
+        app._stream_resize_cache.clear.side_effect = RuntimeError(
+            "driver private path /home/user/rom-name"
+        )
+        clear_game_video(app)
+        self.assertIsNone(app._stream_resize_cache)
+        self.assertIs(app._stream_camera_frame, live_camera)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+        app._stream_canvas.delete.assert_called_once_with("all")
+
+    def test_destroyed_main_canvas_does_not_leave_private_stream_frame(self):
+        """Main Tk destruction must not stop clearing OBS and other views."""
+        import tkinter as tk
+
+        app = VideoHost()
+        retained_camera = app._stream_camera_frame
+        app.game_canvas.delete.side_effect = tk.TclError("main destroyed")
+        clear_game_video(app)
+        self.assertIsNone(app.emu.frame)
+        self.assertEqual(app.emu.frame_serial, 13)
+        self.assertIsNone(app._stream_game_frame)
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_last_render)
+        app._game_only_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        self.assertIs(app._stream_camera_frame, retained_camera)
+        app.game_bezel.set_active.assert_called_once_with(False)
+
+    def test_optional_widget_failures_are_isolated_before_new_rom_launch(self):
+        """No optional widget exception can preserve stopped game pixels."""
+        class PrivateNativeWidget(Exception):
+            pass
+
+        app = LibraryHost()
+        app.emu.running = True
+        app.game_canvas.delete.side_effect = PrivateNativeWidget(
+            "video device /home/private/serial-ABC"
+        )
+        app._game_only_canvas.delete.side_effect = RuntimeError("gone")
+        app._stream_canvas.delete.side_effect = OSError("window detached")
+        app.game_bezel.set_active.side_effect = PrivateNativeWidget("bezel")
+        camera = app._stream_camera_frame
+        app.emu.stop.side_effect = lambda: None
+
+        def check_new_game(path):
+            self.assertEqual(path, "/synthetic/restarted.gba")
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_game_serial)
+            self.assertIsNone(app._stream_last_render)
+            self.assertIs(app._stream_camera_frame, camera)
+
+        app.emu.start.side_effect = check_new_game
+        app.start_rom("/synthetic/restarted.gba")
+        app.game_canvas.delete.assert_called_once_with("all")
+        app._game_only_canvas.delete.assert_called_once_with("all")
+        app._stream_canvas.delete.assert_called_once_with("all")
+        app.emu.start.assert_called_once_with("/synthetic/restarted.gba")
+
+    def test_native_and_stream_frames_are_retired_before_any_canvas_deletion(self):
+        """Reentrant widget callbacks cannot observe old game image refs."""
+        app = VideoHost()
+        retained_camera = app._stream_camera_frame
+        call_order = []
+
+        def inspect(canvas):
+            call_order.append(canvas)
+            self.assertIsNone(app.emu.frame)
+            self.assertIsNone(app.game_photo)
+            self.assertIsNone(app._stream_photo)
+            self.assertIsNone(app._stream_game_frame)
+            self.assertIsNone(app._stream_game_serial)
+            self.assertIsNone(app._stream_last_render)
+            self.assertIs(app._stream_camera_frame, retained_camera)
+
+        app.game_canvas.delete.side_effect = lambda *args: inspect("main")
+        app._game_only_canvas.delete.side_effect = (
+            lambda *args: inspect("game only")
+        )
+        app._stream_canvas.delete.side_effect = lambda *args: inspect("stream")
+        clear_game_video(app)
+        self.assertEqual(call_order, ["main", "game only", "stream"])
 
     def test_double_cleanup_is_idempotent_and_never_touches_camera(self):
         app = VideoHost()

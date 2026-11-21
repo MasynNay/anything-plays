@@ -153,7 +153,53 @@ class AudioBufferTests(unittest.TestCase):
             audio = AudioSink()
             audio.start(48000)
         self.assertFalse(audio.output_active)
-        self.assertIn("device missing", audio.output_error)
+        self.assertIn("RuntimeError", audio.output_error)
+        self.assertNotIn("device missing", audio.output_error)
+
+    def test_audio_device_failure_redacts_private_device_paths_from_stderr(self):
+        import contextlib
+        import io
+        from unittest.mock import Mock, patch
+
+        private = "/home/private/ROMs/doorcam-device-SERIAL123"
+        fake = Mock()
+        fake.OutputStream.side_effect = RuntimeError(
+            "Could not open speaker: " + private
+        )
+        logs = io.StringIO()
+        with (
+            patch("anything_plays.libretro_audio.sd", fake),
+            contextlib.redirect_stderr(logs),
+        ):
+            audio = AudioSink()
+            audio.start(48000)
+        self.assertFalse(audio.output_active)
+        self.assertIn("No usable audio output device", audio.output_error)
+        self.assertIn("RuntimeError", audio.output_error)
+        self.assertNotIn(private, audio.output_error)
+        self.assertNotIn(private, logs.getvalue())
+        # Native gameplay must still enqueue source audio without a device.
+        audio.push(np.array([[12, -12]], dtype=np.int16))
+        self.assertEqual(audio.chunks.qsize(), 1)
+        audio.close()
+
+    def test_audio_teardown_failure_never_prints_private_device_details(self):
+        import contextlib
+        import io
+        from unittest.mock import Mock
+
+        output = AudioSink()
+        output.stream = Mock()
+        output.stream.stop.side_effect = RuntimeError(
+            "Private USB output /Users/private/audio-device-SERIAL123"
+        )
+        logs = io.StringIO()
+        with contextlib.redirect_stderr(logs):
+            output.close()
+        self.assertIn("RuntimeError", logs.getvalue())
+        self.assertNotIn("/Users/private", logs.getvalue())
+        self.assertNotIn("SERIAL123", logs.getvalue())
+        self.assertIsNone(output.stream)
 
     def test_no_default_audio_device_cannot_crash_native_gameplay(self):
         from unittest.mock import Mock, patch
@@ -173,7 +219,8 @@ class AudioBufferTests(unittest.TestCase):
             audio.start(48000)
             self.assertFalse(audio.output_active)
             self.assertIn("No usable audio output device", audio.output_error)
-            self.assertIn("device -1", audio.output_error)
+            self.assertIn("NoDefaultOutput", audio.output_error)
+            self.assertNotIn("device -1", audio.output_error)
             # Core audio must still be accepted in silent-mode operation.
             audio.push(np.array([[12, -12]], dtype=np.int16))
             self.assertEqual(audio.chunks.qsize(), 1)

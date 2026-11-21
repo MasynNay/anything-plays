@@ -1,0 +1,124 @@
+name: 3.3 | Real Tk Stream Mode cadence and bounded-memory soak (unreleased)
+
+# Runs the real Stream Mode output under Xvfb with synthetic game and camera
+# frames. This does NOT certify actual OBS encoding, cameras, GPU, audio,
+# controllers, commercial games or physical sensor-to-screen latency.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v33-stream-mode-soak.yml'
+      - 'tests/soak_gui.py'
+      - 'anything_plays/ui_stream.py'
+      - 'anything_plays/ui_camera.py'
+      - 'anything_plays/ui_setup_diagnostics.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v33-stream-soak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stream-mode-tk-180-second-soak:
+    name: 180-second native Tk Stream Mode + synthetic frames | Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYGAME_HIDE_SUPPORT_PROMPT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install real Tk, SDL, OpenCV and virtual-display prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
+            python3-tk xvfb xauth libgl1 libegl1 libglib2.0-0 libportaudio2
+          python -m pip install -r requirements.txt
+      - name: Require 180 seconds of live Stream Mode images and bounded memory
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py \
+              --seconds 180 --enable-stream --max-growth-mb 96 \
+              --report test-evidence/v33-stream-mode-180-second-soak.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("test-evidence/v33-stream-mode-180-second-soak.json")
+          report = json.loads(p.read_text(encoding="utf-8"))
+          assert report["passed"] is True
+          assert report["seconds_requested"] == 180
+          assert report["stream_mode_requested"] is True
+          assert report["real_stream_hardware_tested"] is False
+          assert report["physical_camera_tested"] is False
+          assert report["real_controller_hardware_tested"] is False
+          assert report["tk_callback_exception_count"] == 0
+          assert report["resident_growth_mb"] <= 96
+          metrics = report["stream_final"]["metrics"]
+          assert metrics["stream_target_refresh_fps"] == 24
+          assert metrics["stream_refresh_intervals"] >= 2
+          assert metrics["stream_published_images"] >= 2
+          assert metrics["stream_failed_ticks"] == 0
+          assert metrics["stream_session_faults"] == 0
+          assert metrics["stream_session_recoveries"] == 0
+          assert metrics["stream_recovery_pending"] is False
+          assert all(s["stream_items"] <= 1 for s in report["samples"])
+          assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
+          assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
+          PY
+      - name: Exercise 45-second real-Tk stream fault blanking and recovery
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. xvfb-run -a -s '-screen 0 1600x900x24' \
+            python tests/soak_gui.py \
+              --seconds 45 --enable-stream --stress-stream --max-growth-mb 96 \
+              --report test-evidence/v33-stream-mode-45-second-fault-recovery.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path(
+              "test-evidence/v33-stream-mode-45-second-fault-recovery.json"
+          ).read_text(encoding="utf-8"))
+          assert report["passed"] is True
+          assert report["seconds_requested"] == 45
+          assert report["stream_transition_stress_requested"] is True
+          assert report["stream_controls_updates"] >= 24
+          assert report["stream_fault_injected"] is True
+          assert report["stream_fault_blanked"] is True
+          assert report["stream_fault_counted"] is True
+          assert report["stream_fault_recovered"] is True
+          assert report["stream_final"]["metrics"]["stream_session_faults"] == 1
+          assert report["stream_final"]["metrics"]["stream_session_recoveries"] == 1
+          assert report["stream_final"]["metrics"]["stream_recovery_pending"] is False
+          assert report["tk_callback_exception_count"] == 0
+          assert report["resident_growth_mb"] <= 96
+          assert report["stream_final"]["metrics"]["stream_target_refresh_fps"] in (15, 24, 30)
+          assert all(s["stream_items"] <= 1 for s in report["samples"])
+          assert all(s["stream_resize_cache_items"] <= 2 for s in report["samples"])
+          assert all(s["pending_tk_jobs"] <= 32 for s in report["samples"])
+          assert report["physical_camera_tested"] is False
+          PY
+      - name: Retain aggregate-only stream soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-v33-Tk-Stream-180s-and-45s-recovery-UNRELEASED
+          path: |
+            test-evidence/v33-stream-mode-180-second-soak.json
+            test-evidence/v33-stream-mode-45-second-fault-recovery.json
+          if-no-files-found: warn
+          retention-days: 14

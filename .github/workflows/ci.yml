@@ -2,7 +2,7 @@ name: Source checks
 
 on:
   push:
-    branches: [main, develop/v2.0, feature/v3.1-controls-usability]
+    branches: [main, develop/v2.0, feature/v3.1-controls-usability, feature/v3.3-stream-render-latency]
   pull_request:
   workflow_dispatch:
 

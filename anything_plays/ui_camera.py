@@ -4,6 +4,7 @@ import os
 from queue import Empty, Queue
 import threading
 import time
+import math
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox
 
@@ -16,6 +17,55 @@ from anything_plays.tracking import locate_target, locate_targets, zone_at
 from anything_plays.libretro_input import TWO_PLAYER_SYSTEMS
 
 
+# At 80 ms per Tk poll, allow about 30 seconds for slow OS permission
+# requests/driver enumeration before returning control to the user.
+# The native OpenCV worker cannot safely be killed mid-driver call. Limit
+# outstanding daemon workers instead of spawning unlimited stuck threads.
+CAMERA_SCAN_MAX_POLLS = 375
+CAMERA_SCAN_MAX_WORKERS = 2
+
+
+def optional_camera_latency_start(enabled):
+    """Timestamp an opt-in input probe without ever blocking camera input.
+
+    This value is only an optional software-stage measurement. A failed
+    system timer, suspend/resume discontinuity, extension or invalid number
+    must not interrupt actual contour tracking or native held-button updates.
+    When disabled, no performance-clock call is made at all.
+    """
+    if not enabled:
+        return None
+    try:
+        stamp = time.perf_counter()
+        if type(stamp) in (int, float) and math.isfinite(stamp) and stamp >= 0:
+            return stamp
+    except Exception:
+        pass
+    return None
+
+
+def optional_camera_pulse_now():
+    """Read classic-pulse cooldown time without interrupting native input.
+
+    Timer errors make this one camera observation ineligible for *new*
+    pulses, but tracking and the complete held-button release path continue.
+    """
+    try:
+        now = time.monotonic()
+        if type(now) in (int, float) and math.isfinite(now) and now >= 0:
+            return now
+    except Exception:
+        pass
+    return None
+
+
+def camera_pulse_due(previous, now, cooldown):
+    """Allow a fresh pulse after cooldown or a monotonic clock reset."""
+    if now is None:
+        return False
+    return previous is None or now < previous or now - previous >= cooldown
+
+
 class CameraMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -23,38 +73,141 @@ class CameraMixin:
     and ``LayoutMixin.build``. They are not standalone widgets.
     """
 
+    def _retire_camera_scan(self, generation, results):
+        """End only this discovery attempt; never cancel a newer scan."""
+        if (generation != getattr(self, "_camera_scan_generation", None)
+                or results is not getattr(self, "_camera_scan_results", None)):
+            return
+        self._camera_scan_generation = generation + 1
+        self._camera_scan_results = None
+        self._camera_scan_poll_count = 0
+        self.camera_scanning = False
+        if not getattr(self, "_closing", False):
+            try:
+                self.status.set(
+                    "Camera search interrupted. Click Refresh cameras to retry."
+                )
+            except Exception:
+                # Closing/destroyed Tk status is not a camera failure.
+                pass
+
     def scan_cameras(self):
-        """Probe off the UI thread; consume the result on Tk's main thread."""
+        """Probe off Tk; accept only the currently owned scan's result."""
         if self.camera_scanning:
+            return
+        # OpenCV VideoCapture may block forever inside a driver/OS permission
+        # prompt, beyond Python's ability to cancel the worker thread. Only
+        # completed workers are released from this small in-memory budget.
+        active = []
+        for done in getattr(self, "_camera_scan_workers", ()):
+            try:
+                if not done.is_set():
+                    active.append(done)
+            except Exception:
+                pass
+        self._camera_scan_workers = active
+        if len(active) >= CAMERA_SCAN_MAX_WORKERS:
+            try:
+                self.status.set(
+                    "Camera search is still busy in the device driver. "
+                    "Check webcam permissions or reconnect the device, "
+                    "then try Refresh cameras again."
+                )
+            except Exception:
+                pass
+            # Keep any healthy existing camera and native controls intact.
             return
         self.stop_camera()
         self.camera_scanning = True
+        generation = getattr(self, "_camera_scan_generation", 0) + 1
+        self._camera_scan_generation = generation
+        self._camera_scan_poll_count = 0
         self.status.set('Searching for available webcams…')
         results = Queue(maxsize=1)
         self._camera_scan_results = results
+        done = threading.Event()
+        self._camera_scan_workers.append(done)
 
         def worker():
-            # Capture this scan's queue, not the mutable App reference.
-            # An old discovery thread must never send into a newer scan's
-            # queue or keep the entire interface alive after it closes.
+            # The worker owns only its queue and completion flag. A retired
+            # scan never publishes into a newer scan, even after timeout.
             try:
-                results.put((discover(), None))
-            except Exception as exc:
-                results.put(([], str(exc)))
+                try:
+                    results.put((discover(), None))
+                except Exception:
+                    # Do not surface native device/path exception strings.
+                    results.put(([], True))
+            finally:
+                done.set()
 
-        threading.Thread(target=worker, daemon=True, name='camera-discovery').start()
-        self.root.after(80, self._poll_camera_scan)
-
-    def _poll_camera_scan(self):
-        """Keep every Tk widget update on the main event-loop thread."""
-        if self._closing:
+        try:
+            threading.Thread(
+                target=worker, daemon=True, name='camera-discovery'
+            ).start()
+        except Exception:
+            done.set()
+            self._retire_camera_scan(generation, results)
             return
         try:
-            cameras, error = self._camera_scan_results.get_nowait()
+            self.root.after(
+                80, lambda: self._poll_camera_scan(generation, results)
+            )
+        except Exception:
+            # The detached worker is allowed to finish its own queue, but
+            # a destroyed Tk loop must never strand a scanning flag.
+            self._retire_camera_scan(generation, results)
+
+    def _poll_camera_scan(self, generation=None, results=None):
+        """Ignore delayed/reentrant callbacks from earlier discovery scans."""
+        if generation is None:
+            generation = getattr(self, "_camera_scan_generation", None)
+        if results is None:
+            results = getattr(self, "_camera_scan_results", None)
+        if (not getattr(self, "camera_scanning", False)
+                or generation != getattr(self, "_camera_scan_generation", None)
+                or results is not getattr(self, "_camera_scan_results", None)):
+            return
+        if getattr(self, "_closing", False):
+            self._retire_camera_scan(generation, results)
+            return
+        try:
+            cameras, error = results.get_nowait()
         except Empty:
-            self.root.after(80, self._poll_camera_scan)
+            # A hung native driver must not leave the GUI in Searching
+            # forever. Count Tk polls, not untrusted/optional OS clocks.
+            polls = getattr(self, "_camera_scan_poll_count", 0) + 1
+            self._camera_scan_poll_count = polls
+            if polls >= CAMERA_SCAN_MAX_POLLS:
+                self._retire_camera_scan(generation, results)
+                return
+            try:
+                self.root.after(
+                    80, lambda: self._poll_camera_scan(generation, results)
+                )
+            except Exception:
+                self._retire_camera_scan(generation, results)
+        except Exception:
+            # A damaged native queue adapter is not a reason to crash Tk or
+            # retain a scan forever; never show its private error details.
+            self._retire_camera_scan(generation, results)
         else:
-            self.finish_scan(cameras, error)
+            # Retire the queue before any Tk widget handlers can reenter
+            # Refresh. The new scan may start from within finish_scan().
+            self._camera_scan_results = None
+            self._camera_scan_poll_count = 0
+            self.camera_scanning = False
+            try:
+                self.finish_scan(cameras, error)
+            except Exception:
+                # Native/Tk wrappers may already be closing. The original
+                # camera remains stopped; no untrusted exception text leaks.
+                if not getattr(self, "_closing", False):
+                    try:
+                        self.status.set(
+                            "Camera list could not be shown. Refresh cameras."
+                        )
+                    except Exception:
+                        pass
 
     def finish_scan(self, found, error=None):
         """Refresh devices without silently switching away from a USB camera.
@@ -91,9 +244,9 @@ class CameraMixin:
         else:
             self.camera_name.set('')
             self.status.set(
-                'No usable cameras found.'
-                + (f' {error}' if error
-                   else ' Check permissions or click Refresh cameras.')
+                'No usable cameras found. '
+                + ('Camera search failed; ' if error else '')
+                + 'check permissions or click Refresh cameras.'
             )
 
     def cancel_camera_reconnect(self):
@@ -217,36 +370,83 @@ class CameraMixin:
         """Release camera, stale frames, and pending reconnect when requested."""
         camera_changed = getattr(self, "calibration_camera_changed", None)
         if callable(camera_changed):
-            camera_changed()
+            try:
+                camera_changed()
+            except Exception:
+                # An optional calibration panel may already be gone. Stop
+                # must not leave camera-driven native controls armed.
+                pass
         if not keep_reconnect:
-            self.cancel_camera_reconnect()
-        self.stop_controls()
+            try:
+                self.cancel_camera_reconnect()
+            except Exception:
+                # Cancel callbacks can fail after Tk shutdown. Retire the
+                # generation and pending job even if after_cancel failed.
+                self._camera_retry_generation = (
+                    getattr(self, "_camera_retry_generation", 0) + 1
+                )
+                self._camera_reconnect_job = None
+                self._camera_reconnect_name = None
+                self._camera_reconnect_attempts = 0
+        try:
+            self.stop_controls()
+        except Exception:
+            # GameplayMixin disarms native inputs before updating labels.
+            # If *any* earlier step failed, enforce Stop independently.
+            self.armed = False
+            self._pending_object_controls = False
+            emu = getattr(self, "emu", None)
+            if emu is not None:
+                try:
+                    emu.disarm()
+                except Exception:
+                    pass
+            bridge = getattr(self, "external_input", None)
+            if bridge is not None:
+                try:
+                    bridge.release_camera()
+                except Exception:
+                    pass
         # Clear the active identity before releasing a native device. The
         # polling loop remembers the original name before stopping it.
         self._active_camera_name = None
-        # Some drivers raise while closing a just-unplugged device; those
-        # errors must not strand Tk preview, bezel or Stream Mode on screen.
+        # Native extension-defined release errors must not strand a privacy
+        # preview, bezel, or Stream Mode after a USB hot-unplug.
         cap, self.cap = self.cap, None
         if cap is not None:
             try:
                 cap.release()
-            except (cv2.error, OSError, RuntimeError):
+            except Exception:
                 pass
         if not self.reference_image:
             self.frame = None
             self.camera_photo = None
-            if hasattr(self, "canvas"):
-                self.canvas.delete("all")
             self._camera_canvas_item = None
-        # Legacy camera harnesses and nonstream clients do not mix in StreamMixin.
-        # A real Stream Mode session always clears its stale preview on Stop.
+            canvas = getattr(self, "canvas", None)
+            if canvas is not None:
+                try:
+                    canvas.delete("all")
+                except Exception:
+                    # Already destroyed widget; continue revoking OBS pixels.
+                    pass
+        # These are independent cleanup paths; one failing must not prevent
+        # the other from running or leave a stale OBS-facing camera image.
         clear_stream = getattr(self, "stream_clear_camera", None)
         if callable(clear_stream):
-            clear_stream()
+            try:
+                clear_stream()
+            except Exception:
+                pass
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
-            bezel.set_active(False)
-        self.status.set('Camera stopped')
+            try:
+                bezel.set_active(False)
+            except Exception:
+                pass
+        try:
+            self.status.set('Camera stopped')
+        except Exception:
+            pass
 
     def pick_color(self):
         if self.frame is None:
@@ -386,23 +586,48 @@ class CameraMixin:
         keyboard injection. An absent fish releases its held button on the
         following camera frame; STOP clears both players immediately.
         """
+        # Opt-in local diagnostics measure start of processing an already
+        # captured frame -> held-input handoff -> next native input snapshot.
+        # Sensor exposure, webcam read() and display delay are NOT measured.
+        inputs = getattr(self.emu, "inputs", None)
+        # A frame can spend time in OpenCV while Stop and a new ROM session
+        # happen on another thread. Bind this frame to its ORIGINAL input
+        # generation before tracking begins, never at the late dispatch.
+        # Other supported emulator adapters retain their historical API.
+        from anything_plays.gba_emulator import Emulator
+        frame_generation = (
+            inputs.camera_generation()
+            if isinstance(self.emu, Emulator) else None
+        )
+        started_at = optional_camera_latency_start(
+            getattr(inputs, "_latency_enabled", False) is True
+            and self.armed and self.external_input is None
+            and self.camera_input_mode.get() != "Pulse (classic)"
+        )
         frame = self.frame.copy()
         h, w = frame.shape[:2]
         tol = max(1, min(90, int(self.tolerance.get())))
         area = max(5, int(self.min_area.get()))
         limit = 16 if self.multi_fish_enabled.get() else 1
+        # Convert the camera frame to HSV once for both colors. HSV is
+        # read-only in locate_targets(), and overlays never touch it.
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         primary = locate_targets(
-            frame, self.cfg['rgb'], tol, area, max_targets=limit
+            frame, self.cfg['rgb'], tol, area, max_targets=limit, hsv=hsv
         )
         secondary = (
             locate_targets(
                 frame, self.cfg.get('rgb2', [255, 30, 180]),
-                tol, area, max_targets=limit,
+                tol, area, max_targets=limit, hsv=hsv,
             ) if self.color2_enabled.get() else []
         )
         mapping = {name: var.get() for name, var in self.mapping_vars.items()}
         active_zones = set()
         buttons = {0: set(), 1: set()}
+        # Draw contours only AFTER dispatching gameplay input. Rendering
+        # decorations is optional UI work and must never delay a button
+        # already detected in this camera frame.
+        annotations = []
         shuffle_seen = False
         second_player_allowed = self.system_key.get() in TWO_PLAYER_SYSTEMS
         second_player_requested = self.color2_player.get() == 'Player 2'
@@ -417,8 +642,7 @@ class CameraMixin:
                 second_player_allowed and self.external_input is None
             )
             for center, contour in matches:
-                cv2.circle(frame, center, 7, contour_color, -1)
-                cv2.drawContours(frame, [contour], -1, contour_color, 2)
+                annotations.append((center, contour, contour_color))
                 zone = zone_at(
                     center, (w, h), self.cfg['zones'], mapping,
                     self.shuffle_enabled.get(),
@@ -444,31 +668,59 @@ class CameraMixin:
             if self.external_input is not None:
                 # Developer-only external controller bridges do not support
                 # a second port. Use bounded classic pulses for P1 only.
-                now = time.monotonic()
+                now = optional_camera_pulse_now()
                 cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
                 for button in sorted(buttons[0]):
                     key = (0, button)
-                    if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
+                    if camera_pulse_due(
+                        self._last_camera_pulses.get(key), now, cooldown
+                    ):
                         self.external_input.press(button, self.hold_frames.get())
                         self._last_camera_pulses[key] = now
             elif self.camera_input_mode.get() == 'Pulse (classic)':
                 # Each button has an independent cooldown; multiple objects
                 # trigger multiple keys on the same emulator frame.
-                self.emu.set_camera_buttons((), ())
-                now = time.monotonic()
+                if frame_generation is None:
+                    self.emu.set_camera_buttons((), ())
+                else:
+                    self.emu.set_camera_buttons((), (), generation=frame_generation)
+                now = optional_camera_pulse_now()
                 cooldown = max(.05, int(self.cooldown.get()) / 1000.0)
                 for port in (0, 1):
                     for button in sorted(buttons[port]):
                         key = (port, button)
-                        if now - self._last_camera_pulses.get(key, -1e9) >= cooldown:
-                            self.emu.press(
-                                button, self.hold_frames.get(), port=port
-                            )
-                            self._last_camera_pulses[key] = now
+                        if camera_pulse_due(
+                            self._last_camera_pulses.get(key), now, cooldown
+                        ):
+                            if frame_generation is None:
+                                delivered = self.emu.press(
+                                    button, self.hold_frames.get(), port=port
+                                )
+                            else:
+                                delivered = self.emu.press(
+                                    button, self.hold_frames.get(), port=port,
+                                    generation=frame_generation,
+                                )
+                            # False means the native buffer rejected an old
+                            # frame after disarm. Do not consume the cooldown
+                            # for a button that was never queued. Legacy
+                            # adapters may still return None on success.
+                            if delivered is not False:
+                                self._last_camera_pulses[key] = now
             else:
                 # Continuous per-frame input with no per-fish queue growth.
                 # This is the ideal mode for a tank with several moving fish.
-                self.emu.set_camera_buttons(buttons[0], buttons[1])
+                kwargs = (
+                    {"generation": frame_generation}
+                    if frame_generation is not None else {}
+                )
+                if started_at is not None:
+                    self.emu.set_camera_buttons(
+                        buttons[0], buttons[1], sample_started_at=started_at,
+                        **kwargs,
+                    )
+                else:
+                    self.emu.set_camera_buttons(buttons[0], buttons[1], **kwargs)
                 self._last_camera_pulses.clear()
 
             if self.color2_enabled.get() and second_player_requested and (
@@ -484,41 +736,97 @@ class CameraMixin:
                     f'P1: {", ".join(sorted(buttons[0])) or "idle"} · '
                     f'P2: {", ".join(sorted(buttons[1])) or "idle"}'
                 )
-            if self.action.get() != message:
-                self.action.set(message)
+            try:
+                if self.action.get() != message:
+                    self.action.set(message)
+            except Exception:
+                # The optional action/status variable may have been
+                # destroyed with a panel, or wrapped by a Tk extension.
+                # A label read/write cannot disarm an otherwise healthy
+                # camera-to-native input session or leak private error text.
+                pass
 
-        # Calibration consumes observations from the same tracking pass.
-        # Never open another webcam or duplicate color processing.
+        # Gameplay input has ALREADY been dispatched. Cosmetic overlays,
+        # calibration, the OBS mirror and primary Tk preview are optional;
+        # errors here may not disarm P1/P2 or stop a healthy camera.
         note = getattr(self, "calibration_note_frame", None)
         if callable(note):
-            note(primary, mapping, (w, h))
+            try:
+                note(primary, mapping, (w, h))
+            except Exception:
+                pass  # No private native driver/ROM path text in UI.
 
-        frame = self.render_zones(frame, active_zones)
-        # Reuse this already-annotated camera frame in the OBS capture view.
-        # No second VideoCapture instance, camera permissions or tracking run.
+        try:
+            for center, contour, contour_color in annotations:
+                cv2.circle(frame, center, 7, contour_color, -1)
+                cv2.drawContours(frame, [contour], -1, contour_color, 2)
+            frame = self.render_zones(frame, active_zones)
+        except Exception:
+            # The already-dispatched controls remain valid; draw an
+            # unannotated frame instead of exposing partial overlays.
+            try:
+                frame = self.frame.copy()
+            except Exception:
+                self._clear_failed_camera_preview()
+                clear = getattr(self, "stream_clear_camera", None)
+                if callable(clear):
+                    try:
+                        clear()
+                    except Exception:
+                        pass
+                return
+
         if getattr(self, "_stream_output_window", None) is not None:
-            self.stream_camera_snapshot(frame)
-        geom = self.geometry()
-        if geom:
-            x, y, dw, dh, _, _ = geom
-            rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)), cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(rgb)
-            photo = self.camera_photo
-            if (photo is None or photo.width() != dw or
-                    photo.height() != dh):
-                # Reuse the Tcl image buffer while webcam dimensions stay
-                # stable, preventing native allocation growth for long runs.
-                photo = ImageTk.PhotoImage(image)
-            else:
-                photo.paste(image)
-            item = getattr(self, "_camera_canvas_item", None)
-            if item is None or not self.canvas.type(item):
-                self.canvas.delete("all")
-                item = self.canvas.create_image(
-                    x, y, anchor="nw", image=photo
-                )
-                self._camera_canvas_item = item
-            else:
-                self.canvas.coords(item, x, y)
-                self.canvas.itemconfigure(item, image=photo)
-            self.camera_photo = photo
+            try:
+                self.stream_camera_snapshot(frame)
+            except Exception:
+                # A failed OBS-only mirror must not stop the primary camera
+                # or leave an old private snapshot visible in capture.
+                clear = getattr(self, "stream_clear_camera", None)
+                if callable(clear):
+                    try:
+                        clear()
+                    except Exception:
+                        pass
+
+        try:
+            geom = self.geometry()
+            if geom:
+                x, y, dw, dh, _, _ = geom
+                rgb = cv2.cvtColor(cv2.resize(frame, (dw, dh)),
+                                   cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(rgb)
+                photo = self.camera_photo
+                if (photo is None or photo.width() != dw or
+                        photo.height() != dh):
+                    # Reuse the Tcl image buffer while dimensions are
+                    # stable, bounding native allocations in long sessions.
+                    photo = ImageTk.PhotoImage(image)
+                else:
+                    photo.paste(image)
+                item = getattr(self, "_camera_canvas_item", None)
+                if item is None or not self.canvas.type(item):
+                    self.canvas.delete("all")
+                    item = self.canvas.create_image(
+                        x, y, anchor="nw", image=photo
+                    )
+                    self._camera_canvas_item = item
+                else:
+                    self.canvas.coords(item, x, y)
+                    self.canvas.itemconfigure(item, image=photo)
+                self.camera_photo = photo
+        except Exception:
+            # Main preview/PIL/Tk errors are cosmetic, not capture faults.
+            # Revoke stale pixels and retry on the next real camera frame.
+            self._clear_failed_camera_preview()
+
+    def _clear_failed_camera_preview(self):
+        """Clear failed preview pixels only, never disarm gameplay input."""
+        self.camera_photo = None
+        self._camera_canvas_item = None
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            try:
+                canvas.delete("all")
+            except Exception:
+                pass

@@ -38,8 +38,8 @@ class PortableGLFrameHost(EGLFrameHost):
         self.last_gl_error = 0
         self.context = None
         self._entered = False
-        self._fbo_callback = GET_FBO(lambda: self.fbo)
-        self._proc_callback = GET_PROC(self.get_proc_address)
+        self._fbo_callback = GET_FBO(self._native_get_framebuffer)
+        self._proc_callback = GET_PROC(self._native_get_proc_address)
         if backend is None:
             try:
                 import glcontext
@@ -83,7 +83,13 @@ class PortableGLFrameHost(EGLFrameHost):
             )
             self._init_framebuffer()
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except Exception:
+                # glcontext/driver teardown must not replace the real
+                # startup failure. The context handle is also reset by
+                # close() even when its native __exit__ hook fails.
+                pass
             raise
 
     def get_proc_address(self, symbol):
@@ -96,7 +102,10 @@ class PortableGLFrameHost(EGLFrameHost):
 
     def accept_core_render(self, address):
         self._check_thread()
-        if not address:
+        # Parsing a stored GL_VERSION is not evidence that the context is
+        # still alive. Reject late or premature native handshakes up front.
+        if (not getattr(self, "context", None)
+                or not self._entered or not address):
             return False
         from anything_plays.libretro_gpu_egl import HardwareRenderCallback
         req = C.cast(address, C.POINTER(HardwareRenderCallback)).contents
@@ -118,8 +127,14 @@ class PortableGLFrameHost(EGLFrameHost):
         context = self.context
         if context is None:
             return
+        entered = self._entered
+        # Native CFUNCTYPE pointers may survive until the core unloads.
+        # Revoke them BEFORE calling GL deletion/driver teardown, which
+        # can invoke callbacks synchronously while the context still exists.
+        # Keep context alive for our direct Python GL deletion loader.
+        self._entered = False
         try:
-            if self._entered:
+            if entered:
                 for attr, symbol in (
                     ("fbo", "glDeleteFramebuffers"),
                     ("color_tex", "glDeleteTextures"),
@@ -131,12 +146,15 @@ class PortableGLFrameHost(EGLFrameHost):
                             self._gl(symbol, None, [
                                 C.c_int, C.POINTER(C.c_uint)
                             ])(1, C.byref(C.c_uint(identifier)))
-                        except (RuntimeError, ValueError):
-                            # No GL calls after the native context is lost.
+                        except Exception:
+                            # GL deletion can fail with an arbitrary native
+                            # driver exception (including OSError). Try to
+                            # release remaining objects and always leave
+                            # the context through its glcontext exit hook.
                             pass
         finally:
             try:
-                if self._entered:
+                if entered:
                     context.__exit__(None, None, None)
             finally:
                 self.context = None
