@@ -176,5 +176,91 @@ class ScanOwnershipTests(unittest.TestCase):
         self.assertNotIn("/home/operator", app.status.set.call_args.args[0])
 
 
+    def test_hung_driver_search_times_out_after_bounded_tk_polls(self):
+        app = ScanHarness()
+        self._scan(app)
+        # The native worker has never returned, as with an unplugged
+        # webcam whose driver blocks inside VideoCapture construction.
+        with patch("anything_plays.ui_camera.CAMERA_SCAN_MAX_POLLS", 3):
+            for _ in range(3):
+                app.timers.pop(0)[1]()
+        self.assertFalse(app.camera_scanning)
+        self.assertIsNone(app._camera_scan_results)
+        self.assertEqual(app._camera_scan_poll_count, 0)
+        self.assertIn("interrupted", app.status.set.call_args.args[0])
+        self.assertFalse(app._camera_scan_workers[0].is_set())
+        # Retry is possible with one orphaned worker still outstanding.
+        self._scan(app)
+        self.assertTrue(app.camera_scanning)
+
+    def test_late_hung_worker_cannot_replace_results_of_retried_search(self):
+        app = ScanHarness()
+        self._scan(app)
+        expired_callback = app.timers[0][1]
+        with patch("anything_plays.ui_camera.CAMERA_SCAN_MAX_POLLS", 1):
+            expired_callback()
+        self._scan(app)
+        with patch("anything_plays.ui_camera.discover",
+                   return_value=[(9, "Old camera")]):
+            ManualThread.pending[0].target()
+        expired_callback()
+        with patch("anything_plays.ui_camera.discover",
+                   return_value=[(2, "Current camera")]):
+            ManualThread.pending[1].target()
+        app.timers[-1][1]()
+        self.assertEqual(
+            app.camera_combo["values"], ["Current camera (device 2)"]
+        )
+        self.assertFalse(app.camera_scanning)
+
+    def test_two_hung_driver_threads_cap_retries_without_disarming_live_game(self):
+        app = ScanHarness()
+        self._scan(app)
+        with patch("anything_plays.ui_camera.CAMERA_SCAN_MAX_POLLS", 1):
+            app.timers[-1][1]()
+        self._scan(app)
+        with patch("anything_plays.ui_camera.CAMERA_SCAN_MAX_POLLS", 1):
+            app.timers[-1][1]()
+        self.assertEqual(len(ManualThread.pending), 2)
+        app.stop_camera.reset_mock()
+        self._scan(app)
+        self.assertEqual(len(ManualThread.pending), 2)
+        app.stop_camera.assert_not_called()
+        self.assertFalse(app.camera_scanning)
+        self.assertIn("still busy", app.status.set.call_args.args[0])
+        # Finishing one old worker releases its one budget slot.
+        with patch("anything_plays.ui_camera.discover",
+                   return_value=[]):
+            ManualThread.pending[0].target()
+        self._scan(app)
+        self.assertEqual(len(ManualThread.pending), 3)
+        self.assertTrue(app.camera_scanning)
+
+    def test_failed_worker_start_does_not_consume_stuck_worker_budget(self):
+        app = ScanHarness()
+        class BadStart(ManualThread):
+            def start(self):
+                raise OSError("Private /dev/video fake driver")
+        for _ in range(3):
+            with patch("anything_plays.ui_camera.threading.Thread", BadStart):
+                app.scan_cameras()
+            self.assertFalse(app.camera_scanning)
+            self.assertIsNone(app._camera_scan_results)
+        self._scan(app)
+        self.assertTrue(app.camera_scanning)
+
+    def test_unexpected_results_queue_error_is_recoverable(self):
+        app = ScanHarness()
+        self._scan(app)
+        app._camera_scan_results.get_nowait = Mock(
+            side_effect=RuntimeError("Private /Users/owner/camera path")
+        )
+        app.timers[-1][1]()
+        self.assertFalse(app.camera_scanning)
+        self.assertIsNone(app._camera_scan_results)
+        self.assertNotIn("/Users/owner", app.status.set.call_args.args[0])
+        self._scan(app)
+        self.assertTrue(app.camera_scanning)
+
 if __name__ == "__main__":
     unittest.main()

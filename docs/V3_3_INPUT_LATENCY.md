@@ -246,3 +246,26 @@ camera is still disarmed during a refresh and never auto-rearms.
 Eight synthetic tests cover these callback and failure transitions.
 Real driver hangs, permissions, webcam hotplug and actual frame
 delivery still require owner hardware verification.
+
+
+## Hung native webcam discovery: 30-second UI timeout and bounded workers
+
+A webcam driver can block indefinitely inside OpenCV's native discovery
+call. The 3.3 camera picker now gives one scan up to 375 80-ms Tk polls
+(approximately 30 seconds of running UI callbacks), then retires its
+generation and shows a fixed, private-data-free retry message. Delayed
+results cannot overwrite a newer scan's camera selection. The scan
+timeout does **not** interrupt or terminate a blocked native driver
+thread: unsafe native cancellation is deliberately avoided.
+
+To prevent repeated Refresh requests from accumulating unlimited
+uninterruptible daemon threads, the application permits at most two
+unfinished discovery workers and prunes completed worker tokens before
+each scan. If both remain stuck, Refresh reports that the device driver
+is still busy and leaves any active game/camera state alone rather
+than starting a third worker. Once an old worker finishes, Refresh can
+start again. A failed thread start does not consume a worker slot.
+Five fault-injection tests cover bounded timeout, stale results after
+timeout, the worker cap, failed worker-start accounting and a damaged
+results queue. Hardware/permissions and real-driver hangs still need
+owner testing; Tk timer counts are not physical timing benchmarks.

@@ -17,6 +17,14 @@ from anything_plays.tracking import locate_target, locate_targets, zone_at
 from anything_plays.libretro_input import TWO_PLAYER_SYSTEMS
 
 
+# At 80 ms per Tk poll, allow about 30 seconds for slow OS permission
+# requests/driver enumeration before returning control to the user.
+# The native OpenCV worker cannot safely be killed mid-driver call. Limit
+# outstanding daemon workers instead of spawning unlimited stuck threads.
+CAMERA_SCAN_MAX_POLLS = 375
+CAMERA_SCAN_MAX_WORKERS = 2
+
+
 def optional_camera_latency_start(enabled):
     """Timestamp an opt-in input probe without ever blocking camera input.
 
@@ -72,6 +80,7 @@ class CameraMixin:
             return
         self._camera_scan_generation = generation + 1
         self._camera_scan_results = None
+        self._camera_scan_poll_count = 0
         self.camera_scanning = False
         if not getattr(self, "_closing", False):
             try:
@@ -86,33 +95,66 @@ class CameraMixin:
         """Probe off Tk; accept only the currently owned scan's result."""
         if self.camera_scanning:
             return
+        # OpenCV VideoCapture may block forever inside a driver/OS permission
+        # prompt, beyond Python's ability to cancel the worker thread. Only
+        # completed workers are released from this small in-memory budget.
+        active = []
+        for done in getattr(self, "_camera_scan_workers", ()):
+            try:
+                if not done.is_set():
+                    active.append(done)
+            except Exception:
+                pass
+        self._camera_scan_workers = active
+        if len(active) >= CAMERA_SCAN_MAX_WORKERS:
+            try:
+                self.status.set(
+                    "Camera search is still busy in the device driver. "
+                    "Check webcam permissions or reconnect the device, "
+                    "then try Refresh cameras again."
+                )
+            except Exception:
+                pass
+            # Keep any healthy existing camera and native controls intact.
+            return
         self.stop_camera()
         self.camera_scanning = True
         generation = getattr(self, "_camera_scan_generation", 0) + 1
         self._camera_scan_generation = generation
+        self._camera_scan_poll_count = 0
         self.status.set('Searching for available webcams…')
         results = Queue(maxsize=1)
         self._camera_scan_results = results
+        done = threading.Event()
+        self._camera_scan_workers.append(done)
 
         def worker():
-            # The worker owns only its queue. Late native discovery replies
-            # must never populate a newer scan, even for the same camera.
+            # The worker owns only its queue and completion flag. A retired
+            # scan never publishes into a newer scan, even after timeout.
             try:
-                results.put((discover(), None))
-            except Exception:
-                # A driver failure can contain private device names/paths.
-                results.put(([], True))
+                try:
+                    results.put((discover(), None))
+                except Exception:
+                    # Do not surface native device/path exception strings.
+                    results.put(([], True))
+            finally:
+                done.set()
 
         try:
             threading.Thread(
                 target=worker, daemon=True, name='camera-discovery'
             ).start()
+        except Exception:
+            done.set()
+            self._retire_camera_scan(generation, results)
+            return
+        try:
             self.root.after(
                 80, lambda: self._poll_camera_scan(generation, results)
             )
         except Exception:
-            # A destroyed Tk loop or failed native thread allocation must
-            # not strand the UI permanently in camera_scanning=True.
+            # The detached worker is allowed to finish its own queue, but
+            # a destroyed Tk loop must never strand a scanning flag.
             self._retire_camera_scan(generation, results)
 
     def _poll_camera_scan(self, generation=None, results=None):
@@ -131,16 +173,28 @@ class CameraMixin:
         try:
             cameras, error = results.get_nowait()
         except Empty:
+            # A hung native driver must not leave the GUI in Searching
+            # forever. Count Tk polls, not untrusted/optional OS clocks.
+            polls = getattr(self, "_camera_scan_poll_count", 0) + 1
+            self._camera_scan_poll_count = polls
+            if polls >= CAMERA_SCAN_MAX_POLLS:
+                self._retire_camera_scan(generation, results)
+                return
             try:
                 self.root.after(
                     80, lambda: self._poll_camera_scan(generation, results)
                 )
             except Exception:
                 self._retire_camera_scan(generation, results)
+        except Exception:
+            # A damaged native queue adapter is not a reason to crash Tk or
+            # retain a scan forever; never show its private error details.
+            self._retire_camera_scan(generation, results)
         else:
             # Retire the queue before any Tk widget handlers can reenter
             # Refresh. The new scan may start from within finish_scan().
             self._camera_scan_results = None
+            self._camera_scan_poll_count = 0
             self.camera_scanning = False
             try:
                 self.finish_scan(cameras, error)
