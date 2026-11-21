@@ -1,0 +1,179 @@
+name: 3.3 | Stable-identity four-platform release source preflight (private)
+
+# Real 3.2 -> 3.3 application identity, but mGBA-only source builds.
+# Do not upload installers to GitHub Releases or overwrite a user's app.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v33-stable-upgrade-source-qa.yml'
+      - 'anything_plays/**'
+      - 'app.py'
+      - 'packaging/**'
+      - 'tools/write_v31_identity.py'
+      - 'tools/verify_v33_stable_upgrade_source.py'
+      - 'tests/test_v33_stable_release_identity.py'
+      - 'requirements-build.txt'
+      - 'fetch_mgba_core.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v33-stable-source-preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-identity-qa:
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v3.3-stream-render-latency') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feature/v3.3-stream-render-latency') }}
+    name: Version 3.3 stable upgrade source QA | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 105
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            installer: release/anything-plays-31_3.3.0~upgradeqa1_amd64.deb
+            bundle: dist/AnythingPlays
+          - target: windows-x64
+            runner: windows-latest
+            installer: release/AnythingPlaysSetup-3.3.0-PRIVATE-UPGRADE-QA.exe
+            bundle: dist/AnythingPlays
+          - target: macos-x64
+            runner: macos-15-intel
+            installer: release/AnythingPlays-3.3.0-UPGRADE-QA-macos-x64.dmg
+            bundle: dist/AnythingPlays31.app
+          - target: macos-arm64
+            runner: macos-15
+            installer: release/AnythingPlays-3.3.0-UPGRADE-QA-macos-arm64.dmg
+            bundle: dist/AnythingPlays31.app
+    env:
+      AP_V33_STABLE_CANDIDATE: '1'
+      AP_V33_CANDIDATE: '0'
+      AP_V32_STABLE_CANDIDATE: '0'
+      AP_V32_PREVIEW_BUILD: '0'
+      AP_V30_MINIMAL_CORE_BUILD: '1'
+      AP_RELEASE_BUILD: '0'
+      AP_V30_APPROVED_RELEASE: '0'
+      AP_V30_STABLE_CANDIDATE: '0'
+      AP_V30_TEST_CORES: '0'
+      AP_V30_GPL_TRIAL: '0'
+      AP_V30_TIA_TRIAL: '0'
+      QA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require original 3.2 install identity, version 3.3 and release disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QA_SOURCE_SHA"
+          python -m unittest discover -s tests -p 'test_v33_stable_release_identity.py' -v
+          python - <<'PY'
+          import os
+          from anything_plays.build_identity import make_identity
+          from tools.write_v31_identity import choose_channel
+          assert choose_channel(os.environ) == "v33_stable_candidate"
+          data=make_identity("v33_stable_candidate")
+          assert data["version"]=="3.3.0"
+          assert data["settings_namespace"]=="anything-plays-31"
+          assert data["public_release_approved"] is False
+          print("Correct 3.3 stable-upgrade identity, source candidate only")
+          PY
+      - name: Prepare native Linux build tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo bash tools/ci_use_canonical_ubuntu_mirror.sh
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo env GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_OS="$RUNNER_OS" bash tools/ci_use_canonical_ubuntu_mirror.sh --repair-missing-packages
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 install -y --no-install-recommends dpkg-dev python3-tk libgl1 libegl1 libglib2.0-0 libportaudio2 xvfb xauth
+      - name: Prepare Windows Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup unavailable" }
+      - name: Create real-version mGBA source shell, without public upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmd.exe /c packaging\\build_windows.bat
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            bash packaging/build_macos_dmg.sh
+          else
+            bash packaging/build_linux_deb.sh
+          fi
+      - name: Verify original stable bundle identity, source SHA and one native core
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.verify_v33_stable_upgrade_source \
+            --target "${{ matrix.target }}" \
+            --installer "${{ matrix.installer }}" \
+            --bundle "${{ matrix.bundle }}" \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          record=json.loads(Path("release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json").read_text())
+          assert record["identity_channel"]=="v33_stable_candidate"
+          assert record["native_core_count"]==1
+          assert record["public_release_approved"] is False
+          path=Path("release")/record["installer"]
+          assert hashlib.sha256(path.read_bytes()).hexdigest()==record["installer_sha256"]
+          Path("release/SHA256SUMS.txt").write_text(
+              record["installer_sha256"]+"  "+path.name+"\n","ascii")
+          PY
+      - name: Inspect genuine extracted Linux DEB
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          dpkg-deb -x "${{ matrix.installer }}" "$tmp"
+          test -x "$tmp/opt/anything-plays-31/AnythingPlays"
+          test -x "$tmp/usr/bin/anything-plays-31"
+          test ! -e "$tmp/opt/anything-plays-33-candidate"
+          python -m tools.verify_v33_stable_upgrade_source \
+            --target linux-x64 \
+            --installer "${{ matrix.installer }}" \
+            --bundle "$tmp/opt/anything-plays-31" \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output release/V33_INSTALLED_UPGRADE_SOURCE_RECEIPT.json
+      - name: Validate Windows Inno stable AppId in script
+        if: matrix.target == 'windows-x64'
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src=Path("packaging/installer.iss").read_text()
+          assert "#ifdef V33StableQABuild" in src
+          assert "AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}" in src
+          print("3.3 source QA selects the prior 3.2 stable Inno AppId")
+          PY
+      - name: Retain only temporary private source-stage QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-STABLE-IDENTITY-SOURCE-QA-${{ matrix.target }}-NOT-RELEASE
+          path: |
+            ${{ matrix.installer }}
+            release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json
+            release/V33_INSTALLED_UPGRADE_SOURCE_RECEIPT.json
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
