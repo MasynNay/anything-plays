@@ -1,0 +1,306 @@
+name: 3.3.0 | Publish SHA-verified four-platform stable upgrade after owner-authorized merge
+
+# One-time, exact-source publication after PR #246 is merged to main.
+# Never publish any separate V33CandidateBuild package or rewrite 3.2.0.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v33-publish-exact-reviewed-stable.yml'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: anything-plays-v330-exact-published-stable
+  cancel-in-progress: false
+
+jobs:
+  publish-reviewed-330:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v3.3.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require owner-authorized merged PR and unchanged release scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          gh api "repos/$GITHUB_REPOSITORY/pulls/246" > reviewed-pr.json
+          python - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          auth=json.loads(Path("config/v3.3-publication-authorization.json").read_text())
+          pr=json.loads(Path("reviewed-pr.json").read_text())
+          required={
+            "schema_version":1,"version":"3.3.0",
+            "owner_explicitly_requested_public_release":True,
+            "scope":"free-noncommercial-nonpromotional-open-source-application",
+            "release_tag":"v3.3.0","release_name":"Anything Plays 3.3.0",
+            "source_branch":"feature/v3.3-stream-render-latency",
+            "source_pr_number":246,"base_branch":"main",
+            "require_exact_source_head_and_four_full_native_upgrade_installers":True,
+            "require_verified_source_native_and_stream_mode_qa":True,
+            "require_unchanged_public_v320_native_core_bytes_and_original_notices":True,
+            "reuse_exact_published_v320_python_sdl_source_companion":True,
+            "preserve_public_320_installer_assets_for_rollback":True,
+            "never_rename_private_qa_binary_as_stable":True,
+            "require_exact_sha256_for_every_published_asset":True,
+            "disclose_real_physical_camera_unverified":True,
+            "disclose_real_physical_controller_unverified":True,
+            "disclose_gamecube_real_speaker_gpu_30_minute_unverified":True,
+            "acknowledge_unsigned_windows_and_adhoc_mac_builds":True,
+            "independent_every_transitive_dependency_license_and_source_audit_complete":False,
+            "physical_webcam_controller_owner_qa_complete":False,
+            "physical_gamecube_observation_complete":False,
+            "universal_commercial_game_compatibility_proven":False,
+          }
+          assert all(type(auth.get(k)) is type(v) and auth[k]==v for k,v in required.items())
+          assert "FINISH IT AND RELEASE IT" in auth["authorization_context"]
+          assert len(auth.get("source_review_basis","")) > 350
+          assert pr["number"]==246 and pr["merged_at"] is not None
+          assert pr["base"]["ref"]=="main"
+          assert pr["head"]["ref"]=="feature/v3.3-stream-render-latency"
+          assert pr["head"]["repo"]["full_name"]==os.environ["GITHUB_REPOSITORY"]
+          sha=pr["head"]["sha"]
+          assert re.fullmatch("[a-f0-9]{40}",sha)
+          Path("accepted-source-sha.txt").write_text(sha,"ascii")
+          print("Exact owner-authorized 3.3 source head:",sha)
+          PY
+          echo "QA_SOURCE_SHA=$(cat accepted-source-sha.txt)" >> "$GITHUB_ENV"
+          git merge-base --is-ancestor "$(cat accepted-source-sha.txt)" HEAD
+      - name: Verify all exact-head build and native gameplay workflows passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=pull_request&head_sha=$QA_SOURCE_SHA&per_page=100" > all-source-runs.json
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          runs=json.loads(Path("all-source-runs.json").read_text())["workflow_runs"]
+          expected=(
+              "Source checks",
+              "3.3 | Real Tk Stream Mode cadence and bounded-memory soak (unreleased)",
+              "3.3 | Four-platform isolated owner QA installers (unreleased)",
+              "3.3 | Stable-identity four-platform release source preflight (private)",
+          )
+          selected={}
+          for name in expected:
+              choices=[r for r in runs
+                  if r["name"]==name
+                  and r["head_sha"]==os.environ["QA_SOURCE_SHA"]
+                  and r["conclusion"]=="success"
+                  and r["event"]=="pull_request"]
+              assert choices,f"Missing exact source verified workflow: {name}"
+              selected[name]=max(choices,key=lambda r:r["id"])["id"]
+          Path("accepted-runs.json").write_text(json.dumps(selected,indent=2)+"\n")
+          Path("stable-qa-run-id.txt").write_text(
+              str(selected[expected[-1]]),"ascii")
+          print("All four exact-source workflow groups passed",selected)
+          PY
+      - name: Download four original full-native stable-identity QA outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN="$(cat stable-qa-run-id.txt)"
+          for target in linux-x64 windows-x64 macos-x64 macos-arm64; do
+            mkdir -p "review/$target"
+            gh run download "$RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "AnythingPlays-3.3.0-STABLE-IDENTITY-FULL-NATIVE-$target-NOT-RELEASE" \
+              --dir "review/$target"
+          done
+      - name: Authenticate four installer bytes, native provenance and original install identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          sha=os.environ["QA_SOURCE_SHA"]
+          names={
+            "linux-x64":("anything-plays-31_3.3.0_amd64.deb","V33_STABLE_FULL_LINUX_QA_RECEIPT.json"),
+            "windows-x64":("AnythingPlaysSetup-3.3.0.exe","V33_STABLE_FULL_WINDOWS_QA_RECEIPT.json"),
+            "macos-x64":("AnythingPlays-3.3.0-macos-x64.dmg","V33_FULL_MACOS_QA_RECEIPT.json"),
+            "macos-arm64":("AnythingPlays-3.3.0-macos-arm64.dmg","V33_FULL_MACOS_QA_RECEIPT.json"),
+          }
+          out=Path("release-ready")
+          out.mkdir(parents=True,exist_ok=False)
+          qa={}
+          for target,(name,receipt) in names.items():
+              folder=Path("review")/target
+              files=list(folder.rglob(name))
+              reports=list(folder.rglob(receipt))
+              assert len(files)==1 and len(reports)==1,(target,files,reports)
+              data=json.loads(reports[0].read_text("utf-8"))
+              assert data["source_revision"]==sha and data["target"]==target
+              assert data["installer"]==name and data["native_core_count"]==11
+              assert data["console_profiles"]==18
+              assert data["native_core_bytes_preserved"] is True
+              assert data["public_release_approved"] is False
+              assert data.get("physical_hardware_tested",False) is False
+              src=files[0]
+              digest=hashlib.sha256(src.read_bytes()).hexdigest()
+              assert digest==data["installer_sha256"]
+              assert src.stat().st_size>30_000_000
+              (out/name).write_bytes(src.read_bytes())
+              qa[target]={"sha256":digest,"bytes":src.stat().st_size,
+                          "source":sha,"native_cores":11,
+                          "artifact_provenance":receipt,
+                          "physical_hardware_verified":False}
+          assert len(qa)==4
+          Path("v33-accepted-installer-QA.json").write_text(
+              json.dumps(qa,indent=2,sort_keys=True)+"\n")
+          print("Exact 3.3 stable installation binaries verified; source + 11 cores",list(qa))
+          PY
+      - name: Verify reused original source companion and stable rollback remain accessible
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip' \
+            --dir release-ready
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS.txt' --dir baseline-checksums
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.2.0" > existing-320.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.0.0-sources" > existing-core-source.json
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          stable=json.loads(Path("existing-320.json").read_text())
+          sources=json.loads(Path("existing-core-source.json").read_text())
+          assert not stable["draft"] and stable["tag_name"]=="v3.2.0"
+          assert not sources["draft"]
+          assert len(stable["assets"])==8
+          name="AnythingPlays-3.1.0-PYGAME-SDL-MPG123-ORIGINAL-SOURCE.zip"
+          path=Path("release-ready")/name
+          lines=Path("baseline-checksums/SHA256SUMS.txt").read_text().splitlines()
+          assert hashlib.sha256(path.read_bytes()).hexdigest()+"  "+name in lines
+          assert len([a for a in sources["assets"] if "Original-Emulator-Sources" in a["name"]])==1
+          PY
+      - name: Generate final manifest, source access review and eight SHA256 values
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          folder=Path("release-ready")
+          qa=json.loads(Path("v33-accepted-installer-QA.json").read_text())
+          runs=json.loads(Path("accepted-runs.json").read_text())
+          report={
+            "schema_version":1,"version":"3.3.0","source_revision":os.environ["QA_SOURCE_SHA"],
+            "stable_in_place_upgrade_identity":True,
+            "native_core_families":11,"console_profiles":18,
+            "public_v320_native_bytes_preserved":True,
+            "exact_sha256_verified_four_platform_binaries":True,
+            "exact_source_completed_workflow_runs":runs,
+            "installer_qa":qa,
+            "physical_camera_controller_gamecube_speakers_obs_acceptance_complete":False,
+            "every_transitive_license_audit_proven":False,
+            "windows_authenticode_signed":False,
+            "macos_notarized":False,
+          }
+          (folder/"FINAL_QA_MANIFEST.json").write_text(
+              json.dumps(report,indent=2,sort_keys=True)+"\n")
+          lines=[
+            "# Anything Plays 3.3.0 — source-access and release scope",
+            "",
+            "Application source SHA: "+os.environ["QA_SOURCE_SHA"],
+            "Source: https://github.com/MasynNay/anything-plays/tree/"+os.environ["QA_SOURCE_SHA"],
+            "MIT application license only applies to original app code.",
+            "Original emulator cores, SDL, pygame, OpenCV and fonts/artwork retain their own rights.",
+            "All 11 native emulator binaries are byte-identical to checksum-verified published 3.2.0 cores.",
+            "These are 18 console profiles, not proof that all games work on all hardware.",
+            "Pinned original emulator sources: https://github.com/MasynNay/anything-plays/releases/tag/v3.0.0-sources",
+            "Original pygame/SDL/mpg123 corresponding-source ZIP is the exact published 3.2.0 companion.",
+            "See docs/V3_1_LGPL_REBUILD_REPLACEMENT.md for component rebuild/replacement instructions.",
+            "This is a free, noncommercial, nonpromotional scoped redistribution; other license conditions remain.",
+            "Source/license review is not an independent legal opinion or blanket commercial-use approval.",
+            "Physical webcam, controller, GameCube GPU, audio speakers, OBS capture and 30-minute sessions not attested.",
+            "Windows unsigned; macOS ad-hoc signed and not notarized.",
+            "Prior stable v3.2.0 remains available for manual rollback.",
+          ]
+          (folder/"FINAL_SOURCE_ACCESS_REVIEW.md").write_text("\n".join(lines)+"\n")
+          files=sorted(folder.iterdir())
+          assert len(files)==7,[p.name for p in files]
+          (folder/"SHA256SUMS.txt").write_text(
+              "".join(hashlib.sha256(p.read_bytes()).hexdigest()+"  "+p.name+"\n" for p in files),"ascii")
+          assert len(list(folder.iterdir()))==8
+          PY
+          (cd release-ready && sha256sum --check SHA256SUMS.txt)
+      - name: Reject any existing 3.3.0 release or tag; never overwrite public files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::v3.3.0 tag already exists; release will not replace it"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::v3.3.0 release already exists; refuse clobber"
+            exit 1
+          fi
+      - name: Create exact-source release draft, upload eight hashed assets and verify remote digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --draft --target "$QA_SOURCE_SHA" \
+            --title 'Anything Plays 3.3.0' \
+            --notes-file docs/releases/ANYTHING_PLAYS_V3_3_PUBLIC_NOTES.md
+          for file in release-ready/*; do
+            gh release upload "$RELEASE_TAG" "$file" --repo "$GITHUB_REPOSITORY"
+          done
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > all-releases.json
+          python - <<'PY'
+          import json,hashlib,os
+          from pathlib import Path
+          releases=json.loads(Path("all-releases.json").read_text())
+          matches=[r for r in releases if r["tag_name"]==os.environ["RELEASE_TAG"]]
+          assert len(matches)==1
+          r=matches[0]
+          assert r["draft"] is True and r["prerelease"] is False
+          assert r["target_commitish"]==os.environ["QA_SOURCE_SHA"]
+          expected={p.name:"sha256:"+hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path("release-ready").iterdir()}
+          assert {a["name"]:a["digest"] for a in r["assets"]}==expected
+          assert all(a["state"]=="uploaded" for a in r["assets"])
+          Path("v330-release-id.txt").write_text(str(r["id"]),"ascii")
+          PY
+      - name: Publish exact verified 3.3.0 stable and retain 3.2.0 rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --prerelease=false --latest
+          gh api "repos/$GITHUB_REPOSITORY/releases/$(cat v330-release-id.txt)" > public-v330.json
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v3.3.0" > tag-v330.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/v3.2.0" > retained-v320.json
+          python - <<'PY'
+          import json,hashlib,os
+          from pathlib import Path
+          r=json.loads(Path("public-v330.json").read_text())
+          tag=json.loads(Path("tag-v330.json").read_text())
+          old=json.loads(Path("retained-v320.json").read_text())
+          sha=os.environ["QA_SOURCE_SHA"]
+          expected={p.name:"sha256:"+hashlib.sha256(p.read_bytes()).hexdigest()
+                    for p in Path("release-ready").iterdir()}
+          assert r["tag_name"]=="v3.3.0" and r["target_commitish"]==sha
+          assert r["draft"] is False and r["prerelease"] is False
+          assert tag["object"]["sha"]==sha
+          assert {a["name"]:a["digest"] for a in r["assets"]}==expected
+          assert old["tag_name"]=="v3.2.0" and not old["draft"] and len(old["assets"])==8
+          print("SUCCESS public Anything Plays 3.3.0 release: "+r["html_url"])
+          PY
