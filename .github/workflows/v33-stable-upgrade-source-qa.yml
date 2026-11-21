@@ -166,6 +166,98 @@ jobs:
           assert "AppId={{753B9C90-2D6A-43E4-90E4-49393B3AE025}" in src
           print("3.3 source QA selects the prior 3.2 stable Inno AppId")
           PY
+      - name: Download and SHA-verify original released 3.2 native baseline
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p published-v32
+          case "${{ matrix.target }}" in
+            linux-x64) name=anything-plays-31_3.2.0_amd64.deb ;;
+            windows-x64) name=AnythingPlaysSetup-3.2.0.exe ;;
+            macos-arm64) name=AnythingPlays-3.2.0-macos-arm64.dmg ;;
+            macos-x64) name=AnythingPlays-3.2.0-macos-x64.dmg ;;
+            *) exit 1 ;;
+          esac
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern "$name" --dir published-v32
+          gh release download v3.2.0 --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS.txt --dir published-v32
+          (cd published-v32 && grep -F "  $name" SHA256SUMS.txt | sha256sum --check --status)
+      - name: Reassemble Linux 11-core stable upgrade in disposable CI root
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v33_stable_full_linux \
+            --stable published-v32/anything-plays-31_3.2.0_amd64.deb \
+            --source "${{ matrix.installer }}" \
+            --checksums published-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output full-v33
+      - name: Reassemble Windows 11-core stable Inno upgrade in disposable CI
+        if: matrix.target == 'windows-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v33_stable_full_windows \
+            --stable published-v32/AnythingPlaysSetup-3.2.0.exe \
+            --source "${{ matrix.installer }}" \
+            --checksums published-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output full-v33
+      - name: Reassemble macOS 11-core stable signed upgrade in disposable CI
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m tools.stage_v33_stable_full_macos \
+            --arch "${{ matrix.target == 'macos-arm64' && 'arm64' || 'x64' }}" \
+            --stable "published-v32/AnythingPlays-3.2.0-macos-${{ matrix.target == 'macos-arm64' && 'arm64' || 'x64' }}.dmg" \
+            --preview "${{ matrix.installer }}" \
+            --checksums published-v32/SHA256SUMS.txt \
+            --source-receipt release/V33_STABLE_UPGRADE_SOURCE_RECEIPT.json \
+            --source-sha "$QA_SOURCE_SHA" \
+            --output full-v33
+      - name: Verify actual complete full-native installer and isolated QA provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          target="${{ matrix.target }}"
+          receipts={
+              "linux-x64":"V33_STABLE_FULL_LINUX_QA_RECEIPT.json",
+              "windows-x64":"V33_STABLE_FULL_WINDOWS_QA_RECEIPT.json",
+              "macos-arm64":"V33_FULL_MACOS_QA_RECEIPT.json",
+              "macos-x64":"V33_FULL_MACOS_QA_RECEIPT.json",
+          }
+          record=json.loads((Path("full-v33")/receipts[target]).read_text("utf-8"))
+          assert record["source_revision"]==os.environ["QA_SOURCE_SHA"]
+          assert record["native_core_count"]==11
+          assert record["console_profiles"]==18
+          assert record["native_core_bytes_preserved"] is True
+          assert record["public_release_approved"] is False
+          path=Path("full-v33")/record["installer"]
+          assert path.is_file() and path.stat().st_size > 30_000_000
+          assert hashlib.sha256(path.read_bytes()).hexdigest()==record["installer_sha256"]
+          Path("full-v33/SHA256SUMS.txt").write_text(
+              record["installer_sha256"]+"  "+path.name+"\n","ascii")
+          print("Verified full-native stable-upgrade identity QA:",target,path.name)
+          PY
+      - name: Retain unpublished full-native stable upgrade and exact hash
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnythingPlays-3.3.0-STABLE-IDENTITY-FULL-NATIVE-${{ matrix.target }}-NOT-RELEASE
+          path: |
+            full-v33/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
       - name: Retain only temporary private source-stage QA
         uses: actions/upload-artifact@v4
         with:
