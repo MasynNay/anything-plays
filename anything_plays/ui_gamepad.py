@@ -123,22 +123,48 @@ class GamepadMixin:
         # into the next newly started game. First-ever active play is unchanged.
         self._gamepad_game_resume_release_pending = False
 
+    def _release_gamepad_after_failure(self):
+        """Best-effort safe release, even if an extension/SDL hook raises.
+
+        Never let a broken controller or an already disposed native session
+        prevent cleanup of the other resource. The reader clears its
+        physical-button latches independently of the emulator input buffer.
+        """
+        try:
+            self.emu.release_gamepad()
+        except Exception:
+            inputs = getattr(self.emu, "inputs", None)
+            release = getattr(inputs, "release_gamepad", None)
+            if callable(release):
+                try:
+                    release()
+                except Exception:
+                    pass
+        reader = getattr(self, "_gamepad", None)
+        if reader is not None:
+            try:
+                reader.stop()
+            except Exception:
+                # Native SDL wrappers may fail during USB removal or quit.
+                pass
+
     def close_gamepad(self):
         """Release gamepad state even for partially constructed App objects."""
         self._gamepad_game_resume_release_pending = False
         self._gamepad_last_controller = None
         self._gamepad_seen_controller = False
         self._gamepad_reconnect_release_pending = False
-        self._cancel_controller_capture()
+        try:
+            self._cancel_controller_capture()
+        except Exception:
+            self._controller_capture = None
         close_guide = getattr(self, "_controller_guide_close", None)
         if callable(close_guide):
-            close_guide()
-        try:
-            self.emu.release_gamepad()
-        finally:
-            reader = getattr(self, "_gamepad", None)
-            if reader is not None:
-                reader.stop()
+            try:
+                close_guide()
+            except Exception:
+                pass
+        self._release_gamepad_after_failure()
 
     def toggle_gamepad(self):
         """Enable an optional local gamepad; keep keyboard play available."""
@@ -151,13 +177,14 @@ class GamepadMixin:
                 self._gamepad.start()
                 self._gamepad.refresh()
                 self.gamepad_status.set("Looking for a controller…")
-            except Exception as exc:
+            except Exception:
                 self.gamepad_enabled.set(False)
+                # SDL exception strings can include Bluetooth identifiers,
+                # USB serials or private driver paths. Keep this fixed text.
                 self.gamepad_status.set(
-                    "Controller unavailable: " + str(exc)[:130]
+                    "Controller unavailable. Check the connection and retry."
                 )
-                self.emu.release_gamepad()
-                self._gamepad.stop()
+                self._release_gamepad_after_failure()
         else:
             self.emu.release_gamepad()
             self._gamepad.stop()
@@ -247,9 +274,11 @@ class GamepadMixin:
             self.root.clipboard_clear()
             self.root.clipboard_append(json.dumps(report, indent=2) + "\n")
             self.root.update_idletasks()
-        except (tk.TclError, RuntimeError, ValueError, OSError) as exc:
+        except Exception:
+            # The clipboard/SDL exception message may contain local ROM
+            # paths or device identifiers. Never echo it to a UI label.
             self.gamepad_diagnostics_status.set(
-                "Could not copy diagnostics: " + str(exc)[:105]
+                "Could not copy controller diagnostics. Try again."
             )
             return False
         self.gamepad_diagnostics_status.set(
@@ -363,24 +392,43 @@ class GamepadMixin:
                 self._refresh_gamepad_live_input()
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
-        except Exception as exc:
+        except Exception:
             self._gamepad_game_resume_release_pending = False
             self._gamepad_last_controller = None
             self._gamepad_seen_controller = False
             self._gamepad_reconnect_release_pending = False
-            self._cancel_controller_capture("Controller error; mapping canceled.")
-            self.emu.release_gamepad()
-            self._gamepad.stop()
+            try:
+                self._cancel_controller_capture(
+                    "Controller error; mapping canceled."
+                )
+            except Exception:
+                self._controller_capture = None
+            self._release_gamepad_after_failure()
             self.gamepad_enabled.set(False)
             self.gamepad_status.set(
-                "Controller disconnected or unavailable: " + str(exc)[:130]
+                "Controller disconnected or unavailable. Reconnect and retry."
             )
-            self.save_preferences()
-            self._refresh_gamepad_live_input()
-            self.refresh_controller_artwork()
+            # Preferences and optional artwork must never interrupt the
+            # primary gamepad-release path or erase a useful error message.
+            for callback in (
+                self.save_preferences,
+                self._refresh_gamepad_live_input,
+                self.refresh_controller_artwork,
+            ):
+                try:
+                    callback()
+                except Exception:
+                    pass
         finally:
             if not self._closing:
-                self._gamepad_tick_job = self.root.after(65, self.gamepad_tick)
+                try:
+                    self._gamepad_tick_job = self.root.after(
+                        65, self.gamepad_tick
+                    )
+                except Exception:
+                    # Tk can be destroyed during a final SDL hot-unplug.
+                    # We cannot safely reschedule against a dead window.
+                    self._gamepad_tick_job = None
 
     def _cancel_controller_capture(self, message=None):
         capture = getattr(self, "_controller_capture", None)

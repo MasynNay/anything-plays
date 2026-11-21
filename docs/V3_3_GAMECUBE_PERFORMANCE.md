@@ -851,3 +851,25 @@ Four synthetic tests cover prolonged clock errors, healthy-clock
 recovery without fake FPS intervals, Stop during readback, and
 malformed GPU frame handling. Actual GameCube hardware, 30-minute
 playback, OBS and speaker acceptance remain required before release.
+
+
+## Controller error text and hotplug cleanup (3.3)
+
+SDL hotplug/initialization errors and local clipboard failures may
+contain private Bluetooth identifiers, OS device paths, or other
+driver-supplied text. The 3.3 controller UI now uses fixed, actionable
+failure messages rather than echoing arbitrary exception strings to
+its status and diagnostics labels. Successful live controller status,
+bindings, visuals and mapping UX are unchanged.
+
+Native controller-release, SDL shutdown, optional setup-guide close,
+preferences saving and icon refresh now fail independently when an
+extension or destroyed Tk window raises during a controller fault.
+If the emulator's release facade raises and its first-party input
+buffer is still reachable, a best-effort direct input release is
+attempted. A destroyed Tk event loop cannot turn the last controller
+poll into an unhandled exception. Six synthetic tests cover failure
+status redaction, native release failures, SDL shutdown faults,
+window teardown, clipboard privacy and the normal 65-ms reschedule.
+Real-gamepad pairing, physical release, GameCube PortAudio speakers
+and camera/OBS performance still require real-device acceptance.
