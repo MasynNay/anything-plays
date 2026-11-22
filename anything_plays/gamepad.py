@@ -9,6 +9,7 @@ separate from keyboard and camera state.
 from __future__ import annotations
 
 import importlib
+import math
 import os
 import time
 
@@ -123,6 +124,25 @@ class GamepadReader:
         # A transient SDL enumeration/event error must not permanently
         # disable the user's saved controller setting or spin every 65 ms.
         self.retry_after = float("-inf")
+        # Only valid, increasing local clock readings govern reconnect
+        # cooldowns. Do not trust optional platform timing after sleep or
+        # native clock failure, or replay held inputs on recovery.
+        self._last_valid_clock = None
+        self._clock_release_pending = False
+
+    def _safe_clock(self):
+        """Sample optional SDL/reconnect time once, without unsafe coercion."""
+        try:
+            now = self.clock()
+            # Exclude bools, NaNs, infinities and implausibly huge clock
+            # values. A bad platform clock must never turn off the saved
+            # controller preference or strand a held emulator input.
+            if (type(now) in (int, float)
+                    and math.isfinite(now) and 0 <= now <= 1_000_000_000_000):
+                return now
+        except Exception:
+            pass
+        return None
 
     def start(self):
         if self.api is not None:
@@ -177,10 +197,17 @@ class GamepadReader:
     def refresh(self):
         self.last_scan = float("-inf")
         self.retry_after = float("-inf")
+        self._last_valid_clock = None
+        self._clock_release_pending = False
         self._close_device()
 
-    def _connect(self):
-        now = self.clock()
+    def _connect(self, now=None):
+        # poll() supplies its validated time so a transient clock error
+        # cannot happen between the retry guard and a native SDL scan.
+        if now is None:
+            now = self._safe_clock()
+            if now is None:
+                return
         if self.controller is not None:
             try:
                 attached = self.controller.attached()
@@ -233,11 +260,34 @@ class GamepadReader:
             self.physical_buttons = frozenset()
             self._active_axes = frozenset()
             self._active_triggers = frozenset()
+            self._clock_release_pending = False
             return frozenset(), "Controller disabled"
+        # An optional monotonic clock can throw, return NaN or jump backwards
+        # after suspend/resume. Neither condition is a controller fault.
+        # Return an empty *native* held-button snapshot without tearing down
+        # a healthy SDL connection or persisting a disabled checkbox.
+        now = self._safe_clock()
+        if now is None:
+            self.physical_buttons = frozenset()
+            self._active_axes = frozenset()
+            self._active_triggers = frozenset()
+            self._clock_release_pending = True
+            return frozenset(), "Controller timing unavailable · Retrying"
+        if (self._last_valid_clock is not None
+                and now < self._last_valid_clock):
+            # A reversed monotonic clock can otherwise strand a controller
+            # behind a future retry_after/last_scan timestamp indefinitely.
+            self.retry_after = float("-inf")
+            self.last_scan = float("-inf")
+            self.physical_buttons = frozenset()
+            self._active_axes = frozenset()
+            self._active_triggers = frozenset()
+            self._clock_release_pending = True
+        self._last_valid_clock = now
         # Event pumping and enumeration may throw during an SDL hotplug race.
         # Treat these as temporary input outages, not a reason for the GUI to
         # uncheck and persistently disable the user's controller preference.
-        if self.clock() < self.retry_after:
+        if now < self.retry_after:
             self.physical_buttons = frozenset()
             return frozenset(), "Controller temporarily unavailable · Retrying"
         try:
@@ -245,11 +295,11 @@ class GamepadReader:
             # accumulate an unbounded event backlog during long sessions.
             self.pygame.event.pump()
             self.pygame.event.get()
-            self._connect()
+            self._connect(now)
         except Exception:
             self._close_device()
-            self.last_scan = self.clock()
-            self.retry_after = self.last_scan + SCAN_INTERVAL
+            self.last_scan = now
+            self.retry_after = now + SCAN_INTERVAL
             return frozenset(), "Controller temporarily unavailable · Retrying"
         self.retry_after = float("-inf")
         if self.controller is None:
@@ -295,8 +345,8 @@ class GamepadReader:
             # can churn native SDL devices and stall the UI. Rescan remains
             # immediately available through refresh().
             self._close_device()
-            self.last_scan = self.clock()
-            self.retry_after = self.last_scan + SCAN_INTERVAL
+            self.last_scan = now
+            self.retry_after = now + SCAN_INTERVAL
             return frozenset(), "Controller disconnected · Retrying"
         # Commit the entire new sample only once all SDL calls succeed.
         # On any exception, _close_device clears these latches and all held
@@ -304,6 +354,15 @@ class GamepadReader:
         self._active_axes = frozenset(next_axes)
         self._active_triggers = frozenset(next_triggers)
         self.physical_buttons = frozenset(physical)
+        if self._clock_release_pending:
+            if physical:
+                # The game may not resume a button held across a clock
+                # outage, restart or sleep. First observe a fresh neutral
+                # physical sample, exactly as after focus/device recovery.
+                return (frozenset(),
+                        self.name + " connected · Release controller inputs "
+                        "after timing recovery")
+            self._clock_release_pending = False
         return mapped_buttons(system, physical, bindings), self.name + " connected"
 
     def stop(self):
@@ -317,6 +376,8 @@ class GamepadReader:
         pg, self.pygame = self.pygame, None
         self.last_scan = float("-inf")
         self.retry_after = float("-inf")
+        self._last_valid_clock = None
+        self._clock_release_pending = False
         callbacks = []
         if api is not None:
             callbacks.append(api.quit)
