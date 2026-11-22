@@ -269,3 +269,32 @@ Five fault-injection tests cover bounded timeout, stale results after
 timeout, the worker cap, failed worker-start accounting and a damaged
 results queue. Hardware/permissions and real-driver hangs still need
 owner testing; Tk timer counts are not physical timing benchmarks.
+
+
+## 3.3.1 source maintenance: SDL controller clock recovery
+
+The optional gamepad reconnect/scan clock is sampled once per active
+Tk poll and validated before any SDL event pump or native device read.
+An exception, NaN/Infinity, boolean, negative, or implausibly large
+value now releases the current emulated buttons and analog hysteresis
+latches, reports a fixed local retry status, and preserves the enabled
+controller preference and existing native device. This avoids a
+persistent disabled checkbox after a transient platform timing fault.
+
+A backwards clock after system sleep/resume resets the scan/retry
+deadline, so a prior future timestamp cannot strand reconnects.
+After any timing outage/discontinuity, held game controls remain neutral
+until one fresh fully released physical controller sample is observed;
+a controller still physically held must not unexpectedly resume inputs
+when timing starts working again. Manual Refresh and Stop clear these
+temporary timing latches. SDL read and enumeration failure cooldowns
+continue to use their original 1.5-second policy, now with the single
+validated clock sample (never a second unchecked exception-path read).
+The gamepad and webcam remain separate and no global key injection
+is introduced.
+
+Synthetic tests cover healthy and failing clocks, clock resets during
+SDL backoff, held-button safety, normal SDL retry behavior, and the
+actual UI input handoff. They cannot establish real Bluetooth/USB,
+system suspend/resume or physical-gameplay compatibility. Public 3.3.0
+installers remain unchanged; this source work is not a 3.3.1 release.
