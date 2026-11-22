@@ -56,6 +56,9 @@ class API:
     def name_forindex(self, _index):
         return "Synthetic pad"
 
+    def quit(self):
+        pass
+
 
 def reader_for(clock, pad=None, *, already_connected=True):
     pad = pad or Pad(pressed=True)
