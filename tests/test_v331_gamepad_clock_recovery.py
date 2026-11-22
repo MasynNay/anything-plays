@@ -64,9 +64,11 @@ def reader_for(clock, pad=None, *, already_connected=True):
     pad = pad or Pad(pressed=True)
     reader = GamepadReader(clock=clock)
     reader.api = API(pad)
-    reader.pygame = SimpleNamespace(event=SimpleNamespace(
-        pump=Mock(), get=Mock(return_value=[])
-    ))
+    reader.pygame = SimpleNamespace(
+        event=SimpleNamespace(pump=Mock(), get=Mock(return_value=[])),
+        joystick=SimpleNamespace(quit=Mock()),
+        display=SimpleNamespace(quit=Mock()),
+    )
     reader._sdl_constant = lambda name: name
     if already_connected:
         reader.controller = pad
