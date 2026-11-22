@@ -62,19 +62,26 @@ def discover(max_index=8):
                 # prevent healthy devices at later indices being discovered.
                 cap = cv2.VideoCapture(index, backend)
                 if cap is not None and cap.isOpened():
-                    ok, _ = cap.read()
-                    if ok:
+                    ok, frame = cap.read()
+                    # Some USB/AVFoundation backends report success after
+                    # disconnect or a permission transition but return no
+                    # pixels (None or an empty numpy frame). Do not advertise
+                    # that camera as ready for tracking.
+                    if ok and frame is not None and getattr(frame, "size", 1):
                         result.append((index, name_for(index)))
                         break
-            except (cv2.error, OSError, RuntimeError):
-                # Treat a failed device as a local transient discovery error.
-                # Camera selection stays disabled until a real successful read.
+            except Exception:
+                # Malformed native read tuples and vendor-specific OpenCV
+                # exceptions are local to this device. Keep scanning later
+                # indexes instead of dropping every usable camera.
                 pass
             finally:
                 if cap is not None:
                     try:
                         cap.release()
-                    except (cv2.error, OSError, RuntimeError):
+                    except Exception:
+                        # Always finish this probe even when device removal
+                        # makes the driver's release hook fail unexpectedly.
                         pass
             if attempt + 1 < attempts:
                 time.sleep(.25)

@@ -12,6 +12,7 @@ on:
       - 'anything_plays/ui_gameplay.py'
       - 'tests/test_v311_camera_failure_isolation.py'
       - 'tests/test_v311_camera_timer_unplug.py'
+      - 'tests/test_v331_camera_discovery_valid_frames.py'
 
 permissions:
   contents: read
@@ -69,4 +70,5 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v311_camera_failure_isolation.py' -v
           python -m unittest discover -s tests -p 'test_v311_camera_timer_unplug.py' -v
+          python -m unittest discover -s tests -p 'test_v331_camera_discovery_valid_frames.py' -v
           echo '4OS camera handling verified with fault injection; live hardware remains untested.'
