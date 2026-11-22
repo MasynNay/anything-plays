@@ -263,7 +263,9 @@ class CameraMixin:
         if job is not None:
             try:
                 self.root.after_cancel(job)
-            except tk.TclError:
+            except Exception:
+                # A destroyed Tk loop/third-party shim may raise something
+                # other than TclError. Generation and state are retired.
                 pass
 
     def _queue_camera_retry(self, name):
@@ -280,14 +282,49 @@ class CameraMixin:
         # cannot distinguish a canceled retry from a newer retry.
         generation = getattr(self, "_camera_retry_generation", 0) + 1
         self._camera_retry_generation = generation
-        self.status.set(
-            f'Camera disconnected. Retrying {name} in {delay_seconds}s; '
-            'object controls remain paused.'
-        )
-        self._camera_reconnect_job = self.root.after(
-            delay_seconds * 1000,
-            lambda: self._retry_camera(name, generation),
-        )
+        try:
+            self.status.set(
+                f'Camera disconnected. Retrying {name} in {delay_seconds}s; '
+                'object controls remain paused.'
+            )
+        except Exception:
+            pass
+        try:
+            job = self.root.after(
+                delay_seconds * 1000,
+                lambda: self._retry_camera(name, generation),
+            )
+            if job is None:
+                # A scheduler returning no cancelable job has not granted
+                # this generation an owned, live retry.
+                raise RuntimeError("Camera timer has no job ID")
+        except Exception:
+            # Invalidate callbacks a damaged scheduler may have queued.
+            # Never leave a phantom retry or a misleading timer status.
+            if self._camera_retry_generation == generation:
+                self._camera_retry_generation = generation + 1
+                self._camera_reconnect_job = None
+                self._camera_reconnect_name = None
+                self._camera_reconnect_attempts = 0
+            if not self._closing:
+                try:
+                    self.status.set(
+                        "Automatic camera retry unavailable. Click Use "
+                        "camera to retry; controls stay paused."
+                    )
+                except Exception:
+                    pass
+            return False
+        if (self._camera_retry_generation != generation or self._closing):
+            # Preserve ownership even if a custom scheduler calls back
+            # during registration, unlike normal asynchronous Tk after().
+            try:
+                self.root.after_cancel(job)
+            except Exception:
+                pass
+            return False
+        self._camera_reconnect_job = job
+        return True
 
     def _retry_camera(self, name, generation=None):
         """Reconnect only the intended webcam and the current retry timer."""
@@ -312,9 +349,10 @@ class CameraMixin:
             return
         try:
             self.start_camera(reconnecting=True)
-        except Exception as exc:
-            # Device drivers can briefly throw while reattaching. No modal
-            # dialog, thread growth, or automatic rearming of game controls.
+        except Exception:
+            # A native/Tk extension may fail after opening a device. First
+            # revoke its handle and OBS pixels, then queue a bounded retry.
+            self.stop_camera(keep_reconnect=True)
             self._queue_camera_retry(name)
 
     def start_camera(self, *, reconnecting=False):
@@ -334,7 +372,9 @@ class CameraMixin:
                 index, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY
             )
             opened = self.cap is not None and self.cap.isOpened()
-        except (cv2.error, OSError, RuntimeError):
+        except Exception:
+            # A vendor driver can raise outside the standard OpenCV family
+            # during VideoCapture() or isOpened(). Release below.
             opened = False
         if not opened:
             self.stop_camera(keep_reconnect=reconnecting)
@@ -351,20 +391,31 @@ class CameraMixin:
         self._active_camera_name = name
         bezel = getattr(self, "camera_bezel", None)
         if bezel is not None:
-            bezel.set_active(True)
+            try:
+                bezel.set_active(True)
+            except Exception:
+                # Bezel is only UI decoration; a destroyed widget cannot
+                # abort a successfully opened native camera session.
+                pass
         if reconnecting:
             self._camera_reconnect_job = None
             self._camera_reconnect_name = None
             self._camera_reconnect_attempts = 0
-            self.status.set(
-                f'Camera reconnected: {name}. Object controls are paused; '
-                'enable them again when ready.'
-            )
+            try:
+                self.status.set(
+                    f'Camera reconnected: {name}. Object controls are paused; '
+                    'enable them again when ready.'
+                )
+            except Exception:
+                pass
         else:
-            self.status.set(
-                f'Camera ready: {name}. Click Pick color from video, '
-                'then click your target.'
-            )
+            try:
+                self.status.set(
+                    f'Camera ready: {name}. Click Pick color from video, '
+                    'then click your target.'
+                )
+            except Exception:
+                pass
 
     def stop_camera(self, *, keep_reconnect=False):
         """Release camera, stale frames, and pending reconnect when requested."""
