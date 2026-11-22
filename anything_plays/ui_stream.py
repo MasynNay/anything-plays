@@ -788,7 +788,9 @@ class StreamMixin:
         if panel is not None:
             try:
                 panel.destroy()
-            except tk.TclError:
+            except Exception:
+                # Tk widgets and optional platform wrappers can raise after
+                # destruction; clearing the OBS output takes precedence.
                 pass
 
     def _choose_stream_border_color(self):
@@ -1310,7 +1312,11 @@ class StreamMixin:
                 self._stream_frame_job = self.root.after(
                     interval, self._stream_render_tick
                 )
-            except (tk.TclError, RuntimeError):
+            except Exception:
+                # A custom Tk scheduling adapter can also raise OSError or
+                # another runtime exception. The timer is no longer armed:
+                # retire the capture window and its sensitive PIL pixels
+                # instead of leaving a frozen OBS picture in an open window.
                 if self._stream_output_window is output:
                     self.close_stream_mode()
 
@@ -1622,24 +1628,36 @@ class StreamMixin:
         if job is not None:
             try:
                 self.root.after_cancel(job)
-            except tk.TclError:
+            except Exception:
+                # Timers can disappear when Tk, an OBS helper or its parent
+                # tears down. Never strand the capture output on cancellation.
                 pass
         save_job = getattr(self, "_stream_save_job", None)
         self._stream_save_job = None
         if save_job is not None:
             try:
                 self.root.after_cancel(save_job)
-            except tk.TclError:
+            except Exception:
                 pass
             # App.close() sets _closing before cleaning auxiliary windows.
             # Persist the last user style change even during that shutdown.
             try:
                 self.save_preferences()
-            except (OSError, ValueError, tk.TclError):
+            except Exception:
+                # Saving a cosmetic setting is optional. Even custom
+                # adapters must not block capture-window teardown.
                 pass
         self._close_stream_controls()
         output = getattr(self, "_stream_output_window", None)
         self._stream_output_window = None
+        canvas = getattr(self, "_stream_canvas", None)
+        if canvas is not None:
+            try:
+                # If output.destroy() fails, avoid leaving the last camera
+                # or game frame in a still-visible OBS capture window.
+                canvas.delete("all")
+            except Exception:
+                pass
         self._stream_canvas = None
         self._stream_photo = None
         self._stream_canvas_item = None
@@ -1667,5 +1685,7 @@ class StreamMixin:
         if output is not None:
             try:
                 output.destroy()
-            except tk.TclError:
+            except Exception:
+                # All image/timer references are already retired and the
+                # canvas has been blanked on a best-effort basis.
                 pass
