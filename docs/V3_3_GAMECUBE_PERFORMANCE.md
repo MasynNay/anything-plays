@@ -1,7 +1,8 @@
 # 3.3 — GameCube native GPU and audio field profile
 
-This guide applies to the experimental **3.3 source branch**, not the
-already published 3.2.0 installer. It gathers local, aggregate timing from
+This guide describes the GameCube native timing and field-testing
+work shipped in public 3.3.0 and ongoing, unreleased 3.3.1 maintenance.
+The verified public 3.3.0 installers remain unchanged by 3.3.1 patches. It gathers local, aggregate timing from
 the embedded Dolphin Libretro worker; it does not send telemetry, record game
 frames or audio, benchmark an external emulator, or verify a real speaker.
 

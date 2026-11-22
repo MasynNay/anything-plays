@@ -182,6 +182,7 @@ class GameCubeSchedulerClockRecoveryTests(unittest.TestCase):
             "gpu_readback_share_of_native_run": 0,
             "gamecube_preview_target_fps": 30,
             "gamecube_preview_cadence_intervals": 0,
+            "gamecube_preview_observed_capture_fps": 0.0,
             "gamecube_preview_max_interval_ms": 0,
             "audio_output_device_underflow_callbacks": 0,
             "audio_output_underrun_frames": 0,
