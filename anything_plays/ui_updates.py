@@ -14,6 +14,7 @@ from threading import Thread
 import time
 from tkinter import messagebox
 
+from anything_plays.atomic_storage import write_json_atomically
 from anything_plays.core_locator import _search_directories
 from anything_plays.core_packs import (
     discover_core_packs, install_core_pack, installed_pack_revision,
@@ -85,12 +86,15 @@ class UpdatesMixin:
         if automatic and cache_path.is_file():
             try:
                 cached = json.loads(cache_path.read_text(encoding="utf-8"))
-                checked = float(cached.get("checked_at_unix", 0))
-                if 0 <= time.time() - checked < CHECK_INTERVAL_SECONDS:
-                    self._emulator_update_status.set(
-                        "Emulator sources checked recently · Check updates for details"
-                    )
-                    return
+                # A truncated or hand-edited cache can be valid JSON but
+                # not a report object. Recheck rather than crashing Tk.
+                if isinstance(cached, dict):
+                    checked = float(cached.get("checked_at_unix", 0))
+                    if 0 <= time.time() - checked < CHECK_INTERVAL_SECONDS:
+                        self._emulator_update_status.set(
+                            "Emulator sources checked recently · Check updates for details"
+                        )
+                        return
             except (OSError, ValueError, TypeError):
                 pass
 
@@ -111,9 +115,14 @@ class UpdatesMixin:
                     available = []
                     approved_error = str(exc)
                 cache = {"checked_at_unix": time.time(), "report": report}
-                temporary = cache_path.with_suffix(".tmp")
-                temporary.write_text(json.dumps(cache, indent=2), encoding="utf-8")
-                temporary.replace(cache_path)
+                try:
+                    # Avoid predictable .tmp collisions across app instances
+                    # and never follow a stale fixed-name temporary symlink.
+                    write_json_atomically(cache_path, cache)
+                except (OSError, ValueError, TypeError):
+                    # Cache persistence is optional: a read-only/full config
+                    # directory must not hide successfully fetched updates.
+                    pass
                 results.put((report, available, approved_error, None))
             except Exception as exc:
                 results.put((None, [], None, str(exc)))
