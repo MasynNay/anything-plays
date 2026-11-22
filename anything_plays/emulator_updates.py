@@ -50,14 +50,28 @@ SHA_PATTERN = re.compile(r"^[a-fA-F0-9]{7,40}$")
 
 
 def find_provenance(search_directories):
-    """Find the first bundle manifest alongside its actual native cores."""
+    """Find a bounded, readable native-core manifest without following links.
+
+    An unplugged/remounted library may fail during any filesystem operation.
+    A failed or malformed manifest must not hide a later, healthy bundle.
+    Reading at most one byte beyond the cap also covers files that grow
+    between an initial filesystem check and the actual read.
+    """
     for folder in search_directories:
         manifest = Path(folder) / "CORE_PROVENANCE.json"
-        if not manifest.is_file() or manifest.stat().st_size > MAX_MANIFEST_BYTES:
-            continue
         try:
-            content = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, ValueError):
+            # A linked manifest can redirect diagnostics into a different,
+            # potentially private directory. Bundled inventories are local.
+            if manifest.is_symlink() or not manifest.is_file():
+                continue
+            with manifest.open("rb") as stream:
+                data = stream.read(MAX_MANIFEST_BYTES + 1)
+            if len(data) > MAX_MANIFEST_BYTES:
+                continue
+            content = json.loads(data.decode("utf-8"))
+        except (OSError, UnicodeError, ValueError, TypeError):
+            # Permission failures, vanishing removable drives, and corrupt
+            # files must remain isolated to the affected candidate.
             continue
         if isinstance(content, dict) and isinstance(content.get("cores"), list):
             return manifest, content
@@ -141,7 +155,10 @@ def check_emulator_updates(search_directories, *, opener=None, online=True):
             if not isinstance(record, dict):
                 continue
             name = record.get("name")
-            if name not in UPSTREAM_REPOS or name in known:
+            # A malformed JSON entry can contain a list/dict where a core
+            # identifier belongs. Never let an unhashable name crash the
+            # whole health report or hide valid entries after it.
+            if not isinstance(name, str) or name not in UPSTREAM_REPOS or name in known:
                 continue
             try:
                 integrity = _verified_record(record, path.parent)
