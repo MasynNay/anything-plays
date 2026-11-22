@@ -69,7 +69,7 @@ def find_provenance(search_directories):
             if len(data) > MAX_MANIFEST_BYTES:
                 continue
             content = json.loads(data.decode("utf-8"))
-        except (OSError, UnicodeError, ValueError, TypeError):
+        except (OSError, UnicodeError, ValueError, TypeError, RecursionError):
             # Permission failures, vanishing removable drives, and corrupt
             # files must remain isolated to the affected candidate.
             continue
