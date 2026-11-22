@@ -11,8 +11,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 import urllib.error
 import urllib.request
 
@@ -83,7 +85,7 @@ def _verified_record(record, folder):
     name = record.get("name")
     filename = record.get("file", "")
     expected = record.get("sha256", "")
-    if name not in UPSTREAM_REPOS:
+    if not isinstance(name, str) or name not in UPSTREAM_REPOS:
         return "invalid"
     if (not isinstance(filename, str) or not filename.startswith(name + "_libretro.")
             or Path(filename).name != filename or
@@ -92,10 +94,22 @@ def _verified_record(record, folder):
     if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
         return "invalid"
     native = folder / filename
+    # An installed-core checksum must never hash through a symlink to an
+    # unrelated file. O_NOFOLLOW also covers replacement between these
+    # path checks and open() on Unix; on other hosts use the lstat guard.
+    if native.is_symlink():
+        return "invalid"
     if not native.is_file():
         return "missing"
     digest = hashlib.sha256()
-    with native.open("rb") as stream:
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0)
+             | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0))
+    with os.fdopen(os.open(native, flags), "rb") as stream:
+        # A file can be swapped for a pipe or device after is_file().
+        # Never read from a non-regular native-core candidate.
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            return "invalid"
         for piece in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(piece)
     return "verified" if digest.hexdigest() == expected else "modified"
