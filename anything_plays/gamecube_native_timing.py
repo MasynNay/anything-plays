@@ -53,6 +53,9 @@ class GameCubeNativeTiming:
         self.scheduler_late_total_seconds = 0.0
         self.scheduler_late_max_seconds = 0.0
         self.scheduler_resyncs = 0
+        # Invalid/reversed scheduling clocks are not missed native frames.
+        # Count recovery events separately, without per-frame traces.
+        self.scheduler_clock_recovery_events = 0
         self.reported_core_fps = None
 
     def record_completed_run(self):
@@ -99,6 +102,10 @@ class GameCubeNativeTiming:
         self.scheduler_late_max_seconds = max(self.scheduler_late_max_seconds, seconds)
         if resynchronized:
             self.scheduler_resyncs += 1
+
+    def record_clock_recovery(self):
+        """Count one invalid clock read or backwards deadline reset."""
+        self.scheduler_clock_recovery_events += 1
 
     def _p95_bucket_code(self):
         if not self.native_run_calls:
@@ -158,6 +165,9 @@ class GameCubeNativeTiming:
                 self.scheduler_late_max_seconds * 1000, 3
             ),
             "scheduler_resyncs": self.scheduler_resyncs,
+            "scheduler_clock_recovery_events": (
+                self.scheduler_clock_recovery_events
+            ),
             "scheduler_wait_calls": self.scheduler_wait_calls,
             "scheduler_wait_total_seconds": round(
                 self.scheduler_wait_total_seconds, 4

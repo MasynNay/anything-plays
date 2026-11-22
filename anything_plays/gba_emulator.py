@@ -47,6 +47,24 @@ from anything_plays.systems import SYSTEMS
 MAX_IN_MEMORY_ROM_BYTES = 256 * 1024 * 1024
 
 
+def _optional_gamecube_frame_clock():
+    """Get a safe GameCube scheduler timestamp without crossing into native.
+
+    A host timing extension can fail, return NaN, or jump backwards after
+    sleep/resume. Never send a nonfinite delay to Event.wait() or leave an
+    indefinitely future deadline in charge of the core's pacing.
+    Non-GameCube consoles retain their existing clock/scheduler behavior.
+    """
+    try:
+        now = time.monotonic()
+        if (type(now) in (int, float) and math.isfinite(now)
+                and 0 <= now <= 1_000_000_000_000):
+            return now
+    except Exception:
+        pass
+    return None
+
+
 def _optional_gamecube_perf_clock():
     """Read optional native A/V timing without ever breaking retro_run().
 
@@ -443,11 +461,20 @@ class CoreSession:
             self.emulator.launching = False
 
             frame_number = 0
-            next_frame = time.monotonic()
+            # GameCube's pacing clock is separate from optional perf_counter
+            # instrumentation. Bad monotonic values must never make Dolphin
+            # spin at 100% CPU or sleep for an unbounded interval.
+            frame_step = 1 / frames_per_second
+            gamecube_timing = getattr(self, "native_run_timing", None)
+            next_frame = (
+                _optional_gamecube_frame_clock()
+                if gamecube_timing is not None else time.monotonic()
+            )
+            if gamecube_timing is not None and next_frame is None:
+                gamecube_timing.record_clock_recovery()
             # GameCube alone records bounded timing counters. The native
             # timing includes GPU callback/readback time; all other systems
             # retain their historical loop without profiling overhead.
-            gamecube_timing = getattr(self, "native_run_timing", None)
             if gamecube_timing is not None:
                 gamecube_timing.reported_core_fps = frames_per_second
             while not self.emulator.stop_event.is_set():
@@ -472,8 +499,32 @@ class CoreSession:
                 if frame_number % 300 == 0:
                     self.persist_game_progress()
 
-                next_frame += 1 / frames_per_second
-                remaining = next_frame - time.monotonic()
+                if gamecube_timing is None:
+                    # Preserve every other console's historical pacing path.
+                    next_frame += frame_step
+                    remaining = next_frame - time.monotonic()
+                else:
+                    now = _optional_gamecube_frame_clock()
+                    if now is None:
+                        # Keep running native frames, audio and inputs even
+                        # while the optional host timing source is broken.
+                        # One bounded frame wait prevents a CPU busy loop.
+                        gamecube_timing.record_clock_recovery()
+                        next_frame = None
+                        self.emulator.stop_event.wait(frame_step)
+                        continue
+                    if next_frame is None:
+                        # First valid observation after a clock outage.
+                        # Never manufacture missed deadlines from that gap.
+                        next_frame = now
+                    elif now < next_frame - 0.25:
+                        # Suspend/resume or a platform clock reset could
+                        # otherwise stall emulation for minutes waiting for
+                        # a deadline in the old clock epoch.
+                        gamecube_timing.record_clock_recovery()
+                        next_frame = now
+                    next_frame += frame_step
+                    remaining = next_frame - now
                 if gamecube_timing is not None and remaining < 0:
                     # Missed-frame diagnostics only. Do not alter native
                     # pacing, queue audio, or skip a Dolphin frame.
@@ -491,7 +542,10 @@ class CoreSession:
                         if wait_end is not None and wait_end >= wait_start:
                             gamecube_timing.record_wait(wait_end - wait_start)
                 elif remaining < -0.25:
-                    next_frame = time.monotonic()
+                    next_frame = (
+                        now if gamecube_timing is not None
+                        else time.monotonic()
+                    )
             self.persist_game_progress()
         finally:
             if getattr(self.emulator, "audio_sink", None) is self.audio:

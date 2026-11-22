@@ -172,7 +172,7 @@ class NativeLoopTimingTests(unittest.TestCase):
         self.assertEqual(t.native_run_calls, 10000)
         # One extra scalar counts returned native frames independently
         # from successful optional timing observations.
-        self.assertLessEqual(len(vars(t)), 15)
+        self.assertLessEqual(len(vars(t)), 16)  # One clock-recovery counter
         self.assertEqual(t.snapshot()["native_run_over_50ms"], 0)
 
     def test_actual_core_loop_records_native_calls_without_mocking_frame_counts(self):

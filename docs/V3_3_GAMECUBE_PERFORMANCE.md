@@ -1,7 +1,8 @@
 # 3.3 — GameCube native GPU and audio field profile
 
-This guide applies to the experimental **3.3 source branch**, not the
-already published 3.2.0 installer. It gathers local, aggregate timing from
+This guide describes the GameCube native timing and field-testing
+work shipped in public 3.3.0 and ongoing, unreleased 3.3.1 maintenance.
+The verified public 3.3.0 installers remain unchanged by 3.3.1 patches. It gathers local, aggregate timing from
 the embedded Dolphin Libretro worker; it does not send telemetry, record game
 frames or audio, benchmark an external emulator, or verify a real speaker.
 
@@ -873,3 +874,32 @@ status redaction, native release failures, SDL shutdown faults,
 window teardown, clipboard privacy and the normal 65-ms reschedule.
 Real-gamepad pairing, physical release, GameCube PortAudio speakers
 and camera/OBS performance still require real-device acceptance.
+
+
+## 3.3.1 source maintenance: GameCube native scheduler clock recovery
+
+The GameCube native worker now validates its scheduling monotonic clock
+independently from optional performance telemetry. On a raised clock
+exception, invalid boolean/object, NaN/infinite timestamp, negative
+value or extreme out-of-range reading, it executes every native retro_run
+but uses a bounded one-frame stop-event wait instead of calculating a
+NaN delay or spinning at full CPU. Once a valid timestamp is observed,
+the deadline restarts in that clock epoch, without inventing overdue
+frame counts. A backwards clock jump of more than 250 milliseconds
+rebases the GameCube frame deadline rather than waiting minutes for the
+old timestamp to catch up. Forward missed-deadline observations retain
+the original resynchronization policy and are tracked separately.
+
+A constant-memory scalar named scheduler_clock_recovery_events is
+included in GameCube's local, allowlisted performance snapshot and
+appears in Check my setup only when nonzero. It is a count of timing
+fault/rebase events, NOT an estimated FPS, verified GPU rate, sound
+playback test, user device identifier or history of frame timestamps.
+Other console frame pacing, all core retro_run calls, real audio,
+controls, game saves and preview 20/30/60 FPS modes are unchanged.
+
+Synthetic tests exercise the real CoreSession.run control loop using
+a fake native core, clock exceptions, nonfinite timestamps, backward
+jumps, ordinary clocks and missed deadlines. No physical GPU, Dolphin
+retail game, speaker, USB webcam or OBS session has been measured.
+The public v3.3.0 installers remain unchanged.
