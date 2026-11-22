@@ -472,6 +472,12 @@ def _gamecube_performance_summary_lines(performance):
             f"application underrun frames · "
             f"{m['audio_queue_dropped_frames']} queue-dropped frames"
         )
+    clock_recoveries = m.get("scheduler_clock_recovery_events")
+    clock_notice = (
+        f" · scheduling clock recoveries: {clock_recoveries}"
+        if type(clock_recoveries) is int and clock_recoveries > 0
+        else ""
+    )
     return (
         (native_line if native_line is not None else
          f"Native frames: {completed} · timed {valid_samples} of {completed} · "
@@ -486,7 +492,8 @@ def _gamecube_performance_summary_lines(performance):
         f"maximum gap {m['gamecube_preview_max_interval_ms']} ms",
         f"Late deadlines (>5 ms): {m['scheduler_late_frames']} · "
         f"resynchronizations: {m['scheduler_resyncs']} · "
-        f"maximum lateness {m['scheduler_late_max_ms']} ms",
+        f"maximum lateness {m['scheduler_late_max_ms']} ms"
+        f"{clock_notice}",
         f"{audio_line}{audio_status}",
     )
 
