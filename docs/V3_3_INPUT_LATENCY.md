@@ -298,3 +298,25 @@ SDL backoff, held-button safety, normal SDL retry behavior, and the
 actual UI input handoff. They cannot establish real Bluetooth/USB,
 system suspend/resume or physical-gameplay compatibility. Public 3.3.0
 installers remain unchanged; this source work is not a 3.3.1 release.
+
+
+## 3.3.1 source maintenance: webcam retry scheduling and device startup
+
+A destroyed Tk event loop or extension-defined scheduler may raise
+during after() or return no cancellable job. This now retires its
+generation, clears pending-retry state, and shows a fixed manual retry
+instruction rather than claiming a retry is scheduled. A late callback
+from a broken scheduler cannot reopen a stopped camera. Cancel also
+tolerates native wrapper exceptions outside TclError.
+
+Native VideoCapture construction/isOpened now tolerates unexpected
+device driver exceptions. Any partially opened camera is released,
+object controls stay disarmed, and Stream Mode camera pixels are
+revoked. A failed reconnection after native opening also closes its
+capture before retrying. Optional destroyed status/bezel widgets
+cannot abort a successful camera open.
+
+The original 2/4/8/16/30-second retry pacing and same-device selection
+fence are preserved. Six fault-injection tests use only mock cameras
+and Tk timers, not actual webcams or OBS. Public 3.3.0 binaries and
+the existing hardware acceptance limitations remain unchanged.
