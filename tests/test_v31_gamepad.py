@@ -458,8 +458,12 @@ class WiringTests(unittest.TestCase):
         ui = (self.root / "anything_plays/ui_gamepad.py").read_text("utf-8")
         self.assertIn("if self._gamepad.api is None:", ui)
         self.assertIn("self.root.focus_get() is None", ui)
-        self.assertIn("self.emu.release_gamepad()", ui)
-        self.assertIn("self._gamepad.stop()", ui)
+        # The explicit Disable/Rescan actions now use a fault-isolated
+        # release helper; the underlying SDL stop is still guaranteed by
+        # that helper rather than called unguarded from the Tk callback.
+        self.assertIn("self._release_emulated_gamepad()", ui)
+        self.assertIn("self._release_gamepad_after_failure()", ui)
+        self.assertIn("reader.stop()", ui)
         prefs = (self.root / "anything_plays/ui_profiles.py").read_text("utf-8")
         self.assertIn("prefs['gamepad_bindings']", prefs)
 
