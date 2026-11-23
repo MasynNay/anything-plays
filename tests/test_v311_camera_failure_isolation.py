@@ -10,6 +10,8 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
+import numpy as np
+
 from anything_plays import cameras
 from anything_plays.ui_camera import CameraMixin
 
@@ -27,7 +29,9 @@ class CameraDiscoveryRecoveryTests(unittest.TestCase):
         closed.isOpened.return_value = False
         healthy = Mock()
         healthy.isOpened.return_value = True
-        healthy.read.return_value = (True, object())
+        healthy.read.return_value = (
+            True, np.zeros((8, 8, 3), dtype=np.uint8),
+        )
 
         def construct(index, backend):
             attempts[index] += 1
@@ -75,7 +79,9 @@ class CameraDiscoveryRecoveryTests(unittest.TestCase):
     def test_healthy_first_camera_does_not_sleep_after_success(self):
         healthy = Mock()
         healthy.isOpened.return_value = True
-        healthy.read.return_value = (True, object())
+        healthy.read.return_value = (
+            True, np.zeros((8, 8, 3), dtype=np.uint8),
+        )
         with patch.object(cameras.cv2, "VideoCapture", return_value=healthy), \
              patch.object(cameras, "name_for", return_value="Webcam"), \
              patch.object(cameras.time, "sleep") as sleep:
