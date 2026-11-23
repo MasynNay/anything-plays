@@ -168,8 +168,17 @@ class SaveRAM:
             return False
         snapshot = C.string_at(pointer, size)
         digest = hashlib.blake2b(snapshot, digest_size=16).digest()
-        if digest == self._last_saved_digest and self.path.is_file():
-            return False
+        if digest == self._last_saved_digest:
+            try:
+                if self.path.is_file():
+                    return False
+            except OSError:
+                # A ROM drive can disappear after the last successful save.
+                # An unreadable .sav existence probe must not bypass the
+                # writable fallback used by _write_atomic() below. Retry the
+                # same complete SRAM snapshot rather than silently marking
+                # progress durable on a disconnected device.
+                pass
         destination = self.path
         if (is_v32_preview() or is_v33_candidate()):
             # Re-validate the preview parent immediately before replacing
