@@ -64,9 +64,18 @@ def find_provenance(search_directories):
         try:
             # A linked manifest can redirect diagnostics into a different,
             # potentially private directory. Bundled inventories are local.
+            # The lstat-style guard alone is not atomic: on Unix also refuse
+            # links swapped into place immediately before the actual open.
             if manifest.is_symlink() or not manifest.is_file():
                 continue
-            with manifest.open("rb") as stream:
+            flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0)
+                     | getattr(os, "O_NOFOLLOW", 0)
+                     | getattr(os, "O_NONBLOCK", 0))
+            with os.fdopen(os.open(manifest, flags), "rb") as stream:
+                # A removable drive can swap a manifest for a device or
+                # named pipe after is_file(). Never read a non-regular fd.
+                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                    continue
                 data = stream.read(MAX_MANIFEST_BYTES + 1)
             if len(data) > MAX_MANIFEST_BYTES:
                 continue
