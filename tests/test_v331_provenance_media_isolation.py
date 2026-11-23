@@ -4,6 +4,7 @@ All tests use tiny synthetic core files; no game ROMs, drivers or network.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -56,18 +57,18 @@ class ProvenanceIsolationTests(unittest.TestCase):
         with patch.object(Path, "is_file", failing_file_probe):
             self._expect_fallback()
 
-    def test_permission_error_during_read_falls_back(self):
+    def test_permission_error_during_open_falls_back(self):
         self._manifest(self.first)
         self._manifest(self.second)
-        original = Path.open
+        original = os.open
         denied = self.first / "CORE_PROVENANCE.json"
 
         def failing_open(path, *args, **kwargs):
-            if path == denied:
+            if Path(path) == denied:
                 raise PermissionError("simulated denied media")
             return original(path, *args, **kwargs)
 
-        with patch.object(Path, "open", failing_open):
+        with patch("anything_plays.emulator_updates.os.open", failing_open):
             self._expect_fallback()
 
     def test_giant_manifest_is_skipped(self):
