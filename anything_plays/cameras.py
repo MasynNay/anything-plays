@@ -18,14 +18,14 @@ def usable_bgr_frame(frame):
     Some unplugged or vendor-specific capture drivers report a successful
     read but return grayscale, non-array or float frames. Such data crashes
     downstream BGR-to-HSV processing after the live capture check, bypassing
-    the normal auto-reconnect path. OpenCV VideoCapture's supported preview
-    contract is an HxWx3 uint8 NumPy BGR array.
+    the normal auto-reconnect path. OpenCV's BGR conversion accepts both
+    three-channel BGR and four-channel BGRA 8-bit NumPy arrays.
     """
     return (
         isinstance(frame, np.ndarray)
         and frame.ndim == 3
         and frame.shape[0] > 0 and frame.shape[1] > 0
-        and frame.shape[2] == 3
+        and frame.shape[2] in (3, 4)
         and frame.dtype == np.uint8
     )
 
