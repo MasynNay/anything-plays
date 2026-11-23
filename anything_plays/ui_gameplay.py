@@ -216,20 +216,24 @@ class GameplayMixin:
             return
         try:
             if self.cap is not None:
+                # A native read/flip can yield to a Stop, webcam replacement
+                # or Tk teardown. Bind this capture tick to its original
+                # device, never attach old pixels to a newly opened camera.
+                capture = self.cap
                 # Some USB drivers switch isOpened() to false on unplug,
                 # without returning a failed read(). Treat both signals as
                 # the same disconnect, clearing the bezel and held controls
                 # through stop_camera() before queuing a bounded retry.
                 camera_open = GameplayMixin._camera_is_open(self)
                 try:
-                    ok, frame = self.cap.read() if camera_open else (False, None)
-                    # Native camera backends sometimes report success while
-                    # returning None/empty pixels during a USB transition.
-                    # Treat this just like a failed read, not a tracking
-                    # exception that silently disables future reconnects.
+                    ok, frame = capture.read() if camera_open else (False, None)
+                    # A reported successful native read can contain invalid
+                    # pixels during a USB transition; mirrored output must
+                    # satisfy the same contract before reaching tracking.
                     ok = bool(ok) and usable_bgr_frame(frame)
-                    if ok:
-                        frame = cv2.flip(frame, 1) if self.mirror.get() else frame
+                    if ok and self.mirror.get():
+                        frame = cv2.flip(frame, 1)
+                        ok = usable_bgr_frame(frame)
                 except Exception:
                     # Vendor-native read()/flip()/shape helpers may raise a
                     # custom exception outside OpenCV's documented family.
@@ -237,7 +241,16 @@ class GameplayMixin:
                     # path that releases held camera controls first. Never
                     # surface its message (device paths/serials) in the UI.
                     ok, frame = False, None
-                if ok:
+                if getattr(self, "_closing", False):
+                    # Do not render or schedule another frame after shutdown
+                    # started while the native driver was processing a frame.
+                    return
+                if self.cap is not capture:
+                    # The old read may have succeeded OR failed after Stop /
+                    # reconnection. Neither result can publish stale pixels,
+                    # disarm the new session or queue an old-device retry.
+                    pass
+                elif ok:
                     self.frame = frame
                 else:
                     # The dropdown may have changed without pressing Use
