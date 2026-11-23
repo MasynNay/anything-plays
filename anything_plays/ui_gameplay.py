@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 
 from anything_plays.systems import SYSTEMS
 from anything_plays.shortcuts import button_for_key
+from anything_plays.cameras import usable_bgr_frame
 
 
 _SAFE_GUI_ERROR_CLASSES = frozenset((
@@ -226,11 +227,7 @@ class GameplayMixin:
                     # returning None/empty pixels during a USB transition.
                     # Treat this just like a failed read, not a tracking
                     # exception that silently disables future reconnects.
-                    shape = getattr(frame, "shape", ())
-                    ok = (
-                        bool(ok) and frame is not None and len(shape) >= 2
-                        and shape[0] > 0 and shape[1] > 0
-                    )
+                    ok = bool(ok) and usable_bgr_frame(frame)
                     if ok:
                         frame = cv2.flip(frame, 1) if self.mirror.get() else frame
                 except Exception:
