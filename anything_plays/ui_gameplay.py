@@ -1,5 +1,6 @@
 """Coordinate manual game input, safe camera controls, and game frames."""
 
+import math
 import time
 from pathlib import Path
 import tkinter as tk
@@ -23,6 +24,23 @@ def safe_gui_failure_class(exc):
     """Allowlisted error category; never display exception/device text."""
     category = type(exc).__name__
     return category if category in _SAFE_GUI_ERROR_CLASSES else "UnexpectedError"
+
+
+def optional_game_render_clock():
+    """Read the UI display clock without risking a permanently dead timer.
+
+    Invalid monotonic timestamps can occur after suspend/VM resume, or from
+    a native timing wrapper. Skip only that optional render update; keep
+    scheduling a safe retry while the emulator/audio worker keeps running.
+    """
+    try:
+        now = time.monotonic()
+        if (type(now) in (int, float)
+                and math.isfinite(now) and 0 <= now <= 1_000_000_000_000):
+            return now
+    except Exception:
+        pass
+    return None
 
 
 class GameplayMixin:
@@ -342,39 +360,76 @@ class GameplayMixin:
                 self._camera_tick_job = self.root.after(interval, self.tick)
 
     def game_render_tick(self):
-        """Refresh game video, keeping idle resource use and errors bounded."""
+        """Keep native game video repainting after timer, Tk or GPU faults."""
         if self._closing:
             return
-        now = time.monotonic()
+        now = optional_game_render_clock()
         try:
-            if now >= getattr(self, "_game_render_retry_at", 0):
+            if now is None:
+                # Do not feed NaN/Infinity to retry thresholds or spin
+                # repeated native image failures at 60 FPS. Try the clock
+                # again on a slower Tk tick; the game/audio worker is alive.
+                return
+            last = getattr(self, "_game_render_last_clock", None)
+            if type(last) in (int, float) and now < last:
+                # A suspended/restored VM or broken monotonic source can
+                # jump backwards. Old retry deadlines would otherwise freeze
+                # the video for minutes or hours after a clock reset.
+                self._game_render_retry_at = 0
+                self._game_render_warning_at = 0
+            self._game_render_last_clock = now
+            retry_at = getattr(self, "_game_render_retry_at", 0)
+            if (type(retry_at) not in (int, float)
+                    or not math.isfinite(retry_at)):
+                retry_at = 0
+            if now >= retry_at:
                 self.draw_game()
         except tk.TclError:
             # A game-only window can disappear between two scheduled frames.
-            self._game_render_retry_at = now + 0.5
+            self._game_render_retry_at = now + 0.5 if now is not None else 0
         except Exception as exc:
             # A bad frame should not produce thousands of exceptions while
-            # the emulator stays open. Retry later and surface a readable status.
-            self._game_render_retry_at = now + 2.0
-            if now >= getattr(self, "_game_render_warning_at", 0):
+            # the emulator stays open. Retry later and surface a readable
+            # status without leaking ROM paths or driver identifiers.
+            self._game_render_retry_at = now + 2.0 if now is not None else 0
+            warning_at = getattr(self, "_game_render_warning_at", 0)
+            if type(warning_at) not in (int, float) or not math.isfinite(warning_at):
+                warning_at = 0
+            if now is not None and now >= warning_at:
                 self._game_render_warning_at = now + 30.0
-                self.game_status.set(
-                    "Display error (retrying: "
-                    + safe_gui_failure_class(exc) + ")."
-                )
+                try:
+                    self.game_status.set(
+                        "Display error (retrying: "
+                        + safe_gui_failure_class(exc) + ")."
+                    )
+                except Exception:
+                    # Tk may have disposed its status variable during a
+                    # window transition. Do not kill the future repaint loop.
+                    pass
         finally:
             if not self._closing:
-                # A 3D preview does not need 60 Tk refresh timers when
-                # GPU readbacks are deliberately budgeted at 20 or 30 FPS.
-                # The native emulator and sound worker keep their own pace.
-                interval = 16 if self.emu.running else 250
-                if self.emu.running and self.system_key.get() == "gamecube":
-                    from anything_plays.gamecube_preview import preview_fps
-                    mode = getattr(self.emu, "gamecube_preview_mode", "")
-                    interval = round(1000 / preview_fps(mode))
-                self._game_tick_job = self.root.after(
-                    interval, self.game_render_tick
-                )
+                # Keep GameCube's explicit 20/30/60 FPS preview pacing on
+                # healthy timers; invalid timestamps or disposed widgets
+                # fall back to a low-cost 250ms recovery poll.
+                interval = 250
+                if now is not None:
+                    try:
+                        running = bool(self.emu.running)
+                        interval = 16 if running else 250
+                        if running and self.system_key.get() == "gamecube":
+                            from anything_plays.gamecube_preview import preview_fps
+                            mode = getattr(self.emu, "gamecube_preview_mode", "")
+                            interval = round(1000 / preview_fps(mode))
+                    except Exception:
+                        interval = 250
+                try:
+                    self._game_tick_job = self.root.after(
+                        interval, self.game_render_tick
+                    )
+                except Exception:
+                    # The root may already have been destroyed in a nested
+                    # GUI callback; a failed timer must not escape into Tk.
+                    self._game_tick_job = None
 
     def draw_game(self):
         """Render a fresh frame only when the game or canvas changed."""
