@@ -97,7 +97,10 @@ class GameplayMixin:
             return False
         try:
             return bool(cap.isOpened())
-        except (cv2.error, OSError, RuntimeError):
+        except Exception:
+            # Some camera extensions use vendor-specific exception classes
+            # during unplug. Treat *any* isOpened failure as disconnected;
+            # the caller must release held controls before retrying.
             return False
 
     def toggle(self):
@@ -230,11 +233,12 @@ class GameplayMixin:
                     )
                     if ok:
                         frame = cv2.flip(frame, 1) if self.mirror.get() else frame
-                except (cv2.error, OSError, RuntimeError, ValueError, TypeError):
-                    # read() and flip() can raise after camera.isOpened()
-                    # returned True. Re-enter the same bounded reconnect
-                    # path used for False/None frames instead of leaving
-                    # the camera silently stopped for the rest of the session.
+                except Exception:
+                    # Vendor-native read()/flip()/shape helpers may raise a
+                    # custom exception outside OpenCV's documented family.
+                    # Keep every failure on the *same* bounded reconnect
+                    # path that releases held camera controls first. Never
+                    # surface its message (device paths/serials) in the UI.
                     ok, frame = False, None
                 if ok:
                     self.frame = frame
