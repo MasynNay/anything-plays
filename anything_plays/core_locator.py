@@ -94,15 +94,19 @@ def find_core(system="gba"):
     for folder in _search_directories():
         for filename in filenames:
             candidate = folder / filename
-            if candidate.is_file():
+            try:
+                if not candidate.is_file():
+                    continue
                 if core == "dolphin":
                     codehandler = folder / "dolphin-emu" / "Sys" / "codehandler.bin"
-                    try:
-                        if not codehandler.is_file() or not codehandler.stat().st_size:
-                            continue
-                    except OSError:
-                        # Bad directory modes on root-owned package contents
-                        # must never prevent the main UI from starting.
+                    if not codehandler.is_file() or not codehandler.stat().st_size:
                         continue
-                return str(candidate)
+            except OSError:
+                # An unplugged ROM/core drive, unreadable mount, or expired
+                # network path can fail during a stat() rather than merely
+                # return False. Keep probing the other recognized native
+                # filenames and bundled directories instead of aborting the
+                # emulator selector or hiding a healthy packaged core.
+                continue
+            return str(candidate)
     return None
