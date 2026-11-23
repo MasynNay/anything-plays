@@ -10,6 +10,7 @@ on:
       - 'anything_plays/libretro_save.py'
       - 'tests/test_save_ram.py'
       - 'tests/test_v331_sram_unplugged_checkpoint.py'
+      - 'tests/test_v331_sram_truncated_repair.py'
 
 permissions:
   contents: read
@@ -42,6 +43,7 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_save_ram.py' -v
           python -m unittest discover -s tests -p 'test_v331_sram_unplugged_checkpoint.py' -v
+          python -m unittest discover -s tests -p 'test_v331_sram_truncated_repair.py' -v
           python - <<'PY'
           import os, platform, tempfile
           from pathlib import Path
