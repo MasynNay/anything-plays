@@ -9,6 +9,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import tempfile
 import time
@@ -139,10 +140,31 @@ class SaveRAM:
                 # through a linked preview destination.
                 raise ValueError("Preview save must not share a stable file")
         if pointer and size and self.path.is_file():
-            # Read only as much as this core can hold, plus one byte to
-            # detect oversized/partial legacy saves. A corrupt multi-GB save
-            # must not exhaust memory before gameplay even begins.
-            with self.path.open("rb") as stream:
+            # Validate the *opened descriptor*, not only the earlier path:
+            # another process can replace a save with a pipe or device after
+            # is_file(). Nonblocking open prevents hanging on a swapped FIFO.
+            # Private preview paths also refuse late symlink replacements on
+            # platforms with O_NOFOLLOW. Public/stable users may deliberately
+            # keep a linked .sav in cloud storage; preserve that contract.
+            private = is_v32_preview() or is_v33_candidate()
+            flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0)
+                     | getattr(os, "O_NONBLOCK", 0))
+            if private:
+                flags |= getattr(os, "O_NOFOLLOW", 0)
+            with os.fdopen(os.open(self.path, flags), "rb") as stream:
+                opened = os.fstat(stream.fileno())
+                if not stat.S_ISREG(opened.st_mode):
+                    raise ValueError("Saved game must be a regular file")
+                if private and opened.st_nlink != 1:
+                    # A hardlink may be swapped into the private directory
+                    # after the initial path-based check. Do not import
+                    # another installed version's cartridge progress.
+                    raise ValueError("Preview save must not share a stable file")
+                if private and self.path.is_symlink():
+                    # Best-effort fallback on hosts without O_NOFOLLOW.
+                    raise ValueError("Preview save must not link to a stable file")
+                # Read only as much as the core can hold, plus one byte to
+                # detect oversized or partial saves before writing any SRAM.
                 data = stream.read(size + 1)
             C.memmove(pointer, data, min(size, len(data)))
             # An incomplete or oversized legacy .sav must be normalized on
