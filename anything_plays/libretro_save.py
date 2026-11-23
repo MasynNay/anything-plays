@@ -170,14 +170,19 @@ class SaveRAM:
         digest = hashlib.blake2b(snapshot, digest_size=16).digest()
         if digest == self._last_saved_digest:
             try:
-                if self.path.is_file():
+                # Unchanged *memory* does not prove unchanged *storage*.
+                # A partially copied, truncated, or externally replaced
+                # save may still be a regular file, and would otherwise be
+                # skipped indefinitely during a long-running game. A cheap
+                # metadata size check repairs incomplete files without
+                # rereading/hashing large SRAM on every checkpoint.
+                if (self.path.is_file()
+                        and self.path.stat().st_size == size):
                     return False
             except OSError:
-                # A ROM drive can disappear after the last successful save.
-                # An unreadable .sav existence probe must not bypass the
-                # writable fallback used by _write_atomic() below. Retry the
-                # same complete SRAM snapshot rather than silently marking
-                # progress durable on a disconnected device.
+                # A ROM drive can disappear between successful checkpoints
+                # or even between is_file() and stat(). Reattempt a complete
+                # snapshot via the existing atomic user-data fallback.
                 pass
         destination = self.path
         if (is_v32_preview() or is_v33_candidate()):
