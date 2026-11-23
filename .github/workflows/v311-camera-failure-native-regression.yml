@@ -15,6 +15,7 @@ on:
       - 'tests/test_v331_camera_discovery_valid_frames.py'
       - 'tests/test_v331_vendor_webcam_reconnect.py'
       - 'tests/test_v331_camera_invalid_pixel_recovery.py'
+      - 'tests/test_v331_camera_capture_publication_fence.py'
 
 permissions:
   contents: read
@@ -75,4 +76,5 @@ jobs:
           python -m unittest discover -s tests -p 'test_v331_camera_discovery_valid_frames.py' -v
           python -m unittest discover -s tests -p 'test_v331_vendor_webcam_reconnect.py' -v
           python -m unittest discover -s tests -p 'test_v331_camera_invalid_pixel_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v331_camera_capture_publication_fence.py' -v
           echo '4OS camera handling verified with fault injection; live hardware remains untested.'
