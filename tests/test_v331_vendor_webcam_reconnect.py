@@ -128,6 +128,25 @@ class VendorWebcamFailureTests(unittest.TestCase):
         old.release.assert_called_once()
         self.assertIn("Click Use camera", app.status.set.call_args.args[0])
 
+    def test_retry_after_vendor_failure_opens_without_rearming_controls(self):
+        app = CameraHarness()
+        app.cap.read.side_effect = VendorDriverFault("PRIVATE unplug")
+        app.tick()
+        self.assertFalse(app.armed)
+        name = app.NAME
+        fresh = Mock()
+        fresh.isOpened.return_value = True
+        with patch("anything_plays.ui_camera.cv2.VideoCapture",
+                   return_value=fresh):
+            app._retry_camera(name)
+        self.assertIs(app.cap, fresh)
+        self.assertEqual(app._active_camera_name, name)
+        self.assertFalse(app.armed)
+        self.assertFalse(app.emu.armed)
+        self.assertIsNone(app._camera_reconnect_job)
+        self.assertEqual(app._camera_reconnect_attempts, 0)
+        self.assertIn("reconnected", app.status.set.call_args.args[0])
+
     def test_vendor_status_exception_fails_closed_for_arm_button(self):
         app = CameraHarness()
         app.armed = False
