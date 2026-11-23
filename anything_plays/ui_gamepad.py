@@ -123,13 +123,8 @@ class GamepadMixin:
         # into the next newly started game. First-ever active play is unchanged.
         self._gamepad_game_resume_release_pending = False
 
-    def _release_gamepad_after_failure(self):
-        """Best-effort safe release, even if an extension/SDL hook raises.
-
-        Never let a broken controller or an already disposed native session
-        prevent cleanup of the other resource. The reader clears its
-        physical-button latches independently of the emulator input buffer.
-        """
+    def _release_emulated_gamepad(self):
+        """Clear native held buttons even if a replaced emulator hook fails."""
         try:
             self.emu.release_gamepad()
         except Exception:
@@ -140,6 +135,15 @@ class GamepadMixin:
                     release()
                 except Exception:
                     pass
+
+    def _release_gamepad_after_failure(self):
+        """Best-effort safe release, even if an extension/SDL hook raises.
+
+        Never let a broken controller or an already disposed native session
+        prevent cleanup of the other resource. The reader clears its
+        physical-button latches independently of the emulator input buffer.
+        """
+        self._release_emulated_gamepad()
         reader = getattr(self, "_gamepad", None)
         if reader is not None:
             try:
@@ -186,8 +190,9 @@ class GamepadMixin:
                 )
                 self._release_gamepad_after_failure()
         else:
-            self.emu.release_gamepad()
-            self._gamepad.stop()
+            # Disabling during USB/Bluetooth removal must not leave held
+            # emulated buttons or SDL handles behind when quit() fails.
+            self._release_gamepad_after_failure()
             self.gamepad_status.set("Controller disabled")
         if not self.gamepad_enabled.get():
             self._cancel_controller_capture("Controller disabled; mapping canceled.")
@@ -209,18 +214,39 @@ class GamepadMixin:
         self.emu.release_gamepad()
 
     def refresh_gamepad(self):
-        self._cancel_controller_capture("Controller rescan; choose Press to assign again.")
+        try:
+            self._cancel_controller_capture(
+                "Controller rescan; choose Press to assign again."
+            )
+        except Exception:
+            # A destroyed remapping status widget cannot keep a capture
+            # active or abort a physical controller handoff.
+            self._controller_capture = None
+            self._controller_capture_release_pending = True
         # Rescan is an explicit handoff. A newly enumerated device may already
         # have held buttons; do not hand them to a live game until neutral.
         self._gamepad_last_controller = None
         self._gamepad_seen_controller = bool(self.gamepad_enabled.get())
         self._gamepad_reconnect_release_pending = bool(self.gamepad_enabled.get())
-        # Rescanning closes the previous SDL handle immediately. Also clear
-        # its emulated held buttons now, rather than waiting for the next tick.
-        self.emu.release_gamepad()
+        # Clear both ports now, even if an extension has replaced the usual
+        # emulator release hook with one that throws during teardown.
+        self._release_emulated_gamepad()
         if self.gamepad_enabled.get():
-            self._gamepad.refresh()
-            self.gamepad_status.set("Looking for a controller…")
+            try:
+                self._gamepad.refresh()
+            except Exception:
+                # A failed explicit SDL rescan must revoke the old handle,
+                # latch state and enabled checkbox rather than leave an
+                # unpredictable device feeding the next GUI tick.
+                self._release_gamepad_after_failure()
+                self.gamepad_enabled.set(False)
+                self._gamepad_reconnect_release_pending = False
+                self.gamepad_status.set(
+                    "Controller unavailable. Check the connection and retry."
+                )
+                self.save_preferences()
+            else:
+                self.gamepad_status.set("Looking for a controller…")
         else:
             self.gamepad_status.set("Enable controller input to scan")
         self._refresh_gamepad_live_input()
