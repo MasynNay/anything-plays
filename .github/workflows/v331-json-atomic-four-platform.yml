@@ -1,0 +1,55 @@
+name: 3.3.1 | Atomic preferences and profiles (four desktop OSes)
+
+# Source-only local JSON durability. Never read personal preferences,
+# use real ROMs, launch a UI, package an app or create public releases.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-json-atomic-four-platform.yml'
+      - 'anything_plays/atomic_storage.py'
+      - 'tests/test_v21_atomic_storage.py'
+      - 'tests/test_v331_json_atomic_windows_retries.py'
+
+permissions:
+  contents: read
+
+jobs:
+  native-json-durability:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Atomic JSON settings | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify atomic JSON persistence and bounded Windows retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v21_atomic_storage.py' -v
+          python -m unittest discover -s tests -p 'test_v331_json_atomic_windows_retries.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          import json, os, platform, tempfile
+          from anything_plays.atomic_storage import write_json_atomically
+          with tempfile.TemporaryDirectory() as root:
+              path = Path(root) / 'real-native-preferences.json'
+              write_json_atomically(path, {'attempt': 1})
+              write_json_atomically(path, {'attempt': 2})
+              assert json.loads(path.read_text()) == {'attempt': 2}
+              assert not list(Path(root).glob('*.tmp'))
+          print('Verified native durable replacement on', platform.platform())
+          PY

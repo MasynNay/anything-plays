@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 
 
 def write_json_atomically(path, document):
@@ -31,7 +32,24 @@ def write_json_atomically(path, document):
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, target)
+        # Windows file scanners, sync software and concurrent app windows
+        # can briefly hold the previous preferences.json open. Retry only
+        # Windows sharing/access-violation errors with bounded backoff.
+        # Any other storage fault must retain the prior committed JSON.
+        for attempt in range(4):
+            try:
+                os.replace(temporary, target)
+                break
+            except PermissionError as exc:
+                if (os.name != "nt" or getattr(exc, "winerror", None)
+                        not in (5, 32, 33) or attempt == 3):
+                    raise
+                time.sleep(0.025 * (attempt + 1))
     finally:
         if temporary is not None:
-            temporary.unlink(missing_ok=True)
+            # Failure to clean a stale temporary file is not permission to
+            # mask the actual persistence result or crash the settings UI.
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass

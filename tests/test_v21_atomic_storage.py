@@ -18,7 +18,10 @@ class AtomicStorageTests(unittest.TestCase):
         with TemporaryDirectory() as root:
             target = Path(root) / "prefs" / "preferences.json"
             write_json_atomically(target, {"theme": "Slate", "label": "Pokémon"})
-            self.assertEqual(json.loads(target.read_text())["label"], "Pokémon")
+            self.assertEqual(
+                json.loads(target.read_text(encoding="utf-8"))["label"],
+                "Pokémon",
+            )
             write_json_atomically(target, {"theme": "Dark"})
             self.assertEqual(json.loads(target.read_text()), {"theme": "Dark"})
             self.assertEqual(list(target.parent.glob("*.tmp")), [])
