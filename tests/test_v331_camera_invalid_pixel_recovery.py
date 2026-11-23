@@ -13,19 +13,20 @@ from anything_plays.ui_gameplay import GameplayMixin
 
 
 class CameraFrameContractTests(unittest.TestCase):
-    def test_normal_color_frame_and_noncontiguous_view_are_usable(self):
+    def test_normal_bgr_bgra_frames_and_noncontiguous_view_are_usable(self):
         frame = np.zeros((12, 16, 3), dtype=np.uint8)
+        bgra = np.zeros((12, 16, 4), dtype=np.uint8)
         self.assertTrue(cameras.usable_bgr_frame(frame))
+        self.assertTrue(cameras.usable_bgr_frame(bgra))
         self.assertTrue(cameras.usable_bgr_frame(frame[:, ::2, :]))
 
-    def test_only_nonempty_uint8_three_channel_arrays_are_accepted(self):
+    def test_only_nonempty_uint8_bgr_or_bgra_arrays_are_accepted(self):
         invalid = (
             None, object(), Mock(), b"not-pixels", [],
             np.array(7, dtype=np.uint8),
             np.zeros((4, 6), dtype=np.uint8),             # grayscale
             np.zeros((4, 6, 1), dtype=np.uint8),          # one channel
             np.zeros((4, 6, 2), dtype=np.uint8),          # incomplete BGR
-            np.zeros((4, 6, 4), dtype=np.uint8),          # BGRA
             np.zeros((0, 6, 3), dtype=np.uint8),
             np.zeros((4, 0, 3), dtype=np.uint8),
             np.zeros((4, 6, 3), dtype=np.uint16),
@@ -41,7 +42,6 @@ class CameraFrameContractTests(unittest.TestCase):
             object(),
             np.zeros((4, 6), dtype=np.uint8),
             np.zeros((4, 6, 3), dtype=np.float32),
-            np.zeros((4, 6, 4), dtype=np.uint8),
         )
         for broken_pixels in malformed:
             with self.subTest(kind=type(broken_pixels).__name__,
@@ -165,6 +165,15 @@ class LiveCameraFrameRecoveryTests(unittest.TestCase):
         app.stop_camera.assert_not_called()
         app._queue_camera_retry.assert_not_called()
         self.assertEqual(app._camera_tick_job, "next-camera-tick")
+
+    def test_valid_bgra_frame_remains_supported(self):
+        frame = np.zeros((8, 10, 4), dtype=np.uint8)
+        app = self.app_with_frame(frame)
+        GameplayMixin.tick(app)
+        self.assertIs(app.frame, frame)
+        app.draw_camera.assert_called_once()
+        app.stop_camera.assert_not_called()
+        app._queue_camera_retry.assert_not_called()
 
 
 if __name__ == "__main__":
