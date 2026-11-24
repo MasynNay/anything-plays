@@ -682,17 +682,33 @@ class Emulator:
         return self._gamecube_last_performance
 
     def set_volume(self, level):
-        """Adjust only this application's audio, including active games."""
+        """Adjust local gain without letting a dead audio device crash Tk.
+
+        Hot-unplugged PortAudio/native drivers may reject live volume updates.
+        Keep the user's bounded gain for the next working output, and show
+        only fixed guidance rather than a private device name or driver path.
+        """
         try:
             volume = float(level)
-        except (TypeError, ValueError, OverflowError):
+        except Exception:
+            # A third-party Tk/native numeric wrapper can also raise during
+            # __float__; never run its exception __str__ for an error label.
             volume = 0.35
-        if not 0.0 <= volume <= 1.0:
-            volume = max(0.0, min(1.0, volume)) if volume == volume else 0.35
-        self.volume = volume
+        if not math.isfinite(volume):
+            volume = 0.35
+        self.volume = max(0.0, min(1.0, volume))
         sink = self.audio_sink
         if sink is not None:
-            sink.set_volume(volume)
+            try:
+                sink.set_volume(self.volume)
+            except Exception:
+                # A failed PortAudio stream does not mean the native ROM or
+                # camera/keyboard controls should stop. Retain the selected
+                # volume for a replacement/reconnected output device.
+                self.audio_warning = (
+                    "Volume adjustment unavailable. "
+                    "Check your audio output and try again."
+                )
 
     def set_camera_buttons(self, player_one=(), player_two=(),
                            *, sample_started_at=None, generation=None):

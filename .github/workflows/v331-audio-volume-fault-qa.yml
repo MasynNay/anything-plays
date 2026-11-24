@@ -1,0 +1,48 @@
+name: 3.3.1 | Audio volume device fault isolation
+
+# Synthetic AudioSink errors and scalar gain controls. No OS audio output,
+# native emulators, microphones, video capture, or personal data.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-audio-volume-fault-qa.yml'
+      - 'anything_plays/gba_emulator.py'
+      - 'tests/test_v331_audio_volume_fault_isolation.py'
+      - 'tests/test_input_and_audio.py'
+      - 'tests/test_v33_audio_device_recovery.py'
+
+permissions:
+  contents: read
+
+jobs:
+  safe-gain:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Live volume | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimum portable audio/test packages
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Compile and run volume device-failure regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/gba_emulator.py tests/test_v331_audio_volume_fault_isolation.py
+          python -m unittest discover -s tests -p 'test_v331_audio_volume_fault_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_input_and_audio.py' -v
+          python -m unittest discover -s tests -p 'test_v33_audio_device_recovery.py' -v
