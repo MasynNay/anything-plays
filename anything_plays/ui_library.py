@@ -391,7 +391,8 @@ class LibraryMixin:
         # requested unavailable console is not permission to disarm the old
         # session, and should not change its ROM or Stream Output.
         if prior_running and self.uses_embedded_emulator():
-            if not self.emu.find_system_core():
+            from anything_plays.preview_storage import is_v32_preview
+            if not is_v32_preview() and not self.emu.find_system_core():
                 self.game_status.set(
                     'New emulator unavailable · previous game retained'
                 )
