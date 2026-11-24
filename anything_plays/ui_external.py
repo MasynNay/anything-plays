@@ -200,7 +200,16 @@ class ExternalBackendMixin:
     def start_external_rom(self, rom):
         system = self.system_key.get()
         self.stop_external_emulator()
-        self.emu.stop()
+        # The bounded native Stop can time out while its worker still owns
+        # a Libretro core. Do not start an external GPU process alongside
+        # that session. The explicit False result is supported by 3.3.1's
+        # native shutdown handshake; older idle stubs may return None.
+        if self.emu.stop() is False:
+            self.game_status.set(
+                "Previous emulator is still shutting down. "
+                "Retry after it finishes."
+            )
+            return False
         try:
             network_config = None
             dolphin_user = None
