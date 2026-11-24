@@ -425,19 +425,32 @@ class LibraryMixin:
                             parent=self.root,
                         )
                         return
+                    # A missing core is an unrecoverable *launch*, not a
+                    # running game. Earlier versions left current_rom set and
+                    # could display an old frozen game frame with a Restart
+                    # suggestion, even though no native core could start.
+                    # Retire the outgoing worker and all GAME-only pixels;
+                    # preserve independent Stream Mode camera imagery.
                     if self.system_key.get() == 'gamecube':
-                        raise RuntimeError(
+                        guidance = (
                             'The installed GameCube emulator or its required '
-                            'Dolphin system files are missing. The complete '
-                            'Anything Plays 3.0 installer includes both. '
-                            'Repair or reinstall the application. No separate '
-                            'Dolphin or emulator download is required.'
+                            'Dolphin system files are missing. Repair or '
+                            'reinstall Anything Plays. No separate Dolphin '
+                            'or emulator download is required.'
                         )
-                    raise RuntimeError(
-                        'A bundled emulator core is missing or damaged. '
-                        'Repair or reinstall Anything Plays 3.0; every console '
-                        'is included and must work offline.'
+                    else:
+                        guidance = (
+                            'A bundled emulator core is missing or damaged. '
+                            'Repair or reinstall Anything Plays; all supported '
+                            'console emulators are bundled for offline use.'
+                        )
+                    self.unload_rom()
+                    self.game_status.set(
+                        'Emulator files missing · repair or reinstall Anything Plays'
                     )
+                    messagebox.showerror('Emulator unavailable', guidance,
+                                         parent=self.root)
+                    return
                 # Existing native sessions must be fully stopped before any
                 # framebuffer cleanup. CoreSession.start() already stops an
                 # inactive session, so avoid an extra stop on first launch.
