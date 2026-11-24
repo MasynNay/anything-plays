@@ -211,7 +211,11 @@ class GamepadMixin:
         enabled = getattr(self, "gamepad_enabled", None)
         if enabled is not None and enabled.get():
             self._gamepad_game_resume_release_pending = True
-        self.emu.release_gamepad()
+        # Use the same native release fallback as Disable and Rescan.
+        # A stale SDL/native extension may throw during ROM handoff; never
+        # strand the old worker or block the next game because the facade's
+        # release hook failed. The underlying input buffer still clears.
+        self._release_emulated_gamepad()
 
     def refresh_gamepad(self):
         try:
@@ -666,7 +670,9 @@ class GamepadMixin:
                 "status": capture_feedback, "rows": remap_rows,
             }
             self._controller_capture_release_pending = True
-            self.emu.release_gamepad()
+            # Remapping is another handoff: don't let a faulty native
+            # facade resurrect held input or prevent the release gate.
+            self._release_emulated_gamepad()
             capture_feedback.set(
                 "Waiting for ONE new press. Release any held controls first."
             )
