@@ -82,18 +82,18 @@ def safe_worker_failure(error, *, starting=False):
         if error in _SAFE_GAMECUBE_WORKER_ERRORS:
             detail = error
         elif re.fullmatch(
-            r"GameCube GPU readback failed \\("
+            r"GameCube GPU readback failed \("
             r"(RuntimeError|ValueError|OSError|TypeError|OverflowError|"
             r"MemoryError|AttributeError|IndexError|KeyError|"
-            r"AssertionError|UnexpectedError)\\)\\.",
+            r"AssertionError|UnexpectedError)\)\.",
             error,
         ):
             detail = error
         elif re.fullmatch(
-            r"GameCube native playback failed \\("
+            r"GameCube native playback failed \("
             r"(RuntimeError|OSError|ValueError|TypeError|MemoryError|"
             r"ImportError|FileNotFoundError|AttributeError|"
-            r"OverflowError|UnexpectedError)\\)\\.",
+            r"OverflowError|UnexpectedError)\)\.",
             error,
         ):
             detail = error
