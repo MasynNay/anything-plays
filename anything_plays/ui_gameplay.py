@@ -12,6 +12,7 @@ from PIL import Image, ImageTk
 from anything_plays.systems import SYSTEMS
 from anything_plays.shortcuts import button_for_key
 from anything_plays.cameras import usable_bgr_frame
+from anything_plays.launch_error_messages import safe_worker_failure
 
 
 _SAFE_GUI_ERROR_CLASSES = frozenset((
@@ -166,13 +167,16 @@ class GameplayMixin:
                 return
             detail = getattr(self.emu, "last_error", None)
             if detail:
-                self.game_status.set("Emulator launch failed: " + detail)
+                # Legacy native workers may retain exception detail for
+                # compatibility, including ROM paths and device identifiers.
+                # Status and warning dialogs may only contain fixed guidance.
+                safe_detail = safe_worker_failure(detail, starting=True)
+                self.game_status.set(safe_detail)
                 messagebox.showwarning(
                     "Game did not start",
-                    "The emulator stopped during loading.\n\n"
-                    + detail[:350]
-                    + "\n\nUse Restart game to try again, or "
-                      "Restore previous / bundled in Emulator maintenance.",
+                    safe_detail
+                    + "\n\nCheck the game and bundled emulator files, or "
+                      "restore the bundled emulator in Emulator maintenance.",
                     parent=self.root,
                 )
             else:
@@ -347,10 +351,7 @@ class GameplayMixin:
                 bezel = getattr(self, "game_bezel", None)
                 if bezel is not None:
                     bezel.set_active(False)
-                self.game_status.set(
-                    'Emulator stopped: ' + self.emu.error
-                    + ' · Select Restart game to recover.'
-                )
+                self.game_status.set(safe_worker_failure(self.emu.error))
                 self._save_warning_until = time.monotonic() + 3600
                 self.stop_controls()
                 self.emu.error = None
