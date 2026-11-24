@@ -722,13 +722,29 @@ class Emulator:
         return False
 
     def set_manual(self, button, down):
+        # During a bounded native Stop the worker may still report
+        # running=True while retro_run() unwinds. Late Tk key events must
+        # not re-latch held input after Stop released it. Restart clears
+        # stop_event before accepting a fresh controller/keyboard session.
+        if self.stop_event.is_set():
+            self.inputs.release_manual()
+            return
         self.inputs.set_manual(button, down)
 
     def release_manual(self):
         self.inputs.release_manual()
 
     def set_gamepad_buttons(self, buttons):
-        """Controller input is isolated from Tk keyboard and camera holds."""
+        """Never republish SDL-held buttons after native Stop was requested.
+
+        The GUI keeps polling every 65ms even while a blocked native worker
+        winds down. Check the same event used by the worker's run loop
+        instead of the potentially stale running flag; disarm only the
+        gamepad channel, preserving unrelated camera and manual latches.
+        """
+        if self.stop_event.is_set():
+            self.inputs.release_gamepad()
+            return
         self.inputs.set_gamepad_buttons(buttons)
 
     def release_gamepad(self):
