@@ -215,6 +215,47 @@ class NeoGeoPocketOpenedFileTests(unittest.TestCase):
                 item.restore()
         self.assertEqual(state["restores"], 0)
 
+    def test_private_candidate_rejects_shared_checkpoint_on_unchanged_persist(self):
+        item, _ = self.checkpoint()
+        item.persist()
+        other = self.root / "other-save"
+        try:
+            os.link(item.path, other)
+        except (OSError, NotImplementedError):
+            self.skipTest("Hardlinks unavailable")
+        original = item.path.read_bytes()
+        with (
+            patch("anything_plays.libretro_state.is_v33_candidate",
+                  return_value=True),
+            patch("anything_plays.libretro_state._checked_native_save_path",
+                  side_effect=lambda path: path),
+        ):
+            with self.assertRaisesRegex(ValueError, "cannot share"):
+                item.persist()
+        self.assertEqual(item.path.read_bytes(), original)
+        self.assertEqual(other.read_bytes(), original)
+
+    def test_private_candidate_rejects_symlink_on_unchanged_persist(self):
+        item, _ = self.checkpoint()
+        item.persist()
+        outside = self.root / "other-private-save"
+        outside.write_bytes(item.path.read_bytes())
+        item.path.unlink()
+        try:
+            item.path.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            self.skipTest("Symlinks unavailable")
+        original = outside.read_bytes()
+        with (
+            patch("anything_plays.libretro_state.is_v33_candidate",
+                  return_value=True),
+            patch("anything_plays.libretro_state._checked_native_save_path",
+                  side_effect=lambda path: path),
+        ):
+            with self.assertRaisesRegex(ValueError, "symlinked"):
+                item.persist()
+        self.assertEqual(outside.read_bytes(), original)
+
     def test_truncated_unchanged_checkpoint_is_repaired(self):
         item, _ = self.checkpoint()
         item.persist()
