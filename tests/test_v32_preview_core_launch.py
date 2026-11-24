@@ -165,7 +165,9 @@ class PreviewCoreLaunchTests(unittest.TestCase):
             with self.subTest(console=console):
                 app = FakeApp(console)
                 app.current_rom = "/synthetic/old-session.rom"
-                app.emu.running = True
+                # An idle rejected launch retires stale pixels. Active sessions
+                # are preserved independently by the live-game regression.
+                app.emu.running = False
                 with patch(
                     "anything_plays.preview_storage.is_v32_preview",
                     return_value=False,
