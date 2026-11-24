@@ -397,12 +397,22 @@ class LibraryMixin:
             # Camera Stop has its own protected input-buffer release path.
             # Do not let a damaged custom hook block the core's shutdown.
             pass
-        self.emu.stop()
+        # A native callback can remain inside retro_run() after the
+        # bounded Stop join. Do not claim "No ROM loaded" or blank the old
+        # pixels while that worker still owns them; another Stop/Restart may
+        # be attempted once the worker exits. Camera and gamepad are already
+        # disarmed above, independently of native shutdown progress.
+        if self.emu.stop() is False:
+            self.game_status.set(
+                "Emulator is still shutting down. Wait before changing games."
+            )
+            return False
         from anything_plays.game_display_lifecycle import clear_game_video
         clear_game_video(self)
         self.current_rom = None
         self.game_status.set('No ROM loaded')
         self.show_library()
+        return True
 
     def start_rom(self, path):
         # Never open a native core while a verified core-pack transaction is
@@ -539,7 +549,18 @@ class LibraryMixin:
                 # Keep missing-core preview's own unload/stop path unchanged.
                 if (getattr(self.emu, "running", False) is True or
                         getattr(self.emu, "launching", False) is True):
-                    self.emu.stop()
+                    if self.emu.stop() is False:
+                        # Do not switch the core path or use the new ROM for
+                        # Restart while the previous worker remains alive.
+                        # The stop request has disarmed camera and gamepad,
+                        # but the previous session still owns native state.
+                        self.current_rom = prior_rom
+                        self.emu.core_path = prior_core_path
+                        self.game_status.set(
+                            "Previous game is still shutting down. "
+                            "Try changing games after it finishes."
+                        )
+                        return False
                 # Only clear a prior *rendered* game. On first launch the
                 # canvas is already empty, and headless UI hosts may not
                 # have an emulator frame lock or stream widgets yet.
