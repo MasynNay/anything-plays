@@ -1,0 +1,46 @@
+name: 3.3.1 | Manual keyboard native and IPC release safety
+
+# Synthetic native facade, external bridge, and Tk keyboard callbacks.
+# No live ROMs, native emulator processes, cameras, or user file reads.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-manual-keyboard-release-qa.yml'
+      - 'anything_plays/ui_gameplay.py'
+      - 'tests/test_v331_manual_keyboard_release_isolation.py'
+
+permissions:
+  contents: read
+
+jobs:
+  manual-release:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Keyboard release | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal desktop image and input dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Compile and verify manual input release contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_gameplay.py tests/test_v331_manual_keyboard_release_isolation.py
+          python -m unittest discover -s tests -p 'test_v331_manual_keyboard_release_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_v331_gamepad_manual_cleanup.py' -v
+          python -m unittest discover -s tests -p 'test_v21_shortcut_collisions.py' -v

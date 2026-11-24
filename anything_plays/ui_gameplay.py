@@ -76,33 +76,107 @@ class GameplayMixin:
         canvas.focus_set()
         self.manual_label.set('MANUAL PLAY ACTIVE · Open Game Controls to view or edit keys')
 
+    def _release_manual_native(self):
+        """Revoke native keyboard input even if its facade was replaced."""
+        try:
+            self.emu.release_manual()
+        except Exception:
+            inputs = getattr(self.emu, "inputs", None)
+            release = getattr(inputs, "release_manual", None)
+            if callable(release):
+                try:
+                    release()
+                except Exception:
+                    pass
+
+    def _release_manual_external(self):
+        """Never leave a disconnected external bridge holding a game key.
+
+        Release errors may mean an IPC pipe is unusable. Retire its emulator
+        process rather than allowing a stuck held button to continue after
+        a focus loss or failed Tk key event.
+        """
+        bridge = getattr(self, "external_input", None)
+        if bridge is None:
+            return
+        try:
+            bridge.release_manual()
+        except Exception:
+            stop = getattr(self, "stop_external_emulator", None)
+            if callable(stop):
+                try:
+                    stop()
+                    return
+                except Exception:
+                    pass
+            # A custom host may have no external Stop hook. Close the
+            # damaged pipe and detach it, so future key events cannot
+            # continue delivering to an already broken controller.
+            try:
+                bridge.close()
+            except Exception:
+                pass
+            self.external_input = None
+
     def deactivate_manual(self, event=None):
         self.manual_active = False
-        self.emu.release_manual()
-        if self.external_input is not None:
-            self.external_input.release_manual()
-        self.manual_label.set('Click game screen to use editable keyboard controls')
+        # Both release paths are independent: a broken native facade must
+        # not skip an external bridge, or vice versa. A destroyed Tk label
+        # cannot prevent either physical input channel being released.
+        self._release_manual_native()
+        self._release_manual_external()
+        try:
+            self.manual_label.set(
+                'Click game screen to use editable keyboard controls'
+            )
+        except Exception:
+            pass
 
     def deactivate_on_outside_click(self, event):
         if event.widget not in (self.game_canvas, getattr(self, '_game_only_canvas', None)) and self.manual_active:
             self.deactivate_manual()
 
+    def _manual_key_failure(self):
+        self.deactivate_manual()
+        try:
+            self.manual_label.set(
+                'Manual input paused after controller error. Click game screen to retry.'
+            )
+        except Exception:
+            pass
+
     def manual_key_down(self, event):
         button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
         if button and self.manual_active:
             if self.external_input is not None:
-                self.external_input.set_manual(button, True)
+                try:
+                    self.external_input.set_manual(button, True)
+                except Exception:
+                    self._manual_key_failure()
                 return 'break'
             if self.uses_embedded_emulator():
-                self.emu.set_manual(button, True)
+                try:
+                    self.emu.set_manual(button, True)
+                except Exception:
+                    self._manual_key_failure()
                 return 'break'
 
     def manual_key_up(self, event):
         button = button_for_key(self.system_key.get(), self._shortcut_bindings.get(self.system_key.get()), event.keysym)
         if button:
-            self.emu.set_manual(button, False)
-            if self.external_input is not None:
-                self.external_input.set_manual(button, False)
+            failed = False
+            try:
+                self.emu.set_manual(button, False)
+            except Exception:
+                failed = True
+            bridge = getattr(self, "external_input", None)
+            if bridge is not None:
+                try:
+                    bridge.set_manual(button, False)
+                except Exception:
+                    failed = True
+            if failed:
+                self._manual_key_failure()
             return 'break'
 
     def _camera_is_open(self):
