@@ -32,7 +32,7 @@ class Host(LibraryMixin):
         self.emu = Mock()
         self.emu.rom = "/synthetic/old-game.gba"
         self.emu.lock = Lock()
-        self.emu.running = True
+        self.emu.running = False
         self.emu.launching = False
         self.emu.frame = object()
         self.emu.frame_serial = 10
@@ -90,6 +90,29 @@ class MissingCoreLaunchCleanupTests(unittest.TestCase):
         app.stop_controls.assert_called()
         app.show_library.assert_called_once()
         app.show_playing_info.assert_not_called()
+        app.emu.start.assert_not_called()
+
+    def test_active_game_keeps_video_controls_and_current_rom(self):
+        app = Host("snes")
+        app.emu.running = True
+        prior_rom = app.current_rom
+        prior_frame = app.emu.frame
+        camera = app._stream_camera_frame
+        prior_core = app.emu.core_path
+        message = self._reject(app)
+        self.assertIn("bundled emulator core", message)
+        self.assertIs(app.emu.frame, prior_frame)
+        self.assertIs(app._stream_camera_frame, camera)
+        self.assertEqual(app.current_rom, prior_rom)
+        self.assertIs(app.emu.core_path, prior_core)
+        self.assertFalse(getattr(app, "_retry_requires_rom_selection", False))
+        app.emu.stop.assert_not_called()
+        app.prepare_gamepad_for_game_transition.assert_not_called()
+        app.stop_controls.assert_not_called()
+        app.deactivate_manual.assert_not_called()
+        app.game_canvas.delete.assert_not_called()
+        app._stream_resize_cache.clear.assert_not_called()
+        app.show_library.assert_not_called()
         app.emu.start.assert_not_called()
 
     def test_missing_other_core_has_version_agnostic_repair_guidance(self):
