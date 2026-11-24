@@ -126,7 +126,8 @@ class NativeUnloadFailureIsolationTests(TestCase):
         app.stop_controls.side_effect = RuntimeError("camera")
         app.unload_rom()
         app.emu.inputs.release_manual.assert_called_once()
-        app.external_process is None
+        self.assertIsNone(app.external_process)
+        self.assertIsNone(app.external_input)
         app.assert_retired(self)
         app.stop_controls.assert_called_once()
         app.prepare_gamepad_for_game_transition.assert_called_once()
@@ -165,7 +166,7 @@ class NativeUnloadFailureIsolationTests(TestCase):
         app.game_status.set.assert_not_called()
         app.show_library.assert_not_called()
         app.stop_controls.assert_called_once()
-        app.external_input is None
+        self.assertIsNone(app.external_input)
 
 
 if __name__ == "__main__":
