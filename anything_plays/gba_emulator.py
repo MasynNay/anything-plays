@@ -741,7 +741,13 @@ class Emulator:
         self.inputs.disarm()
 
     def stop(self):
-        """Request worker shutdown, keeping it tracked if it does not exit."""
+        """Request shutdown and report whether the native worker actually exited.
+
+        A blocked Libretro callback cannot safely be killed from Python.
+        Keep its thread and live state tracked when the bounded join expires;
+        callers must not replace the core, clear the visible session or
+        announce a completed ROM switch until this returns True.
+        """
         self.release_manual()
         self.release_gamepad()
         self.disarm()
@@ -749,11 +755,13 @@ class Emulator:
         worker = self.thread
         if worker is not None and worker.is_alive():
             worker.join(timeout=4)
-        if worker is None or not worker.is_alive():
-            self.thread = None
-            self.running = False
-            self.launching = False
-            self.inputs.disarm()
+        if worker is not None and worker.is_alive():
+            return False
+        self.thread = None
+        self.running = False
+        self.launching = False
+        self.inputs.disarm()
+        return True
 
     def _run(self):
         try:

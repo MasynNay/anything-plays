@@ -33,6 +33,25 @@ def stable_missing_core_guidance(system):
     )
 
 
+def native_worker_alive(emu):
+    """Treat an unfinished native worker as active even during final teardown.
+
+    Libretro may set running=False before the Python thread exits. Do not
+    switch the library pointer or discard the previous frame during that
+    gap. A broken third-party thread probe fails closed.
+    """
+    worker = getattr(emu, "thread", None)
+    if worker is None:
+        return False
+    probe = getattr(worker, "is_alive", None)
+    if not callable(probe):
+        return False
+    try:
+        return probe() is True
+    except Exception:
+        return True
+
+
 class LibraryMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -405,12 +424,22 @@ class LibraryMixin:
             # Camera Stop has its own protected input-buffer release path.
             # Do not let a damaged custom hook block the core's shutdown.
             pass
-        self.emu.stop()
+        # A native callback can remain inside retro_run() after the
+        # bounded Stop join. Do not claim "No ROM loaded" or blank the old
+        # pixels while that worker still owns them; another Stop/Restart may
+        # be attempted once the worker exits. Camera and gamepad are already
+        # disarmed above, independently of native shutdown progress.
+        if self.emu.stop() is False:
+            self.game_status.set(
+                "Emulator is still shutting down. Wait before changing games."
+            )
+            return False
         from anything_plays.game_display_lifecycle import clear_game_video
         clear_game_video(self)
         self.current_rom = None
         self.game_status.set('No ROM loaded')
         self.show_library()
+        return True
 
     def start_rom(self, path):
         # Never open a native core while a verified core-pack transaction is
@@ -426,7 +455,8 @@ class LibraryMixin:
         prior_rom = getattr(self, "current_rom", None)
         prior_core_path = getattr(self.emu, "core_path", None)
         prior_running = (getattr(self.emu, "running", False) is True
-                         or getattr(self.emu, "launching", False) is True)
+                         or getattr(self.emu, "launching", False) is True
+                         or native_worker_alive(self.emu))
         # Preflight the new core BEFORE releasing a healthy, currently
         # playing session's controls, camera input or native worker. A
         # requested unavailable console is not permission to disarm the old
@@ -478,8 +508,8 @@ class LibraryMixin:
                 # Resolve the selected core on every game launch. A vetted
                 # in-app update or rollback takes effect here without an app
                 # restart; an already-loaded native DLL is never replaced.
-                self.emu.core_path = self.emu.find_system_core()
-                if not self.emu.core_path:
+                selected_core_path = self.emu.find_system_core()
+                if not selected_core_path:
                     # Public 3.1.1 contains the full approved console set,
                     # but the 3.2 QA installer intentionally contains only
                     # mGBA. An unbundled preview core is NOT file corruption.
@@ -498,7 +528,9 @@ class LibraryMixin:
                         # missing core must also stop its worker and clear
                         # stale video. Use the normal shutdown path so save
                         # state, canvas, and native resources are released.
-                        self.unload_rom()
+                        if self.unload_rom() is False:
+                            self.current_rom = prior_rom
+                            return False
                         self.game_status.set(title)
                         messagebox.showinfo(
                             "3.2 preview emulator availability",
@@ -521,7 +553,6 @@ class LibraryMixin:
                         # core metadata rather than leaving the failed ROM
                         # as the next Restart target.
                         self.current_rom = prior_rom
-                        self.emu.core_path = prior_core_path
                         if bezel is not None:
                             try:
                                 bezel.set_active(True)
@@ -533,7 +564,9 @@ class LibraryMixin:
                         messagebox.showerror('Emulator unavailable', guidance,
                                              parent=self.root)
                         return
-                    self.unload_rom()
+                    if self.unload_rom() is False:
+                        self.current_rom = prior_rom
+                        return False
                     self._retry_requires_rom_selection = True
                     self.game_status.set(
                         'Emulator files missing · repair or reinstall Anything Plays'
@@ -545,9 +578,18 @@ class LibraryMixin:
                 # framebuffer cleanup. CoreSession.start() already stops an
                 # inactive session, so avoid an extra stop on first launch.
                 # Keep missing-core preview's own unload/stop path unchanged.
-                if (getattr(self.emu, "running", False) is True or
-                        getattr(self.emu, "launching", False) is True):
-                    self.emu.stop()
+                if prior_running:
+                    if self.emu.stop() is False:
+                        # Do not switch the core path or use the new ROM for
+                        # Restart while the previous worker remains alive.
+                        # The stop request has disarmed camera and gamepad,
+                        # but the previous session still owns native state.
+                        self.current_rom = prior_rom
+                        self.game_status.set(
+                            "Previous game is still shutting down. "
+                            "Try changing games after it finishes."
+                        )
+                        return False
                 # Only clear a prior *rendered* game. On first launch the
                 # canvas is already empty, and headless UI hosts may not
                 # have an emulator frame lock or stream widgets yet.
@@ -571,6 +613,7 @@ class LibraryMixin:
                 if prior_render or prior_game_cache:
                     from anything_plays.game_display_lifecycle import clear_game_video
                     clear_game_video(self)
+                self.emu.core_path = selected_core_path
                 self.emu.start(str(path))
             self.current_rom = str(path)
             if self.uses_embedded_emulator():
