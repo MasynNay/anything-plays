@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from anything_plays.gba_emulator import Emulator
-from anything_plays.ui_library import LibraryMixin
+from anything_plays.ui_library import LibraryMixin, native_worker_alive
 from anything_plays.ui_profiles import ProfilesMixin
 
 
@@ -185,6 +185,59 @@ class LaunchWaitTests(unittest.TestCase):
         self.assertIsNone(app._stream_game_frame)
         self.assertIs(app._stream_camera_frame, camera)
         app.show_playing_info.assert_called_once()
+
+class TeardownFlagSafetyTests(unittest.TestCase):
+    def test_finishing_thread_remains_active_after_running_flag_clears(self):
+        app = UnloadHost()
+        app.emu.running = False
+        app.emu.launching = False
+        app.emu.thread = Mock()
+        app.emu.thread.is_alive.return_value = True
+        self.assertTrue(native_worker_alive(app.emu))
+        with patch("anything_plays.preview_storage.is_v32_preview",
+                   return_value=False):
+            self.assertIs(app.start_rom("/synthetic/next-game.gba"), False)
+        self.assertEqual(app.current_rom, "/synthetic/prior-game.gba")
+        self.assertEqual(app.emu.core_path, "/synthetic/prior-core.so")
+        app.emu.stop.assert_called_once()
+        app.emu.start.assert_not_called()
+        app.game_canvas.delete.assert_not_called()
+
+    def test_failed_native_thread_probe_blocks_unsafe_switch(self):
+        app = UnloadHost()
+        app.emu.running = False
+        app.emu.launching = False
+        app.emu.thread = Mock()
+        app.emu.thread.is_alive.side_effect = RuntimeError(
+            "PRIVATE third-party thread wrapper"
+        )
+        self.assertTrue(native_worker_alive(app.emu))
+        with patch("anything_plays.preview_storage.is_v32_preview",
+                   return_value=False):
+            self.assertIs(app.start_rom("/synthetic/next-game.gba"), False)
+        self.assertIn("still shutting down", app.game_status.get())
+        app.emu.start.assert_not_called()
+
+    def test_missing_core_does_not_announce_cleanup_if_stop_timed_out(self):
+        app = UnloadHost()
+        app.emu.running = False
+        app.emu.launching = False
+        app.emu.find_system_core.return_value = None
+        with patch("anything_plays.preview_storage.is_v32_preview",
+                   return_value=False), patch(
+                       "anything_plays.ui_library.messagebox.showerror"
+                   ) as error:
+            self.assertIs(app.start_rom("/synthetic/unavailable.gba"), False)
+        error.assert_not_called()
+        self.assertEqual(app.current_rom, "/synthetic/prior-game.gba")
+        self.assertIn("still shutting down", app.game_status.get())
+        app.show_library.assert_not_called()
+        app.game_canvas.delete.assert_not_called()
+        app.emu.start.assert_not_called()
+
+    def test_no_thread_is_not_a_stale_native_worker(self):
+        self.assertFalse(native_worker_alive(Mock(thread=None)))
+
 
 class SwitchHost(VideoHost, ProfilesMixin):
     def __init__(self):
