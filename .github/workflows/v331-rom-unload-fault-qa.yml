@@ -1,0 +1,47 @@
+name: 3.3.1 | Fault-isolated native ROM unload
+
+# Synthetic cross-platform lifecycle checks. No real emulator, ROM,
+# controller, camera, process or external pipe is started.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-rom-unload-fault-qa.yml'
+      - 'anything_plays/ui_library.py'
+      - 'anything_plays/ui_external.py'
+      - 'tests/test_v331_rom_unload_fault_tolerance.py'
+      - 'tests/test_v32_game_display_lifecycle.py'
+
+permissions:
+  contents: read
+
+jobs:
+  safe-unload:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: ROM unload | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal source dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Compile and test all ROM unload fault contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_library.py anything_plays/ui_external.py tests/test_v331_rom_unload_fault_tolerance.py
+          python -m unittest discover -s tests -p 'test_v331_rom_unload_fault_tolerance.py' -v
+          python -m unittest discover -s tests -p 'test_v32_game_display_lifecycle.py' -v
