@@ -211,22 +211,62 @@ class GameplayMixin:
         )
 
     def stop_controls(self):
+        """Release camera input even when a native hook or Tk widget fails.
+
+        Stop is a safety action and is also called before ROM shutdown.
+        An expired Libretro wrapper, detached external bridge or destroyed
+        status widget must not prevent the other input sources from being
+        released. Never display native exception text or device paths.
+        """
         self._pending_object_controls = False
         self.armed = False
-        self.emu.disarm()
-        if hasattr(self, "_last_camera_pulses"):
-            self._last_camera_pulses.clear()
-        if self.external_input is not None:
-            self.external_input.release_camera()
+        try:
+            self.emu.disarm()
+        except Exception:
+            # If a replaced native facade faults, revoke its arm flag and
+            # clear the real InputBuffer directly. The independent camera
+            # generation and queued P1/P2 pulses are reset there.
+            try:
+                self.emu.armed = False
+            except Exception:
+                pass
+            inputs = getattr(self.emu, "inputs", None)
+            fallback = getattr(inputs, "disarm", None)
+            if callable(fallback):
+                try:
+                    fallback()
+                except Exception:
+                    pass
+        pulses = getattr(self, "_last_camera_pulses", None)
+        if pulses is not None:
+            try:
+                pulses.clear()
+            except Exception:
+                # Optional frame deduplication state cannot block Stop.
+                self._last_camera_pulses = {}
+        bridge = getattr(self, "external_input", None)
+        if bridge is not None:
+            try:
+                bridge.release_camera()
+            except Exception:
+                # An external native pipe/UDP bridge may be offline during
+                # teardown; camera and embedded input remain disarmed.
+                pass
         if hasattr(self, 'arm_button'):
-            label = ('Enable object controls'
-                     if self.uses_embedded_emulator()
-                     or SYSTEMS[self.system_key.get()].backend == 'retroarch'
-                     or self.external_input is not None
-                     else 'Camera controls unavailable for Dolphin')
-            self.arm_button.config(text=label)
+            try:
+                label = ('Enable object controls'
+                         if self.uses_embedded_emulator()
+                         or SYSTEMS[self.system_key.get()].backend == 'retroarch'
+                         or bridge is not None
+                         else 'Camera controls unavailable for Dolphin')
+                self.arm_button.config(text=label)
+            except Exception:
+                pass
         if hasattr(self, 'action'):
-            self.action.set('PREVIEW ONLY — no keyboard events are sent')
+            try:
+                self.action.set('PREVIEW ONLY — no keyboard events are sent')
+            except Exception:
+                pass
 
     def tick(self):
         """Process one UI frame, and always schedule another while the window lives."""
