@@ -189,6 +189,15 @@ class PreviewCoreLaunchTests(unittest.TestCase):
                 app.game_canvas.delete.assert_called_once_with("all")
                 app.show_library.assert_called_once()
                 app.show_playing_info.assert_not_called()
+                # A stable worker may still retain the last ROM after stop;
+                # its normal restart fallback must not reopen that old game.
+                app.emu.rom = "/synthetic/previous-game.rom"
+                app.retry_current_rom()
+                self.assertEqual(
+                    app.game_status.get(),
+                    "Choose a game ROM before restarting.",
+                )
+                app.emu.start.assert_not_called()
 
     def test_setup_diagnostics_matches_launch_and_omits_private_details(self):
         for console in BUTTONS_BY_SYSTEM:
