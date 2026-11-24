@@ -157,13 +157,15 @@ class PreviewCoreLaunchTests(unittest.TestCase):
         self.assertEqual(app.current_rom, "/synthetic/user-game.sfc")
         self.assertIn("Starting", app.game_status.get())
 
-    def test_stable_full_core_missing_messages_unchanged(self):
+    def test_stable_missing_core_retires_game_and_gives_current_repair_guidance(self):
         for console, excerpt in (
-            ("snes", "every console is included"),
+            ("snes", "all supported console emulators"),
             ("gamecube", "Dolphin system files"),
         ):
             with self.subTest(console=console):
                 app = FakeApp(console)
+                app.current_rom = "/synthetic/old-session.rom"
+                app.emu.running = True
                 with patch(
                     "anything_plays.preview_storage.is_v32_preview",
                     return_value=False,
@@ -175,11 +177,18 @@ class PreviewCoreLaunchTests(unittest.TestCase):
                     app.start_rom("/synthetic/stable-game.rom")
                 error.assert_called_once()
                 self.assertIn(excerpt, error.call_args.args[1])
+                self.assertIn("reinstall Anything Plays", error.call_args.args[1])
+                self.assertNotIn("3.0 installer", error.call_args.args[1])
                 info.assert_not_called()
-                self.assertEqual(
-                    app.current_rom, "/synthetic/stable-game.rom",
-                )
-                app.show_playing_info.assert_called_once()
+                self.assertIsNone(app.current_rom)
+                self.assertIsNone(app.emu.frame)
+                self.assertIsNone(app.game_photo)
+                self.assertIn("Emulator files missing", app.game_status.get())
+                app.emu.stop.assert_called_once()
+                app.emu.start.assert_not_called()
+                app.game_canvas.delete.assert_called_once_with("all")
+                app.show_library.assert_called_once()
+                app.show_playing_info.assert_not_called()
 
     def test_setup_diagnostics_matches_launch_and_omits_private_details(self):
         for console in BUTTONS_BY_SYSTEM:
