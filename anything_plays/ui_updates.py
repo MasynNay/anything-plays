@@ -68,7 +68,11 @@ class UpdatesMixin:
     def _can_update_emulators(self):
         native = getattr(self, "emu", None)
         if native is not None and (
-            getattr(native, "running", False)
+            getattr(native, "running", False) is True
+            # A native worker can be preparing its first thread while
+            # running is still false. Switching DLLs during that window is
+            # not safe, even if the game shelf has not populated current_rom.
+            or getattr(native, "launching", False) is True
             or (getattr(native, "thread", None) is not None
                 and native.thread.is_alive())
         ):
@@ -199,6 +203,18 @@ class UpdatesMixin:
             parent=self.root,
         ):
             return
+        # Tk confirmation boxes run a nested event loop. An automatic ROM
+        # launch or another update action can change application state while
+        # the user answers. Never trust only the earlier availability check.
+        if self._closing or getattr(self, "_updates_busy", False):
+            return
+        if not self._can_update_emulators():
+            messagebox.showwarning(
+                "Emulator updates",
+                "Unload the running game before installing emulator updates.",
+                parent=self.root,
+            )
+            return
 
         self._updates_busy = True
         self._core_install_busy = True
@@ -283,6 +299,17 @@ class UpdatesMixin:
             f"Restore {name} to its previous verified version or the bundled original?",
             parent=self.root,
         ):
+            return
+        # Recheck after the nested confirmation event loop before changing
+        # the active core manifest or attempting any rollback on disk.
+        if self._closing or getattr(self, "_updates_busy", False):
+            return
+        if not self._can_update_emulators():
+            messagebox.showwarning(
+                "Restore emulator",
+                "Unload the game before restoring the bundled emulator.",
+                parent=self.root,
+            )
             return
         try:
             rollback_core(name)
