@@ -7,9 +7,10 @@ from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 
-from anything_plays.launch_error_messages import safe_launch_failure
+from anything_plays.launch_error_messages import (safe_launch_failure, safe_worker_failure)
 from anything_plays.ui_external import ExternalBackendMixin
 from anything_plays.ui_library import LibraryMixin
+from anything_plays.ui_gameplay import GameplayMixin
 
 
 class Value:
@@ -61,6 +62,34 @@ class ExternalHost(ExternalBackendMixin):
         self.emu = Mock()
         self.game_status = Value("")
         self.show_external_placeholder = Mock()
+
+
+class GameHost(GameplayMixin):
+    def __init__(self):
+        self._closing = False
+        self.root = Mock()
+        self.cap = None
+        self.frame = None
+        self.reference_image = None
+        self.emu = Mock()
+        self.emu.running = False
+        self.emu.launching = False
+        self.emu.thread = None
+        self.emu.save_warning = None
+        self.emu.audio_warning = None
+        self.emu.resume_info = None
+        self.emu.error = None
+        self.game_bezel = Mock()
+        self.game_status = Value("")
+        self.status = Value("")
+        self.action = Value("")
+        self.armed = False
+        self._pending_object_controls = False
+        self._calibration_window = None
+        self.system_key = Value("gba")
+        self.external_input = None
+        self.uses_embedded_emulator = lambda: True
+        self.stop_controls = Mock()
 
 
 class PoisonedNativeError(RuntimeError):
@@ -173,6 +202,64 @@ class LaunchErrorPrivacyTests(unittest.TestCase):
         self.assertIsNone(app.external_input)
         self.assertNotIn("PRIVATE", app.game_status.get())
         error.assert_called_once()
+
+    def test_async_worker_failure_category_never_discloses_rom_or_usb_path(self):
+        error = "OSError: PRIVATE /Users/person/game.gba usb-serial-001"
+        message = safe_worker_failure(error)
+        self.assertIn("Emulator stopped", message)
+        self.assertIn("OSError", message)
+        self.assertNotIn("PRIVATE", message)
+        self.assertNotIn("/Users/", message)
+        self.assertNotIn("usb-serial", message)
+
+    def test_known_gamecube_gpu_guidance_remains_actionable(self):
+        status = safe_worker_failure(
+            "GameCube needs a GPU driver with OpenGL 3.3 or newer. "
+            "Install or update the graphics driver and restart Anything Plays."
+        )
+        self.assertIn("OpenGL 3.3", status)
+        readback = safe_worker_failure(
+            "GameCube GPU readback failed (RuntimeError)."
+        )
+        self.assertIn("GPU readback failed", readback)
+        self.assertNotIn("UnexpectedError", readback)
+
+    def test_forged_gamecube_worker_details_are_never_echoed(self):
+        hostile = (
+            "GameCube GPU readback failed (RuntimeError) "
+            "PRIVATE /Users/person/private.iso"
+        )
+        message = safe_worker_failure(hostile)
+        self.assertIn("UnexpectedError", message)
+        self.assertNotIn("PRIVATE", message)
+        self.assertNotIn("/Users/", message)
+
+    def test_worker_error_status_in_camera_tick_is_safe(self):
+        app = GameHost()
+        app.emu.error = "OSError: PRIVATE /home/person/private-rom.gba"
+        GameplayMixin.tick(app)
+        self.assertIn("Emulator stopped", app.game_status.get())
+        self.assertIn("OSError", app.game_status.get())
+        self.assertNotIn("PRIVATE", app.game_status.get())
+        app.stop_controls.assert_called_once()
+        self.assertIsNone(app.emu.error)
+        app.root.after.assert_called_once()
+        app.game_bezel.set_active.assert_called_once_with(False)
+
+    def test_camera_arm_launch_warning_does_not_echo_worker_failure(self):
+        app = GameHost()
+        app.emu.last_error = "FileNotFoundError: PRIVATE /Users/name/game.gba"
+        with patch.object(GameplayMixin, "_camera_is_open",
+                          return_value=True), patch(
+                              "anything_plays.ui_gameplay.messagebox.showwarning"
+                          ) as warning:
+            GameplayMixin.toggle(app)
+        self.assertIn("Emulator launch failed", app.game_status.get())
+        self.assertNotIn("PRIVATE", app.game_status.get())
+        self.assertNotIn("/Users/", warning.call_args.args[1])
+        self.assertIn("Restart game", warning.call_args.args[1])
+        warning.assert_called_once()
+        app.stop_controls.assert_not_called()
 
     def test_external_start_waits_for_confirmed_native_stop(self):
         app = ExternalHost()
