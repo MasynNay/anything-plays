@@ -1,0 +1,45 @@
+name: 3.3.1 | Preserve external game until native Stop completes
+
+# Four-platform synthetic compatibility gate. Never launches a real ROM,
+# Dolphin, RetroArch, camera, GPU process or local user configuration.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-external-launch-stop-order-qa.yml'
+      - 'anything_plays/ui_external.py'
+      - 'tests/test_v331_external_launch_stop_order.py'
+
+permissions:
+  contents: read
+
+jobs:
+  external-native-stop-order:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: External launch safety | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal desktop import dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Verify external process preservation and native Stop ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_external.py tests/test_v331_external_launch_stop_order.py
+          python -m unittest discover -s tests -p 'test_v331_external_launch_stop_order.py' -v
+          python -m unittest discover -s tests -p 'test_v331_backend_switch_stop_guard.py' -v
