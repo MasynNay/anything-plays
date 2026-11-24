@@ -358,12 +358,45 @@ class LibraryMixin:
         self.start_rom(str(path))
 
     def unload_rom(self):
+        """Retire the native game even when optional input cleanup breaks.
+
+        Unloading must not stop halfway because a dead HID/IPC wrapper or Tk
+        status widget threw during teardown. Preserve each independent
+        release action and then run the mandatory native stop. A failure of
+        the actual native stop is NOT masked or reported as a clean unload.
+        """
         prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
         if callable(prepare):
-            prepare()
-        self.stop_external_emulator()
-        self.deactivate_manual()
-        self.stop_controls()
+            try:
+                prepare()
+            except Exception:
+                # Even a swapped/broken controller wrapper must not block
+                # shutting down the currently running game.
+                pass
+        try:
+            self.stop_external_emulator()
+        except Exception:
+            # External developer fallback is separate from native Libretro.
+            pass
+        try:
+            self.deactivate_manual()
+        except Exception:
+            # Directly clear the underlying manual input latch if a custom
+            # native facade throws while unloading. The mandatory core stop
+            # below also releases its native input resources.
+            inputs = getattr(self.emu, "inputs", None)
+            release = getattr(inputs, "release_manual", None)
+            if callable(release):
+                try:
+                    release()
+                except Exception:
+                    pass
+        try:
+            self.stop_controls()
+        except Exception:
+            # Camera Stop has its own protected input-buffer release path.
+            # Do not let a damaged custom hook block the core's shutdown.
+            pass
         self.emu.stop()
         from anything_plays.game_display_lifecycle import clear_game_video
         clear_game_video(self)
