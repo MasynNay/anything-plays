@@ -407,9 +407,18 @@ class GamepadMixin:
                 if unfocused:
                     buttons = frozenset()
                 self.emu.set_gamepad_buttons(buttons)
-                status_changed = status != self.gamepad_status.get()
-                if status_changed:
-                    self.gamepad_status.set(status)
+                # Tk labels and optional live preview canvases are not SDL
+                # input devices. A destroyed status widget or decorative
+                # renderer must never trigger the device-failure handler,
+                # uncheck the saved controller preference, or revoke a
+                # working native gamepad snapshot.
+                status_changed = False
+                try:
+                    status_changed = status != self.gamepad_status.get()
+                    if status_changed:
+                        self.gamepad_status.set(status)
+                except Exception:
+                    status_changed = False
                 # Redraw live highlighted inputs even when the device
                 # connection label stays unchanged. Skip steady idle polls.
                 connected = self._gamepad.controller is not None
@@ -418,8 +427,17 @@ class GamepadMixin:
                             if connected else frozenset())
                 if (status_changed or
                         snapshot != getattr(self, "_last_controller_art_snapshot", None)):
-                    self.refresh_controller_artwork()
-                self._refresh_gamepad_live_input()
+                    try:
+                        self.refresh_controller_artwork()
+                    except Exception:
+                        # Avoid retrying a faulty decorative canvas every
+                        # 65 ms until the device inputs actually change.
+                        self._last_controller_art_snapshot = snapshot
+                try:
+                    self._refresh_gamepad_live_input()
+                except Exception:
+                    # Live-test text is advisory, not input transport.
+                    pass
             # Off-state is handled immediately in toggle_gamepad(), not on
             # the next timer callback.
         except Exception:
