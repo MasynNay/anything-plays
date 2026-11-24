@@ -231,11 +231,11 @@ class ProfilesMixin:
         # a live core while a blocked Libretro callback is winding down.
         # A timed-out Stop has already disarmed camera/controller input,
         # so a canceled switch cannot promise that play is still active.
+        self.stop_controls()
         prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
         if callable(prepare):
             prepare()
         self.deactivate_manual()
-        self.stop_controls()
         if self.emu.stop() is False:
             self.system_key.set(previous)
             self.cfg = old_editor
