@@ -17,6 +17,22 @@ MAX_VISIBLE_CARTRIDGES = 300
 CARTRIDGES_PER_BATCH = 12
 
 
+def stable_missing_core_guidance(system):
+    """Version-independent repair instructions without ROM or host paths."""
+    if system == 'gamecube':
+        return (
+            'The installed GameCube emulator or its required '
+            'Dolphin system files are missing. Repair or '
+            'reinstall Anything Plays. No separate Dolphin '
+            'or emulator download is required.'
+        )
+    return (
+        'A bundled emulator core is missing or damaged. '
+        'Repair or reinstall Anything Plays; all supported '
+        'console emulators are bundled for offline use.'
+    )
+
+
 class LibraryMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -370,6 +386,21 @@ class LibraryMixin:
         prior_core_path = getattr(self.emu, "core_path", None)
         prior_running = (getattr(self.emu, "running", False) is True
                          or getattr(self.emu, "launching", False) is True)
+        # Preflight the new core BEFORE releasing a healthy, currently
+        # playing session's controls, camera input or native worker. A
+        # requested unavailable console is not permission to disarm the old
+        # session, and should not change its ROM or Stream Output.
+        if prior_running and self.uses_embedded_emulator():
+            if not self.emu.find_system_core():
+                self.game_status.set(
+                    'New emulator unavailable · previous game retained'
+                )
+                messagebox.showerror(
+                    'Emulator unavailable',
+                    stable_missing_core_guidance(self.system_key.get()),
+                    parent=self.root,
+                )
+                return
         # An explicit shelf selection may recover from a rejected missing-
         # core launch. Never reuse the old native ROM during the rejected
         # state; users can deliberately choose a new game once repaired.
@@ -439,19 +470,9 @@ class LibraryMixin:
                     # suggestion, even though no native core could start.
                     # Retire the outgoing worker and all GAME-only pixels;
                     # preserve independent Stream Mode camera imagery.
-                    if self.system_key.get() == 'gamecube':
-                        guidance = (
-                            'The installed GameCube emulator or its required '
-                            'Dolphin system files are missing. Repair or '
-                            'reinstall Anything Plays. No separate Dolphin '
-                            'or emulator download is required.'
-                        )
-                    else:
-                        guidance = (
-                            'A bundled emulator core is missing or damaged. '
-                            'Repair or reinstall Anything Plays; all supported '
-                            'console emulators are bundled for offline use.'
-                        )
+                    guidance = stable_missing_core_guidance(
+                        self.system_key.get()
+                    )
                     if prior_running:
                         # A missing *new* system must not terminate a real
                         # session already playing. Restore its selection and
