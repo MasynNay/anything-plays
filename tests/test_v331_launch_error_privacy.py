@@ -174,6 +174,39 @@ class LaunchErrorPrivacyTests(unittest.TestCase):
         self.assertNotIn("PRIVATE", app.game_status.get())
         error.assert_called_once()
 
+    def test_external_start_waits_for_confirmed_native_stop(self):
+        app = ExternalHost()
+        app.emu.stop.return_value = False
+        with patch("anything_plays.ui_external.launch") as launch, \
+             patch("anything_plays.ui_external.DolphinPipeController") as bridge, \
+             patch("anything_plays.ui_external.messagebox.showerror") as error:
+            self.assertIs(app.start_external_rom("/synthetic/game.iso"), False)
+        app.emu.stop.assert_called_once()
+        launch.assert_not_called()
+        bridge.assert_not_called()
+        error.assert_not_called()
+        self.assertIsNone(app.external_process)
+        self.assertIsNone(app.external_input)
+        self.assertIn("still shutting down", app.game_status.get())
+
+    def test_external_launch_after_native_stop_completion_still_works(self):
+        app = ExternalHost()
+        app.emu.stop.return_value = True
+        process, bridge = Mock(), Mock()
+        with patch("anything_plays.ui_external.sys.platform", "linux"), \
+             patch("anything_plays.ui_external.DolphinPipeController",
+                   return_value=bridge), \
+             patch("anything_plays.ui_external.launch",
+                   return_value=process) as launch, \
+             patch("anything_plays.ui_external.messagebox.showerror") as error:
+            self.assertTrue(app.start_external_rom("/synthetic/game.iso"))
+        launch.assert_called_once()
+        bridge.start.assert_called_once()
+        error.assert_not_called()
+        self.assertIs(app.external_process, process)
+        self.assertIs(app.external_input, bridge)
+        app.show_external_placeholder.assert_called_once()
+
     def test_external_native_error_with_broken_str_is_safe(self):
         app = ExternalHost()
         with patch("anything_plays.ui_external.launch",
