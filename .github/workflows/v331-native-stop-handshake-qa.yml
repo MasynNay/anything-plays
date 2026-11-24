@@ -10,6 +10,7 @@ on:
       - 'anything_plays/gba_emulator.py'
       - 'anything_plays/ui_library.py'
       - 'anything_plays/ui_profiles.py'
+      - 'anything_plays/ui_gameplay.py'
       - 'tests/test_v331_native_worker_stop_confirmation.py'
 
 permissions:
@@ -43,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m compileall -q anything_plays/gba_emulator.py anything_plays/ui_library.py anything_plays/ui_profiles.py tests/test_v331_native_worker_stop_confirmation.py
+          python -m compileall -q anything_plays/gba_emulator.py anything_plays/ui_library.py anything_plays/ui_profiles.py anything_plays/ui_gameplay.py tests/test_v331_native_worker_stop_confirmation.py
           python -m unittest discover -s tests -p 'test_v331_native_worker_stop_confirmation.py' -v
           python -m unittest discover -s tests -p 'test_v331_rom_unload_fault_tolerance.py' -v
           python -m unittest discover -s tests -p 'test_v331_missing_core_launch_cleanup.py' -v
