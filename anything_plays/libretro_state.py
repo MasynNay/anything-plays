@@ -176,6 +176,15 @@ class LibretroRecoveryState:
             raise RuntimeError("Native core could not serialize recovery state")
         payload = buffer.raw
         digest = hashlib.sha256(payload).hexdigest()
+        # A private QA checkpoint must never refer to another install,
+        # including when its native payload is unchanged and would be skipped.
+        private = is_v32_preview() or is_v33_candidate()
+        if private:
+            _checked_native_save_path(self.path)
+            if self.path.is_symlink():
+                raise ValueError("Refusing symlinked native resume")
+            if self.path.is_file() and self.path.stat().st_nlink != 1:
+                raise ValueError("Preview recovery state cannot share a stable file")
         if digest == self._last_digest and self._last_packet_size is not None:
             try:
                 # Identical in-memory state is not proof that a removable
@@ -200,7 +209,7 @@ class LibretroRecoveryState:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.is_symlink():
             raise ValueError("Refusing to replace symlinked native resume")
-        if (is_v32_preview() and self.path.is_file()
+        if (private and self.path.is_file()
                 and self.path.stat().st_nlink != 1):
             raise ValueError("Preview recovery state cannot share a stable file")
         # Never use a fixed .apstate.tmp name. Two independent instances
