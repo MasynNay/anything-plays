@@ -9,6 +9,7 @@ on:
       - 'anything_plays/launch_error_messages.py'
       - 'anything_plays/ui_library.py'
       - 'anything_plays/ui_external.py'
+      - 'anything_plays/ui_gameplay.py'
       - 'tests/test_v331_launch_error_privacy.py'
 
 permissions:
@@ -42,7 +43,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m compileall -q anything_plays/launch_error_messages.py anything_plays/ui_library.py anything_plays/ui_external.py tests/test_v331_launch_error_privacy.py
+          python -m compileall -q anything_plays/launch_error_messages.py anything_plays/ui_library.py anything_plays/ui_external.py anything_plays/ui_gameplay.py tests/test_v331_launch_error_privacy.py
           python -m unittest discover -s tests -p 'test_v331_launch_error_privacy.py' -v
+          python -m unittest discover -s tests -p 'test_v32_calibration_input_safety.py' -v
           python -m unittest discover -s tests -p 'test_v331_rom_unload_fault_tolerance.py' -v
           python -m unittest discover -s tests -p 'test_v331_missing_core_launch_cleanup.py' -v
