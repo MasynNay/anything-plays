@@ -521,6 +521,7 @@ class LibraryMixin:
                         # stale video. Use the normal shutdown path so save
                         # state, canvas, and native resources are released.
                         if self.unload_rom() is False:
+                            self.current_rom = prior_rom
                             return False
                         self.game_status.set(title)
                         messagebox.showinfo(
@@ -556,6 +557,7 @@ class LibraryMixin:
                                              parent=self.root)
                         return
                     if self.unload_rom() is False:
+                        self.current_rom = prior_rom
                         return False
                     self._retry_requires_rom_selection = True
                     self.game_status.set(
