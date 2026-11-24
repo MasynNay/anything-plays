@@ -374,7 +374,17 @@ class GameplayMixin:
                 self._save_warning_until = time.monotonic() + 20
                 self.emu.resume_info = None
             elif self.emu.running:
-                if (self.current_rom and
+                # A timed-out native Stop may retain running=True until the
+                # worker returns from retro_run(). Never replace the explicit
+                # "still shutting down" status with a false "Playing" label.
+                # New sessions clear stop_event before launching the worker.
+                stop_event = getattr(self.emu, "stop_event", None)
+                try:
+                    stopping = (stop_event is not None
+                                and stop_event.is_set() is True)
+                except Exception:
+                    stopping = True
+                if (not stopping and self.current_rom and
                         time.monotonic() >= getattr(self, "_save_warning_until", 0)):
                     playing = 'Playing ' + Path(self.current_rom).stem
                     # Tk variable traces and widget relayouts are unnecessary
