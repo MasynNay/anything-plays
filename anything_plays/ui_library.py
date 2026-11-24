@@ -366,6 +366,10 @@ class LibraryMixin:
                 parent=self.root,
             )
             return
+        prior_rom = getattr(self, "current_rom", None)
+        prior_core_path = getattr(self.emu, "core_path", None)
+        prior_running = (getattr(self.emu, "running", False) is True
+                         or getattr(self.emu, "launching", False) is True)
         # An explicit shelf selection may recover from a rejected missing-
         # core launch. Never reuse the old native ROM during the rejected
         # state; users can deliberately choose a new game once repaired.
@@ -448,6 +452,24 @@ class LibraryMixin:
                             'Repair or reinstall Anything Plays; all supported '
                             'console emulators are bundled for offline use.'
                         )
+                    if prior_running:
+                        # A missing *new* system must not terminate a real
+                        # session already playing. Restore its selection and
+                        # core metadata rather than leaving the failed ROM
+                        # as the next Restart target.
+                        self.current_rom = prior_rom
+                        self.emu.core_path = prior_core_path
+                        if bezel is not None:
+                            try:
+                                bezel.set_active(True)
+                            except Exception:
+                                pass
+                        self.game_status.set(
+                            'New emulator unavailable · previous game retained'
+                        )
+                        messagebox.showerror('Emulator unavailable', guidance,
+                                             parent=self.root)
+                        return
                     self.unload_rom()
                     self._retry_requires_rom_selection = True
                     self.game_status.set(
