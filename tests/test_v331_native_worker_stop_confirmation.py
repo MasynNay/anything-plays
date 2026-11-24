@@ -62,7 +62,7 @@ class VideoHost:
         self.uses_embedded_emulator = lambda system=None: True
 
 
-class StatusTickHost(VideoHost):
+class StatusTickHost(VideoHost, GameplayMixin):
     def __init__(self):
         super().__init__()
         self._closing = False
