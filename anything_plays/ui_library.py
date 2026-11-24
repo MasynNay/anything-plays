@@ -480,8 +480,8 @@ class LibraryMixin:
                 # Resolve the selected core on every game launch. A vetted
                 # in-app update or rollback takes effect here without an app
                 # restart; an already-loaded native DLL is never replaced.
-                self.emu.core_path = self.emu.find_system_core()
-                if not self.emu.core_path:
+                selected_core_path = self.emu.find_system_core()
+                if not selected_core_path:
                     # Public 3.1.1 contains the full approved console set,
                     # but the 3.2 QA installer intentionally contains only
                     # mGBA. An unbundled preview core is NOT file corruption.
@@ -523,7 +523,6 @@ class LibraryMixin:
                         # core metadata rather than leaving the failed ROM
                         # as the next Restart target.
                         self.current_rom = prior_rom
-                        self.emu.core_path = prior_core_path
                         if bezel is not None:
                             try:
                                 bezel.set_active(True)
@@ -555,7 +554,6 @@ class LibraryMixin:
                         # The stop request has disarmed camera and gamepad,
                         # but the previous session still owns native state.
                         self.current_rom = prior_rom
-                        self.emu.core_path = prior_core_path
                         self.game_status.set(
                             "Previous game is still shutting down. "
                             "Try changing games after it finishes."
@@ -584,6 +582,7 @@ class LibraryMixin:
                 if prior_render or prior_game_cache:
                     from anything_plays.game_display_lifecycle import clear_game_video
                     clear_game_video(self)
+                self.emu.core_path = selected_core_path
                 self.emu.start(str(path))
             self.current_rom = str(path)
             if self.uses_embedded_emulator():
