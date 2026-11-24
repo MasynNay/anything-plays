@@ -172,7 +172,6 @@ class ProfilesMixin:
         key = self.system_key.get()
         if key not in SYSTEMS:
             return
-        self.stop_controls()
         # The combobox has already changed, so save the previous system explicitly.
         previous = getattr(self, '_active_profile_system', DEFAULT_SYSTEM)
         # Flush any pending size change against the previous console before
@@ -224,6 +223,13 @@ class ProfilesMixin:
                 "Switch canceled; previous controls were retained."
             )
             return False
+        # Only commit the input handoff after the destination profile was
+        # loaded, the previous profile was persisted, and the new editor was
+        # successfully rendered. If any of those steps fail, the selector
+        # rolls back while the existing game and camera-controlled buttons
+        # stay active. A successful console switch still releases every
+        # held camera input before stopping the old native game.
+        self.stop_controls()
         # External games have their own window. Change the overlay only
         # after the incoming controls have been displayed successfully.
         if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
