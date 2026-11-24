@@ -3,7 +3,17 @@
 Cover art is loaded from the user's ROM directory; nothing is downloaded.
 """
 
+from pathlib import Path
+import warnings
+
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+
+# A local ROM directory can contain user images far larger than a 176x133
+# shelf tile. Reject oversized decoded sources before any RGB conversion and
+# resize accepted images before allocating the cover copy on the Tk thread.
+MAX_COVER_SOURCE_PIXELS = 12_000_000
+COVER_PREVIEW_OVERSAMPLE = 3
 
 
 def cartridge_image(filename, system='gba', artwork_path=None):
@@ -126,15 +136,39 @@ def cartridge_image(filename, system='gba', artwork_path=None):
     # with the same filename stem alongside the ROM. No network required.
     if artwork_path is not None:
         try:
-            with Image.open(artwork_path) as source:
-                cover = source.convert('RGB')
+            # The background scanner rejects linked cover files, but a
+            # symlink may be swapped in before this later GUI render.
+            if Path(artwork_path).is_symlink():
+                raise ValueError("Linked cover is not allowed")
             box_w = label_box[2] - label_box[0]
             box_h = label_box[3] - label_box[1]
-            from PIL import ImageOps
-            cover = ImageOps.fit(cover, (box_w, box_h), method=Image.Resampling.LANCZOS)
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(artwork_path) as source:
+                    width, height = source.size
+                    if (width <= 0 or height <= 0
+                            or width * height > MAX_COVER_SOURCE_PIXELS):
+                        raise ValueError("Cover dimensions exceed shelf budget")
+                    # Reduce large JPEGs in their decoder when possible and
+                    # constrain subsequent RGBA/RGB allocations to a tiny
+                    # preview, rather than a full multi-megapixel image.
+                    source.draft("RGB", (box_w * COVER_PREVIEW_OVERSAMPLE,
+                                         box_h * COVER_PREVIEW_OVERSAMPLE))
+                    source.thumbnail(
+                        (box_w * COVER_PREVIEW_OVERSAMPLE,
+                         box_h * COVER_PREVIEW_OVERSAMPLE),
+                        Image.Resampling.LANCZOS,
+                    )
+                    cover = source.convert("RGB")
+            cover = ImageOps.fit(
+                cover, (box_w, box_h), method=Image.Resampling.LANCZOS
+            )
             image.paste(cover, (label_box[0], label_box[1]))
             return image
-        except (OSError, ValueError):
+        except Exception:
+            # Optional local artwork must never crash the shelf, leak a
+            # private device path, or keep Tk busy on a corrupt image.
+            # The normal generated cartridge remains a safe fallback.
             pass
     max_width = label_box[2] - label_box[0] - 6
     max_lines = 3 if system in ('gb', 'gbc') else 2

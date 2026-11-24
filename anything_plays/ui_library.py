@@ -253,8 +253,13 @@ class LibraryMixin:
             try:
                 games = scan_rom_directory(folder, extensions, cancelled=cancel.is_set)
                 result.put((games, None))
-            except OSError as exc:
-                result.put(([], str(exc)))
+            except Exception:
+                # A bad filesystem adapter, unplugged share, or canceled
+                # scanner may fail with more than OSError. Always publish a
+                # terminal result, otherwise the Tk timer polls forever.
+                # Never copy exception text containing private file paths,
+                # user names or device identifiers to the visible shelf.
+                result.put(([], "unavailable"))
 
         Thread(target=scan_worker, daemon=True, name="rom-library-scan").start()
         self.root.after(60, lambda: self._poll_rom_scan(generation, result))
@@ -269,7 +274,10 @@ class LibraryMixin:
             return
 
         if error:
-            self.library_summary.set(f"ROM LIBRARY · Could not scan folder: {error}")
+            self.library_summary.set(
+                "ROM LIBRARY · Could not scan folder. "
+                "Check the folder or drive and refresh."
+            )
             return
         if not games:
             self.library_summary.set("ROM LIBRARY · No compatible games found")

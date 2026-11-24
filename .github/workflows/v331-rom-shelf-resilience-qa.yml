@@ -1,0 +1,50 @@
+name: 3.3.1 | ROM shelf scans and cover-art resilience
+
+# Cross-platform synthetic folder and cover image tests. No emulator cores,
+# real ROMs, personal images, Tk display, USB hardware, or external servers.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-rom-shelf-resilience-qa.yml'
+      - 'anything_plays/ui_library.py'
+      - 'anything_plays/rom_library.py'
+      - 'anything_plays/cartridge_art.py'
+      - 'tests/test_v331_rom_shelf_fault_recovery.py'
+      - 'tests/test_rom_library.py'
+      - 'tests/test_v311_rom_scan_isolation.py'
+
+permissions:
+  contents: read
+
+jobs:
+  safe-shelf:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: ROM shelf | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install local image decoder
+        run: python -m pip install "Pillow>=10,<13"
+      - name: Validate scan cancellation, failure recovery and cover boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_library.py anything_plays/rom_library.py anything_plays/cartridge_art.py tests/test_v331_rom_shelf_fault_recovery.py
+          python -m unittest discover -s tests -p 'test_v331_rom_shelf_fault_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v311_rom_scan_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_rom_library.py' -v
