@@ -248,15 +248,28 @@ class ExternalBackendMixin:
         return True
 
     def stop_external_emulator(self):
+        """Retire both external resources even if either native hook fails.
+
+        A detached/closed Dolphin or RetroPad bridge can raise on close().
+        That must never prevent an independent emulator process from being
+        terminated. Detach both references first so repeated Stop is safe.
+        No native exception strings or private device paths reach the UI.
+        """
         input_bridge = getattr(self, "external_input", None)
-        self.external_input = None
-        if input_bridge is not None:
-            input_bridge.close()
         process = getattr(self, "external_process", None)
+        self.external_input = None
         self.external_process = None
-        if process is None or process.poll() is not None:
-            return
-        try:
-            process.terminate()
-        except OSError:
-            pass
+        if input_bridge is not None:
+            try:
+                input_bridge.close()
+            except Exception:
+                # A failed IPC bridge release cannot hold the emulator alive.
+                pass
+        if process is not None:
+            try:
+                if process.poll() is None:
+                    process.terminate()
+            except Exception:
+                # A process may exit between poll() and terminate(), or an
+                # already-reaped/foreign native handle may reject either.
+                pass
