@@ -25,8 +25,8 @@ def facade():
 class NativeStopInputFenceTests(TestCase):
     def test_gamepad_snapshot_is_allowed_before_stop(self):
         emu = facade()
-        emu.set_gamepad_buttons(("A", "START"))
-        self.assertEqual(emu.inputs.gamepad_buttons, {"A", "START"})
+        emu.set_gamepad_buttons(("A", "B"))
+        self.assertEqual(emu.inputs.gamepad_buttons, {"A", "B"})
 
     def test_gamepad_pressed_after_stop_is_rejected_and_clears_old_hold(self):
         emu = facade()
