@@ -33,6 +33,25 @@ def stable_missing_core_guidance(system):
     )
 
 
+def native_worker_alive(emu):
+    """Treat an unfinished native worker as active even during final teardown.
+
+    Libretro may set running=False before the Python thread exits. Do not
+    switch the library pointer or discard the previous frame during that
+    gap. A broken third-party thread probe fails closed.
+    """
+    worker = getattr(emu, "thread", None)
+    if worker is None:
+        return False
+    probe = getattr(worker, "is_alive", None)
+    if not callable(probe):
+        return False
+    try:
+        return probe() is True
+    except Exception:
+        return True
+
+
 class LibraryMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -428,7 +447,8 @@ class LibraryMixin:
         prior_rom = getattr(self, "current_rom", None)
         prior_core_path = getattr(self.emu, "core_path", None)
         prior_running = (getattr(self.emu, "running", False) is True
-                         or getattr(self.emu, "launching", False) is True)
+                         or getattr(self.emu, "launching", False) is True
+                         or native_worker_alive(self.emu))
         # Preflight the new core BEFORE releasing a healthy, currently
         # playing session's controls, camera input or native worker. A
         # requested unavailable console is not permission to disarm the old
@@ -500,7 +520,8 @@ class LibraryMixin:
                         # missing core must also stop its worker and clear
                         # stale video. Use the normal shutdown path so save
                         # state, canvas, and native resources are released.
-                        self.unload_rom()
+                        if self.unload_rom() is False:
+                            return False
                         self.game_status.set(title)
                         messagebox.showinfo(
                             "3.2 preview emulator availability",
@@ -534,7 +555,8 @@ class LibraryMixin:
                         messagebox.showerror('Emulator unavailable', guidance,
                                              parent=self.root)
                         return
-                    self.unload_rom()
+                    if self.unload_rom() is False:
+                        return False
                     self._retry_requires_rom_selection = True
                     self.game_status.set(
                         'Emulator files missing · repair or reinstall Anything Plays'
@@ -546,8 +568,7 @@ class LibraryMixin:
                 # framebuffer cleanup. CoreSession.start() already stops an
                 # inactive session, so avoid an extra stop on first launch.
                 # Keep missing-core preview's own unload/stop path unchanged.
-                if (getattr(self.emu, "running", False) is True or
-                        getattr(self.emu, "launching", False) is True):
+                if prior_running:
                     if self.emu.stop() is False:
                         # Do not switch the core path or use the new ROM for
                         # Restart while the previous worker remains alive.
