@@ -1,0 +1,50 @@
+name: 3.3.1 | Native worker shutdown handshake
+
+# Cross-platform synthetic worker timeout tests, not a claim that any real
+# hanging Libretro core can safely be forcibly terminated. No user ROMs,
+# physical controllers/cameras, emulator binaries or recorded video.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-native-stop-handshake-qa.yml'
+      - 'anything_plays/gba_emulator.py'
+      - 'anything_plays/ui_library.py'
+      - 'anything_plays/ui_profiles.py'
+      - 'tests/test_v331_native_worker_stop_confirmation.py'
+
+permissions:
+  contents: read
+
+jobs:
+  native-stop:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Stop handshake | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal source dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Compile and test blocked worker transitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/gba_emulator.py anything_plays/ui_library.py anything_plays/ui_profiles.py tests/test_v331_native_worker_stop_confirmation.py
+          python -m unittest discover -s tests -p 'test_v331_native_worker_stop_confirmation.py' -v
+          python -m unittest discover -s tests -p 'test_v331_rom_unload_fault_tolerance.py' -v
+          python -m unittest discover -s tests -p 'test_v331_missing_core_launch_cleanup.py' -v
+          python -m unittest discover -s tests -p 'test_v331_console_switch_input_guard.py' -v
