@@ -21,14 +21,33 @@ class ExternalBackendMixin:
     def _switch_3d_backend(self, system):
         """Select a 3D renderer without disturbing other console settings."""
         if self.system_key.get() != system:
-            return
-        if not getattr(self, "external_fallback_enabled", False):
+            return False
+        fallback = bool(getattr(self, "external_fallback_enabled", False))
+        selection = (
+            self.n64_embedded if system == "n64" else self.gamecube_embedded
+        )
+        # This callback belongs to a Tk Checkbutton: the new boolean is
+        # already applied when we run. On a rejected switch roll the widget
+        # back to the *previous* backend rather than leaving it pointing at
+        # an external process while the embedded core is still alive.
+        prior_selected = not bool(selection.get()) if fallback else True
+        if not fallback:
             # External launchers are not an acceptable user-facing fallback:
             # select the packaged core even if old test preferences said no.
             self.n64_embedded.set(True)
             self.gamecube_embedded.set(True)
         self.stop_controls()
-        self.unload_rom()
+        try:
+            unloaded = self.unload_rom()
+        except Exception:
+            unloaded = False
+        if unloaded is False:
+            selection.set(prior_selected)
+            self.game_status.set(
+                "Backend switch canceled: the previous emulator could not "
+                "finish shutting down. Retry after it stops."
+            )
+            return False
         if not self.uses_embedded_emulator() and self.view_mode.get() == "Game only":
             self.set_view_mode("Windowed")
         self.save_preferences()
@@ -52,6 +71,7 @@ class ExternalBackendMixin:
                 f"{name} external developer fallback selected; "
                 f"{program} must be installed separately."
             )
+        return True
 
     def switch_n64_backend(self):
         self._switch_3d_backend("n64")
