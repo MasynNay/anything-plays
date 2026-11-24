@@ -65,7 +65,7 @@ class BackendSwitchStopTests(unittest.TestCase):
         frame = app.emu.frame
         self.assertIs(app._switch_3d_backend("gamecube"), False)
         self.assertTrue(app.gamecube_embedded.get())
-        self.assertIn("still", app.game_status.get())
+        self.assertIn("finish shutting down", app.game_status.get())
         app.assert_previous_game_untouched(self, frame)
 
     def test_n64_timeout_does_not_persist_external_fallback(self):
