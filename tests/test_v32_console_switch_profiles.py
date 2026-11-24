@@ -76,7 +76,9 @@ class ProfileConsoleSwitchTests(unittest.TestCase):
         self.assertEqual(app.profile_store.attempt[0], "gb")
         self.assertIn("Switch canceled", app.status.get())
         self.assertNotIn("full disk", app.status.get())
-        self.assertEqual(app.stopped, 1)
+        # Saving the old profile failed: the pending selector move must
+        # NOT disarm already-held camera controls in the running game.
+        self.assertEqual(app.stopped, 0)
         self.assertEqual(app.view_mode.get(), "Game only")
         self.assertEqual(app.view_transitions, [])
 
