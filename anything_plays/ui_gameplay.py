@@ -63,12 +63,41 @@ class GameplayMixin:
                 ('All files', '*'),
             ],
         )
-        if path:
-            self.stop_controls()
-            self.emu.stop()
-            self.emu.core_path = path
+        if not path:
+            return False
+        # Legacy manual-core selection must obey the same native worker
+        # acknowledgement as ROM replacement and console switching.
+        # A stuck retro_run() can outlive the bounded Stop join; never
+        # change its loaded DLL pointer while the worker still owns it.
+        self.stop_controls()
+        try:
+            stopped = self.emu.stop()
+        except Exception:
+            self.game_status.set(
+                'Could not stop the previous emulator. Core unchanged.'
+            )
+            return False
+        if stopped is False:
+            self.game_status.set(
+                'Previous emulator is still shutting down. '
+                'Core unchanged; retry after it finishes.'
+            )
+            return False
+        prior_core = self.emu.core_path
+        self.emu.core_path = path
+        try:
             self.save_preferences(core_path=path)
-            self.game_status.set('Core selected: ' + Path(path).name)
+        except Exception:
+            # A failed preferences write must not silently commit a core
+            # selector inconsistent with the saved installed configuration.
+            # Never copy private path/permission exception text to Tk.
+            self.emu.core_path = prior_core
+            self.game_status.set(
+                'Could not save emulator selection. Previous core retained.'
+            )
+            return False
+        self.game_status.set('Core selected: ' + Path(path).name)
+        return True
 
     def activate_manual(self, event=None):
         self.manual_active = True
