@@ -262,8 +262,13 @@ class GameVideoLifecycleTests(unittest.TestCase):
         self.assertIs(app._stream_game_frame, previous_stream)
         app.emu.stop.assert_not_called()
         app.emu.start.assert_not_called()
-        self.assertIn("A bundled emulator core is missing",
+        self.assertIn("New emulator unavailable",
                       app.game_status.set.call_args.args[0])
+        # Failed lookup occurs before any live input is disarmed.
+        app.prepare_gamepad_for_game_transition.assert_not_called()
+        app.stop_controls.assert_not_called()
+        app.deactivate_manual.assert_not_called()
+        self.assertEqual(app.current_rom, "/synthetic/previous-game.gba")
 
     def test_rom_unload_disarms_gamepad_before_stop(self):
         app = LibraryHost()
