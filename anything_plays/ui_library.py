@@ -17,6 +17,22 @@ MAX_VISIBLE_CARTRIDGES = 300
 CARTRIDGES_PER_BATCH = 12
 
 
+def stable_missing_core_guidance(system):
+    """Version-independent repair instructions without ROM or host paths."""
+    if system == 'gamecube':
+        return (
+            'The installed GameCube emulator or its required '
+            'Dolphin system files are missing. Repair or '
+            'reinstall Anything Plays. No separate Dolphin '
+            'or emulator download is required.'
+        )
+    return (
+        'A bundled emulator core is missing or damaged. '
+        'Repair or reinstall Anything Plays; all supported '
+        'console emulators are bundled for offline use.'
+    )
+
+
 class LibraryMixin:
     """Tkinter behavior shared with the main application controller.
 
@@ -329,7 +345,7 @@ class LibraryMixin:
         # Only the explicitly selected current game is safe to retry.
         # Preserve the published stable channel's existing fallback.
         path = self.current_rom
-        if not path:
+        if not path and not getattr(self, "_retry_requires_rom_selection", False):
             from anything_plays.preview_storage import is_v32_preview
             if not is_v32_preview():
                 path = getattr(self.emu, "rom", None)
@@ -366,6 +382,30 @@ class LibraryMixin:
                 parent=self.root,
             )
             return
+        prior_rom = getattr(self, "current_rom", None)
+        prior_core_path = getattr(self.emu, "core_path", None)
+        prior_running = (getattr(self.emu, "running", False) is True
+                         or getattr(self.emu, "launching", False) is True)
+        # Preflight the new core BEFORE releasing a healthy, currently
+        # playing session's controls, camera input or native worker. A
+        # requested unavailable console is not permission to disarm the old
+        # session, and should not change its ROM or Stream Output.
+        if prior_running and self.uses_embedded_emulator():
+            from anything_plays.preview_storage import is_v32_preview
+            if not is_v32_preview() and not self.emu.find_system_core():
+                self.game_status.set(
+                    'New emulator unavailable · previous game retained'
+                )
+                messagebox.showerror(
+                    'Emulator unavailable',
+                    stable_missing_core_guidance(self.system_key.get()),
+                    parent=self.root,
+                )
+                return
+        # An explicit shelf selection may recover from a rejected missing-
+        # core launch. Never reuse the old native ROM during the rejected
+        # state; users can deliberately choose a new game once repaired.
+        self._retry_requires_rom_selection = False
         # Switching directly between ROMs can finish before the next SDL
         # poll; explicitly disarm the outgoing controller snapshot now.
         prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
@@ -425,19 +465,41 @@ class LibraryMixin:
                             parent=self.root,
                         )
                         return
-                    if self.system_key.get() == 'gamecube':
-                        raise RuntimeError(
-                            'The installed GameCube emulator or its required '
-                            'Dolphin system files are missing. The complete '
-                            'Anything Plays 3.0 installer includes both. '
-                            'Repair or reinstall the application. No separate '
-                            'Dolphin or emulator download is required.'
-                        )
-                    raise RuntimeError(
-                        'A bundled emulator core is missing or damaged. '
-                        'Repair or reinstall Anything Plays 3.0; every console '
-                        'is included and must work offline.'
+                    # A missing core is an unrecoverable *launch*, not a
+                    # running game. Earlier versions left current_rom set and
+                    # could display an old frozen game frame with a Restart
+                    # suggestion, even though no native core could start.
+                    # Retire the outgoing worker and all GAME-only pixels;
+                    # preserve independent Stream Mode camera imagery.
+                    guidance = stable_missing_core_guidance(
+                        self.system_key.get()
                     )
+                    if prior_running:
+                        # A missing *new* system must not terminate a real
+                        # session already playing. Restore its selection and
+                        # core metadata rather than leaving the failed ROM
+                        # as the next Restart target.
+                        self.current_rom = prior_rom
+                        self.emu.core_path = prior_core_path
+                        if bezel is not None:
+                            try:
+                                bezel.set_active(True)
+                            except Exception:
+                                pass
+                        self.game_status.set(
+                            'New emulator unavailable · previous game retained'
+                        )
+                        messagebox.showerror('Emulator unavailable', guidance,
+                                             parent=self.root)
+                        return
+                    self.unload_rom()
+                    self._retry_requires_rom_selection = True
+                    self.game_status.set(
+                        'Emulator files missing · repair or reinstall Anything Plays'
+                    )
+                    messagebox.showerror('Emulator unavailable', guidance,
+                                         parent=self.root)
+                    return
                 # Existing native sessions must be fully stopped before any
                 # framebuffer cleanup. CoreSession.start() already stops an
                 # inactive session, so avoid an extra stop on first launch.

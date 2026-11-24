@@ -1,5 +1,6 @@
 """GameCube normal GUI controls launch in the canvas, never through Dolphin.app."""
 from pathlib import Path
+from threading import Lock
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -19,7 +20,14 @@ class GameCubeEmbeddedGuiTests(TestCase):
         panel.stop_external_emulator = Mock()
         panel.start_external_rom = Mock()
         panel.emu = Mock()
+        panel.emu.lock = Lock()
+        panel.emu.running = False
+        panel.emu.launching = False
+        panel.emu.frame = None
+        panel.emu.frame_serial = 0
         panel.emu.find_system_core.return_value = core
+        panel.game_canvas = Mock()
+        panel.show_library = Mock()
         panel.show_playing_info = Mock()
         panel.game_status = Mock()
         return panel
