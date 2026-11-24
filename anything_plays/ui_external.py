@@ -219,17 +219,23 @@ class ExternalBackendMixin:
 
     def start_external_rom(self, rom):
         system = self.system_key.get()
-        self.stop_external_emulator()
-        # The bounded native Stop can time out while its worker still owns
-        # a Libretro core. Do not start an external GPU process alongside
-        # that session. The explicit False result is supported by 3.3.1's
-        # native shutdown handshake; older idle stubs may return None.
-        if self.emu.stop() is False:
+        # Confirm the native worker has exited BEFORE retiring any existing
+        # external fallback. A timed-out or failing native Stop must not
+        # unexpectedly kill a healthy Dolphin/RetroArch game. Legacy idle
+        # facades returning None are still treated as completed.
+        try:
+            stopped = self.emu.stop()
+        except Exception:
+            stopped = False
+        if stopped is False:
+            # Never copy an exception string containing ROM or device paths
+            # into Tk; leave the old external process and bridge untouched.
             self.game_status.set(
                 "Previous emulator is still shutting down. "
-                "Retry after it finishes."
+                "Existing external game retained; retry after it finishes."
             )
             return False
+        self.stop_external_emulator()
         try:
             network_config = None
             dolphin_user = None
