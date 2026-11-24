@@ -1,0 +1,46 @@
+name: 3.3.1 | NGP recovery state file safety (four desktop OSes)
+
+# Source-only synthetic ROM/core/state fixtures; no real ROMs, emulator cores,
+# device capture, user saves, installers, tags or publication actions.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-ngp-state-file-safety.yml'
+      - 'anything_plays/libretro_state.py'
+      - 'tests/test_v30_ngp_state_recovery.py'
+      - 'tests/test_v32_state_atomic.py'
+      - 'tests/test_v331_ngp_recovery_fd_safety.py'
+
+permissions:
+  contents: read
+
+jobs:
+  native-resume-file-safety:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: NGP file safety | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check recovery state source and run pure synthetic regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays tests/test_v331_ngp_recovery_fd_safety.py
+          python -m unittest discover -s tests -p 'test_v30_ngp_state_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v32_state_atomic.py' -v
+          python -m unittest discover -s tests -p 'test_v331_ngp_recovery_fd_safety.py' -v
