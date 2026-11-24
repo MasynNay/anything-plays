@@ -329,7 +329,7 @@ class LibraryMixin:
         # Only the explicitly selected current game is safe to retry.
         # Preserve the published stable channel's existing fallback.
         path = self.current_rom
-        if not path:
+        if not path and not getattr(self, "_retry_requires_rom_selection", False):
             from anything_plays.preview_storage import is_v32_preview
             if not is_v32_preview():
                 path = getattr(self.emu, "rom", None)
@@ -366,6 +366,10 @@ class LibraryMixin:
                 parent=self.root,
             )
             return
+        # An explicit shelf selection may recover from a rejected missing-
+        # core launch. Never reuse the old native ROM during the rejected
+        # state; users can deliberately choose a new game once repaired.
+        self._retry_requires_rom_selection = False
         # Switching directly between ROMs can finish before the next SDL
         # poll; explicitly disarm the outgoing controller snapshot now.
         prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
@@ -445,6 +449,7 @@ class LibraryMixin:
                             'console emulators are bundled for offline use.'
                         )
                     self.unload_rom()
+                    self._retry_requires_rom_selection = True
                     self.game_status.set(
                         'Emulator files missing · repair or reinstall Anything Plays'
                     )
