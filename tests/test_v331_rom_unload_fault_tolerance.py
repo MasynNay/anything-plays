@@ -73,12 +73,12 @@ class ExternalProcessShutdownTests(TestCase):
         app.stop_external_emulator()
         process.terminate.assert_not_called()
 
-    def test_external_poll_fault_detaches_both_resources_without_raising(self):
+    def test_external_poll_fault_attempts_shutdown_before_detaching(self):
         app = FakeHost()
         process = app.external_process
         process.poll.side_effect = RuntimeError("PRIVATE stale handle")
         app.stop_external_emulator()
-        process.terminate.assert_not_called()
+        process.terminate.assert_called_once()
         self.assertIsNone(app.external_input)
         self.assertIsNone(app.external_process)
 

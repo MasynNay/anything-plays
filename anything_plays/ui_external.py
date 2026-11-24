@@ -4,6 +4,7 @@ Hardware GPU games still render in their own windows; only controller input
 is relayed from Anything Plays via RetroPad or the Dolphin POSIX pipe.
 """
 from pathlib import Path
+import subprocess
 import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -299,11 +300,54 @@ class ExternalBackendMixin:
             except Exception:
                 # A failed IPC bridge release cannot hold the emulator alive.
                 pass
-        if process is not None:
+        if process is None:
+            return
+        try:
+            running = process.poll() is None
+        except Exception:
+            # A faulty status handle must not skip the shutdown request.
+            running = True
+        if not running:
+            return
+        try:
+            process.terminate()
+        except Exception:
+            # It might have exited between poll() and terminate(). Avoid a
+            # forceful signal when a completed process can be confirmed.
             try:
-                if process.poll() is None:
-                    process.terminate()
+                if process.poll() is not None:
+                    return
             except Exception:
-                # A process may exit between poll() and terminate(), or an
-                # already-reaped/foreign native handle may reject either.
+                pass
+            try:
+                process.kill()
+            except Exception:
+                pass
+            return
+        # Wait only a bounded interval inside the Tk callback. Hung GPU
+        # processes must not survive indefinitely after a polite request.
+        wait = getattr(process, "wait", None)
+        if not callable(wait):
+            return  # Legacy/custom process facades have no wait hook.
+        try:
+            wait(timeout=0.6)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except Exception:
+                pass
+            try:
+                wait(timeout=0.25)
+            except Exception:
+                pass
+        except Exception:
+            # Even a broken wait wrapper may leave the original process live.
+            try:
+                if process.poll() is not None:
+                    return
+            except Exception:
+                pass
+            try:
+                process.kill()
+            except Exception:
                 pass
