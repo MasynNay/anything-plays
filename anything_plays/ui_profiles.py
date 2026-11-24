@@ -224,22 +224,36 @@ class ProfilesMixin:
             )
             return False
         # Only commit the input handoff after the destination profile was
-        # loaded, the previous profile was persisted, and the new editor was
-        # successfully rendered. If any of those steps fail, the selector
-        # rolls back while the existing game and camera-controlled buttons
-        # stay active. A successful console switch still releases every
-        # held camera input before stopping the old native game.
-        self.stop_controls()
-        # External games have their own window. Change the overlay only
-        # after the incoming controls have been displayed successfully.
-        if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
-            self.set_view_mode("Windowed")
-        self._active_profile_system = key
+        # loaded, the previous profile persisted, and the new editor rendered.
+        # Failed validation must not interrupt active camera controls.
+        # Rendered destination controls are ready, but native shutdown is
+        # still an acceptance gate. Avoid changing the console key used by
+        # a live core while a blocked Libretro callback is winding down.
+        # A timed-out Stop has already disarmed camera/controller input,
+        # so a canceled switch cannot promise that play is still active.
         prepare = getattr(self, "prepare_gamepad_for_game_transition", None)
         if callable(prepare):
             prepare()
         self.deactivate_manual()
-        self.emu.stop()
+        self.stop_controls()
+        if self.emu.stop() is False:
+            self.system_key.set(previous)
+            self.cfg = old_editor
+            try:
+                self.refresh_settings()
+                self.refresh_system_buttons()
+            except (ValueError, TypeError, tk.TclError, RuntimeError):
+                pass
+            self.status.set(
+                "Console switch canceled: the previous emulator is "
+                "still shutting down. Retry after it finishes."
+            )
+            return False
+        # External games have their own window. Change the overlay only
+        # after the incoming controls and native Stop both succeeded.
+        if not self.uses_embedded_emulator(key) and self.view_mode.get() == "Game only":
+            self.set_view_mode("Windowed")
+        self._active_profile_system = key
         self.stop_external_emulator()
         from anything_plays.game_display_lifecycle import clear_game_video
         clear_game_video(self)
