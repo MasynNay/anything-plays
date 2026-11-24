@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from anything_plays.gba_emulator import Emulator
+from anything_plays.ui_gameplay import GameplayMixin
 from anything_plays.ui_library import LibraryMixin, native_worker_alive
 from anything_plays.ui_profiles import ProfilesMixin
 
@@ -59,6 +60,24 @@ class VideoHost:
         self.show_playing_info = Mock()
         self.system_key = Value("gba")
         self.uses_embedded_emulator = lambda system=None: True
+
+
+class StatusTickHost(VideoHost):
+    def __init__(self):
+        super().__init__()
+        self._closing = False
+        self.cap = None
+        self.frame = None
+        self.reference_image = None
+        self._pending_object_controls = False
+        self.emu.error = None
+        self.emu.save_warning = None
+        self.emu.audio_warning = None
+        self.emu.resume_info = None
+        self.emu.stop_event = Event()
+        self.game_status = Value(
+            "Emulator is still shutting down. Wait before changing games."
+        )
 
 
 class NativeStopAcknowledgementTests(unittest.TestCase):
@@ -114,6 +133,23 @@ class NativeStopAcknowledgementTests(unittest.TestCase):
         self.assertIs(Emulator.stop(emu), True)
         self.assertFalse(emu.running)
         self.assertFalse(emu.launching)
+
+class ShutdownStatusTests(unittest.TestCase):
+    def test_stopping_worker_cannot_restore_false_playing_status(self):
+        app = StatusTickHost()
+        app.emu.stop_event.set()
+        GameplayMixin.tick(app)
+        self.assertIn("still shutting down", app.game_status.get())
+        self.assertNotIn("Playing", app.game_status.get())
+        app.root.after.assert_called_once()
+
+    def test_new_session_can_resume_playing_status_when_stop_flag_clears(self):
+        app = StatusTickHost()
+        app.emu.stop_event.clear()
+        GameplayMixin.tick(app)
+        self.assertEqual(app.game_status.get(), "Playing prior-game")
+        app.root.after.assert_called_once()
+
 
 class UnloadHost(VideoHost, LibraryMixin):
     pass
