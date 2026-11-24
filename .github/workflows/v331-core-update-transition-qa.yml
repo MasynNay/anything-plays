@@ -1,0 +1,48 @@
+name: 3.3.1 | Emulator update transition safety
+
+# Source-only synthetic native state. No unapproved core downloads,
+# installation, update token, native library, ROM or user preferences.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-core-update-transition-qa.yml'
+      - 'anything_plays/ui_updates.py'
+      - 'tests/test_v331_core_update_startup_guard.py'
+      - 'tests/test_v21_core_update_ui.py'
+      - 'tests/test_v32_core_update_status.py'
+      - 'tests/test_v331_emulator_update_cache.py'
+
+permissions:
+  contents: read
+
+jobs:
+  core-update-transition:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Update transition | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile source and run updater transition suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_updates.py tests/test_v331_core_update_startup_guard.py
+          python -m unittest discover -s tests -p 'test_v331_core_update_startup_guard.py' -v
+          python -m unittest discover -s tests -p 'test_v21_core_update_ui.py' -v
+          python -m unittest discover -s tests -p 'test_v32_core_update_status.py' -v
+          python -m unittest discover -s tests -p 'test_v331_emulator_update_cache.py' -v
