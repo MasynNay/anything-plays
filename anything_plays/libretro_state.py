@@ -15,6 +15,7 @@ import ctypes as C
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import tempfile
 import time
@@ -22,7 +23,7 @@ import time
 from anything_plays.libretro_save import (
     _checked_native_save_path, _fallback_path, _user_save_directory,
 )
-from anything_plays.preview_storage import is_v32_preview
+from anything_plays.preview_storage import is_v32_preview, is_v33_candidate
 
 MAGIC = b"AP30ST\0\1"
 MAX_STATE_BYTES = 64 * 1024 * 1024
@@ -32,19 +33,31 @@ MAX_CORE_IDENTITY_BYTES = 64 * 1024 * 1024
 
 
 def _hash_file(path, limit):
+    """Hash only the bounded regular file actually opened, not an earlier path."""
     candidate = Path(path)
-    if not candidate.is_file() or candidate.is_symlink():
+    if candidate.is_symlink() or not candidate.is_file():
         raise ValueError("Native game or emulator identity file unavailable")
-    length = candidate.stat().st_size
-    if not 0 < length <= limit:
-        raise ValueError("Native game or emulator identity file too large")
-    digest = hashlib.sha256()
-    with candidate.open("rb") as stream:
-        while True:
-            chunk = stream.read(1024 * 1024)
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0)
+             | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0))
+    with os.fdopen(os.open(candidate, flags), "rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if not stat.S_ISREG(opened.st_mode) or candidate.is_symlink():
+            raise ValueError("Native game or emulator identity file unavailable")
+        if not 0 < opened.st_size <= limit:
+            raise ValueError("Native game or emulator identity file too large")
+        digest = hashlib.sha256()
+        remaining = opened.st_size
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
             if not chunk:
-                break
+                raise ValueError("Native game or emulator identity file changed")
             digest.update(chunk)
+            remaining -= len(chunk)
+        # A file can grow after fstat; never hash bytes beyond the limit or
+        # silently accept an identity that changed partway through the read.
+        if stream.read(1):
+            raise ValueError("Native game or emulator identity file changed")
     return digest.hexdigest()
 
 
@@ -68,6 +81,7 @@ class LibretroRecoveryState:
         self.core_sha = _hash_file(core_path, MAX_CORE_IDENTITY_BYTES)
         self.system = system
         self._last_digest = None
+        self._last_packet_size = None
         self._size = getattr(native.library, "retro_serialize_size", None)
         self._serialize = getattr(native.library, "retro_serialize", None)
         self._restore = getattr(native.library, "retro_unserialize", None)
@@ -105,11 +119,22 @@ class LibretroRecoveryState:
         _checked_native_save_path(self.path)
         if not self.path.is_file():
             return False
-        if is_v32_preview() and self.path.stat().st_nlink != 1:
-            raise ValueError("Preview recovery state cannot share a stable file")
-        if self.path.stat().st_size > MAX_STATE_BYTES + MAX_HEADER_BYTES + 16:
-            raise ValueError("Native resume file exceeds safe size limit")
-        with self.path.open("rb") as stream:
+        private = is_v32_preview() or is_v33_candidate()
+        flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0)
+                 | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_NONBLOCK", 0))
+        with os.fdopen(os.open(self.path, flags), "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            # The path may be replaced after is_file()/stat(): validate the
+            # actual descriptor before reading even the first magic byte.
+            if not stat.S_ISREG(opened.st_mode):
+                raise ValueError("Native resume must be a regular file")
+            if self.path.is_symlink():
+                raise ValueError("Refusing symlinked native resume file")
+            if private and opened.st_nlink != 1:
+                raise ValueError("Preview recovery state cannot share a stable file")
+            if opened.st_size > MAX_STATE_BYTES + MAX_HEADER_BYTES + 16:
+                raise ValueError("Native resume file exceeds safe size limit")
             if stream.read(len(MAGIC)) != MAGIC:
                 raise ValueError("Native resume header not recognized")
             header_size = int.from_bytes(stream.read(4), "big")
@@ -140,6 +165,7 @@ class LibretroRecoveryState:
         if not self._restore(buffer, len(payload)):
             raise RuntimeError("Native core rejected compatible recovery state")
         self._last_digest = digest
+        self._last_packet_size = opened.st_size
         return True
 
     def persist(self):
@@ -150,8 +176,16 @@ class LibretroRecoveryState:
             raise RuntimeError("Native core could not serialize recovery state")
         payload = buffer.raw
         digest = hashlib.sha256(payload).hexdigest()
-        if digest == self._last_digest and self.path.is_file():
-            return False
+        if digest == self._last_digest and self._last_packet_size is not None:
+            try:
+                # Identical in-memory state is not proof that a removable
+                # drive still holds a complete checkpoint. Repair deleted or
+                # truncated files without hashing them on every tick.
+                if (not self.path.is_symlink() and self.path.is_file()
+                        and self.path.stat().st_size == self._last_packet_size):
+                    return False
+            except OSError:
+                pass
         header = json.dumps(
             self._header(payload), sort_keys=True,
             separators=(",", ":"),
@@ -209,4 +243,5 @@ class LibretroRecoveryState:
                 except OSError:
                     pass
         self._last_digest = digest
+        self._last_packet_size = len(packet)
         return True
