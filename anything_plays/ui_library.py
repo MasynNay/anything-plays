@@ -11,6 +11,7 @@ from PIL import Image, ImageTk
 from anything_plays.systems import SYSTEMS
 from anything_plays.cartridge_art import cartridge_image, cartridge_font
 from anything_plays.rom_library import scan_rom_directory, find_cover_art
+from anything_plays.launch_error_messages import safe_launch_failure
 
 
 MAX_VISIBLE_CARTRIDGES = 300
@@ -630,14 +631,15 @@ class LibraryMixin:
                 try:
                     bezel.set_active(False)
                 except Exception:
-                    # Report the original launch failure, not bezel teardown.
+                    # Report the launch failure, not bezel teardown.
                     pass
-            self.game_status.set(
-                "Game could not start: " + str(exc)[:220]
-                + " · Select Restart game after correcting the issue."
-            )
+            # Core/ROM exceptions often embed full personal paths or a
+            # private native device identifier. Do not call str(exc) here
+            # (a faulty extension may even raise from __str__).
+            detail = safe_launch_failure(exc)
+            self.game_status.set(detail)
             self.show_playing_info()
-            messagebox.showerror('ROM', f'Could not start game: {exc}')
+            messagebox.showerror('ROM', detail, parent=self.root)
 
     def load_rom(self):
         system = SYSTEMS[self.system_key.get()]

@@ -12,6 +12,7 @@ from anything_plays.external_emulators import ExternalLaunchError, launch
 from anything_plays.remote_retropad import N64RemoteController, write_retroarch_config
 from anything_plays.dolphin_pipe import DolphinPipeController
 from anything_plays.systems import SYSTEMS
+from anything_plays.launch_error_messages import safe_launch_failure
 
 
 class ExternalBackendMixin:
@@ -199,7 +200,16 @@ class ExternalBackendMixin:
     def start_external_rom(self, rom):
         system = self.system_key.get()
         self.stop_external_emulator()
-        self.emu.stop()
+        # The bounded native Stop can time out while its worker still owns
+        # a Libretro core. Do not start an external GPU process alongside
+        # that session. The explicit False result is supported by 3.3.1's
+        # native shutdown handshake; older idle stubs may return None.
+        if self.emu.stop() is False:
+            self.game_status.set(
+                "Previous emulator is still shutting down. "
+                "Retry after it finishes."
+            )
+            return False
         try:
             network_config = None
             dolphin_user = None
@@ -224,18 +234,16 @@ class ExternalBackendMixin:
             if self.external_input is not None:
                 self.external_input.start()
         except (ExternalLaunchError, OSError, RuntimeError) as exc:
-            if self.external_input is not None:
-                self.external_input.close()
-                self.external_input = None
-            process = self.external_process
-            self.external_process = None
-            if process is not None and process.poll() is None:
-                try:
-                    process.terminate()
-                except OSError:
-                    pass
-            self.game_status.set(str(exc))
-            messagebox.showerror("External emulator setup", str(exc), parent=self.root)
+            # Use the same independently fault-isolated IPC and process
+            # teardown as Stop. A controller bridge can fail during startup
+            # and then fail again during close(); never orphan the process.
+            self.stop_external_emulator()
+            # Launch/OS errors can embed private local paths and device IDs.
+            # Do not evaluate or display exception strings, even when a
+            # third-party extension provides a broken __str__ method.
+            detail = safe_launch_failure(exc, external=True)
+            self.game_status.set(detail)
+            messagebox.showerror("External emulator setup", detail, parent=self.root)
             return False
         self.show_external_placeholder()
         self.game_status.set(

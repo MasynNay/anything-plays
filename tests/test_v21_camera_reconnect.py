@@ -97,7 +97,12 @@ class CameraRecoveryTests(unittest.TestCase):
         app.tick()
         app.game_bezel.set_active.assert_called_once_with(False)
         app.game_status.set.assert_called_once()
-        self.assertIn("core unexpectedly exited", app.game_status.set.call_args.args[0])
+        status = app.game_status.set.call_args.args[0]
+        self.assertIn("Emulator stopped:", status)
+        self.assertIn("Restart game", status)
+        # Raw native error details can contain personal ROM/device paths.
+        # The status message now keeps only safe, fixed guidance.
+        self.assertNotIn("core unexpectedly exited", status)
         self.assertIsNone(app.emu.error)
         self.assertFalse(app.armed)
         app.tick()
