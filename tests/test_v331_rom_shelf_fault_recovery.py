@@ -175,7 +175,11 @@ class BoundedCoverArtTests(unittest.TestCase):
             art = Path(tmp) / "art.jpg"
             Image.new("RGB", (2000, 1000), (34, 200, 15)).save(art)
             actual = cartridge_image("Synthetic", "gba", art)
-            self.assertEqual(actual.getpixel((150, 138))[:3], (34, 200, 15))
+            # JPEG chroma subsampling can round RGB channels slightly
+            # differently in each platform's Pillow/libjpeg build.
+            pixel = actual.getpixel((150, 138))
+            for observed, expected in zip(pixel[:3], (34, 200, 15)):
+                self.assertLessEqual(abs(observed - expected), 5)
             self.assertEqual(actual.getpixel((0, 0))[3], 0)
 
 
