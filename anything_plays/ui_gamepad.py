@@ -491,7 +491,7 @@ class GamepadMixin:
     def _set_controller_capture_status(capture, message):
         """Optional mapping feedback must never interrupt SDL/gameplay."""
         try:
-            self._set_controller_capture_status(capture,message)
+            capture["status"].set(message)
         except Exception:
             # A dismissed mapping dialog can dispose its Tk variables
             # between the 65 ms poll and the pending status update.
