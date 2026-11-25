@@ -256,13 +256,22 @@ class GamepadMixin:
         self._refresh_gamepad_live_input()
         self.refresh_controller_artwork()
 
+    def _gamepad_window_focused(self):
+        """Fail closed on a disappearing Tk window, without disabling SDL."""
+        try:
+            return self.root.focus_get() is not None
+        except Exception:
+            # A destroyed/closing focus widget is not a physical USB fault.
+            # Keep the controller enabled, but never publish held input.
+            return False
+
     def _gamepad_live_message(self):
         """Read-only diagnostic; raw buttons never inject emulated input."""
         if not self.gamepad_enabled.get():
             return "Enable gamepad input to test its buttons."
         if self._gamepad.controller is None:
             return "Connect a compatible controller, then press a button."
-        if self.root.focus_get() is None:
+        if not self._gamepad_window_focused():
             return "Focus Anything Plays to see live controller input."
         pressed = self._gamepad.physical_buttons
         if not pressed:
@@ -375,7 +384,7 @@ class GamepadMixin:
                 # another application was active. Require a neutral physical
                 # controller sample before game input resumes. This is
                 # independent of the remapping press/release guard above.
-                unfocused = self.root.focus_get() is None
+                unfocused = not self._gamepad_window_focused()
                 if unfocused:
                     self._gamepad_focus_release_pending = True
                 elif getattr(self, "_gamepad_focus_release_pending", False):
@@ -478,13 +487,23 @@ class GamepadMixin:
                     # We cannot safely reschedule against a dead window.
                     self._gamepad_tick_job = None
 
+    @staticmethod
+    def _set_controller_capture_status(capture, message):
+        """Optional mapping feedback must never interrupt SDL/gameplay."""
+        try:
+            self._set_controller_capture_status(capture,message)
+        except Exception:
+            # A dismissed mapping dialog can dispose its Tk variables
+            # between the 65 ms poll and the pending status update.
+            pass
+
     def _cancel_controller_capture(self, message=None):
         capture = getattr(self, "_controller_capture", None)
         self._controller_capture = None
         if capture is not None:
             self._controller_capture_release_pending = True
             if message:
-                capture["status"].set(message)
+                self._set_controller_capture_status(capture, message)
 
     def _controller_capture_tick(self, system):
         """Use an SDL physical-input edge to assign a game action safely."""
@@ -497,11 +516,11 @@ class GamepadMixin:
                 "Console changed or controller disconnected; mapping canceled."
             )
             return
-        if self.root.focus_get() is None:
+        if not self._gamepad_window_focused():
             # Never learn a mapping from another app or an unattended pad.
             # Require a fresh edge after the window regains focus.
             capture["baseline"] = frozenset(self._gamepad.physical_buttons)
-            capture["status"].set(
+            self._set_controller_capture_status(capture,
                 "Focus Anything Plays, then release and press the control."
             )
             return
@@ -510,21 +529,26 @@ class GamepadMixin:
         )
         capture["baseline"] = baseline
         if ambiguous:
-            capture["status"].set(
+            self._set_controller_capture_status(capture,
                 "Multiple inputs detected. Release them, then press one control."
             )
         if source is not None:
             target = capture["target"]
             if self._save_gamepad_binding(system, source, target) is False:
-                capture["status"].set(
+                self._set_controller_capture_status(capture,
                     "Controller mapping could not be saved. Check preferences "
                     "storage, release the input and press again to retry."
                 )
                 return
             row = capture["rows"].get(source)
             if row is not None:
-                row.set(target)
-            capture["status"].set(
+                try:
+                    row.set(target)
+                except Exception:
+                    # Mapping is already persisted; a stale dialog widget
+                    # cannot disable a good controller or repeat assignment.
+                    pass
+            self._set_controller_capture_status(capture,
                 f"{source.replace('_', ' ').title()} assigned to {target}. "
                 "Release the controller input before playing."
             )
