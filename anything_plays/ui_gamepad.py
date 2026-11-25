@@ -811,6 +811,15 @@ class GamepadMixin:
             style="Helper.TLabel"
         ).pack(anchor="w", pady=(5, 0))
 
+    def _set_controller_notice(self, message):
+        """A disposed settings label cannot undo a completed disk rollback."""
+        notice = getattr(self, "gamepad_diagnostics_status", None)
+        if notice is not None:
+            try:
+                notice.set(message)
+            except Exception:
+                pass
+
     def _reset_gamepad_mappings(self, system, close):
         """Reset only one console after its preferences write succeeds."""
         previous = self._gamepad_bindings.get(system)
@@ -822,9 +831,9 @@ class GamepadMixin:
         if persisted is False:
             if previous is not None:
                 self._gamepad_bindings[system] = previous
-            notice = getattr(self, "gamepad_diagnostics_status", None)
-            if notice is not None:
-                notice.set("Controller defaults were not saved. Check storage and retry.")
+            self._set_controller_notice(
+                "Controller defaults were not saved. Check storage and retry."
+            )
             return False
         close()
         self.open_controller_settings(system)
@@ -854,11 +863,14 @@ class GamepadMixin:
             else:
                 self._gamepad_bindings[system] = previous
             if display_var is not None:
-                display_var.set(previous_button)
-            notice = getattr(self, "gamepad_diagnostics_status", None)
-            if notice is not None:
-                notice.set(
-                    "Controller mapping could not be saved. Check preferences storage."
-                )
+                try:
+                    display_var.set(previous_button)
+                except Exception:
+                    # Failed persistence was rolled back above; an optional
+                    # destroyed mapping row is not an SDL/controller failure.
+                    pass
+            self._set_controller_notice(
+                "Controller mapping could not be saved. Check preferences storage."
+            )
             return False
         return True
