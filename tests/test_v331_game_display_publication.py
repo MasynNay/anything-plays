@@ -78,6 +78,8 @@ class NativeGameFramePublicationFenceTests(unittest.TestCase):
     def test_healthy_next_native_frame_reuses_photo_and_canvas_item(self):
         app = FakeGameDisplay()
         with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage") as make:
+            make.return_value.width.return_value = 320
+            make.return_value.height.return_value = 213
             app.draw_game()
             with app.emu.lock:
                 app.emu.frame = np.full((4, 6, 3), 72, dtype=np.uint8)
@@ -293,6 +295,8 @@ class NativeGameFramePublicationFenceTests(unittest.TestCase):
     def test_500_frame_session_keeps_one_tk_item_and_no_extra_photos(self):
         app = FakeGameDisplay()
         with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage") as make:
+            make.return_value.width.return_value = 320
+            make.return_value.height.return_value = 213
             for number in range(500):
                 with app.emu.lock:
                     app.emu.frame_serial += 1
