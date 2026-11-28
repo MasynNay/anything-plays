@@ -623,8 +623,8 @@ def compose_stream_output(game, camera, *, size, settings, themes,
                           camera_reference=False, resize_cache=None):
     """Render one complete OBS-capturable DS-style frame as a PIL RGB image.
 
-    With two fitted live/reference sources, a one-entry window-local static
-    chassis avoids repeated text and rounded-rectangle rendering. The cache
+    With two fitted sources or one fitted source in stacked layout, a
+    one-entry window-local static chassis avoids repeated decoration. The cache
     never contains source pixels, and returned frames own their canvas.
     """
     options = validate_stream_settings(settings, themes)
@@ -664,21 +664,32 @@ def compose_stream_output(game, camera, *, size, settings, themes,
         )
         descriptions.append((name, status, placeholder))
 
-    # Two nonempty fitted sources occupy disjoint interior rectangles. All
-    # subsequent static decoration lies outside those rectangles, so pasting
-    # after copying the chassis is pixel-equivalent. Missing/invalid sources
-    # use the original ordered painter (important for narrow placeholders).
-    if (type(resize_cache) is StreamPanelResizeCache
-            and all(fitted is not None for fitted in fits)):
-        key = (width, height, tuple(options.items()), palette,
-               tuple(descriptions))
+    # Two nonempty fitted sources occupy disjoint interior rectangles.
+    # In the stacked layout a missing source's centered placeholder also
+    # stays in its own vertical panel, so it is safe to cache that chrome
+    # while the other screen animates. Keep the ordered painter for narrow
+    # side-by-side placeholders, which can extend horizontally into a
+    # neighboring panel, and for a fully idle output (no live source).
+    cacheable = (
+        all(fitted is not None for fitted in fits)
+        or (options["layout"] == "DS stacked"
+            and any(fitted is not None for fitted in fits))
+    )
+    if type(resize_cache) is StreamPanelResizeCache and cacheable:
+        # Refresh-rate changes affect scheduling, not any painted pixel.
+        key = (width, height, tuple(
+            (name, value) for name, value in options.items()
+            if name != "frame_rate"
+        ), palette, tuple(descriptions))
         img = resize_cache.chassis(
             key, lambda: _draw_stream_chassis(
                 width, height, options, palette, descriptions, (None, None)
             )
         )
-        for resized, x, y in fits:
-            img.paste(resized, (x, y))
+        for fitted in fits:
+            if fitted is not None:
+                resized, x, y = fitted
+                img.paste(resized, (x, y))
         return img
     if type(resize_cache) is StreamPanelResizeCache:
         resize_cache.clear_chassis()
