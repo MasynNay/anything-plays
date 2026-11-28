@@ -73,7 +73,13 @@ class SRAMSameSizeRecoveryTests(unittest.TestCase):
         os.replace(external, self.save.path)
         self.assertNotEqual(
             self.save._last_saved_file_signature,
-            self.save.path.stat().st_mtime_ns
+            (
+                self.save.path.stat().st_dev,
+                self.save.path.stat().st_ino,
+                self.save.path.stat().st_size,
+                self.save.path.stat().st_mtime_ns,
+                self.save.path.stat().st_ctime_ns,
+            ),
         )
         self.assertTrue(self.save.persist())
         self.assert_save_bytes()
