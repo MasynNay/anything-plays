@@ -550,9 +550,19 @@ class CoreSession:
         finally:
             if getattr(self.emulator, "audio_sink", None) is self.audio:
                 self.emulator.audio_sink = None
-            self.audio.close()
-            if self.native is not None:
-                self.native.close()
+            try:
+                self.audio.close()
+            except Exception:
+                # Audio cleanup is optional to native-core teardown.
+                # A failed sink/extension must not mask a playback error
+                # or prevent unload/deinit (especially Dolphin's GL
+                # teardown). Never expose its driver/path details.
+                self.emulator.audio_warning = (
+                    "Audio cleanup failed. Check your audio output."
+                )
+            finally:
+                if self.native is not None:
+                    self.native.close()
 
 
 def safe_gamecube_worker_error(exc):
