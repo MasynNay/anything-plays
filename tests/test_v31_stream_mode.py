@@ -20,6 +20,18 @@ from anything_plays.ui_theme import ThemeMixin
 THEMES = ThemeMixin.THEMES
 
 
+def assert_stream_render_scheduled(testcase, app, interval_ms):
+    """Verify the timer rate and callable without assuming a bare method.
+
+    Stream Mode binds each timer to the OBS output it belongs to so old
+    queued callbacks cannot publish into a reopened capture window.
+    """
+    testcase.assertEqual(app.root.after.call_count, 1)
+    args = app.root.after.call_args.args
+    testcase.assertEqual(args[0], interval_ms)
+    testcase.assertTrue(callable(args[1]))
+
+
 def sample(image, box):
     """Center of the actual content, below the optional header rail."""
     x0, y0, x1, y1 = box
@@ -131,7 +143,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIsNone(app._stream_canvas_item)
         self.assertIsNone(app._stream_last_render)
         app._stream_canvas.delete.assert_called_once_with("all")
-        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 1000)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_failed_ticks"], 1
         )
@@ -148,7 +160,7 @@ class StreamModeContracts(unittest.TestCase):
             app._stream_render_tick()
         self.assertIsNotNone(app._stream_photo)
         self.assertEqual(app._stream_canvas_item, 19)
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_published_images"], 1
         )
@@ -176,7 +188,7 @@ class StreamModeContracts(unittest.TestCase):
         app._render_stream_frame.assert_called_once()
         app._stream_canvas.delete.assert_not_called()
         self.assertIs(app._stream_photo, prior_photo)
-        app.root.after.assert_called_once_with(42, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 42)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_failed_ticks"], 0
         )
@@ -192,7 +204,7 @@ class StreamModeContracts(unittest.TestCase):
                    side_effect=(20.0, 20.01)):
             app._stream_render_tick()
         self.assertEqual(app._render_stream_frame.call_count, 2)
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_published_images"], 1
         )
@@ -223,7 +235,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertIn("UnexpectedError", status)
         for private in ("WebcamSerialPrivate", "/Users/", "secret-driver"):
             self.assertNotIn(private, status)
-        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 1000)
 
     def test_stream_camera_stale_guard_fails_closed_on_invalid_clock(self):
         from types import SimpleNamespace
@@ -411,7 +423,7 @@ class StreamModeContracts(unittest.TestCase):
         with patch("anything_plays.ui_stream.time.perf_counter",
                    side_effect=(5.0, 5.01)):
             app._stream_render_tick()
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
         self.assertEqual(app.stream_performance_snapshot()["metrics"][
             "stream_target_refresh_fps"
         ], 24)
@@ -437,7 +449,7 @@ class StreamModeContracts(unittest.TestCase):
         with patch("anything_plays.ui_stream.time.perf_counter",
                    side_effect=(10.0, 10.020)):
             app._stream_render_tick()
-        app.root.after.assert_called_once_with(22, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 22)
         app._render_stream_frame.assert_called_once_with()
         self.assertIsNotNone(app._stream_frame_job)
 
@@ -542,7 +554,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(app._stream_cadence.snapshot()[
             "stream_failed_ticks"
         ], 0)
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
         app.root.after.reset_mock()
 
         # The status widget can also fail while assigning a new label.
@@ -557,7 +569,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(app._stream_cadence.snapshot()[
             "stream_failed_ticks"
         ], 0)
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
 
     def test_stream_render_failure_redacts_driver_device_and_private_paths(self):
         from unittest.mock import Mock, patch
@@ -584,9 +596,7 @@ class StreamModeContracts(unittest.TestCase):
         self.assertNotIn("/home/", status)
         self.assertNotIn("secret.iso", status)
         self.assertNotIn("SERIAL-123", status)
-        app.root.after.assert_called_once_with(
-            1000, app._stream_render_tick
-        )
+        assert_stream_render_scheduled(self, app, 1000)
         self.assertEqual(
             app._stream_cadence.snapshot()["stream_failed_ticks"], 1
         )
@@ -607,7 +617,7 @@ class StreamModeContracts(unittest.TestCase):
         with patch("anything_plays.ui_stream.time.perf_counter",
                    return_value=10.0):
             app._stream_render_tick()
-        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 1000)
         self.assertEqual(app._stream_last_render, None)
 
     def test_stream_settings_same_value_does_not_repaint_or_schedule_save(self):
@@ -1599,11 +1609,14 @@ class StreamModeContracts(unittest.TestCase):
         self.assertEqual(m["stream_render_over_budget_ticks"], 0)
         self.assertEqual(m["stream_render_max_ms"], 12.0)
         self.assertEqual(m["stream_render_p95_bucket_code"], 2)
-        app.root.after.assert_has_calls([
-            call(32, app._stream_render_tick),
-            call(30, app._stream_render_tick),
-            call(32, app._stream_render_tick),
-        ])
+        self.assertEqual(
+            [invocation.args[0] for invocation in app.root.after.call_args_list],
+            [32, 30, 32],
+        )
+        self.assertTrue(
+            all(callable(invocation.args[1])
+                for invocation in app.root.after.call_args_list)
+        )
         app._stream_output_window = None
         self.assertIsNone(app.stream_performance_snapshot())
 
@@ -2171,7 +2184,7 @@ class StreamModeContracts(unittest.TestCase):
         # runtime state must not interrupt camera or native game input.
         self.assertIn('raw_mode = self._stream_options.get("frame_rate")', source)
         self.assertIn("interval = round(1000 / int(mode.split()[0]))", source)
-        self.assertIn("interval, self._stream_render_tick", source)
+        self.assertIn("callback = lambda: self._stream_render_tick(output)", source)
 
     def test_long_session_font_caching_stays_bounded(self):
         from anything_plays.ui_stream import _font
