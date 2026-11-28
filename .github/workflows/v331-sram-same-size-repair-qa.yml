@@ -7,6 +7,7 @@ on:
       - '.github/workflows/v331-sram-same-size-repair-qa.yml'
       - 'anything_plays/libretro_save.py'
       - 'tests/test_v331_sram_same_size_repair.py'
+      - 'tests/test_v331_sram_restore_identity_race.py'
 
 permissions:
   contents: read
@@ -39,6 +40,7 @@ jobs:
           set -euo pipefail
           python -m compileall -q anything_plays/libretro_save.py tests/test_v331_sram_same_size_repair.py
           python -m unittest discover -s tests -p 'test_v331_sram_same_size_repair.py' -v
+          python -m unittest discover -s tests -p 'test_v331_sram_restore_identity_race.py' -v
           python -m unittest discover -s tests -p 'test_save_ram.py' -v
           python -m unittest discover -s tests -p 'test_v331_sram_truncated_repair.py' -v
           python -m unittest discover -s tests -p 'test_v331_sram_unplugged_checkpoint.py' -v
