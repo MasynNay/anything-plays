@@ -12,6 +12,8 @@ from anything_plays.settings_defaults import DEFAULT
 from anything_plays.system_profiles import ProfileStore, default_for
 from anything_plays.ui_profiles import ProfilesMixin
 from anything_plays.ui_theme import ThemeMixin
+from anything_plays.ui_named_presets import layout_preview
+from anything_plays.system_profiles import DISABLED_MAPPING
 
 
 class Harness(ProfilesMixin):
@@ -38,6 +40,30 @@ def descendants(widget):
     for child in widget.winfo_children():
         yield child
         yield from descendants(child)
+
+
+class LayoutPreviewTests(unittest.TestCase):
+    def test_preview_uses_normalized_geometry_and_excludes_disabled_zones(self):
+        profile = default_for("gba", DEFAULT)
+        profile["mapping"]["A"] = "B"
+        profile["mapping"]["B"] = DISABLED_MAPPING
+        profile["zones"]["A"] = [0.1, 0.2, 0.4, 0.5]
+        profile["shuffle_enabled"] = False
+        profile["zone_image"] = "/private/image.png"
+        preview = layout_preview("gba", profile)
+        rows = {name: (action, rect) for name, action, rect in preview}
+        self.assertEqual(rows["A"], ("B", (0.1, 0.2, 0.4, 0.5)))
+        self.assertNotIn("B", rows)
+        self.assertNotIn("Shuffle", rows)
+        self.assertNotIn("private", repr(preview))
+
+    def test_partial_portable_layout_uses_same_normalized_defaults(self):
+        preview = layout_preview("gba", {"zones": {"A": [0, 0, 0.5, 0.5]},
+                                         "mapping": {}})
+        rows = {name: rect for name, _, rect in preview}
+        self.assertEqual(rows["A"], (0, 0, 0.5, 0.5))
+        self.assertIn("Start", rows)
+        self.assertIn("Shuffle", rows)
 
 
 @unittest.skipUnless(os.environ.get("DISPLAY"),
@@ -67,6 +93,9 @@ class NamedPresetWindowTests(unittest.TestCase):
                    return_value="001"):
             self.button("Save current").invoke()
         self.assertEqual(self.store.list("gba"), ("001",))
+        maps = [w for w in descendants(self.window) if isinstance(w, tk.Canvas)]
+        self.assertEqual(len(maps), 2)
+        self.assertTrue(all(canvas.find_all() for canvas in maps))
         self.app.cfg["tolerance"] = 33
         self.app.profile_store.put("gba", self.app.cfg)
         with patch("anything_plays.ui_profiles.messagebox.askyesno", return_value=True):
