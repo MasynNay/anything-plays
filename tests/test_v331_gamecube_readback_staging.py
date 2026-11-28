@@ -116,7 +116,7 @@ class GameCubeReadbackStagingTests(unittest.TestCase):
         self.assertEqual(calls[-1], "glBindFramebuffer")
         self.assertEqual(len(captured), 1)
         fails[0] = False
-        good = host.read_frame(6, 5)
+        good = host.read_frame(6, 5, flip_vertical=False)
         self.assertEqual(good[0, 0].tolist(), [2, 30, 40])
         self.assertIs(host._readback_staging, captured[0])
 
