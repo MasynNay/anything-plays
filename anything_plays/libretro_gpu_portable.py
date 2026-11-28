@@ -36,6 +36,9 @@ class PortableGLFrameHost(EGLFrameHost):
         self.fbo = self.color_tex = self.depth_stencil = 0
         self.core_reset = self.core_destroy = None
         self.last_gl_error = 0
+        # The shared EGLFrameHost.read_frame() reuses this allocation on
+        # Windows WGL and macOS CGL as well as Linux EGL.
+        self._readback_staging = None
         self.context = None
         self._entered = False
         self._fbo_callback = GET_FBO(self._native_get_framebuffer)
@@ -124,6 +127,9 @@ class PortableGLFrameHost(EGLFrameHost):
 
     def close(self):
         self._check_thread()
+        # Even a partially initialized/destroyed portable context must not
+        # retain old CPU-side pixel bytes after close().
+        self._readback_staging = None
         context = self.context
         if context is None:
             return
