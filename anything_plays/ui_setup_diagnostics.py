@@ -87,6 +87,8 @@ _GC_INTEGER_METRICS = frozenset((
     "native_run_over_50ms", "native_run_over_100ms",
     "scheduler_late_frames", "scheduler_resyncs", "scheduler_wait_calls",
     "gpu_readback_calls", "gpu_readback_timing_samples",
+    "gpu_readback_staging_allocations", "gpu_readback_staging_reuses",
+    "gpu_readback_staging_peak_bytes",
     "gamecube_preview_clock_failures", "gamecube_hardware_frames",
     "gamecube_preview_readback_skips", "gpu_readback_p95_bucket_code",
     "gpu_readback_over_16ms", "gpu_readback_over_33ms",
@@ -148,6 +150,10 @@ def _safe_gamecube_performance_report(value):
             valid = number in (0, 20, 30, 60)
         elif key in ("audio_native_rate_hz", "audio_output_rate_hz"):
             valid = 8000 <= number <= 192000
+        elif key == "gpu_readback_staging_peak_bytes":
+            # bounded_dimensions() caps native GL buffers at 4096x4096
+            # RGBA bytes. A fabricated, impossible capacity is unsafe data.
+            valid = 0 <= number <= 4096 * 4096 * 4
         else:
             valid = 0 <= number <= (2**63 - 1)
         if not valid:
@@ -478,6 +484,19 @@ def _gamecube_performance_summary_lines(performance):
         if type(clock_recoveries) is int and clock_recoveries > 0
         else ""
     )
+    staging_lines = ()
+    staging_keys = (
+        "gpu_readback_staging_allocations",
+        "gpu_readback_staging_reuses",
+        "gpu_readback_staging_peak_bytes",
+    )
+    if all(key in m for key in staging_keys):
+        staging_lines = (
+            f"GPU transfer memory: {m['gpu_readback_staging_allocations']} "
+            f"allocations · {m['gpu_readback_staging_reuses']} reuses · "
+            f"peak {m['gpu_readback_staging_peak_bytes']} bytes "
+            "(CPU staging only, not native GPU FPS).",
+        )
     return (
         (native_line if native_line is not None else
          f"Native frames: {completed} · timed {valid_samples} of {completed} · "
@@ -486,6 +505,7 @@ def _gamecube_performance_summary_lines(performance):
         f"GPU readback: {captures} captures · {readback_cost}"
         f"{readback_timing}",
         *readback_p95,
+        *staging_lines,
         f"Preview captures: target {m['gamecube_preview_target_fps']} FPS · "
         f"observed {observed_preview} over "
         f"{m['gamecube_preview_cadence_intervals']} intervals · "

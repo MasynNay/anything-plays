@@ -1,0 +1,50 @@
+name: 3.3.1 | GameCube GPU staging measurement
+
+# Numeric diagnostics only; synthetic GL transfers and no private data.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-gamecube-staging-diagnostics-qa.yml'
+      - 'anything_plays/libretro_gpu_egl.py'
+      - 'anything_plays/libretro_gpu_portable.py'
+      - 'anything_plays/gamecube_gpu.py'
+      - 'anything_plays/ui_setup_diagnostics.py'
+      - 'tests/test_v331_gamecube_staging_diagnostics.py'
+
+permissions:
+  contents: read
+
+jobs:
+  staging-evidence:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Staging evidence | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic-test dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Verify numeric report safety and existing GL regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/libretro_gpu_egl.py anything_plays/gamecube_gpu.py anything_plays/ui_setup_diagnostics.py
+          python -m unittest discover -s tests -p 'test_v331_gamecube_staging_diagnostics.py' -v
+          python -m unittest discover -s tests -p 'test_v331_gamecube_readback_staging.py' -v
+          python -m unittest discover -s tests -p 'test_v33_gamecube_optional_preview_telemetry.py' -v
+          python -m unittest discover -s tests -p 'test_v33_gpu_readback_p95.py' -v
+          python -m unittest discover -s tests -p 'test_v32_gamecube_native_timing.py' -v

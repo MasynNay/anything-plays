@@ -105,6 +105,10 @@ class EGLFrameHost:
         # read_frame() always returns a separate, owned RGB copy, so the
         # next native callback cannot change pixels already shown in Tk.
         self._readback_staging = None
+        # Aggregate-only counters, independent of image objects or GPU data.
+        self.readback_staging_allocations = 0
+        self.readback_staging_reuses = 0
+        self.readback_staging_peak_bytes = 0
         self._fbo_callback = GET_FBO(self._native_get_framebuffer)
         self._proc_callback = GET_PROC(self._native_get_proc_address)
         try:
@@ -396,6 +400,14 @@ class EGLFrameHost:
         if image is None or len(image) < required:
             image = (C.c_ubyte * required)()
             self._readback_staging = image
+            self.readback_staging_allocations = (
+                getattr(self, "readback_staging_allocations", 0) + 1
+            )
+            self.readback_staging_peak_bytes = required
+        else:
+            self.readback_staging_reuses = (
+                getattr(self, "readback_staging_reuses", 0) + 1
+            )
         # Read-buffer selection belongs to the FBO, not the global pack
         # state. Query it only AFTER binding our FBO; restore it before
         # returning to the previously active native read framebuffer.

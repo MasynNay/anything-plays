@@ -39,6 +39,9 @@ class PortableGLFrameHost(EGLFrameHost):
         # The shared EGLFrameHost.read_frame() reuses this allocation on
         # Windows WGL and macOS CGL as well as Linux EGL.
         self._readback_staging = None
+        self.readback_staging_allocations = 0
+        self.readback_staging_reuses = 0
+        self.readback_staging_peak_bytes = 0
         self.context = None
         self._entered = False
         self._fbo_callback = GET_FBO(self._native_get_framebuffer)
