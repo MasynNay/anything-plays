@@ -75,6 +75,7 @@ class GameCubeHardwareSession(CoreSession):
         })
         self._host_factory = host_factory or choose_gamecube_gpu_host()
         self.host = None
+        self._final_staging_snapshot = None
         self.hardware_frames = 0
         # Per-frame GL readback is synchronous; keep bounded counters so
         # slow Intel CGL sessions can be diagnosed without assuming the CPU
@@ -357,6 +358,27 @@ class GameCubeHardwareSession(CoreSession):
         # Cores may supply a software frame even after HW negotiation.
         super().video(data, width, height, pitch)
 
+    @staticmethod
+    def _staging_snapshot(host):
+        """Collect only immutable numeric evidence from known GL hosts."""
+        if type(host) not in (EGLFrameHost, PortableGLFrameHost):
+            return None
+        try:
+            values = (
+                host.readback_staging_allocations,
+                host.readback_staging_reuses,
+                host.readback_staging_peak_bytes,
+            )
+            if (all(type(value) is int for value in values)
+                    and 0 <= values[0] <= 2**63 - 1
+                    and 0 <= values[1] <= 2**63 - 1
+                    and 0 <= values[2] <= MAX_PIXELS * 4):
+                return values
+        except Exception:
+            # Diagnostics must not mask an original native/teardown failure.
+            pass
+        return None
+
     def performance_snapshot(self):
         """Bounded, allowlisted counters only; no game frames/device strings.
 
@@ -381,27 +403,23 @@ class GameCubeHardwareSession(CoreSession):
             "gamecube_hardware_frames": self.hardware_frames,
             "gamecube_preview_readback_skips": self.preview_readback_skips,
         })
-        # Only exact first-party OpenGL hosts may supply these integers.
-        # No GL calls, pixels, paths or device IDs cross the Tk diagnostics
-        # boundary. Malformed/custom hosts simply omit this optional metric.
+        # Keep the same three bounded numbers visible after GL teardown.
+        # The cached tuple contains no reference to a native host or image.
         host = getattr(self, "host", None)
-        if type(host) in (EGLFrameHost, PortableGLFrameHost):
-            try:
-                allocations = getattr(host, "readback_staging_allocations")
-                reuses = getattr(host, "readback_staging_reuses")
-                peak = getattr(host, "readback_staging_peak_bytes")
-                if (type(allocations) is int and 0 <= allocations <= 2**63 - 1
-                        and type(reuses) is int and 0 <= reuses <= 2**63 - 1
-                        and type(peak) is int and 0 <= peak <= MAX_PIXELS * 4):
-                    metrics.update({
-                        "gpu_readback_staging_allocations": allocations,
-                        "gpu_readback_staging_reuses": reuses,
-                        "gpu_readback_staging_peak_bytes": peak,
-                    })
-            except Exception:
-                # Driver shims can fail during close; performance display
-                # remains optional and must not interrupt native gameplay.
-                pass
+        staging = (
+            self._staging_snapshot(host) if host is not None
+            else getattr(self, "_final_staging_snapshot", None)
+        )
+        if (type(staging) is tuple and len(staging) == 3
+                and all(type(value) is int for value in staging)
+                and 0 <= staging[0] <= 2**63 - 1
+                and 0 <= staging[1] <= 2**63 - 1
+                and 0 <= staging[2] <= MAX_PIXELS * 4):
+            metrics.update({
+                "gpu_readback_staging_allocations": staging[0],
+                "gpu_readback_staging_reuses": staging[1],
+                "gpu_readback_staging_peak_bytes": staging[2],
+            })
         hist = getattr(self, "_readback_histogram", None)
         # A third-party diagnostic implementation can raise or return
         # unexpected/private data. Only the exact first-party bounded
@@ -520,6 +538,8 @@ class GameCubeHardwareSession(CoreSession):
         }
 
     def run(self):
+        # Never carry the previous context's counters into a new attempt.
+        self._final_staging_snapshot = None
         with self._host_factory(width=640, height=576) as host:
             self.host = host
             try:
@@ -528,6 +548,11 @@ class GameCubeHardwareSession(CoreSession):
                 # CoreSession.run unloads Dolphin BEFORE the EGL host closes.
                 super().run()
             finally:
+                # NativeCore has already finished unloading. Preserve only
+                # scalar evidence BEFORE losing the context reference, even
+                # when the native worker failed. GL context teardown still
+                # happens via the context manager, with no retained pixels.
+                self._final_staging_snapshot = self._staging_snapshot(host)
                 self.host = None
                 if self.opengl_error is not None:
                     raise RuntimeError(self.opengl_error)
