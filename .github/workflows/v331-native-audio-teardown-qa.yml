@@ -7,6 +7,7 @@ on:
       - 'anything_plays/libretro_audio.py'
       - 'anything_plays/gba_emulator.py'
       - 'tests/test_v331_native_audio_teardown.py'
+      - 'tests/test_v331_audio_flush_recovery.py'
 
 permissions:
   contents: read
@@ -40,6 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v331_native_audio_teardown.py' -v
+          python -m unittest discover -s tests -p 'test_v331_audio_flush_recovery.py' -v
           python -m unittest discover -s tests -p 'test_v331_audio_callback_ownership.py' -v
           python -m unittest discover -s tests -p 'test_v33_audio_device_recovery.py' -v
           python -m unittest discover -s tests -p 'test_v331_gamecube_scheduler_clock.py' -v
