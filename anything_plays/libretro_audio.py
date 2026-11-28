@@ -447,9 +447,16 @@ class AudioSink:
         # final callback that the driver invokes while tearing down.
         with self._callback_lock:
             self._callback_owner = None
-        self._flush_single_samples()
+        # Detach the device before flushing the final partial PCM block.
+        # Allocation/resampling/queue faults cannot strand its native
+        # handle or cause a second close to stop it again.
         self.output_active = False
         stream, self.stream = self.stream, None
+        try:
+            self._flush_single_samples()
+        except Exception:
+            self._single_count = 0
+            _audio_diagnostic("Could not flush final audio samples")
         if stream is not None:
             try:
                 stream.stop()
