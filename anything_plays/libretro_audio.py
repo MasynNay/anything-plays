@@ -174,8 +174,15 @@ class AudioSink:
     def _flush_single_samples(self):
         """Move a completed fixed-size sample block to the bounded queue."""
         if self._single_count:
-            self.push(self._single_samples[:self._single_count])
-            self._single_count = 0
+            try:
+                self.push(self._single_samples[:self._single_count])
+            finally:
+                # An allocation/queue failure may have consumed part of
+                # this block already. Do not replay it, or leave a full
+                # staging buffer that makes every subsequent sample index
+                # out of range. Preserve the original exception for the
+                # caller's existing failure handling.
+                self._single_count = 0
 
     def sample(self, left, right):
         """Buffer single-sample callbacks without per-sample allocations."""
