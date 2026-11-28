@@ -6,6 +6,36 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from anything_plays.named_presets import NamedPresetStore, validate_name
 from anything_plays.portable_profiles import save_bundle, load_bundle
 from anything_plays.systems import SYSTEMS
+from anything_plays.settings_defaults import DEFAULT
+from anything_plays.system_profiles import enabled_zones, normalize
+
+
+def layout_preview(system, profile):
+    """Return visible normalized rectangles and mapped labels, never artwork."""
+    normalized = normalize(system, profile, DEFAULT)
+    names = enabled_zones(normalized, system)
+    if normalized.get("shuffle_enabled", True):
+        names.append("Shuffle")
+    return tuple(
+        (name, normalized["mapping"].get(name, name),
+         tuple(normalized["zones"][name]))
+        for name in names
+    )
+
+
+def _draw_layout(canvas, system, profile, palette):
+    canvas.delete("all")
+    if profile is None:
+        canvas.create_text(100, 60, text="Select a preset", fill=palette[2])
+        return
+    for name, action, (x0, y0, x1, y1) in layout_preview(system, profile):
+        coords = (4 + 192*x0, 4 + 112*y0, 4 + 192*x1, 4 + 112*y1)
+        canvas.create_rectangle(*coords, outline=palette[3], width=1)
+        label = name if action == name else f"{name} → {action}"
+        if coords[2] - coords[0] >= 26 and coords[3] - coords[1] >= 14:
+            canvas.create_text((coords[0]+coords[2])/2, (coords[1]+coords[3])/2,
+                               text=label, fill=palette[2], font=("TkDefaultFont", 8),
+                               width=max(1, coords[2]-coords[0]-3))
 
 
 def show_named_presets(app):
@@ -29,7 +59,7 @@ def show_named_presets(app):
     app._named_presets_window = window
     window.title("Control presets · " + SYSTEMS[system].title)
     window.transient(app.root)
-    window.minsize(440, 360)
+    window.minsize(470, 520)
     outer = ttk.Frame(window, padding=16)
     outer.pack(fill="both", expand=True)
     ttk.Label(outer, text=SYSTEMS[system].title + " control presets").pack(anchor="w")
@@ -42,6 +72,21 @@ def show_named_presets(app):
     table.column("name", width=340)
     table.pack(fill="both", expand=True)
     row_names = {}
+    comparison = ttk.Frame(outer)
+    comparison.pack(fill="x", pady=(8, 0))
+    palette = app.THEMES[app.theme_name.get()]
+    maps = []
+    for column, caption in enumerate(("Current editor", "Selected preset")):
+        panel = ttk.Frame(comparison)
+        panel.grid(row=0, column=column, sticky="n", padx=4)
+        comparison.columnconfigure(column, weight=1)
+        ttk.Label(panel, text=caption).pack(anchor="w")
+        canvas = tk.Canvas(panel, width=200, height=120, bg=palette[4],
+                           highlightthickness=0)
+        canvas.pack()
+        maps.append(canvas)
+    ttk.Label(outer, text="Zone preview only · disabled controls are hidden.",
+              wraplength=420).pack(anchor="w", pady=(4, 0))
     status = tk.StringVar(value="")
     ttk.Label(outer, textvariable=status, wraplength=420).pack(anchor="w", pady=8)
     buttons = ttk.Frame(outer)
@@ -57,6 +102,21 @@ def show_named_presets(app):
             status.set("Console or calibration changed. Close this window and reopen it.")
             return False
         return True
+
+    def compare(_event=None):
+        if app.system_key.get() != system:
+            for canvas in maps:
+                canvas.delete("all")
+            return
+        try:
+            _draw_layout(maps[0], system, app.cfg, palette)
+            selection = table.selection()
+            name = row_names.get(selection[0]) if selection else None
+            bundle = store.get(system, name) if name is not None else None
+            _draw_layout(maps[1], system, bundle["profile"] if bundle else None, palette)
+        except (OSError, ValueError, TypeError, KeyError, tk.TclError):
+            maps[1].delete("all")
+            maps[1].create_text(100, 60, text="Preview unavailable", fill=palette[2])
 
     def refresh(select=None):
         try:
@@ -74,6 +134,7 @@ def show_named_presets(app):
                 table.selection_set(row)
                 table.see(row)
         status.set(f"{len(names)} of 12 presets saved for this console.")
+        compare()
 
     def selected():
         selection = table.selection()
@@ -114,6 +175,7 @@ def show_named_presets(app):
             bundle = store.get(system, name)
             if app.apply_portable_controls(system, bundle["profile"], bundle.get("theme")):
                 status.set("Preset applied. Use Undo import in the main window to revert.")
+                compare()
         except (OSError, ValueError, TypeError, tk.TclError):
             status.set("Could not apply preset. Check current controls before playing.")
 
@@ -189,6 +251,7 @@ def show_named_presets(app):
         buttons.columnconfigure(col, weight=1)
         ttk.Button(buttons, text=label, command=command).grid(
             row=row, column=col, sticky="ew", padx=3, pady=3)
+    table.bind("<<TreeviewSelect>>", compare)
     window.protocol("WM_DELETE_WINDOW", close)
     window.bind("<Escape>", lambda _event: close())
     refresh()
