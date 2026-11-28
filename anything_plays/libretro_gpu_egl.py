@@ -386,13 +386,14 @@ class EGLFrameHost:
             [C.c_int, C.c_int, C.c_int, C.c_int,
              C.c_uint, C.c_uint, C.c_void_p],
         )
-        # Reuse the bounded RGBA staging allocation on this GL-owning
+        # Grow a single bounded RGBA staging allocation on the GL-owning
         # thread. At 30 FPS, allocating a fresh 640x576x4 buffer for every
         # preview previously churned ~44 MB/s before the independent RGB
-        # publication copy. Never return a view into this mutable storage.
+        # publication copy. A smaller viewport reuses the same storage;
+        # decode ONLY this frame's required bytes, never the old tail.
         required = w * h * 4
         image = getattr(self, "_readback_staging", None)
-        if image is None or len(image) != required:
+        if image is None or len(image) < required:
             image = (C.c_ubyte * required)()
             self._readback_staging = image
         # Read-buffer selection belongs to the FBO, not the global pack
@@ -435,7 +436,11 @@ class EGLFrameHost:
             # like a valid (but permanently black) video frame. Fail closed
             # with a fixed error category; do not include GPU vendor strings.
             raise RuntimeError("GPU readback OpenGL error")
-        arr = np.frombuffer(image, dtype=np.uint8).reshape(h, w, 4)[:, :, :3]
+        # The buffer can exceed the current viewport after a resolution
+        # downshift. Exclude those stale tail bytes from every published frame.
+        arr = np.frombuffer(
+            image, dtype=np.uint8, count=required
+        ).reshape(h, w, 4)[:, :, :3]
         return arr[::-1].copy() if flip_vertical else arr.copy()
 
     def close(self):
