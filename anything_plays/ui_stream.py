@@ -1363,6 +1363,16 @@ class StreamMixin:
             self.emu.running and self.uses_embedded_emulator()
             and not stop_pending
         )
+        def same_or_newer_serial(current, captured, generation):
+            # Native pixels are copied into independent storage. A newer
+            # frame in a verified unchanged session cannot invalidate that
+            # snapshot; requiring equality can starve slow OBS previews.
+            return (
+                current == captured
+                or (type(generation) is int and type(current) is int
+                    and type(captured) is int and current > captured)
+            )
+
         if active_game:
             # Protect only the native-owned pixel snapshot. Converting a
             # possibly large NumPy array to a PIL image can allocate/copy
@@ -1391,7 +1401,11 @@ class StreamMixin:
                     still_current = (
                         same_session
                         and self.emu.running
-                        and getattr(self.emu, "frame_serial", 0) == serial
+                        and same_or_newer_serial(
+                            getattr(self.emu, "frame_serial", 0),
+                            serial, game_generation,
+                        )
+                        and (fresh is None or self.emu.frame is not None)
                         and not (
                             isinstance(stop, threading.Event)
                             and stop.is_set()
@@ -1416,6 +1430,10 @@ class StreamMixin:
                     stopped = (
                         not same_session
                         or not self.emu.running
+                        or (fresh is not None and self.emu.frame is None)
+                        or (type(serial) is int
+                            and type(getattr(self.emu, "frame_serial", None)) is int
+                            and self.emu.frame_serial < serial)
                         or (isinstance(stop, threading.Event)
                             and stop.is_set())
                     )
@@ -1581,14 +1599,30 @@ class StreamMixin:
             if active_game:
                 with self.emu.lock:
                     game_revoked = (
-                        not self.emu.running
+                        not still_active
+                        or not self.emu.running
                         or (isinstance(stop_event, threading.Event)
                             and stop_event.is_set())
                         or (getattr(self.emu, "session_generation", None)
                             != game_generation)
                     )
+                    current_serial = getattr(self.emu, "frame_serial", 0)
+                    # A missing source or backwards revision is not an
+                    # ordinary new frame. Revoke old pixels immediately.
+                    # Legacy adapters without a session generation may
+                    # intentionally expose a cached frame without a live
+                    # native buffer. Preserve their existing contract.
+                    if (type(game_generation) is int
+                            and self._stream_game_frame is not None
+                            and self.emu.frame is None):
+                        game_revoked = True
+                    if (type(current_serial) is int and type(serial) is int
+                            and current_serial < serial):
+                        game_revoked = True
                     changed_game = changed_game or (
-                        getattr(self.emu, "frame_serial", 0) != serial
+                        not same_or_newer_serial(
+                            current_serial, serial, game_generation,
+                        )
                         or game_revoked
                     )
             if not (changed_game or changed_camera or changed_settings):

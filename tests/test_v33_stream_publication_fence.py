@@ -461,18 +461,16 @@ class StreamPublicationFenceTests(unittest.TestCase):
         app._stream_canvas.delete.assert_called_once_with("all")
 
 
-    def test_healthy_next_native_frame_during_composition_keeps_previous_photo(self):
-        """New healthy frames must not flicker the last OBS image."""
+    def test_healthy_next_native_frame_during_composition_finishes_owned_snapshot(self):
+        """A verified same-session frame can finish despite a newer arrival."""
         app = self.make_app(game=True, camera=False)
         app.emu.session_generation = 3
         previous_photo = Mock()
+        previous_photo.width.return_value = 760
+        previous_photo.height.return_value = 980
         app._stream_photo = previous_photo
         app._stream_canvas_item = 21
         app._stream_last_render = ("last published native image",)
-        old_game = Image.new("RGB", (24, 16), "blue")
-        app._stream_game_frame = old_game
-        app._stream_game_serial = 6
-        app._stream_resize_cache.contained("GAME", old_game, (0, 0, 72, 56))
         def publish_next(*_args, **_kwargs):
             app.emu.frame_serial += 1
             return Image.new("RGB", (760, 980), "red")
@@ -481,17 +479,115 @@ class StreamPublicationFenceTests(unittest.TestCase):
                   side_effect=publish_next),
             patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
         ):
-            self.assertFalse(app._render_stream_frame())
+            self.assertTrue(app._render_stream_frame())
         photo.assert_not_called()
+        previous_photo.paste.assert_called_once()
         app._stream_canvas.delete.assert_not_called()
         self.assertIs(app._stream_photo, previous_photo)
         self.assertEqual(app._stream_canvas_item, 21)
-        self.assertTrue(app.emu.running)
-        self.assertFalse(app.emu.stop_event.is_set())
-        self.assertIsNone(app._stream_last_render)
-        self.assertIn("GAME", app._stream_resize_cache._entries)
-        # The very next tick can catch up to the new native serial.
-        self.assertNotEqual(app.emu.frame_serial, app._stream_game_serial)
+        self.assertEqual(app._stream_last_render[2], 7)
+        self.assertEqual(app._stream_game_serial, 7)
+        self.assertEqual(app.emu.frame_serial, 8)
+
+    def test_stream_makes_progress_with_native_updates_at_every_render_stage(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        photo = Mock()
+        photo.width.return_value = 760
+        photo.height.return_value = 980
+        composed = Image.new("RGB", (760, 980), "green")
+        converted = Image.new("RGB", (24, 16), "green")
+
+        def advance(*args, **kwargs):
+            app.emu.frame_serial += 1
+
+        def convert(_pixels):
+            advance()
+            return converted
+
+        def compose(*args, **kwargs):
+            advance()
+            return composed
+
+        def create(*args, **kwargs):
+            advance()
+            return photo
+
+        photo.paste.side_effect = advance
+        app._stream_canvas.itemconfigure.side_effect = advance
+        with (
+            patch("anything_plays.ui_stream.Image.fromarray", side_effect=convert),
+            patch("anything_plays.ui_stream.compose_stream_output", side_effect=compose),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage", side_effect=create) as make,
+        ):
+            for _ in range(300):
+                captured = app.emu.frame_serial
+                self.assertTrue(app._render_stream_frame())
+                self.assertEqual(app._stream_last_render[2], captured)
+                self.assertEqual(app._stream_game_serial, captured)
+                self.assertGreater(app.emu.frame_serial, captured)
+        make.assert_called_once()
+        app._stream_canvas.create_image.assert_called_once()
+        self.assertEqual(photo.paste.call_count, 299)
+
+    def test_same_session_backward_serial_during_composition_revokes_photo(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        def rewind(*args, **kwargs):
+            app.emu.frame_serial -= 1
+            return Image.new("RGB", (760, 980), "red")
+        with patch("anything_plays.ui_stream.compose_stream_output",
+                   side_effect=rewind):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+
+    def test_lost_native_source_during_conversion_revokes_photo(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        def lose_frame(_pixels):
+            app.emu.frame = None
+            app.emu.frame_serial += 1
+            return Image.new("RGB", (24, 16), "red")
+        with patch("anything_plays.ui_stream.Image.fromarray",
+                   side_effect=lose_frame):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+
+    def test_lost_native_source_during_composition_revokes_photo(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        def lose_frame(*args, **kwargs):
+            app.emu.frame = None
+            app.emu.frame_serial += 1
+            return Image.new("RGB", (760, 980), "red")
+        with patch("anything_plays.ui_stream.compose_stream_output",
+                   side_effect=lose_frame):
+            self.assertFalse(app._render_stream_frame())
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+
+    def test_backend_switch_during_composition_revokes_old_native_image(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 21
+        def switch(*args, **kwargs):
+            app.uses_embedded_emulator = lambda: False
+            return Image.new("RGB", (760, 980), "red")
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output", side_effect=switch),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        photo.assert_not_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+        app._stream_canvas.delete.assert_called_once_with("all")
 
     def test_rom_restart_during_composition_revokes_old_obs_photo(self):
         """A replaced native session is not a harmless fresh frame."""
