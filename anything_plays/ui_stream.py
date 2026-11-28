@@ -221,10 +221,26 @@ class StreamPanelResizeCache:
         self._entries = {}
         self.hits = 0
         self.misses = 0
+        # At most one RGB chassis for this output window. No source pixels.
+        self._chassis_key = None
+        self._chassis_image = None
+
+    def chassis(self, key, build):
+        """Return an owned copy of static decoration, never a shared canvas."""
+        if self._chassis_key != key or self._chassis_image is None:
+            self.clear_chassis()
+            image = build()
+            self._chassis_key, self._chassis_image = key, image
+        return self._chassis_image.copy()
+
+    def clear_chassis(self):
+        self._chassis_key = None
+        self._chassis_image = None
 
     def clear(self, channel=None):
         if channel is None:
             self._entries.clear()
+            self.clear_chassis()
         else:
             self._entries.pop(channel, None)
 
@@ -495,18 +511,27 @@ def stream_camera_snapshot_due(previous, now, mode):
     return now - previous >= period - 0.001
 
 
-def compose_stream_output(game, camera, *, size, settings, themes,
-                          game_active=False, camera_active=False,
-                          camera_reference=False, resize_cache=None):
-    """Render one complete OBS-capturable DS-style frame as a PIL RGB image.
+def _stream_video_bounds(bounds, options):
+    """The exact original panel interior and label geometry."""
+    x0, y0, x1, y1 = bounds
+    border = options["border_width"]
+    label_height = (
+        min(34, max(20, (y1-y0) // 12)) if options["show_labels"] else 0
+    )
+    return (
+        x0 + border + 9, y0 + border + 9 + label_height,
+        x1 - border - 9, y1 - border - 9,
+    )
 
-    Includes custom borders and both sources, but no settings widgets or
-    private source paths. Frames are read-only and never altered in place.
+
+def _draw_stream_chassis(width, height, options, palette, screens, fits):
+    """Draw static chrome and optional fitted sources in original paint order.
+
+    A cache build supplies no fitted images and no placeholders. It cannot
+    contain game/camera pixels. The ordinary fallback retains original
+    layering, including placeholders that could extend across narrow panels.
     """
-    options = validate_stream_settings(settings, themes)
-    width = max(320, min(1920, int(size[0])))
-    height = max(400, min(1600, int(size[1])))
-    outer, surface, foreground, accent, housing, well = themes[options["theme"]]
+    outer, surface, foreground, accent, housing, well = palette
     line = options["border_color"] or accent
     img = Image.new("RGB", (width, height), outer)
     painter = ImageDraw.Draw(img)
@@ -521,19 +546,9 @@ def compose_stream_output(game, camera, *, size, settings, themes,
     boxes = stream_panel_boxes(
         (width, height), options["layout"], options["game_size"],
     )
-    screens = [
-        ("GAME", game if game_active else None,
-         "GAMEPLAY" if game_active else "NO GAME LOADED", True),
-        ("CAMERA", camera if camera_active or camera_reference else None,
-         "CAMERA LIVE" if camera_active and camera is not None else
-         "CAMERA WAITING" if camera_active else
-         "REFERENCE IMAGE" if camera_reference else "CAMERA OFF", False),
-    ]
-    if options["swap_screens"]:
-        screens.reverse()
 
     border = options["border_width"]
-    for index, (bounds, (name, source, status, nearest)) in enumerate(
+    for index, (bounds, (name, status, placeholder)) in enumerate(
         zip(boxes, screens)
     ):
         x0, y0, x1, y1 = bounds
@@ -569,21 +584,13 @@ def compose_stream_output(game, camera, *, size, settings, themes,
             inner[2] - 4, inner[3] - 4,
         )
         if video[2] > video[0] and video[3] > video[1]:
-            sized = (
-                resize_cache.contained(name, source, video, nearest=nearest)
-                if resize_cache is not None
-                else _contained(source, video, nearest=nearest)
-            )
+            sized = fits[index]
             if sized is not None:
                 resized, x, y = sized
                 img.paste(resized, (x, y))
-            else:
+            elif placeholder is not None:
                 # A neutral, truthful placeholder until a live source exists.
-                msg = (
-                    "Load a game to begin" if name == "GAME"
-                    else "Waiting for camera frames" if camera_active
-                    else "Start a camera to begin"
-                )
+                msg = placeholder
                 box = painter.textbbox((0, 0), msg, font=label_font)
                 cx = (video[0] + video[2] - (box[2]-box[0])) // 2
                 cy = (video[1] + video[3] - (box[3]-box[1])) // 2
@@ -608,6 +615,76 @@ def compose_stream_output(game, camera, *, size, settings, themes,
                  "STREAM OUTPUT  /  OBS WINDOW CAPTURE",
                  fill=foreground, font=micro)
     return img
+
+
+
+def compose_stream_output(game, camera, *, size, settings, themes,
+                          game_active=False, camera_active=False,
+                          camera_reference=False, resize_cache=None):
+    """Render one complete OBS-capturable DS-style frame as a PIL RGB image.
+
+    With two fitted live/reference sources, a one-entry window-local static
+    chassis avoids repeated text and rounded-rectangle rendering. The cache
+    never contains source pixels, and returned frames own their canvas.
+    """
+    options = validate_stream_settings(settings, themes)
+    width = max(320, min(1920, int(size[0])))
+    height = max(400, min(1600, int(size[1])))
+    palette = tuple(themes[options["theme"]])
+    screens = [
+        ("GAME", game if game_active else None,
+         "GAMEPLAY" if game_active else "NO GAME LOADED", True),
+        ("CAMERA", camera if camera_active or camera_reference else None,
+         "CAMERA LIVE" if camera_active and camera is not None else
+         "CAMERA WAITING" if camera_active else
+         "REFERENCE IMAGE" if camera_reference else "CAMERA OFF", False),
+    ]
+    if options["swap_screens"]:
+        screens.reverse()
+
+    boxes = stream_panel_boxes(
+        (width, height), options["layout"], options["game_size"],
+    )
+    fits = []
+    descriptions = []
+    for bounds, (name, source, status, nearest) in zip(boxes, screens):
+        video = _stream_video_bounds(bounds, options)
+        fitted = None
+        if video[2] > video[0] and video[3] > video[1]:
+            fitted = (
+                resize_cache.contained(name, source, video, nearest=nearest)
+                if resize_cache is not None
+                else _contained(source, video, nearest=nearest)
+            )
+        fits.append(fitted)
+        placeholder = None if fitted is not None else (
+            "Load a game to begin" if name == "GAME"
+            else "Waiting for camera frames" if camera_active
+            else "Start a camera to begin"
+        )
+        descriptions.append((name, status, placeholder))
+
+    # Two nonempty fitted sources occupy disjoint interior rectangles. All
+    # subsequent static decoration lies outside those rectangles, so pasting
+    # after copying the chassis is pixel-equivalent. Missing/invalid sources
+    # use the original ordered painter (important for narrow placeholders).
+    if (type(resize_cache) is StreamPanelResizeCache
+            and all(fitted is not None for fitted in fits)):
+        key = (width, height, tuple(options.items()), palette,
+               tuple(descriptions))
+        img = resize_cache.chassis(
+            key, lambda: _draw_stream_chassis(
+                width, height, options, palette, descriptions, (None, None)
+            )
+        )
+        for resized, x, y in fits:
+            img.paste(resized, (x, y))
+        return img
+    if type(resize_cache) is StreamPanelResizeCache:
+        resize_cache.clear_chassis()
+    return _draw_stream_chassis(
+        width, height, options, palette, descriptions, fits
+    )
 
 
 class StreamMixin:
