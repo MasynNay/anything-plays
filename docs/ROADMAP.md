@@ -78,11 +78,12 @@ The existing 3.2 portable profile import/export and all-console backup remain su
 
 - Save up to 12 named camera-control layouts per console, without replacing active controls.
 - Apply a selected layout through the existing confirmed import transaction, with object input paused and Undo import available.
+- Compare normalized current and selected button zones side by side before applying, including remapped labels and hidden disabled zones.
 - Import a portable control file into the library without applying it, and export a saved preset as the existing version-1 portable profile format. Local preset names are not exported.
 - Preserve ROM libraries, saves, artwork, local device settings and other consoles. Store the library beside the current preferences, with bounded versioned JSON, validation and atomic writes.
 - Acceptance: four-platform storage and portable-profile regression tests, real Tk interaction tests, and subsequent clean-install/manual usability checks. The implementation is under development; it is not in the published 3.3.0 binaries.
 
-Follow-on roadmap: curated accessibility layouts with explicit console compatibility, visual layout comparison, and a user-initiated shared-preset exchange using the existing nonprivate format. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
+Follow-on roadmap: curated accessibility layouts with explicit console compatibility, richer mapping-difference summaries, and a user-initiated shared-preset exchange using the existing nonprivate format. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
 
 ## Future ideas — not committed
 
