@@ -11,6 +11,18 @@ from anything_plays.ui_stream import (
 )
 
 
+def assert_stream_render_scheduled(testcase, app, interval_ms):
+    """Verify the timer rate and callable without assuming a bare method.
+
+    Stream Mode binds each timer to the OBS output it belongs to so old
+    queued callbacks cannot publish into a reopened capture window.
+    """
+    testcase.assertEqual(app.root.after.call_count, 1)
+    args = app.root.after.call_args.args
+    testcase.assertEqual(args[0], interval_ms)
+    testcase.assertTrue(callable(args[1]))
+
+
 class StreamOptionalDiagnosticsTests(unittest.TestCase):
     def make_app(self, *, render=True):
         class Harness(StreamMixin):
@@ -37,7 +49,7 @@ class StreamOptionalDiagnosticsTests(unittest.TestCase):
         app._render_stream_frame.assert_called_once_with()
         self.assertIs(app._stream_photo, photo)
         app._stream_canvas.delete.assert_not_called()
-        app.root.after.assert_called_once_with(42, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 42)
         m = app.stream_performance_snapshot()["metrics"]
         self.assertEqual(m["stream_failed_ticks"], 0)
         self.assertEqual(m["stream_render_samples"], 0)
@@ -48,7 +60,7 @@ class StreamOptionalDiagnosticsTests(unittest.TestCase):
                    side_effect=(10.0, 9.0)):
             app._stream_render_tick()
         app._stream_canvas.delete.assert_not_called()
-        app.root.after.assert_called_once_with(42, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 42)
         m = app.stream_performance_snapshot()["metrics"]
         self.assertEqual(m["stream_failed_ticks"], 0)
         self.assertEqual(m["stream_render_samples"], 0)
@@ -66,7 +78,7 @@ class StreamOptionalDiagnosticsTests(unittest.TestCase):
         self.assertIs(app._stream_photo, photo)
         self.assertIsNone(app._stream_cadence)
         self.assertEqual(getattr(app, "_stream_session_faults", 0), 0)
-        app.root.after.assert_called_once_with(32, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 32)
         self.assertIsNone(app.stream_performance_snapshot())
 
     def test_failed_canvas_still_blanks_and_retries_if_counter_throws(self):
@@ -84,7 +96,7 @@ class StreamOptionalDiagnosticsTests(unittest.TestCase):
         self.assertIsNone(app._stream_canvas_item)
         self.assertIsNone(app._stream_cadence)
         app._stream_canvas.delete.assert_called_once_with("all")
-        app.root.after.assert_called_once_with(1000, app._stream_render_tick)
+        assert_stream_render_scheduled(self, app, 1000)
         self.assertEqual(app._stream_session_faults, 1)
         self.assertTrue(app._stream_recovery_pending)
 

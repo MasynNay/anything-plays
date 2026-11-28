@@ -1204,7 +1204,13 @@ class StreamMixin:
                 # widget/driver exception into the original game loop.
                 pass
 
-    def _stream_render_tick(self):
+    def _stream_render_tick(self, scheduled_output=None):
+        # A delayed Tk callback can survive after_cancel() during an OBS
+        # close/reopen race. Never let an old callback clear the new timer,
+        # sample its private frames or schedule another tick for that window.
+        if (scheduled_output is not None
+                and self._stream_output_window is not scheduled_output):
+            return
         self._stream_frame_job = None
         output = self._stream_output_window
         if output is None or getattr(self, "_closing", False):
@@ -1309,9 +1315,26 @@ class StreamMixin:
             )
         if self._stream_output_window is output and not self._closing:
             try:
-                self._stream_frame_job = self.root.after(
-                    interval, self._stream_render_tick
-                )
+                # Bind this timer to the current OBS output. A callback
+                # already queued by Tk may execute even after cancellation.
+                callback = lambda: self._stream_render_tick(output)
+                job = self.root.after(interval, callback)
+                if job is None:
+                    # Some custom Tk shims queue a callback but return no
+                    # cancelable ID. Do not leave sensitive pixels in an
+                    # output that cannot be reliably refreshed or closed.
+                    if self._stream_output_window is output:
+                        self.close_stream_mode()
+                    return
+                if self._stream_output_window is output:
+                    self._stream_frame_job = job
+                else:
+                    # Scheduling itself may reenter Tk and replace the
+                    # window. Never overwrite the replacement's timer.
+                    try:
+                        self.root.after_cancel(job)
+                    except Exception:
+                        pass
             except Exception:
                 # A custom Tk scheduling adapter can also raise OSError or
                 # another runtime exception. The timer is no longer armed:
