@@ -101,6 +101,10 @@ class EGLFrameHost:
         self.depth_stencil = 0
         self.core_reset = None
         self.core_destroy = None
+        # A single bounded transfer buffer is reused for each GL readback.
+        # read_frame() always returns a separate, owned RGB copy, so the
+        # next native callback cannot change pixels already shown in Tk.
+        self._readback_staging = None
         self._fbo_callback = GET_FBO(self._native_get_framebuffer)
         self._proc_callback = GET_PROC(self._native_get_proc_address)
         try:
@@ -382,8 +386,15 @@ class EGLFrameHost:
             [C.c_int, C.c_int, C.c_int, C.c_int,
              C.c_uint, C.c_uint, C.c_void_p],
         )
-        # Allocate native transfer storage before mutating GL state.
-        image = (C.c_ubyte * (w * h * 4))()
+        # Reuse the bounded RGBA staging allocation on this GL-owning
+        # thread. At 30 FPS, allocating a fresh 640x576x4 buffer for every
+        # preview previously churned ~44 MB/s before the independent RGB
+        # publication copy. Never return a view into this mutable storage.
+        required = w * h * 4
+        image = getattr(self, "_readback_staging", None)
+        if image is None or len(image) != required:
+            image = (C.c_ubyte * required)()
+            self._readback_staging = image
         # Read-buffer selection belongs to the FBO, not the global pack
         # state. Query it only AFTER binding our FBO; restore it before
         # returning to the previously active native read framebuffer.
@@ -435,6 +446,9 @@ class EGLFrameHost:
         mask the originating exception or leave a surface/display behind.
         """
         self._check_thread()
+        # Revoke the last native transfer bytes before potentially slow
+        # context teardown, including partially initialized EGL sessions.
+        self._readback_staging = None
         display, surface, context = self.display, self.surface, self.context
         entered = getattr(self, "_entered", True)
         # Revoke callbacks synchronously, before any potentially slow native
