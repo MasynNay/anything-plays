@@ -7,6 +7,7 @@ chunks are dropped when audio falls behind instead of blocking emulation.
 import ctypes as C
 from queue import Empty, Full, Queue
 import sys
+from threading import Lock
 
 import numpy as np
 
@@ -48,6 +49,10 @@ class AudioSink:
         self.pending = np.empty((0, 2), dtype=np.int16)
         self.position = 0
         self.stream = None
+        # A rejected PortAudio stream may still deliver a queued callback.
+        # Fence its access to PCM/counters before retrying or closing.
+        self._callback_lock = Lock()
+        self._callback_owner = None
         self.output_error = None
         self.output_active = False
         # Lifetime evidence survives close() for the final GameCube report.
@@ -208,6 +213,19 @@ class AudioSink:
             gain = 0.35
         self._volume = max(0.0, min(1.0, gain))
 
+    def _owned_callback(self, owner, outdata, frames, time_info, status):
+        """Keep delayed native callbacks out of a different stream's queue.
+
+        The short ownership lock serializes callbacks and revocation only.
+        Never hold it across PortAudio start/stop/close: a driver may invoke
+        its callback synchronously, or wait for its audio thread to finish.
+        """
+        with self._callback_lock:
+            if self._callback_owner is not owner:
+                outdata.fill(0)
+                return
+            self.callback(outdata, frames, time_info, status)
+
     def callback(self, outdata, frames, time_info, status):
         """Fill every output frame, including silence during underruns."""
         # PortAudio invokes this from its audio thread. Track only aggregate
@@ -339,6 +357,7 @@ class AudioSink:
         error = None
         for rate in attempts:
             candidate = None
+            owner = object()
             # A driver can invoke an output callback from start() and then
             # reject the stream. Snapshot ALL source-rate playback state,
             # not only queued PCM: an attempted callback advances pending
@@ -355,7 +374,9 @@ class AudioSink:
             try:
                 candidate = sd.OutputStream(
                     samplerate=rate, channels=2, dtype="int16",
-                    blocksize=1024, callback=self.callback,
+                    blocksize=1024,
+                    callback=lambda outdata, frames, timing, status, token=owner:
+                        self._owned_callback(token, outdata, frames, timing, status),
                 )
                 # Every candidate (including the unchanged native rate)
                 # reads a separate bounded queue. A rejected stream may
@@ -375,6 +396,8 @@ class AudioSink:
                     self.push(old)
                 # The first PortAudio callback may be synchronous. The
                 # correct resampled PCM and phase must already be ready.
+                with self._callback_lock:
+                    self._callback_owner = owner
                 candidate.start()
                 self.stream = candidate
                 self.output_active = True
@@ -384,6 +407,11 @@ class AudioSink:
                 return
             except Exception as exc:
                 error = exc
+                # Revoke before invoking driver cleanup or restoring the
+                # source queue. Even if close() fails, its callback is silent
+                # and cannot consume the next candidate's audio.
+                with self._callback_lock:
+                    self._callback_owner = None
                 if candidate is not None:
                     try:
                         candidate.close()
@@ -415,6 +443,10 @@ class AudioSink:
         self.close()
 
     def close(self):
+        # Revoke before stopping the device, including any synchronous
+        # final callback that the driver invokes while tearing down.
+        with self._callback_lock:
+            self._callback_owner = None
         self._flush_single_samples()
         self.output_active = False
         stream, self.stream = self.stream, None
