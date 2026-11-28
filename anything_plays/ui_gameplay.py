@@ -644,9 +644,25 @@ class GameplayMixin:
             except Exception:
                 return False
             with self.emu.lock:
+                current_serial = getattr(self.emu, "frame_serial", 0)
+                # Native publication may advance every 16ms while Tk is
+                # resizing or pasting a frame. Requiring equality at every
+                # checkpoint can starve the canvas forever on a slow host.
+                # A known unchanged session may finish its owned snapshot;
+                # commit the captured serial, not the newer native serial,
+                # so the next tick still draws the latest available frame.
+                # Legacy adapters without a generation retain strict serial
+                # equality, and backwards serial changes are always fenced.
+                same_or_newer_frame = (
+                    current_serial == serial
+                    or (type(generation) is int
+                        and type(serial) is int
+                        and type(current_serial) is int
+                        and current_serial > serial)
+                )
                 return (
                     getattr(self.emu, "session_generation", None) == generation
-                    and getattr(self.emu, "frame_serial", 0) == serial
+                    and same_or_newer_frame
                     and self.emu.frame is not None
                     and (self.emu.running
                          or getattr(self.emu, "launching", False))
