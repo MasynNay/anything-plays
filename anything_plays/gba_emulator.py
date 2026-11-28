@@ -673,8 +673,31 @@ class Emulator:
             self.frame = None
             self.frame_serial += 1
             self.session_generation += 1
-        self.thread = threading.Thread(target=self._run, daemon=True, name="libretro")
-        self.thread.start()
+        # Thread construction/start can fail under OS resource pressure.
+        # Do not leave a nonexistent worker marked as launching, but retain
+        # a worker if an adapter raised *after* actually starting it.
+        worker = None
+        try:
+            worker = threading.Thread(
+                target=self._run, daemon=True, name="libretro"
+            )
+            self.thread = worker
+            worker.start()
+        except Exception:
+            self.stop_event.set()
+            self.armed = False
+            self.inputs.disarm()
+            self.inputs.release_manual()
+            self.inputs.release_gamepad()
+            if worker is None or not worker.is_alive():
+                self.thread = None
+                self.launching = False
+                self.running = False
+            # The requested ROM remains selected so a user can retry.
+            # Avoid exposing native scheduler/host paths to the UI.
+            self.last_error = "Unable to start the emulator worker. Try restarting the game."
+            self.error = self.last_error
+            raise RuntimeError(self.last_error) from None
 
     def gamecube_performance_snapshot(self):
         """Return local GameCube metrics, never native session or device data."""
