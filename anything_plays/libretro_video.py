@@ -58,24 +58,29 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
         # Owned storage is mandatory: Dolphin reuses its native texture.
         return pixels[:, :, :3].copy()
     if pixel_format == XRGB8888:
+        # The established little-endian XRGB8888 contract stores B,G,R,X
+        # bytes. View padded rows directly and copy the three RGB channels
+        # in reverse order. This avoids three full-frame uint32 channel
+        # arrays, their stacked uint32 image, and a final dtype conversion.
+        # The returned positive-stride RGB array owns its storage.
         pixels = np.ndarray(
-            (height, width), dtype="<u4", buffer=raw, strides=(pitch, 4)
+            (height, width, 4), dtype=np.uint8,
+            buffer=raw, strides=(pitch, 4, 1),
         )
-        channels = ((pixels >> 16) & 255, (pixels >> 8) & 255, pixels & 255)
+        return pixels[:, :, 2::-1].copy()
+    pixels = np.ndarray(
+        (height, width), dtype="<u2", buffer=raw, strides=(pitch, 2)
+    )
+    if pixel_format == RGB565:
+        channels = (
+            ((pixels >> 11) & 31) * 255 // 31,
+            ((pixels >> 5) & 63) * 255 // 63,
+            (pixels & 31) * 255 // 31,
+        )
     else:
-        pixels = np.ndarray(
-            (height, width), dtype="<u2", buffer=raw, strides=(pitch, 2)
+        channels = (
+            ((pixels >> 10) & 31) * 255 // 31,
+            ((pixels >> 5) & 31) * 255 // 31,
+            (pixels & 31) * 255 // 31,
         )
-        if pixel_format == RGB565:
-            channels = (
-                ((pixels >> 11) & 31) * 255 // 31,
-                ((pixels >> 5) & 63) * 255 // 63,
-                (pixels & 31) * 255 // 31,
-            )
-        else:
-            channels = (
-                ((pixels >> 10) & 31) * 255 // 31,
-                ((pixels >> 5) & 31) * 255 // 31,
-                (pixels & 31) * 255 // 31,
-            )
     return np.stack(channels, axis=-1).astype(np.uint8)
