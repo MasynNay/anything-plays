@@ -41,6 +41,7 @@ def show_named_presets(app):
     table.heading("name", text="Saved layout")
     table.column("name", width=340)
     table.pack(fill="both", expand=True)
+    row_names = {}
     status = tk.StringVar(value="")
     ttk.Label(outer, textvariable=status, wraplength=420).pack(anchor="w", pady=8)
     buttons = ttk.Frame(outer)
@@ -65,8 +66,10 @@ def show_named_presets(app):
             return
         for item in table.get_children():
             table.delete(item)
+        row_names.clear()
         for name in names:
             row = table.insert("", "end", values=(name,))
+            row_names[row] = name
             if name == select:
                 table.selection_set(row)
                 table.see(row)
@@ -77,7 +80,9 @@ def show_named_presets(app):
         if not selection:
             status.set("Choose a saved layout first.")
             return None
-        return str(table.item(selection[0], "values")[0])
+        # Tcl can coerce numeric-looking values (e.g. 001) into integers.
+        # Use the exact stored label rather than round-tripping display text.
+        return row_names.get(selection[0])
 
     def save_current():
         if not ready():
