@@ -192,7 +192,20 @@ class SaveRAM:
                 self._last_saved_digest = hashlib.blake2b(
                     restored, digest_size=16
                 ).digest()
-                self._last_saved_file_signature = _save_file_signature(opened)
+                # A Windows fd's CRT stat identity may not have the same
+                # inode/device/ctime representation as Path.stat(). Cache
+                # a PATH signature for future path checks, not an fd token.
+                # POSIX can additionally confirm both refer to the exact
+                # opened inode; a late path swap becomes unverified.
+                try:
+                    path_signature = _save_file_signature(self.path.stat())
+                    if (os.name == "nt"
+                            or path_signature == _save_file_signature(opened)):
+                        self._last_saved_file_signature = path_signature
+                    else:
+                        self._last_saved_file_signature = None
+                except (OSError, ValueError, TypeError, AttributeError):
+                    self._last_saved_file_signature = None
             else:
                 self._last_saved_digest = None
                 self._last_saved_file_signature = None
