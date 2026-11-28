@@ -5,6 +5,8 @@ on:
       - '.github/workflows/v331-stream-chassis-cache-qa.yml'
       - 'anything_plays/ui_stream.py'
       - 'tests/test_v331_stream_chassis_cache.py'
+      - 'tests/test_v331_stream_chassis_diagnostics.py'
+      - 'anything_plays/ui_setup_diagnostics.py'
 permissions:
   contents: read
 jobs:
@@ -36,5 +38,6 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v331_stream_chassis_cache.py' -v
+          python -m unittest discover -s tests -p 'test_v331_stream_chassis_diagnostics.py' -v
           python -m unittest discover -s tests -p 'test_v31_stream_mode.py' -v
           python -m unittest discover -s tests -p 'test_v33_stream_publication_fence.py' -v
