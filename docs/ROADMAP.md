@@ -72,6 +72,18 @@ The current [3.3.0 public stable release](https://github.com/MasynNay/anything-p
 
 **Success:** Reproducible before/after measurements, no degraded input correctness, no hidden frame skipping or false FPS claims, and passing source/native CI.
 
+## Next product milestone — Reusable control presets
+
+The existing 3.2 portable profile import/export and all-console backup remain supported. The next feature increment adds a local named preset library accessible from Safety & Profiles:
+
+- Save up to 12 named camera-control layouts per console, without replacing active controls.
+- Apply a selected layout through the existing confirmed import transaction, with object input paused and Undo import available.
+- Import a portable control file into the library without applying it, and export a saved preset as the existing version-1 portable profile format. Local preset names are not exported.
+- Preserve ROM libraries, saves, artwork, local device settings and other consoles. Store the library beside the current preferences, with bounded versioned JSON, validation and atomic writes.
+- Acceptance: four-platform storage and portable-profile regression tests, real Tk interaction tests, and subsequent clean-install/manual usability checks. The implementation is under development; it is not in the published 3.3.0 binaries.
+
+Follow-on roadmap: curated accessibility layouts with explicit console compatibility, visual layout comparison, and a user-initiated shared-preset exchange using the existing nonprivate format. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
+
 ## Future ideas — not committed
 
 After stability, usability and performance improve, explore more accessible multiplayer mapping, community-shareable nonprivate control presets, better first-run tutorials, cross-device configuration transfer and additional streamer customization. New console families, web-play editions or streaming services are **not** automatic priorities: they require clear user value, compatible sources and legal packaging review.
