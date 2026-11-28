@@ -184,6 +184,9 @@ def stream_safe_qa_report(snapshot):
         if name == "stream_recovery_pending":
             if type(value) is bool:
                 safe[name] = value
+        elif name in ("stream_chassis_cache_hits", "stream_chassis_cache_builds"):
+            if type(value) is int and 0 <= value <= 2**63 - 1:
+                safe[name] = value
         elif type(value) in (int, float):
             try:
                 if math.isfinite(value) and (
