@@ -1,0 +1,39 @@
+name: 3.3.1 | Native XRGB video decode
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-native-xrgb-decode-qa.yml'
+      - 'anything_plays/libretro_video.py'
+      - 'tests/test_v331_native_xrgb_decode.py'
+permissions:
+  contents: read
+jobs:
+  decode:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Native RGB ownership | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Verify native pixel formats and source ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v331_native_xrgb_decode.py' -v
+          python -m unittest discover -s tests -p 'test_video_and_tracking.py' -v
+          python -m unittest discover -s tests -p 'test_v33_software_video_stop_race.py' -v
