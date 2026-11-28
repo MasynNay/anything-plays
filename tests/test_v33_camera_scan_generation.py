@@ -119,9 +119,10 @@ class ScanOwnershipTests(unittest.TestCase):
         self.assertIsNone(app._camera_scan_results)
         self.assertIn("interrupted", app.status.set.call_args.args[0])
         self.assertNotIn("/Users/", app.status.set.call_args.args[0])
-        app.root.after.side_effect = lambda delay, fn: app.timers.append(
-            (delay, fn)
-        )
+        def recovered_timer(delay, fn):
+            app.timers.append((delay, fn))
+            return "recovered-camera-scan"
+        app.root.after.side_effect = recovered_timer
         self._scan(app)
         self.assertTrue(app.camera_scanning)
 
