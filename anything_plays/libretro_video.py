@@ -71,16 +71,20 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
     pixels = np.ndarray(
         (height, width), dtype="<u2", buffer=raw, strides=(pitch, 2)
     )
-    if pixel_format == RGB565:
-        channels = (
-            ((pixels >> 11) & 31) * 255 // 31,
-            ((pixels >> 5) & 63) * 255 // 63,
-            (pixels & 31) * 255 // 31,
-        )
-    else:
-        channels = (
-            ((pixels >> 10) & 31) * 255 // 31,
-            ((pixels >> 5) & 31) * 255 // 31,
-            (pixels & 31) * 255 // 31,
-        )
-    return np.stack(channels, axis=-1).astype(np.uint8)
+    # Expand one channel at a time into an owned RGB image. The uint16
+    # scratch buffer is large enough for the maximum 63 * 255 product.
+    # Reuse it across the three channels instead of allocating three
+    # channel arrays, a stacked uint16 image and a uint8 conversion.
+    # Keep the historical floor-scaled colors (not bit replication).
+    rgb = np.empty((height, width, 3), dtype=np.uint8)
+    scratch = np.empty((height, width), dtype=np.uint16)
+    red_shift, green_mask = (11, 63) if pixel_format == RGB565 else (10, 31)
+    for index, (shift, mask) in enumerate(
+        ((red_shift, 31), (5, green_mask), (0, 31))
+    ):
+        np.right_shift(pixels, shift, out=scratch)
+        np.bitwise_and(scratch, mask, out=scratch)
+        np.multiply(scratch, 255, out=scratch)
+        np.floor_divide(scratch, mask, out=scratch)
+        rgb[:, :, index] = scratch
+    return rgb
