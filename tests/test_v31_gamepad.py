@@ -457,7 +457,11 @@ class WiringTests(unittest.TestCase):
         self.assertIn("self.initialize_gamepad_preferences(preferences)", source)
         ui = (self.root / "anything_plays/ui_gamepad.py").read_text("utf-8")
         self.assertIn("if self._gamepad.api is None:", ui)
-        self.assertIn("self.root.focus_get() is None", ui)
+        # Focus lookup now fails closed through a safe helper: a destroyed
+        # Tk widget is not evidence that the physical pad disconnected.
+        self.assertIn("def _gamepad_window_focused(self):", ui)
+        self.assertIn("return self.root.focus_get() is not None", ui)
+        self.assertIn("unfocused = not self._gamepad_window_focused()", ui)
         # The explicit Disable/Rescan actions now use a fault-isolated
         # release helper; the underlying SDL stop is still guaranteed by
         # that helper rather than called unguarded from the Tk callback.
