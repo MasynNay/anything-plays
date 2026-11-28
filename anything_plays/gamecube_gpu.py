@@ -22,7 +22,10 @@ import math
 import ctypes as C
 from anything_plays.gba_emulator import CoreSession
 from anything_plays.libretro_audio import AudioSink
-from anything_plays.libretro_gpu_portable import choose_gamecube_gpu_host
+from anything_plays.libretro_gpu_egl import EGLFrameHost, MAX_PIXELS
+from anything_plays.libretro_gpu_portable import (
+    PortableGLFrameHost, choose_gamecube_gpu_host,
+)
 from anything_plays.gamecube_preview import (
     should_capture, preview_fps, DEFAULT_PREVIEW_MODE, PreviewCadenceTracker,
     ReadbackTimingHistogram,
@@ -378,6 +381,27 @@ class GameCubeHardwareSession(CoreSession):
             "gamecube_hardware_frames": self.hardware_frames,
             "gamecube_preview_readback_skips": self.preview_readback_skips,
         })
+        # Only exact first-party OpenGL hosts may supply these integers.
+        # No GL calls, pixels, paths or device IDs cross the Tk diagnostics
+        # boundary. Malformed/custom hosts simply omit this optional metric.
+        host = getattr(self, "host", None)
+        if type(host) in (EGLFrameHost, PortableGLFrameHost):
+            try:
+                allocations = getattr(host, "readback_staging_allocations")
+                reuses = getattr(host, "readback_staging_reuses")
+                peak = getattr(host, "readback_staging_peak_bytes")
+                if (type(allocations) is int and 0 <= allocations <= 2**63 - 1
+                        and type(reuses) is int and 0 <= reuses <= 2**63 - 1
+                        and type(peak) is int and 0 <= peak <= MAX_PIXELS * 4):
+                    metrics.update({
+                        "gpu_readback_staging_allocations": allocations,
+                        "gpu_readback_staging_reuses": reuses,
+                        "gpu_readback_staging_peak_bytes": peak,
+                    })
+            except Exception:
+                # Driver shims can fail during close; performance display
+                # remains optional and must not interrupt native gameplay.
+                pass
         hist = getattr(self, "_readback_histogram", None)
         # A third-party diagnostic implementation can raise or return
         # unexpected/private data. Only the exact first-party bounded
