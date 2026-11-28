@@ -149,21 +149,89 @@ class NativeGameFramePublicationFenceTests(unittest.TestCase):
         make.assert_called_once()
         self.assertEqual(app._last_game_render[0], 12)
 
-    def test_healthy_new_frame_during_conversion_does_not_blank_canvas(self):
+    def test_healthy_new_frame_during_conversion_allows_owned_snapshot(self):
         app = FakeGameDisplay()
         before = app.emu.frame
+        photo = Mock()
         def newer_frame(_frame):
             with app.emu.lock:
                 app.emu.frame = np.full((4, 6, 3), 99, dtype=np.uint8)
                 app.emu.frame_serial += 1
-            return Mock()
+            return photo
         with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage",
                    side_effect=newer_frame):
             app.draw_game()
-        app.game_canvas.delete.assert_not_called()
+        app.game_canvas.create_image.assert_called_once()
+        self.assertIs(app.game_photo, photo)
+        self.assertEqual(app._last_game_render[0], 11)
+        self.assertEqual(app.emu.frame_serial, 12)
+        self.assertIsNot(app.emu.frame, before)
+
+    def test_continuous_native_publication_cannot_starve_preview(self):
+        app = FakeGameDisplay()
+        photo = Mock()
+        photo.width.return_value = 320
+        photo.height.return_value = 213
+
+        def advance(*args, **kwargs):
+            with app.emu.lock:
+                app.emu.frame_serial += 1
+                app.emu.frame = np.full((4, 6, 3), 99, dtype=np.uint8)
+
+        def create(_image):
+            advance()
+            return photo
+
+        photo.paste.side_effect = advance
+        app.game_canvas.coords.side_effect = advance
+        app.game_canvas.itemconfigure.side_effect = advance
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage",
+                   side_effect=create) as make:
+            for _ in range(300):
+                captured = app.emu.frame_serial
+                app.draw_game()
+                self.assertEqual(app._last_game_render[0], captured)
+                self.assertGreater(app.emu.frame_serial, captured)
+            make.assert_called_once()
+        app.game_canvas.create_image.assert_called_once()
+        self.assertEqual(photo.paste.call_count, 299)
+        self.assertEqual(app.game_canvas.itemconfigure.call_count, 299)
+
+    def test_newer_serial_with_different_generation_is_rejected(self):
+        app = FakeGameDisplay()
+        def switch(_image):
+            app.restart_native()
+            return Mock()
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage",
+                   side_effect=switch):
+            app.draw_game()
         app.game_canvas.create_image.assert_not_called()
         self.assertIsNone(app.game_photo)
-        self.assertIsNot(app.emu.frame, before)
+
+    def test_backwards_serial_is_rejected_even_with_same_generation(self):
+        app = FakeGameDisplay()
+        def rewind(_image):
+            with app.emu.lock:
+                app.emu.frame_serial -= 1
+            return Mock()
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage",
+                   side_effect=rewind):
+            app.draw_game()
+        app.game_canvas.create_image.assert_not_called()
+        self.assertIsNone(app.game_photo)
+
+    def test_generationless_adapter_keeps_strict_serial_fence(self):
+        app = FakeGameDisplay()
+        app.emu.session_generation = None
+        def advance(_image):
+            with app.emu.lock:
+                app.emu.frame_serial += 1
+            return Mock()
+        with patch("anything_plays.ui_gameplay.ImageTk.PhotoImage",
+                   side_effect=advance):
+            app.draw_game()
+        app.game_canvas.create_image.assert_not_called()
+        self.assertIsNone(app.game_photo)
 
     def test_stop_during_existing_photo_paste_does_not_reattach(self):
         app = FakeGameDisplay()
