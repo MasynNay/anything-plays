@@ -4,10 +4,13 @@ No GPU, physical ROM, camera, sound device, Tk instance or real native core.
 The fake OpenGL driver writes tiny RGBA buffers through the real read_frame().
 """
 import ctypes as C
+import gc
+import weakref
+from contextlib import contextmanager
 import json
 import threading
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from anything_plays.gamecube_gpu import GameCubeHardwareSession
 from anything_plays.gamecube_native_timing import GameCubeNativeTiming
@@ -193,6 +196,84 @@ class ReadbackAllocationDiagnosticsTests(unittest.TestCase):
         self.assertIsNotNone(safe)
         self.assertFalse(any("GPU transfer memory" in x
                              for x in _gamecube_performance_summary_lines(safe)))
+
+
+    def test_final_report_retains_counters_without_retaining_gl_host(self):
+        host, _ = host_with_fake_gl()
+        host.readback_staging_allocations = 2
+        host.readback_staging_reuses = 800
+        host.readback_staging_peak_bytes = 256
+        ref = weakref.ref(host)
+        holder = [host]
+        session = fake_session(None)
+        session.opengl_error = None
+
+        @contextmanager
+        def context(**kwargs):
+            yield holder.pop()
+
+        session._host_factory = context
+        del host
+        with patch("anything_plays.gamecube_gpu.CoreSession.run"):
+            session.run()
+        gc.collect()
+        self.assertIsNone(session.host)
+        self.assertIsNone(ref())
+        safe = _safe_gamecube_performance_report(session.performance_snapshot())
+        self.assertIsNotNone(safe)
+        self.assertEqual(safe["metrics"]["gpu_readback_staging_allocations"], 2)
+        self.assertEqual(safe["metrics"]["gpu_readback_staging_reuses"], 800)
+        self.assertEqual(safe["metrics"]["gpu_readback_staging_peak_bytes"], 256)
+
+    def test_failed_native_run_preserves_available_evidence_and_original_error(self):
+        host, _ = host_with_fake_gl(PortableGLFrameHost)
+        host.readback_staging_allocations = 1
+        host.readback_staging_reuses = 25
+        host.readback_staging_peak_bytes = 128
+        session = fake_session(None)
+        session.opengl_error = None
+
+        @contextmanager
+        def context(**kwargs):
+            yield host
+
+        session._host_factory = context
+        with patch("anything_plays.gamecube_gpu.CoreSession.run",
+                   side_effect=RuntimeError("original native error")):
+            with self.assertRaisesRegex(RuntimeError, "original native error"):
+                session.run()
+        self.assertIsNone(session.host)
+        self.assertEqual(session.performance_snapshot()["metrics"][
+            "gpu_readback_staging_reuses"], 25)
+
+    def test_new_failed_context_does_not_reuse_previous_session_evidence(self):
+        session = fake_session(None)
+        session._final_staging_snapshot = (1, 80, 256)
+        session._host_factory = Mock(side_effect=RuntimeError("context failed"))
+        with self.assertRaisesRegex(RuntimeError, "context failed"):
+            session.run()
+        self.assertNotIn("gpu_readback_staging_allocations",
+                         session.performance_snapshot()["metrics"])
+
+    def test_untrusted_cached_staging_values_never_enter_report(self):
+        session = fake_session(None)
+        for bad in ((1, "PRIVATE /home/user", 256), (True, 0, 256),
+                    (1, 2, 4096 * 4096 * 4 + 1), {"unsafe": "PRIVATE"}):
+            session._final_staging_snapshot = bad
+            report = session.performance_snapshot()
+            self.assertNotIn("gpu_readback_staging_allocations", report["metrics"])
+            self.assertNotIn("PRIVATE", json.dumps(report))
+
+    def test_scheduler_clock_recovery_count_survives_sanitization(self):
+        session = fake_session(None)
+        report = session.performance_snapshot()
+        report["metrics"]["scheduler_clock_recovery_events"] = 7
+        safe = _safe_gamecube_performance_report(report)
+        self.assertIsNotNone(safe)
+        self.assertEqual(safe["metrics"]["scheduler_clock_recovery_events"], 7)
+        for bad in (-1, True, "PRIVATE", 2**63):
+            report["metrics"]["scheduler_clock_recovery_events"] = bad
+            self.assertIsNone(_safe_gamecube_performance_report(report))
 
 
 if __name__ == "__main__":

@@ -86,6 +86,7 @@ _GC_INTEGER_METRICS = frozenset((
     "native_run_p95_bucket_code", "native_run_over_16ms",
     "native_run_over_50ms", "native_run_over_100ms",
     "scheduler_late_frames", "scheduler_resyncs", "scheduler_wait_calls",
+    "scheduler_clock_recovery_events",
     "gpu_readback_calls", "gpu_readback_timing_samples",
     "gpu_readback_staging_allocations", "gpu_readback_staging_reuses",
     "gpu_readback_staging_peak_bytes",
