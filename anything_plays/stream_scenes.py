@@ -1,5 +1,4 @@
 """Reusable creator configurations, containing only Stream Mode style settings."""
-import copy
 import json
 import re
 from pathlib import Path
