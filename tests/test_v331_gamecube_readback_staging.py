@@ -83,17 +83,35 @@ class GameCubeReadbackStagingTests(unittest.TestCase):
         self.assertEqual(flipped[0, -1].tolist(), [51, 60, 70])
         self.assertIs(captured[0], captured[1])
 
-    def test_resize_reallocates_once_then_reuses_new_bounded_buffer(self):
+    def test_smaller_viewport_reuses_capacity_and_ignores_old_rgba_tail(self):
         host, captured, _, _ = fake_host()
-        host.read_frame(6, 5)
-        old = host._readback_staging
+        first = host.read_frame(6, 5, flip_vertical=False)
+        capacity = host._readback_staging
+        smaller = host.read_frame(3, 2, flip_vertical=False)
+        self.assertIs(host._readback_staging, capacity)
+        self.assertEqual(len(capacity), 6 * 5 * 4)
+        self.assertEqual(smaller.shape, (2, 3, 3))
+        self.assertEqual(smaller[0, 0].tolist(), [2, 30, 40])
+        self.assertTrue(np.array_equal(first[0, 0], [1, 30, 40]))
         host.read_frame(3, 2)
-        updated = host._readback_staging
-        self.assertIsNot(old, updated)
-        self.assertEqual(len(updated), 3 * 2 * 4)
-        host.read_frame(3, 2)
-        self.assertIs(host._readback_staging, updated)
+        self.assertIs(captured[0], captured[1])
         self.assertIs(captured[1], captured[2])
+
+    def test_growing_viewport_allocates_once_and_preserves_old_pixels(self):
+        host, captured, _, _ = fake_host()
+        first = host.read_frame(2, 2, flip_vertical=False)
+        small = host._readback_staging
+        grown = host.read_frame(6, 5, flip_vertical=False)
+        larger = host._readback_staging
+        self.assertIsNot(small, larger)
+        self.assertEqual(len(larger), 6 * 5 * 4)
+        self.assertEqual(first[0, 0].tolist(), [1, 30, 40])
+        self.assertEqual(grown[0, 0].tolist(), [2, 30, 40])
+        host.read_frame(3, 2)
+        host.read_frame(6, 5)
+        self.assertIs(host._readback_staging, larger)
+        self.assertIs(captured[1], captured[2])
+        self.assertIs(captured[2], captured[3])
 
     def test_invalid_dimension_does_not_allocate_or_call_gl(self):
         host, captured, gl_calls, _ = fake_host()
