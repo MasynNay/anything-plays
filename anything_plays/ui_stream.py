@@ -720,6 +720,7 @@ class StreamMixin:
         )
         self._stream_output_window = None
         self._stream_controls_window = None
+        self._stream_controls_syncing = False
         self._stream_canvas = None
         self._stream_photo = None
         self._stream_canvas_item = None
@@ -798,7 +799,7 @@ class StreamMixin:
         panel = tk.Toplevel(self.root)
         self._stream_controls_window = panel
         panel.title("Anything Plays · Stream Settings")
-        panel.geometry("400x610")
+        panel.geometry("400x650")
         panel.minsize(340, 520)
         panel.protocol("WM_DELETE_WINDOW", self._close_stream_controls)
         root = ttk.Frame(panel, padding=16)
@@ -861,6 +862,8 @@ class StreamMixin:
                    command=self._choose_stream_border_color).pack(side="left")
         ttk.Button(colors, text="Use theme accent",
                    command=self._reset_stream_border_color).pack(side="right")
+        ttk.Button(root, text="Creator scenes…",
+                   command=self._open_stream_scenes).pack(fill="x", pady=(5, 4))
         self._stream_diagnostic = tk.StringVar(value="Stream output ready")
         ttk.Label(root, textvariable=self._stream_diagnostic,
                   style="Helper.TLabel", wraplength=360).pack(anchor="w", pady=(4, 0))
@@ -920,8 +923,40 @@ class StreamMixin:
             self._stream_options["border_color"] = ""
             self._stream_options_updated(force_camera_snapshot=False)
 
+    def _open_stream_scenes(self):
+        from anything_plays.ui_stream_scenes import show_stream_scenes
+        return show_stream_scenes(self)
+
+    def apply_stream_scene(self, options):
+        """Apply a validated scene as one settings update, not seven traces."""
+        from anything_plays.stream_scenes import strict_scene
+        if (getattr(self, "_closing", False)
+                or getattr(self, "_stream_controls_window", None) is None):
+            return False
+        updated = strict_scene(options, self.THEMES)
+        prior = dict(self._stream_options)
+        if updated == prior:
+            return True
+        variables = getattr(self, "_stream_vars", {})
+        self._stream_controls_syncing = True
+        try:
+            for key, var in variables.items():
+                var.set(updated[key])
+        except (tk.TclError, RuntimeError, ValueError, TypeError, KeyError):
+            for key, var in variables.items():
+                try:
+                    var.set(prior[key])
+                except (tk.TclError, RuntimeError, ValueError, TypeError, KeyError):
+                    pass
+            return False
+        finally:
+            self._stream_controls_syncing = False
+        self._commit_stream_options(updated)
+        return True
+
     def _stream_controls_changed(self):
-        if not getattr(self, "_stream_vars", None):
+        if (getattr(self, "_stream_controls_syncing", False)
+                or not getattr(self, "_stream_vars", None)):
             return
         options = dict(self._stream_options)
         for key, var in self._stream_vars.items():
@@ -932,11 +967,14 @@ class StreamMixin:
                 # A destroyed/custom Tk variable must not unwind the
                 # main UI event loop or erase a healthy stream image.
                 return
-        previous_layout = self._stream_options["layout"]
-        previous_rate = self._stream_options["frame_rate"]
         updated = validate_stream_settings(
             options, self.THEMES, self.theme_name.get(),
         )
+        self._commit_stream_options(updated)
+
+    def _commit_stream_options(self, updated):
+        previous_layout = self._stream_options["layout"]
+        previous_rate = self._stream_options["frame_rate"]
         if updated == self._stream_options:
             # Tk traces and scale controls may fire without a real change.
             # Avoid unnecessary full-canvas work, camera snapshots and
