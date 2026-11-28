@@ -119,6 +119,51 @@ class NamedPresetStore:
         self._write(all_entries)
         return name
 
+    def import_collection(self, entries):
+        """Import a selected collection in one atomic write, never overwrite.
+
+        Existing equal layouts are skipped. Name collisions and capacity
+        errors reject the entire batch, leaving disk and active profiles
+        unchanged. The caller can review/select a smaller batch and retry.
+        """
+        from anything_plays.preset_exchange import (
+            validate_collection, FORMAT, VERSION,
+        )
+        clean = validate_collection(
+            {"format": FORMAT, "version": VERSION, "layouts": entries},
+            self.allowed_themes,
+        )
+        library = self._read()
+        added, skipped = 0, 0
+        for item in clean["layouts"]:
+            name, bundle = item["label"], item["bundle"]
+            system = bundle["system"]
+            target = library.setdefault(system, {})
+            existing = next((key for key in target
+                             if key.casefold() == name.casefold()), None)
+            if existing is not None:
+                if target[existing] == bundle:
+                    skipped += 1
+                    continue
+                raise ValueError("A selected layout conflicts with an existing preset.")
+            if len(target) >= MAX_PRESETS_PER_CONSOLE:
+                raise ValueError("A selected console has no remaining preset slots.")
+            target[name] = bundle
+            added += 1
+        if added:
+            self._write(library)
+        return added, skipped
+
+    def collection_candidates(self):
+        """Return detached local entries, for explicit selection and relabeling."""
+        library = self._read()
+        return tuple(
+            (system, name, copy.deepcopy(bundle))
+            for system in BUTTONS_BY_SYSTEM
+            for name, bundle in sorted(library.get(system, {}).items(),
+                                       key=lambda pair: pair[0].casefold())
+        )
+
     def delete(self, system, name):
         name = validate_name(name)
         if system not in BUTTONS_BY_SYSTEM:

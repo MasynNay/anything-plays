@@ -5,6 +5,9 @@ on:
       - '.github/workflows/v331-named-presets-qa.yml'
       - 'anything_plays/named_presets.py'
       - 'anything_plays/accessible_layouts.py'
+      - 'anything_plays/preset_exchange.py'
+      - 'anything_plays/ui_preset_exchange.py'
+      - 'tests/test_v331_preset_exchange.py'
       - 'tests/test_v331_accessible_layouts.py'
       - 'anything_plays/ui_named_presets.py'
       - 'anything_plays/ui_profiles.py'
@@ -41,6 +44,7 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v331_named_presets.py' -v
           python -m unittest discover -s tests -p 'test_v331_accessible_layouts.py' -v
+          python -m unittest discover -s tests -p 'test_v331_preset_exchange.py' -v
           python -m unittest discover -s tests -p 'test_portable_profiles.py' -v
           python -m unittest discover -s tests -p 'test_v32_profile_export_isolation.py' -v
           python -m unittest discover -s tests -p 'test_system_profiles.py' -v

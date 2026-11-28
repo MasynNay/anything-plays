@@ -85,7 +85,9 @@ The existing 3.2 portable profile import/export and all-console backup remain su
 
 The next source increment implements five built-in starting layouts across all 18 console profiles: large movement zones, two large action zones, simplified adventure controls, high-contrast full controls and a mirrored full grid. The browser previews active, disabled, remapped and moved camera buttons, supports saving a starter to the local library, and uses the existing confirmed apply/Undo path. Tracking colors, detection calibration, local device settings and global theme are preserved. The simplified layouts intentionally disable camera buttons not included in their description; these are uncalibrated starting points, not verified accessibility prescriptions. Physical user testing and installer verification are still required.
 
-Follow-on roadmap: a user-initiated shared-preset exchange using the existing nonprivate format, richer per-setting change summaries, and measured accessibility usability improvements. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
+The preset collection exchange is implemented in development source: explicitly select up to 48 saved layouts across consoles, assign share labels, export a bounded versioned JSON collection, and review/select incoming layouts before an atomic import. Existing names are not automatically exported; generic labels are the default. Identical existing layouts are skipped, while conflicting names or capacity limits reject the entire selected batch. Imports never change active controls. No online catalog or account is involved. Source and actual Tk tests gate this increment; installed application usability remains a manual acceptance task.
+
+Follow-on roadmap: richer per-setting change summaries, measured accessibility usability improvements, and creator-focused preset and capture customization. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
 
 ## Future ideas — not committed
 

@@ -190,6 +190,64 @@ class NamedPresetWindowTests(unittest.TestCase):
         self.app.stop_controls.assert_not_called()
         self.assertEqual(self.store.list("gba"), ())
 
+    def test_exchange_uses_generic_labels_and_imports_without_applying(self):
+        self.store.save("gba", "Private room name", default_for("gba", DEFAULT))
+        self.store.save("snes", "Private other name", default_for("snes", DEFAULT))
+        self.button("Preset exchange").invoke()
+        exchange = self.window._preset_exchange_window
+        tree = next(w for w in descendants(exchange) if isinstance(w, ttk.Treeview))
+        tree.selection_set(tree.get_children())
+        action = lambda label: next(w for w in descendants(exchange)
+                                    if isinstance(w, ttk.Button) and w.cget("text") == label)
+        path = self.app.preferences_path.with_name("collection.json")
+        with (
+            patch("anything_plays.ui_preset_exchange.messagebox.askyesno", return_value=True),
+            patch("anything_plays.ui_preset_exchange.filedialog.asksaveasfilename",
+                  return_value=str(path)),
+        ):
+            action("Export selected").invoke()
+        self.assertTrue(path.is_file())
+        self.assertNotIn("Private", path.read_text(encoding="utf-8"))
+        with patch("anything_plays.ui_preset_exchange.filedialog.askopenfilename",
+                   return_value=str(path)):
+            action("Open collection").invoke()
+        tree.selection_set(tree.get_children())
+        with patch("anything_plays.ui_preset_exchange.messagebox.askyesno", return_value=True):
+            action("Import selected").invoke()
+        self.assertEqual(self.store.list("gba"), ("Layout 1", "Private room name"))
+        self.assertEqual(self.store.list("snes"), ("Layout 1", "Private other name"))
+        self.app.stop_controls.assert_not_called()
+        self.app.save_preferences.assert_not_called()
+
+    def test_exchange_cancel_and_conflict_leave_library_unchanged(self):
+        from anything_plays.preset_exchange import write_collection
+        from anything_plays.portable_profiles import make_bundle
+        self.store.save("gba", "Existing", default_for("gba", DEFAULT))
+        changed = default_for("gba", DEFAULT)
+        changed["tolerance"] = 33
+        path = self.app.preferences_path.with_name("incoming.json")
+        write_collection(path, [
+            {"label": "New", "bundle": make_bundle("gb", default_for("gb", DEFAULT))},
+            {"label": "Existing", "bundle": make_bundle("gba", changed)},
+        ], self.app.THEMES)
+        self.button("Preset exchange").invoke()
+        exchange = self.window._preset_exchange_window
+        action = lambda label: next(w for w in descendants(exchange)
+                                    if isinstance(w, ttk.Button) and w.cget("text") == label)
+        with patch("anything_plays.ui_preset_exchange.filedialog.askopenfilename",
+                   return_value=str(path)):
+            action("Open collection").invoke()
+        tree = next(w for w in descendants(exchange) if isinstance(w, ttk.Treeview))
+        tree.selection_set(tree.get_children())
+        prior = self.store.path.read_bytes()
+        for confirm in (False, True):
+            with patch("anything_plays.ui_preset_exchange.messagebox.askyesno",
+                       return_value=confirm):
+                action("Import selected").invoke()
+            self.assertEqual(self.store.path.read_bytes(), prior)
+        self.assertEqual(self.store.list("gb"), ())
+        self.app.stop_controls.assert_not_called()
+
     def test_reopening_raises_existing_window_and_close_releases_it(self):
         self.assertIsNone(self.app.open_named_presets())
         self.assertIs(self.app._named_presets_window, self.window)
