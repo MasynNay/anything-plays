@@ -1,0 +1,49 @@
+name: 3.3.1 | Stream Mode session timer fencing
+
+# Synthetic Tk/OBS lifecycle and PIL image stubs; no physical devices.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-stream-session-timers-qa.yml'
+      - 'anything_plays/ui_stream.py'
+      - 'tests/test_v331_stream_timer_session_fence.py'
+      - 'tests/test_v31_stream_mode.py'
+      - 'tests/test_v33_stream_optional_diagnostics.py'
+
+permissions:
+  contents: read
+
+jobs:
+  session-timer-fence:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Stream timer ownership | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal desktop import dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Verify OBS timer session ownership and older stream regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_stream.py tests/test_v331_stream_timer_session_fence.py
+          python -m unittest discover -s tests -p 'test_v331_stream_timer_session_fence.py' -v
+          python -m unittest discover -s tests -p 'test_v31_stream_mode.py' -v
+          python -m unittest discover -s tests -p 'test_v33_stream_optional_diagnostics.py' -v
+          python -m unittest discover -s tests -p 'test_v33_stream_publication_fence.py' -v
+          python -m unittest discover -s tests -p 'test_v331_stream_close_fault_isolation.py' -v
