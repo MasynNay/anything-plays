@@ -49,7 +49,13 @@ def decode_frame(buffer, width, height, pitch, pixel_format):
     if pitch * height > MAX_FRAME_BYTES:
         raise ValueError("Libretro video frame exceeds safe memory budget")
 
-    raw = C.string_at(buffer, pitch * height)
+    # Pitch describes the distance between row starts. Padding between
+    # rows is required for the strided view, but padding AFTER the final
+    # visible row need not belong to the core's allocation. Copy only the
+    # byte span needed by the view. Keep the conservative pitch * height
+    # budget above unchanged for malformed native geometry.
+    visible_span = (height - 1) * pitch + width * bytes_per_pixel
+    raw = C.string_at(buffer, visible_span)
     if pixel_format == SOFTWARE_RGBA8888:
         pixels = np.ndarray(
             (height, width, 4), dtype=np.uint8,
