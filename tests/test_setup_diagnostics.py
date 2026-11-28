@@ -274,12 +274,16 @@ class SnapshotPrivacyTests(unittest.TestCase):
             "1 reused · 1 resized",
             _stream_cadence_summary_lines(report["stream_cadence"])[4],
         )
+        self.assertIn(
+            "Static chassis cache: 0 reused · 0 built (decoration only)",
+            _stream_cadence_summary_lines(report["stream_cadence"])[5],
+        )
         self.assertNotIn("112233", json.dumps(report))
         self.assertNotIn("/home/private", json.dumps(report))
         # Old reports remain legible without the new timing fields.
         old = {"metrics": {
             key: value for key, value in report["stream_cadence"]["metrics"].items()
-            if not key.startswith("stream_render_")
+            if not key.startswith(("stream_render_", "stream_chassis_cache_"))
         }}
         self.assertIn(
             "P95 not sampled", _stream_cadence_summary_lines(old)[3]

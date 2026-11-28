@@ -162,6 +162,8 @@ _STREAM_QA_FIELDS = (
     "stream_render_over_budget_ticks",
     "stream_resize_cache_hits",
     "stream_resize_cache_misses",
+    "stream_chassis_cache_hits",
+    "stream_chassis_cache_builds",
     "stream_stale_camera_clears",
     "stream_session_faults",
     "stream_session_recoveries",
@@ -181,6 +183,9 @@ def stream_safe_qa_report(snapshot):
         value = incoming.get(name)
         if name == "stream_recovery_pending":
             if type(value) is bool:
+                safe[name] = value
+        elif name in ("stream_chassis_cache_hits", "stream_chassis_cache_builds"):
+            if type(value) is int and 0 <= value <= 2**63 - 1:
                 safe[name] = value
         elif type(value) in (int, float):
             try:
@@ -224,6 +229,8 @@ class StreamPanelResizeCache:
         # At most one RGB chassis for this output window. No source pixels.
         self._chassis_key = None
         self._chassis_image = None
+        self.chassis_hits = 0
+        self.chassis_builds = 0
 
     def chassis(self, key, build):
         """Return an owned copy of static decoration, never a shared canvas."""
@@ -231,6 +238,9 @@ class StreamPanelResizeCache:
             self.clear_chassis()
             image = build()
             self._chassis_key, self._chassis_image = key, image
+            self.chassis_builds += 1
+        else:
+            self.chassis_hits += 1
         return self._chassis_image.copy()
 
     def clear_chassis(self):
@@ -277,6 +287,8 @@ class StreamPanelResizeCache:
         return {
             "stream_resize_cache_hits": self.hits,
             "stream_resize_cache_misses": self.misses,
+            "stream_chassis_cache_hits": self.chassis_hits,
+            "stream_chassis_cache_builds": self.chassis_builds,
         }
 
 
@@ -1188,7 +1200,7 @@ class StreamMixin:
         cache = getattr(self, "_stream_resize_cache", None)
         cache_stats = {}
         # The real fitted-image cache is best-effort, and may have been
-        # replaced during teardown. Only its two known nonnegative integer
+        # replaced during teardown. Only known nonnegative integer
         # counters may appear in a GUI-visible or copied report.
         if type(cache) is StreamPanelResizeCache:
             try:
@@ -1201,6 +1213,17 @@ class StreamMixin:
                                 and 0 <= candidate[name] <= (2**63 - 1)
                                 for name in names)):
                     cache_stats = {name: candidate[name] for name in names}
+                    # Optional newer evidence must not invalidate the older
+                    # fitted-source counters on malformed reports.
+                    chassis_names = (
+                        "stream_chassis_cache_hits",
+                        "stream_chassis_cache_builds",
+                    )
+                    if all(type(candidate.get(name)) is int
+                           and 0 <= candidate[name] <= (2**63 - 1)
+                           for name in chassis_names):
+                        cache_stats.update({name: candidate[name]
+                                            for name in chassis_names})
             except Exception:
                 pass
         session_stats = {}
