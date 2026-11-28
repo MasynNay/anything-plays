@@ -389,11 +389,16 @@ def show_named_presets(app):
         if ready():
             return show_builtin_layouts(app, window, system, store, refresh)
 
+    def exchange():
+        if ready():
+            from anything_plays.ui_preset_exchange import show_preset_exchange
+            return show_preset_exchange(app, window, store, refresh)
+
     for index, (label, command) in enumerate((
         ("Save current", save_current), ("Apply selected", apply),
         ("Import to library", import_file), ("Export selected", export),
         ("Delete selected", delete), ("Built-in layouts", builtins),
-        ("Close", close),
+        ("Preset exchange", exchange), ("Close", close),
     )):
         row, col = divmod(index, 2)
         buttons.columnconfigure(col, weight=1)
