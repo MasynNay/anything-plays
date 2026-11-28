@@ -553,6 +553,13 @@ def _stream_cadence_summary_lines(stream):
         f"{m['stream_resize_cache_misses']} resized"
         if cache_counts_known else "Source resize cache: not measured"
     )
+    chassis_info = (
+        (
+            f"Static chassis cache: {m['stream_chassis_cache_hits']} reused · "
+            f"{m['stream_chassis_cache_builds']} built (decoration only)",
+        ) if ("stream_chassis_cache_hits" in m
+               and "stream_chassis_cache_builds" in m) else ()
+    )
     recovery_info = (
         (
             f"Session compositor recovery: {m['stream_session_faults']} "
@@ -575,7 +582,7 @@ def _stream_cadence_summary_lines(stream):
         f"{m.get('stream_render_over_budget_ticks', 0)} over-budget "
         f"of {m.get('stream_render_samples', 0)} measured ticks",
         fit_summary,
-    ) + recovery_info
+    ) + chassis_info + recovery_info
 
 
 def show_setup_diagnostics(app):
