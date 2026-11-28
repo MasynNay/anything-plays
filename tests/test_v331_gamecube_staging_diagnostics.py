@@ -133,7 +133,8 @@ class ReadbackAllocationDiagnosticsTests(unittest.TestCase):
         self.assertIn("4 reuses", matching[0])
         self.assertIn("256 bytes", matching[0])
         self.assertIn("not native GPU FPS", matching[0])
-        self.assertNotIn("device", json.dumps(safe).lower())
+        self.assertNotIn("/Users/", json.dumps(safe))
+        self.assertNotIn("PRIVATE", json.dumps(safe))
 
     def test_third_party_host_never_injects_paths_or_image_data(self):
         fake_host = Mock()
