@@ -350,6 +350,11 @@ def main():
                     # tests the stopped-game privacy path instead of reuse.
                     app.emu.running = True
                     app.emu.launching = False
+                    # An actual fresh native session clears the Stop flag
+                    # before it can publish frames. The synthetic smoke must
+                    # model that lifecycle or the generation/privacy fence
+                    # correctly rejects this artificial "running" state.
+                    app.emu.stop_event.clear()
                     with app.emu.lock:
                         app.emu.frame = np.zeros((180, 240, 3), dtype=np.uint8)
                         app.emu.frame_serial += 1

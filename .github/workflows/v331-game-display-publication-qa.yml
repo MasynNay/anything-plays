@@ -1,0 +1,47 @@
+name: 3.3.1 | Native game image publication fence
+
+# Synthetic PIL/Tk and generation changes only. No real game/device.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-game-display-publication-qa.yml'
+      - 'anything_plays/ui_gameplay.py'
+      - 'tests/test_v331_game_display_publication.py'
+
+permissions:
+  contents: read
+
+jobs:
+  native-display:
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Game display publication | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install minimal PIL/NumPy import dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Verify pixel publication and native Stop/restart lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q anything_plays/ui_gameplay.py tests/test_v331_game_display_publication.py
+          python -m unittest discover -s tests -p 'test_v331_game_display_publication.py' -v
+          python -m unittest discover -s tests -p 'test_v32_game_display_lifecycle.py' -v
+          python -m unittest discover -s tests -p 'test_v331_game_render_loop_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v33_stream_publication_fence.py' -v
+          python -m unittest discover -s tests -p 'test_v331_native_stop_input_fence.py' -v
