@@ -609,41 +609,102 @@ class GameplayMixin:
         canvas = getattr(self, '_game_only_canvas', None) or self.game_canvas
         canvas_width = max(1, canvas.winfo_width())
         canvas_height = max(1, canvas.winfo_height())
+        # Capture the original frame's session and already-published image
+        # BEFORE any Tk/PIL work. Stop, a ROM replacement or Game only view
+        # switching can reenter while PIL scales the snapshot or Tcl creates
+        # a PhotoImage. The native lock is never held around those calls.
+        previous_render = getattr(self, "_last_game_render", None)
+        previous_photo = getattr(self, "game_photo", None)
         with self.emu.lock:
             serial = getattr(self.emu, "frame_serial", 0)
+            generation = getattr(self.emu, "session_generation", None)
             revision = (serial, id(canvas), canvas_width, canvas_height)
-            if revision == getattr(self, "_last_game_render", None):
+            if revision == previous_render:
                 return
             frame = None if self.emu.frame is None else self.emu.frame.copy()
         if frame is None:
             return
+
+        def still_current():
+            # Only the game image is fenced: unrelated camera/OBS pixels and
+            # native input/audio must not be touched by an outdated UI tick.
+            if getattr(self, "_closing", False):
+                return False
+            selected = getattr(self, "_game_only_canvas", None) or self.game_canvas
+            if selected is not canvas:
+                return False
+            if (getattr(self, "game_photo", None) is not previous_photo
+                    or getattr(self, "_last_game_render", None)
+                    != previous_render):
+                return False
+            stop = getattr(self.emu, "stop_event", None)
+            try:
+                if stop is not None and stop.is_set() is True:
+                    return False
+            except Exception:
+                return False
+            with self.emu.lock:
+                return (
+                    getattr(self.emu, "session_generation", None) == generation
+                    and getattr(self.emu, "frame_serial", 0) == serial
+                    and self.emu.frame is not None
+                    and (self.emu.running
+                         or getattr(self.emu, "launching", False))
+                )
+
         scale = min(canvas_width / frame.shape[1], canvas_height / frame.shape[0])
         width = max(1, int(frame.shape[1] * scale))
         height = max(1, int(frame.shape[0] * scale))
         image = Image.fromarray(frame[:, :, :3]).resize(
             (width, height), Image.Resampling.NEAREST
         )
-        photo = self.game_photo
+        if not still_current():
+            return
+        photo = previous_photo
         if (photo is None or photo.width() != width or
                 photo.height() != height):
-            # Recreate Tk's native image only when resolution changes. A new
-            # PhotoImage every 16 ms churns native/Tcl allocations over days.
+            # Recreate Tk's native image only when resolution changes. Never
+            # attach an old ROM's new PhotoImage after a reentrant Stop.
             photo = ImageTk.PhotoImage(image)
         else:
+            # This mutates an already displayed Tcl image; a Stop during
+            # paste() must be fenced before we touch the canvas afterward.
             photo.paste(image)
+        if not still_current():
+            return
+
         x = (canvas_width - width) // 2
         y = (canvas_height - height) // 2
         item = getattr(self, "_game_image_item", None)
-        if (getattr(self, "_game_image_canvas", None) is not canvas
-                or item is None or not canvas.type(item)):
-            # A new canvas (e.g. Game only) needs one image item. Reuse it
-            # across frames to keep Tk's item count permanently bounded.
+        needs_item = (
+            getattr(self, "_game_image_canvas", None) is not canvas
+            or item is None or not canvas.type(item)
+        )
+        if not still_current():
+            return
+        if needs_item:
+            # One Tk item per canvas, even after 30-minute game sessions.
             canvas.delete("all")
+            if not still_current():
+                return
             item = canvas.create_image(x, y, image=photo, anchor="nw")
+            if not still_current():
+                # A Stop may have cleared the canvas INSIDE create_image().
+                # Remove only our newly created item, not the new session's
+                # other canvas or its independently published frames.
+                try:
+                    canvas.delete(item)
+                except Exception:
+                    pass
+                return
             self._game_image_item = item
             self._game_image_canvas = canvas
         else:
             canvas.coords(item, x, y)
+            if not still_current():
+                return
             canvas.itemconfigure(item, image=photo)
+            if not still_current():
+                return
         self.game_photo = photo
         self._last_game_render = revision
