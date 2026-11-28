@@ -168,6 +168,14 @@ class SaveRAM:
                      | getattr(os, "O_NONBLOCK", 0))
             if private:
                 flags |= getattr(os, "O_NOFOLLOW", 0)
+            # Capture the pathname identity before opening. Windows CRT
+            # descriptor metadata may differ from Path.stat(), so the
+            # pathname must remain stable across the entire read as well.
+            try:
+                before_path = _save_file_signature(self.path.stat())
+            except (OSError, ValueError, TypeError, AttributeError):
+                before_path = None
+            verified_signature = None
             with os.fdopen(os.open(self.path, flags), "rb") as stream:
                 opened = os.fstat(stream.fileno())
                 if not stat.S_ISREG(opened.st_mode):
@@ -183,6 +191,21 @@ class SaveRAM:
                 # Read only as much as the core can hold, plus one byte to
                 # detect oversized or partial saves before writing any SRAM.
                 data = stream.read(size + 1)
+                # A metadata probe failure does not discard readable game
+                # progress, but it must prevent an unchanged-save shortcut.
+                # Check both sides while the opened descriptor is still live.
+                try:
+                    after_fd = os.fstat(stream.fileno())
+                    after_path = _save_file_signature(self.path.stat())
+                    if (before_path is not None
+                            and before_path == after_path
+                            and _save_file_signature(opened)
+                            == _save_file_signature(after_fd)
+                            and (os.name == "nt"
+                                 or after_path == _save_file_signature(after_fd))):
+                        verified_signature = after_path
+                except (OSError, ValueError, TypeError, AttributeError):
+                    pass
             C.memmove(pointer, data, min(size, len(data)))
             # An incomplete or oversized legacy .sav must be normalized on
             # the next safe persist, rather than mistaken for a valid full
@@ -192,20 +215,10 @@ class SaveRAM:
                 self._last_saved_digest = hashlib.blake2b(
                     restored, digest_size=16
                 ).digest()
-                # A Windows fd's CRT stat identity may not have the same
-                # inode/device/ctime representation as Path.stat(). Cache
-                # a PATH signature for future path checks, not an fd token.
-                # POSIX can additionally confirm both refer to the exact
-                # opened inode; a late path swap becomes unverified.
-                try:
-                    path_signature = _save_file_signature(self.path.stat())
-                    if (os.name == "nt"
-                            or path_signature == _save_file_signature(opened)):
-                        self._last_saved_file_signature = path_signature
-                    else:
-                        self._last_saved_file_signature = None
-                except (OSError, ValueError, TypeError, AttributeError):
-                    self._last_saved_file_signature = None
+                # Cache only the pathname identity observed across a
+                # stable read. If the path or descriptor changed, retain
+                # restored RAM but require the normal checkpoint path.
+                self._last_saved_file_signature = verified_signature
             else:
                 self._last_saved_digest = None
                 self._last_saved_file_signature = None
