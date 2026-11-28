@@ -1,0 +1,46 @@
+name: 3.3.1 | Native teardown despite audio failure
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v331-native-audio-teardown-qa.yml'
+      - 'anything_plays/libretro_audio.py'
+      - 'anything_plays/gba_emulator.py'
+      - 'tests/test_v331_native_audio_teardown.py'
+
+permissions:
+  contents: read
+
+jobs:
+  teardown:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Native teardown | ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64, runner: ubuntu-24.04}
+          - {target: windows-x64, runner: windows-latest}
+          - {target: macos-arm64, runner: macos-15}
+          - {target: macos-x64, runner: macos-15-intel}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic dependencies
+        run: python -m pip install "numpy>=1.26,<3" "Pillow>=10,<13" "opencv-python-headless>=4.8,<5"
+      - name: Exercise core and audio lifecycle failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_v331_native_audio_teardown.py' -v
+          python -m unittest discover -s tests -p 'test_v331_audio_callback_ownership.py' -v
+          python -m unittest discover -s tests -p 'test_v33_audio_device_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v331_gamecube_scheduler_clock.py' -v
+          python -m unittest discover -s tests -p 'test_v331_native_worker_stop_confirmation.py' -v
