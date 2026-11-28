@@ -665,6 +665,18 @@ class ProfilesMixin:
                 parent=self.root,
             )
             return
+        return self.apply_portable_controls(system, imported, theme, legacy=legacy)
+
+    def apply_portable_controls(self, system, imported, theme=None, *, legacy=False):
+        """Shared confirmed, transactional import and named-preset application."""
+        if (self.system_key.get() != system
+                or getattr(self, "_calibration_window", None) is not None):
+            messagebox.showinfo(
+                'Apply controls',
+                'Select the original console and finish camera calibration first.',
+                parent=self.root,
+            )
+            return False
         description = (
             f'Console: {system.upper()}\n'
             f'Button zones: {len(imported["zones"])}\n'
@@ -735,6 +747,11 @@ class ProfilesMixin:
             f'{system.upper()} controls imported. Local zone artwork was kept. '
             'Object input is paused; use Undo import to restore your layout.'
         )
+        return True
+
+    def open_named_presets(self):
+        from anything_plays.ui_named_presets import show_named_presets
+        return show_named_presets(self)
 
     def undo_profile_import(self):
         """Undo a portable profile without silently losing later local edits."""
