@@ -161,7 +161,11 @@ class AudioSink:
             return
         chunk = np.asarray(samples, dtype=np.int16).reshape(-1, 2)
         for start in range(0, len(chunk), RESAMPLE_INPUT_CHUNK):
-            part = chunk[start:start + RESAMPLE_INPUT_CHUNK].copy()
+            # Input is borrowed only for this synchronous push. Resampling
+            # reads it without mutation and copies its retained tail; the
+            # queue independently copies each bounded output block before
+            # returning. Avoid an extra input copy for every PCM chunk.
+            part = chunk[start:start + RESAMPLE_INPUT_CHUNK]
             if self._resample_step is not None:
                 part = self._resample(part)
             if len(part):
