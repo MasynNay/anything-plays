@@ -144,6 +144,52 @@ class NamedPresetWindowTests(unittest.TestCase):
         self.app.stop_controls.assert_not_called()
         self.app.save_preferences.assert_not_called()
 
+    def test_built_in_layout_preview_save_and_apply_are_explicit(self):
+        self.app.cfg["rgb"] = [12, 34, 56]
+        self.app.cfg["tolerance"] = 42
+        self.app.profile_store.put("gba", self.app.cfg)
+        self.button("Built-in layouts").invoke()
+        browser = self.window._built_in_layouts_window
+        combo = next(w for w in descendants(browser) if isinstance(w, ttk.Combobox))
+        combo.set("Two large action zones")
+        combo.event_generate("<<ComboboxSelected>>")
+        self.root.update_idletasks()
+        self.app.stop_controls.assert_not_called()
+        self.assertEqual(self.store.list("gba"), ())
+        action = lambda label: next(w for w in descendants(browser)
+                                    if isinstance(w, ttk.Button) and w.cget("text") == label)
+        with patch("anything_plays.ui_named_presets.simpledialog.askstring",
+                   return_value="Two action controls"):
+            action("Save to library").invoke()
+        self.assertEqual(self.store.list("gba"), ("Two action controls",))
+        self.assertEqual(self.app.cfg["mapping"]["Up"], "Up")
+        self.app.stop_controls.assert_not_called()
+        # A newly edited tracking value must be retained when applying.
+        self.app.cfg["tolerance"] = 47
+        with patch("anything_plays.ui_profiles.messagebox.askyesno", return_value=True):
+            action("Apply layout").invoke()
+        self.assertEqual(self.app.cfg["mapping"]["Up"], DISABLED_MAPPING)
+        self.assertEqual(self.app.cfg["mapping"]["A"], "A")
+        self.assertEqual(self.app.cfg["rgb"], [12, 34, 56])
+        self.assertEqual(self.app.cfg["tolerance"], 47)
+        self.assertEqual(self.app.cfg["zone_image"], "/local-only/art.png")
+        self.app.undo_profile_import()
+        self.assertEqual(self.app.cfg["mapping"]["Up"], "Up")
+        self.assertEqual(self.app.cfg["tolerance"], 47)
+
+    def test_built_in_browser_rejects_console_change_and_cancel(self):
+        self.button("Built-in layouts").invoke()
+        browser = self.window._built_in_layouts_window
+        apply = next(w for w in descendants(browser)
+                     if isinstance(w, ttk.Button) and w.cget("text") == "Apply layout")
+        with patch("anything_plays.ui_profiles.messagebox.askyesno", return_value=False):
+            apply.invoke()
+        self.app.stop_controls.assert_not_called()
+        self.app.system_key.set("gb")
+        apply.invoke()
+        self.app.stop_controls.assert_not_called()
+        self.assertEqual(self.store.list("gba"), ())
+
     def test_reopening_raises_existing_window_and_close_releases_it(self):
         self.assertIsNone(self.app.open_named_presets())
         self.assertIs(self.app._named_presets_window, self.window)

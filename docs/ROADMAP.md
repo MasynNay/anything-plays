@@ -83,7 +83,9 @@ The existing 3.2 portable profile import/export and all-console backup remain su
 - Preserve ROM libraries, saves, artwork, local device settings and other consoles. Store the library beside the current preferences, with bounded versioned JSON, validation and atomic writes.
 - Acceptance: four-platform storage and portable-profile regression tests, real Tk interaction tests, and subsequent clean-install/manual usability checks. The implementation is under development; it is not in the published 3.3.0 binaries.
 
-Follow-on roadmap: curated accessibility layouts with explicit console compatibility, richer mapping-difference summaries, and a user-initiated shared-preset exchange using the existing nonprivate format. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
+The next source increment implements five built-in starting layouts across all 18 console profiles: large movement zones, two large action zones, simplified adventure controls, high-contrast full controls and a mirrored full grid. The browser previews active, disabled, remapped and moved camera buttons, supports saving a starter to the local library, and uses the existing confirmed apply/Undo path. Tracking colors, detection calibration, local device settings and global theme are preserved. The simplified layouts intentionally disable camera buttons not included in their description; these are uncalibrated starting points, not verified accessibility prescriptions. Physical user testing and installer verification are still required.
+
+Follow-on roadmap: a user-initiated shared-preset exchange using the existing nonprivate format, richer per-setting change summaries, and measured accessibility usability improvements. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
 
 ## Future ideas — not committed
 
