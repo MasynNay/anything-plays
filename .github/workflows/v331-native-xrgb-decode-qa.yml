@@ -5,6 +5,7 @@ on:
       - '.github/workflows/v331-native-xrgb-decode-qa.yml'
       - 'anything_plays/libretro_video.py'
       - 'tests/test_v331_native_xrgb_decode.py'
+      - 'tests/test_v331_native_16bit_decode.py'
 permissions:
   contents: read
 jobs:
@@ -35,5 +36,6 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_v331_native_xrgb_decode.py' -v
+          python -m unittest discover -s tests -p 'test_v331_native_16bit_decode.py' -v
           python -m unittest discover -s tests -p 'test_video_and_tracking.py' -v
           python -m unittest discover -s tests -p 'test_v33_software_video_stop_race.py' -v
