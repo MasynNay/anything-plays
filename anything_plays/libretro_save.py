@@ -23,6 +23,19 @@ from anything_plays.preview_storage import (
 MAX_SAVE_RAM_BYTES = 64 * 1024 * 1024
 
 
+def _save_file_signature(info):
+    """Bounded metadata identity for one committed regular save file.
+
+    A same-size cloud-sync replacement or in-place mutation must not be
+    mistaken for the previously written bytes. No paths or file contents
+    enter this token; ctime also detects edits that preserve mtime.
+    """
+    return (
+        info.st_dev, info.st_ino, info.st_size,
+        info.st_mtime_ns, info.st_ctime_ns,
+    )
+
+
 def _user_save_directory():
     """Writable user saves; isolated private QA never reads stable progress."""
     preview = is_v32_preview() or is_v33_candidate()
@@ -112,6 +125,10 @@ class SaveRAM:
         # A fixed-size digest prevents unbounded snapshot history and avoids
         # rewriting identical save RAM every few seconds for days.
         self._last_saved_digest = None
+        # A digest of unchanged native SRAM says nothing about a file that
+        # another app/backup sync replaced with different equal-size bytes.
+        # Remember only the metadata of our last completed disk checkpoint.
+        self._last_saved_file_signature = None
 
     def _memory(self):
         pointer = self.get_data(0)
@@ -175,8 +192,23 @@ class SaveRAM:
                 self._last_saved_digest = hashlib.blake2b(
                     restored, digest_size=16
                 ).digest()
+                # A Windows fd's CRT stat identity may not have the same
+                # inode/device/ctime representation as Path.stat(). Cache
+                # a PATH signature for future path checks, not an fd token.
+                # POSIX can additionally confirm both refer to the exact
+                # opened inode; a late path swap becomes unverified.
+                try:
+                    path_signature = _save_file_signature(self.path.stat())
+                    if (os.name == "nt"
+                            or path_signature == _save_file_signature(opened)):
+                        self._last_saved_file_signature = path_signature
+                    else:
+                        self._last_saved_file_signature = None
+                except (OSError, ValueError, TypeError, AttributeError):
+                    self._last_saved_file_signature = None
             else:
                 self._last_saved_digest = None
+                self._last_saved_file_signature = None
 
     def persist(self):
         """Write only changed SRAM, replacing a complete snapshot atomically.
@@ -192,19 +224,20 @@ class SaveRAM:
         digest = hashlib.blake2b(snapshot, digest_size=16).digest()
         if digest == self._last_saved_digest:
             try:
-                # Unchanged *memory* does not prove unchanged *storage*.
-                # A partially copied, truncated, or externally replaced
-                # save may still be a regular file, and would otherwise be
-                # skipped indefinitely during a long-running game. A cheap
-                # metadata size check repairs incomplete files without
-                # rereading/hashing large SRAM on every checkpoint.
-                if (self.path.is_file()
-                        and self.path.stat().st_size == size):
+                # Unchanged SRAM does not prove unchanged STORAGE. In
+                # addition to truncation, a cloud-sync replacement or edit
+                # may retain precisely the same file size. Compare one
+                # bounded descriptor-derived signature (not file contents)
+                # to the last successful checkpoint/restore identity.
+                if (self._last_saved_file_signature is not None
+                        and self.path.is_file()
+                        and _save_file_signature(self.path.stat())
+                        == self._last_saved_file_signature):
                     return False
-            except OSError:
-                # A ROM drive can disappear between successful checkpoints
-                # or even between is_file() and stat(). Reattempt a complete
-                # snapshot via the existing atomic user-data fallback.
+            except (OSError, ValueError, TypeError, AttributeError):
+                # Missing/remounted ROM media or failed stat means unknown,
+                # never a reason to claim that the native SRAM was saved.
+                # The ordinary atomic fallback will handle a write fault.
                 pass
         destination = self.path
         if (is_v32_preview() or is_v33_candidate()):
@@ -221,6 +254,15 @@ class SaveRAM:
             self._write_atomic(destination, snapshot, create_directory=True)
         self.path = destination
         self._last_saved_digest = digest
+        try:
+            # Capture the committed path identity after os.replace(). A
+            # metadata probe failure cannot undo a successful atomic save;
+            # the next unchanged checkpoint safely retries verification.
+            self._last_saved_file_signature = _save_file_signature(
+                destination.stat()
+            )
+        except (OSError, ValueError, TypeError, AttributeError):
+            self._last_saved_file_signature = None
         return True
 
     @staticmethod
