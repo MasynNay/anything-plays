@@ -1609,7 +1609,11 @@ class StreamMixin:
                     current_serial = getattr(self.emu, "frame_serial", 0)
                     # A missing source or backwards revision is not an
                     # ordinary new frame. Revoke old pixels immediately.
-                    if (self._stream_game_frame is not None
+                    # Legacy adapters without a session generation may
+                    # intentionally expose a cached frame without a live
+                    # native buffer. Preserve their existing contract.
+                    if (type(game_generation) is int
+                            and self._stream_game_frame is not None
                             and self.emu.frame is None):
                         game_revoked = True
                     if (type(current_serial) is int and type(serial) is int
