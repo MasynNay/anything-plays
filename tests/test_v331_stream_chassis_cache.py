@@ -86,18 +86,82 @@ class StreamStaticChassisTests(unittest.TestCase):
             self.assertEqual(draw.call_count, 4)
         self.assertEqual(self.cache._chassis_image.size, (780, 980))
 
-    def test_missing_sources_fall_back_and_release_static_chassis(self):
+    def test_idle_and_side_by_side_missing_sources_release_static_chassis(self):
         self.render()
         self.assertIsNotNone(self.cache._chassis_image)
         for game_active, camera_active in ((True, False), (False, True),
                                            (False, False)):
+            opts = {"layout": "Side by side"}
             self.assert_pixels_equal(
-                self.render(game_active=game_active, camera_active=camera_active),
-                self.render(cache=False, game_active=game_active,
+                self.render(settings=opts, game_active=game_active,
+                            camera_active=camera_active),
+                self.render(cache=False, settings=opts, game_active=game_active,
                             camera_active=camera_active),
             )
             self.assertIsNone(self.cache._chassis_image)
             self.assertIsNone(self.cache._chassis_key)
+        self.render()
+        self.render(game_active=False, camera_active=False)
+        self.assertIsNone(self.cache._chassis_image)
+        self.assertEqual(self.cache._entries, {})
+
+    def test_stacked_single_source_matches_original_across_geometry(self):
+        for size in ((320, 400), (760, 980), (1920, 1600), (1920, 400)):
+            for game_active, camera_active in ((True, False), (False, True)):
+                for share in (30, 53, 70):
+                    for swap in (False, True):
+                        for labels in (False, True):
+                            opts = {"layout": "DS stacked", "game_size": share,
+                                    "swap_screens": swap, "show_labels": labels,
+                                    "border_width": 16}
+                            with self.subTest(size=size, game=game_active, opts=opts):
+                                cached = self.render(size=size, settings=opts,
+                                    game_active=game_active, camera_active=camera_active)
+                                self.assertIsNotNone(self.cache._chassis_image)
+                                original = self.render(cache=False, size=size,
+                                    settings=opts, game_active=game_active,
+                                    camera_active=camera_active)
+                                self.assert_pixels_equal(cached, original)
+
+    def test_game_only_animation_reuses_chassis_for_300_frames(self):
+        with patch.object(ui_stream, "_draw_stream_chassis",
+                          wraps=ui_stream._draw_stream_chassis) as draw:
+            for n in range(300):
+                self.game = Image.new("RGB", (24, 16), (n % 256, 7, 89))
+                self.render(size=(400, 500), camera_active=False)
+            self.assertEqual(draw.call_count, 1)
+        self.assertEqual(set(self.cache._entries), {"GAME"})
+        self.assertIsNotNone(self.cache._chassis_image)
+
+    def test_camera_only_animation_reuses_chassis_for_300_frames(self):
+        with patch.object(ui_stream, "_draw_stream_chassis",
+                          wraps=ui_stream._draw_stream_chassis) as draw:
+            for n in range(300):
+                self.camera = Image.new("RGB", (24, 16), (2, n % 256, 74))
+                self.render(size=(400, 500), game_active=False)
+            self.assertEqual(draw.call_count, 1)
+        self.assertEqual(set(self.cache._entries), {"CAMERA"})
+
+    def test_frame_rate_change_does_not_rebuild_static_art(self):
+        with patch.object(ui_stream, "_draw_stream_chassis",
+                          wraps=ui_stream._draw_stream_chassis) as draw:
+            for rate in ui_stream.FRAME_RATES:
+                self.render(settings={"frame_rate": rate}, camera_active=False)
+            self.assertEqual(draw.call_count, 1)
+
+    def test_single_source_transition_does_not_retain_disconnected_pixels(self):
+        self.render()
+        before = self.cache._chassis_image
+        game_only = self.render(camera_active=False)
+        self.assertIsNot(before, self.cache._chassis_image)
+        self.assertNotIn("CAMERA", self.cache._entries)
+        self.assertNotIn((19, 249, 199), game_only.getdata())
+        self.assertNotIn((251, 1, 157), self.cache._chassis_image.getdata())
+        self.assert_pixels_equal(game_only,
+                                 self.render(cache=False, camera_active=False))
+        camera_only = self.render(game_active=False)
+        self.assertNotIn("GAME", self.cache._entries)
+        self.assertNotIn((251, 1, 157), camera_only.getdata())
 
     def test_clear_all_releases_chassis_and_fits(self):
         self.render()
