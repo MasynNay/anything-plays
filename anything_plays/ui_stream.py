@@ -1599,7 +1599,8 @@ class StreamMixin:
             if active_game:
                 with self.emu.lock:
                     game_revoked = (
-                        not self.emu.running
+                        not still_active
+                        or not self.emu.running
                         or (isinstance(stop_event, threading.Event)
                             and stop_event.is_set())
                         or (getattr(self.emu, "session_generation", None)
