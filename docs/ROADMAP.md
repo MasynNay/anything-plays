@@ -87,7 +87,13 @@ The next source increment implements five built-in starting layouts across all 1
 
 The preset collection exchange is implemented in development source: explicitly select up to 48 saved layouts across consoles, assign share labels, export a bounded versioned JSON collection, and review/select incoming layouts before an atomic import. Existing names are not automatically exported; generic labels are the default. Identical existing layouts are skipped, while conflicting names or capacity limits reject the entire selected batch. Imports never change active controls. No online catalog or account is involved. Source and actual Tk tests gate this increment; installed application usability remains a manual acceptance task.
 
-Follow-on roadmap: richer per-setting change summaries, measured accessibility usability improvements, and creator-focused preset and capture customization. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
+## Creator workspace — reusable Stream Mode scenes
+
+Development source adds a separate Creator scenes window in Stream Settings. Five built-in capture starters (portrait recording, landscape stream, camera spotlight, clean gameplay and low overhead) provide ordinary existing Stream Mode layouts and refresh settings. Save up to 16 named local configurations, preview synthetic panel geometry, apply all options as one update, undo the latest applied scene while the browser is open, and import/export versioned settings-only JSON. A saved scene includes layout, theme, refresh, screen share, labels, screen order and border settings; it never stores camera/game pixels, OBS credentials, devices, paths or ROMs. No changes to emulator FPS or native input, and no extra camera or OBS connection. The output window remains independently resizable.
+
+Acceptance: strict scene validation, atomic persistence, existing compositor regressions, real Tk scene workflow and four-platform source checks. Physical OBS capture and installer testing remain outstanding.
+
+Follow-on roadmap: richer per-setting change summaries, measured accessibility usability improvements, advanced creator capture customization and multiplayer mapping. No account, server or automatic upload is required. This increment does not yet include a community catalog or sync service.
 
 ## Future ideas — not committed
 
