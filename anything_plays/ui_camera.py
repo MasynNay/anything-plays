@@ -122,7 +122,12 @@ class CameraMixin:
         generation = getattr(self, "_camera_scan_generation", 0) + 1
         self._camera_scan_generation = generation
         self._camera_scan_poll_count = 0
-        self.status.set('Searching for available webcams…')
+        # The status label is advisory. A destroyed or custom Tk variable
+        # must not abort discovery after camera_scanning was marked active.
+        try:
+            self.status.set('Searching for available webcams…')
+        except Exception:
+            pass
         results = Queue(maxsize=1)
         self._camera_scan_results = results
         done = threading.Event()
@@ -149,9 +154,14 @@ class CameraMixin:
             self._retire_camera_scan(generation, results)
             return
         try:
-            self.root.after(
+            job = self.root.after(
                 80, lambda: self._poll_camera_scan(generation, results)
             )
+            if job is None:
+                # A broken timer adapter that returns no job ID did not
+                # establish an owned poll. A late callback is fenced by the
+                # retired generation instead of publishing an old scan.
+                self._retire_camera_scan(generation, results)
         except Exception:
             # The detached worker is allowed to finish its own queue, but
             # a destroyed Tk loop must never strand a scanning flag.
@@ -181,9 +191,14 @@ class CameraMixin:
                 self._retire_camera_scan(generation, results)
                 return
             try:
-                self.root.after(
+                job = self.root.after(
                     80, lambda: self._poll_camera_scan(generation, results)
                 )
+                if job is None:
+                    # A lost timer cannot leave Refresh permanently
+                    # disabled. Delayed callbacks from the old generation
+                    # are rejected by _poll_camera_scan.
+                    self._retire_camera_scan(generation, results)
             except Exception:
                 self._retire_camera_scan(generation, results)
         except Exception:
