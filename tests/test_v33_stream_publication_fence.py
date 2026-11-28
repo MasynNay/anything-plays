@@ -571,6 +571,24 @@ class StreamPublicationFenceTests(unittest.TestCase):
         self.assertIsNone(app._stream_photo)
         self.assertIsNone(app._stream_game_frame)
 
+    def test_backend_switch_during_composition_revokes_old_native_image(self):
+        app = self.make_app(game=True, camera=False)
+        app.emu.session_generation = 3
+        app._stream_photo = Mock()
+        app._stream_canvas_item = 21
+        def switch(*args, **kwargs):
+            app.uses_embedded_emulator = lambda: False
+            return Image.new("RGB", (760, 980), "red")
+        with (
+            patch("anything_plays.ui_stream.compose_stream_output", side_effect=switch),
+            patch("anything_plays.ui_stream.ImageTk.PhotoImage") as photo,
+        ):
+            self.assertFalse(app._render_stream_frame())
+        photo.assert_not_called()
+        self.assertIsNone(app._stream_photo)
+        self.assertIsNone(app._stream_game_frame)
+        app._stream_canvas.delete.assert_called_once_with("all")
+
     def test_rom_restart_during_composition_revokes_old_obs_photo(self):
         """A replaced native session is not a harmless fresh frame."""
         app = self.make_app(game=True, camera=False)
