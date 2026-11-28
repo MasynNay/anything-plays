@@ -144,6 +144,9 @@ class AuxiliaryPanelsMixin:
         self._undo_profile_reset_button.grid(
             row=4, column=0, columnspan=2, sticky='ew', pady=(5, 0),
         )
+        ttk.Button(
+            profiles, text='Control preset library', command=self.open_named_presets,
+        ).grid(row=5, column=0, columnspan=2, sticky='ew', pady=(5, 0))
         ttk.Label(
             right,
             text='Exported profiles contain controls and theme only. '
